@@ -37,17 +37,17 @@ dependencies {
 
     // 👇 [미래 확장] 주석 해제하여 사용할 라이브러리 구역
     // 1. 데이터베이스 및 ORM (JPA) 라이브러리 추가
-    // implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     // 2. PostgreSQL (주 DBMS 연동 시 주석 해제)
-    // runtimeOnly("org.postgresql:postgresql")
+    runtimeOnly("org.postgresql:postgresql")
 
     // 3. Redis & Spring Session (세션 관리용 Redis 연동 시 주석 해제)
     // implementation("org.springframework.boot:spring-boot-starter-data-redis")
     // implementation("org.springframework.session:spring-session-data-redis")
 
     // 4. Spring Security & OAuth 2.0 (소셜 로그인 및 보안 적용 시 주석 해제)
-    // implementation("org.springframework.boot:spring-boot-starter-security")
-    // implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
 
     // AI agent
 
@@ -57,12 +57,15 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok")
 
     // Test Dependencies
-    testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-validation-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+
     testCompileOnly("org.projectlombok:lombok")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testAnnotationProcessor("org.projectlombok:lombok")
+
+    testImplementation("org.testcontainers:testcontainers:1.20.1")
+    testImplementation("org.testcontainers:junit-jupiter:1.20.1")
+    testImplementation("org.testcontainers:postgresql:1.20.1")
 
     // [Test 미래 확장] Spring Security 테스트용 (OAuth2 도입 시 주석 해제)
     // testImplementation("org.springframework.security:spring-security-test")

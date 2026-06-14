@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        highlight_sql: true
+
+logging:
+  level:
+    root: INFO
+    com.example: DEBUG                             # 본인 프로젝트 패키지는 디버그 로그 출력
+    org.testcontainers: INFO                       # 컨테이너 구동 로그 요약
+    org.hibernate.SQL: DEBUG                       # 실행되는 SQL문 상세 노출
+    org.hibernate.orm.results.loading.embeddable: TRACE # 내장 임베디드 타입(Name 등) 바인딩 로그 확인

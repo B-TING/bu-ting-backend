@@ -1,0 +1,18 @@
+#!/bin/sh
+
+echo "🎨 Running Spotless to format Java code..."
+
+# 1. 실행 환경의 OS가 윈도우인지 맥/리눅스인지 판별하여 실행
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    cmd.exe /c gradlew.bat spotlessApply
+    ;;
+  *)
+    # 2. 맥/리눅스에서 실행 권한 오류가 나지 않도록 권한 부여 후 실행
+    chmod +x ./gradlew
+    ./gradlew spotlessApply
+    ;;
+esac
+
+# 3. Spotless가 수정한 Java 파일만 자동으로 다시 스테이징
+git diff --name-only -z -- '*.java' | xargs -0 git add --

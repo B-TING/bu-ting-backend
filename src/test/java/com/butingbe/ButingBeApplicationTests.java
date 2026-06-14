@@ -1,10 +1,9 @@
 package com.butingbe;
 
+import com.butingbe.support.AbstractContainerTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class ButingBeApplicationTests {
+class ButingBeApplicationTests extends AbstractContainerTest {
 
   @Test
   void contextLoads() {}

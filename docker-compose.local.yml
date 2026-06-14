@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres-local:
+    image: postgres:16-alpine
+    container_name: postgres_local_container
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydb
+      TZ: Asia/Seoul
+    volumes:
+      # 변경 전: - postgres_local_data:/var/lib/postgresql/data
+      # 변경 후: 현재 폴더(.) 안의 postgres_data 폴더와 동기화
+      - ./postgres_data:/var/lib/postgresql/data
+    networks:
+      - local-network
+
+# 최하단에 있던 volumes: 와 postgres_local_data: 영역은 과감히 삭제하거나 주석 처리합니다.
+networks:
+  local-network:
+    driver: bridge
