@@ -1,7 +1,9 @@
 plugins {
     java
+    jacoco
     id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
+    id("org.sonarqube") version "7.3.1.8318"
     // 코드 스타일 통일을 위한 Spotless 플러그인
     id("com.diffplug.spotless") version "6.25.0"
 }
@@ -23,6 +25,72 @@ spotless {
         trimTrailingWhitespace() // 줄 끝 공백 제거
         endWithNewline() // 파일 끝에 개행 추가
         targetExclude("build/**/*") // 빌드 결과물은 포맷팅에서 제외
+    }
+}
+
+jacoco {
+    toolVersion = "0.8.15"
+}
+
+val jacocoCoverageExcludes = listOf(
+    "**/ButingBeApplication.class",
+    "**/global/**",
+    "**/domain/**/dto/**",
+    "**/domain/**/entity/**",
+    "**/domain/**/repository/**"
+)
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude(jacocoCoverageExcludes)
+                }
+            }
+        )
+    )
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.jacocoTestReport)
+
+    violationRules {
+        rule {
+            enabled = true
+            element = "BUNDLE"
+
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "1.00".toBigDecimal()
+            }
+        }
+    }
+
+    classDirectories.setFrom(tasks.jacocoTestReport.get().classDirectories)
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "B-TING_bu-ting-backend")
+        property("sonar.projectName", "bu-ting-backend")
+        property("sonar.coverage.jacoco.xmlReportPaths", layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile.path)
+        property("sonar.coverage.exclusions", listOf(
+            "**/ButingBeApplication.java",
+            "**/global/**",
+            "**/domain/**/dto/**",
+            "**/domain/**/entity/**",
+            "**/domain/**/repository/**"
+        ).joinToString(","))
     }
 }
 repositories {
@@ -73,4 +141,13 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestCoverageVerification)
+}
+
+tasks.sonar {
+    dependsOn(tasks.jacocoTestReport)
 }

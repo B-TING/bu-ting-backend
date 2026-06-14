@@ -12,7 +12,8 @@ B-ting backend is a Spring Boot API server. The current development branch focus
 | Validation | Jakarta Validation |
 | Persistence | Spring Data JPA, Hibernate |
 | Database | PostgreSQL |
-| Test | JUnit 6, Mockito, Spring Boot Test, Testcontainers |
+| Test | JUnit 6, Mockito, Spring Boot Test, Testcontainers, JaCoCo |
+| Code Quality | SonarQube, SonarScanner for Gradle |
 | Formatting | Spotless, Google Java Format |
 | Local Infra | Docker Compose, PostgreSQL 16 Alpine |
 | Build | Gradle Kotlin DSL |
@@ -125,6 +126,50 @@ curl -i "http://localhost:8080/api/v1/users/signin?email=test@example.com"
 ```
 
 Integration tests use Testcontainers. They start their own PostgreSQL container, so the local Docker Compose database does not need to be running for tests.
+
+## Coverage And SonarQube
+
+The build enforces 100% line coverage for the current business API coverage target:
+
+- `com.butingbe.domain.user.controller`
+- `com.butingbe.domain.user.service`
+
+Boilerplate and framework wiring are excluded from the coverage gate:
+
+- Spring Boot bootstrap class
+- global config/common/error classes
+- DTOs
+- JPA entities
+- Spring Data repositories
+
+Run the coverage gate:
+
+```bash
+./gradlew jacocoTestReport jacocoTestCoverageVerification
+```
+
+Generated reports:
+
+```text
+build/reports/jacoco/test/html/index.html
+build/reports/jacoco/test/jacocoTestReport.xml
+```
+
+Run the same checks through the standard verification task:
+
+```bash
+./gradlew check
+```
+
+Run SonarQube analysis after setting your SonarQube server and token:
+
+```bash
+SONAR_HOST_URL=http://localhost:9000 \
+SONAR_TOKEN=<your-token> \
+./gradlew sonar
+```
+
+The SonarQube Gradle task imports JaCoCo XML coverage from `build/reports/jacoco/test/jacocoTestReport.xml`.
 
 ## Formatting
 
