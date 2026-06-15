@@ -39,6 +39,7 @@ body:
         - Infra
         - Docs
         - Other
+      multiple: false
     validations:
       required: true
 
