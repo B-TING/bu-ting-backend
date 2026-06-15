@@ -57,4 +57,4 @@ body:
     attributes:
       label: 참고 사항
       description: 관련 브랜치, PR, 설계 결정, 논의 내용을 적어주세요.
-      placeholder: 예) Branch: feature/user
+      placeholder: "예) Branch: feature/user"
