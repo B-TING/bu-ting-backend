@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres-local:
     image: postgres:16-alpine
@@ -19,7 +17,27 @@ services:
     networks:
       - local-network
 
-# 최하단에 있던 volumes: 와 postgres_local_data: 영역은 과감히 삭제하거나 주석 처리합니다.
+  sonarqube-local:
+    image: sonarqube:lts-community
+    container_name: sonarqube_local_container
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+      TZ: Asia/Seoul
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks:
+      - local-network
+
+volumes:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+
 networks:
   local-network:
     driver: bridge
