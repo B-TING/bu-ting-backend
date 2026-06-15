@@ -16,8 +16,9 @@ body:
     id: area
     attributes:
       label: 작업 영역
-      description: 가장 가까운 영역을 선택해주세요.
+      description: 가장 가까운 영역을 하나만 선택해주세요.
       options:
+        - Domain
         - Backend
         - API
         - Security
