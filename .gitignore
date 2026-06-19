@@ -42,3 +42,12 @@ node_modules/
 # env
 .env
 application-oauth.yaml
+
+# macOS
+.DS_Store
+
+# Local runtime data
+postgres_data/
+
+# SonarQube scanner output
+.scannerwork/
