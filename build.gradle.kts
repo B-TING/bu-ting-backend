@@ -1,5 +1,8 @@
+import org.springframework.boot.gradle.tasks.run.BootRun
+
 plugins {
     java
+    jacoco
     id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
     // 코드 스타일 통일을 위한 Spotless 플러그인
@@ -41,6 +44,11 @@ dependencies {
     // 2. PostgreSQL (주 DBMS 연동 시 주석 해제)
     runtimeOnly("org.postgresql:postgresql")
 
+    // Database migrations
+    implementation("org.springframework.boot:spring-boot-flyway")
+    implementation("org.flywaydb:flyway-core")
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
+
     // 3. Redis & Spring Session (세션 관리용 Redis 연동 시 주석 해제)
     // implementation("org.springframework.boot:spring-boot-starter-data-redis")
     // implementation("org.springframework.session:spring-session-data-redis")
@@ -58,6 +66,7 @@ dependencies {
 
     // Test Dependencies
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.restdocs:spring-restdocs-mockmvc")
 
     testCompileOnly("org.projectlombok:lombok")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -67,10 +76,83 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter:1.20.1")
     testImplementation("org.testcontainers:postgresql:1.20.1")
 
-    // [Test 미래 확장] Spring Security 테스트용 (OAuth2 도입 시 주석 해제)
-    // testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("org.springframework.security:spring-security-test")
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    outputs.dir(layout.buildDirectory.dir("generated-snippets"))
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+val jacocoCoverageExcludes =
+    listOf(
+        "**/ButingBeApplication*",
+        "**/global/config/**",
+        "**/*Dto*",
+    )
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude(jacocoCoverageExcludes)
+                }
+            })
+    )
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.test)
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude(jacocoCoverageExcludes)
+                }
+            })
+    )
+    violationRules {
+        rule {
+            limit {
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestCoverageVerification)
+}
+
+tasks.named<BootRun>("bootRun") {
+    args("--spring.config.import=optional:classpath:application-oauth.yaml")
+
+    val envFile = layout.projectDirectory.file(".env").asFile
+    if (envFile.exists()) {
+        envFile.readLines()
+            .map(String::trim)
+            .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+            .forEach { line ->
+                val key = line.substringBefore("=").trim()
+                val value = line.substringAfter("=").trim().trim('"', '\'')
+                environment(key, value)
+            }
+    }
+}
+
+tasks.register<Copy>("openapi3") {
+    dependsOn(tasks.test)
+    from(layout.projectDirectory.file("src/main/resources/static/docs/openapi3.yaml"))
+    into(layout.buildDirectory.dir("api-spec"))
 }
