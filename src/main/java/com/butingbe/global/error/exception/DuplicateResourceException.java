@@ -2,10 +2,10 @@ package com.butingbe.global.error.exception;
 
 public class DuplicateResourceException extends RuntimeException {
 
-  private static final String DEFAULT_MESSAGE = "이미 가입된 이메일 주소입니다.";
+  public static final String MESSAGE_CODE = "error.user.email.duplicate";
 
   public DuplicateResourceException() {
-    super(DEFAULT_MESSAGE);
+    super(MESSAGE_CODE);
   }
 
   public DuplicateResourceException(String message) {

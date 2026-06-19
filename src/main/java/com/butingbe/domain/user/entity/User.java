@@ -9,7 +9,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "users")
+@Table(
+    name = "users",
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = "uk_users_provider_provider_id",
+          columnNames = {"provider", "provider_id"})
+    })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseEntity {
@@ -19,15 +25,14 @@ public class User extends BaseEntity {
   @Column(nullable = false, updatable = false)
   private UUID id;
 
-  @Column(nullable = false, unique = true, length = 100)
+  @Column(unique = true, length = 100)
   private String email;
 
-  // 🔑 OAuth 2.0 대비용 필드 추가
-  //    @Column(nullable = false, length = 20)
-  //    private String provider;     // kakao, google, naver 등
-  //
-  //    @Column(nullable = false, unique = true, length = 100)
-  //    private String providerId;   // 소셜사에서 넘겨주는 유저 고유 식별 ID값
+  @Column(length = 30)
+  private String provider;
+
+  @Column(name = "provider_id", length = 100)
+  private String providerId;
 
   @Embedded private Name name;
 
@@ -39,12 +44,18 @@ public class User extends BaseEntity {
   private UserRole role;
 
   @Builder
-  public User(String email, Name name, String nickname, UserRole role) {
+  public User(
+      String email, String provider, String providerId, Name name, String nickname, UserRole role) {
     this.email = email;
-    //        this.provider = provider != null ? provider : "LOCAL_MOCK"; // 현재 임시용 default
-    //        this.providerId = providerId != null ? providerId : email; // 현재는 임시로 email을 꽂아둠
+    this.provider = provider;
+    this.providerId = providerId;
     this.name = name;
     this.nickname = nickname;
     this.role = role != null ? role : UserRole.USER;
+  }
+
+  public void linkOAuthProvider(String provider, String providerId) {
+    this.provider = provider;
+    this.providerId = providerId;
   }
 }
