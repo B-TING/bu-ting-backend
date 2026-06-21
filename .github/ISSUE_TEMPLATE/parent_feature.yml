@@ -1,0 +1,62 @@
+name: Parent Feature
+description: 여러 하위 이슈로 나누어 진행할 큰 기능을 추적합니다.
+title: "feat: "
+labels: ["feature", "parent"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 작업 목적
+      description: 이 부모 이슈가 추적하는 큰 기능과 방향을 적어주세요.
+      placeholder: 예) 사용자 도메인의 기본 API, OAuth2.0 로그인, 인증된 사용자 정보 API, 다국어 응답을 단계적으로 구현한다.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 작업 영역
+      description: 가장 가까운 영역을 하나만 선택해주세요.
+      options:
+        - Domain
+        - Backend
+        - API
+        - Security
+        - Database
+        - Test
+        - Infra
+        - Docs
+        - Other
+      multiple: false
+    validations:
+      required: true
+
+  - type: textarea
+    id: child_issues
+    attributes:
+      label: 하위 이슈
+      description: 실제 구현 범위는 하위 이슈에서 관리합니다. 이슈 생성 후 번호를 연결해주세요.
+      value: |
+        - [ ] #
+        - [ ] #
+        - [ ] #
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: 완료 조건
+      description: 부모 이슈가 완료되었다고 판단할 전체 기준만 적어주세요.
+      value: |
+        - [ ] 모든 하위 이슈가 완료된다.
+        - [ ] 핵심 사용자 흐름이 통합 관점에서 검증된다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 참고 사항
+      description: 관련 브랜치, PR, 설계 결정, 논의 내용을 적어주세요.
+      placeholder: "예) Branch: feature/user"

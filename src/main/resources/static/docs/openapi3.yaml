@@ -1,0 +1,263 @@
+openapi: 3.0.3
+info:
+  title: B-ting Backend API
+  description: B-ting backend API documentation.
+  version: 0.0.1-SNAPSHOT
+servers:
+  - url: http://localhost:8080
+    description: Local server
+tags:
+  - name: Auth
+    description: Authentication APIs
+  - name: User
+    description: User APIs
+paths:
+  /api/v1/auth/oauth/login:
+    post:
+      tags:
+        - Auth
+      summary: 클라이언트 SSO 로그인
+      description: |
+        클라이언트가 Google/Naver/Kakao SDK로 SSO 로그인 후 받은 provider token을 백엔드로 전달합니다.
+        Google/Naver/Kakao는 provider token 또는 authorization code를 전달할 수 있습니다.
+        백엔드는 provider token을 검증하고, 기존 회원 조회/연결 또는 신규 회원 생성을 수행한 뒤 B-TING 전용 opaque access token을 발급합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OAuthLoginRequest"
+            examples:
+              google:
+                summary: Google id_token 로그인
+                value:
+                  provider: google
+                  providerToken: GOOGLE_ID_TOKEN
+              googleCode:
+                summary: Google PKCE authorization code 로그인
+                value:
+                  provider: google
+                  providerToken: GOOGLE_AUTHORIZATION_CODE
+                  redirectUri: http://localhost:8080/login/oauth2/code/google
+                  codeVerifier: GOOGLE_CODE_VERIFIER
+              naver:
+                summary: Naver access_token 로그인
+                value:
+                  provider: naver
+                  providerToken: NAVER_ACCESS_TOKEN
+              naverCode:
+                summary: Naver PKCE authorization code 로그인
+                value:
+                  provider: naver
+                  providerToken: code=NAVER_AUTHORIZATION_CODE&state=NAVER_STATE
+                  redirectUri: http://localhost:8080/login/oauth2/code/naver
+                  codeVerifier: NAVER_CODE_VERIFIER
+              kakao:
+                summary: Kakao access_token 로그인
+                value:
+                  provider: kakao
+                  providerToken: KAKAO_ACCESS_TOKEN
+              kakaoCode:
+                summary: Kakao PKCE authorization code 로그인
+                value:
+                  provider: kakao
+                  providerToken: KAKAO_AUTHORIZATION_CODE
+                  redirectUri: http://localhost:8080/login/oauth2/code/kakao
+                  codeVerifier: KAKAO_CODE_VERIFIER
+      responses:
+        "200":
+          description: OAuth login succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuth2LoginResponseEnvelope"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Provider token verification failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/signup:
+    post:
+      tags:
+        - User
+      summary: 사용자 회원가입
+      description: 이메일과 닉네임으로 사용자를 생성합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignUpRequest"
+            example:
+              email: test@example.com
+              nickname: 테스터
+              provider: google
+              providerId: google-123
+              firstName: 길동
+              lastName: 홍
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/signin:
+    get:
+      tags:
+        - User
+      summary: 사용자 이메일 조회
+      description: 이메일로 사용자 정보를 조회합니다. OAuth2 완료 전 임시 로그인/조회 API입니다.
+      parameters:
+        - name: email
+          in: query
+          required: true
+          description: 조회할 사용자 이메일
+          schema:
+            type: string
+            format: email
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+components:
+  securitySchemes:
+    opaqueToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    OAuthLoginRequest:
+      type: object
+      required:
+        - provider
+        - providerToken
+      properties:
+        provider:
+          type: string
+          description: 클라이언트 SSO provider
+          enum:
+            - google
+            - naver
+            - kakao
+          example: google
+        providerToken:
+          type: string
+          description: Google은 id_token 또는 authorization code, Naver/Kakao는 access_token 또는 authorization code를 전달합니다.
+          example: GOOGLE_ID_TOKEN
+        redirectUri:
+          type: string
+          format: uri
+          description: Authorization code 발급 시 사용한 redirect_uri입니다. providerToken이 access token/id token이면 생략할 수 있습니다.
+          example: http://localhost:8080/login/oauth2/code/google
+        codeVerifier:
+          type: string
+          description: PKCE authorization code flow에서 사용한 code_verifier입니다. providerToken이 access token/id token이면 생략할 수 있습니다.
+          example: GOOGLE_CODE_VERIFIER
+    SignUpRequest:
+      type: object
+      required:
+        - email
+        - nickname
+      properties:
+        email:
+          type: string
+          format: email
+          example: test@example.com
+        nickname:
+          type: string
+          example: 테스터
+        provider:
+          type: string
+          example: google
+        providerId:
+          type: string
+          example: google-123
+        firstName:
+          type: string
+          example: 길동
+        lastName:
+          type: string
+          example: 홍
+    UserResponse:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: test@example.com
+        nickname:
+          type: string
+          example: 테스터
+    ApiErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Email is required.
+        data:
+          nullable: true
+    OAuth2LoginResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: OAuth2 login succeeded.
+        data:
+          $ref: "#/components/schemas/OAuth2LoginResponse"
+    OAuth2LoginResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+          description: OAuth provider가 제공한 사용자 이메일입니다. OAuth 로그인에서 필수입니다.
+        nickname:
+          type: string
+        provider:
+          type: string
+          example: google
+        loggedIn:
+          type: boolean
+          example: true
+        emailRequired:
+          type: boolean
+          description: 이메일 추가 입력 필요 여부입니다. OAuth 로그인에서는 provider 이메일 제공이 필수이므로 항상 false입니다.
+          example: false
+        accessToken:
+          type: string
+          description: Opaque access token. Store securely on the client and send it as a Bearer token.
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          format: int64
+          example: 1209600
