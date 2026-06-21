@@ -72,7 +72,7 @@ Check the container:
 docker compose -f docker-compose.local.yml ps
 ```
 
-Local PostgreSQL connection:
+Local PostgreSQL connection values:
 
 | Key      | Value        |
 |----------|--------------|
@@ -84,18 +84,22 @@ Local PostgreSQL connection:
 
 ## Run The Application
 
-Because `dev` currently keeps only the base `application.yaml`, pass local database properties when running the app:
+Create a `.env` file in the project root. The Gradle `bootRun` task loads this file before starting Spring Boot:
+
+```dotenv
+DB_URL=jdbc:postgresql://localhost:5433/mydb
+DB_USERNAME=myuser
+DB_PASSWORD=mypassword
+```
+
+Run the application:
 
 ```bash
-SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/mydb \
-SPRING_DATASOURCE_USERNAME=myuser \
-SPRING_DATASOURCE_PASSWORD=mypassword \
-SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver \
-SPRING_JPA_HIBERNATE_DDL_AUTO=update \
 ./gradlew bootRun
 ```
 
-The `bootRun` task keeps running while the server is alive. Stop it with `Ctrl + C`.
+The `bootRun` task keeps running while the server is alive. Stop it with `Ctrl + C`. When running the packaged JAR,
+provide the same `DB_*` values as process environment variables because `.env` loading is configured for `bootRun`.
 
 ## API Test Examples
 
