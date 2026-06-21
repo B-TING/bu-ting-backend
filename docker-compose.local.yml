@@ -17,27 +17,6 @@ services:
     networks:
       - local-network
 
-  sonarqube-local:
-    image: sonarqube:lts-community
-    container_name: sonarqube_local_container
-    restart: unless-stopped
-    ports:
-      - "9000:9000"
-    environment:
-      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
-      TZ: Asia/Seoul
-    volumes:
-      - sonarqube_data:/opt/sonarqube/data
-      - sonarqube_extensions:/opt/sonarqube/extensions
-      - sonarqube_logs:/opt/sonarqube/logs
-    networks:
-      - local-network
-
-volumes:
-  sonarqube_data:
-  sonarqube_extensions:
-  sonarqube_logs:
-
 networks:
   local-network:
     driver: bridge

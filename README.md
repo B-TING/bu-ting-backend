@@ -14,7 +14,6 @@ sign-in style lookup, duplicate email validation, and basic global API error han
 | Persistence  | Spring Data JPA, Hibernate                                 |
 | Database     | PostgreSQL                                                 |
 | Test         | JUnit 6, Mockito, Spring Boot Test, Testcontainers, JaCoCo |
-| Code Quality | SonarQube, SonarScanner for Gradle                         |
 | Formatting   | Spotless, Google Java Format                               |
 | Local Infra  | Docker Compose, PostgreSQL 16 Alpine                       |
 | Build        | Gradle Kotlin DSL                                          |
@@ -130,7 +129,7 @@ curl -i "http://localhost:8080/api/v1/users/signin?email=test@example.com"
 Integration tests use Testcontainers. They start their own PostgreSQL container, so the local Docker Compose database
 does not need to be running for tests.
 
-## Coverage And SonarQube
+## Coverage
 
 The build enforces 100% line coverage for the current business API coverage target:
 
@@ -164,32 +163,7 @@ Run the same checks through the standard verification task:
 ./gradlew check
 ```
 
-Run SonarQube analysis after setting your SonarQube server and token:
-
-Start local SonarQube:
-
-```bash
-docker compose -f docker-compose.local.yml up -d sonarqube-local
-```
-
-Open SonarQube:
-
-```text
-http://localhost:9000
-```
-
-The first local login uses `admin` / `admin`. SonarQube will ask you to change the password. After logging in, create a
-project token from the SonarQube UI, then run:
-
-```bash
-SONAR_HOST_URL=http://localhost:9000 \
-SONAR_TOKEN=<your-token> \
-./gradlew sonar
-```
-
-The SonarQube Gradle task imports JaCoCo XML coverage from `build/reports/jacoco/test/jacocoTestReport.xml`.
-
-If you only want to run coverage locally without uploading metrics to SonarQube, use:
+To generate the coverage report directly, use:
 
 ```bash
 ./gradlew jacocoTestReport

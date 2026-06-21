@@ -48,6 +48,3 @@ application-oauth.yaml
 
 # Local runtime data
 postgres_data/
-
-# SonarQube scanner output
-.scannerwork/
