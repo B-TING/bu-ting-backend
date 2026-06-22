@@ -91,21 +91,31 @@ jobs:
 
       - name: Deploy image on EC2
         env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
         run: |
-          ssh "$EC2_USER@$EC2_HOST" "bash -s -- '$DEPLOY_PATH' '$IMAGE_TAG'" <<'REMOTE'
+          ssh "$EC2_USER@$EC2_HOST" \
+            "bash -s -- '$DEPLOY_PATH' '$IMAGE_TAG' '$DOCKERHUB_USERNAME'" <<'REMOTE'
           set -euo pipefail
           DEPLOY_PATH="$1"
           IMAGE_TAG="$2"
+          DOCKERHUB_USERNAME="$3"
           cd "$DEPLOY_PATH"
 
-          if grep -q '^IMAGE_TAG=' .env; then
-            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env
-          else
-            printf '\nIMAGE_TAG=%s\n' "$IMAGE_TAG" >> .env
-          fi
+          update_env() {
+            KEY="$1"
+            VALUE="$2"
+            if grep -q "^${KEY}=" .env; then
+              sed -i "s|^${KEY}=.*|${KEY}=${VALUE}|" .env
+            else
+              printf '%s=%s\n' "$KEY" "$VALUE" >> .env
+            fi
+          }
+
+          update_env DOCKERHUB_USERNAME "$DOCKERHUB_USERNAME"
+          update_env IMAGE_TAG "$IMAGE_TAG"
 
           docker compose pull app
           docker compose up -d --no-deps app
