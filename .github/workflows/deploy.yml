@@ -117,7 +117,22 @@ jobs:
           update_env DOCKERHUB_USERNAME "$DOCKERHUB_USERNAME"
           update_env IMAGE_TAG "$IMAGE_TAG"
 
+          # Migrate the old source-tree path to the certificate path bundled in the runtime image.
+          sed -i \
+            's|sslrootcert=src/main/resources/certs/global-bundle.pem|sslrootcert=/app/certs/global-bundle.pem|g' \
+            .env
+
           docker compose pull app
           docker compose up -d --no-deps app
-          docker image prune -f
+
+          for attempt in $(seq 1 12); do
+            if timeout 1 bash -c '</dev/tcp/127.0.0.1/8080' 2>/dev/null; then
+              docker image prune -f
+              exit 0
+            fi
+            sleep 5
+          done
+
+          docker compose logs --tail=100 app
+          exit 1
           REMOTE

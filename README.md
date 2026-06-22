@@ -209,8 +209,10 @@ EC2_SSH_KNOWN_HOSTS
 The Amazon Linux instance uses `ec2-user`, so configure `EC2_USER=ec2-user` and set `EC2_HOST` to the Elastic IP in
 GitHub Secrets. Before the first deployment, install Docker with the Compose plugin and keep the existing
 `/home/ec2-user/app/docker-compose.yml` and `/home/ec2-user/app/.env` files on EC2. The workflow updates only
-`IMAGE_TAG` in that `.env`, pulls the exact image tagged with the main commit SHA, and recreates only the `app`
-container.
+the Docker Hub namespace and `IMAGE_TAG` in that `.env`, pulls the exact image tagged with the main commit SHA,
+and recreates only the `app` container. For an RDS connection using `sslmode=verify-full`, set the JDBC URL's
+certificate parameter to `sslrootcert=/app/certs/global-bundle.pem`. The AWS RDS global CA bundle is included at
+that path in the runtime image.
 
 ## Branches
 
