@@ -4,8 +4,10 @@ info:
   description: B-ting backend API documentation.
   version: 0.0.1-SNAPSHOT
 servers:
+  - url: https://api.buting.store
+    description: Production server
   - url: http://localhost:8080
-    description: Local server
+    description: Local development server
 tags:
   - name: Auth
     description: Authentication APIs
