@@ -27,6 +27,7 @@ WORKDIR /app
 
 # 빌드 스테이지에서 생성된 껍데기 없는 순수 완제품 JAR 파일만 쏙 빼서 복사
 COPY --from=builder /build/build/libs/*-SNAPSHOT.jar app.jar
+COPY --from=builder /build/src/main/resources/certs/global-bundle.pem /app/certs/global-bundle.pem
 
 # 스프링 부트 컨테이너가 외부와 통신할 기본 포트 개방
 EXPOSE 8080

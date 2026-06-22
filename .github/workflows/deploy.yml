@@ -1,0 +1,138 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/buting-be
+  DEPLOY_PATH: /home/ec2-user/app
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      image-tag: ${{ steps.image.outputs.tag }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run checks
+        run: ./gradlew check --no-daemon
+
+      - name: Set image tag
+        id: image
+        run: echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ steps.image.outputs.tag }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.EC2_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Log EC2 in to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          printf '%s' "$DOCKERHUB_TOKEN" | ssh "$EC2_USER@$EC2_HOST" \
+            "docker login --username '$DOCKERHUB_USERNAME' --password-stdin"
+
+      - name: Deploy image on EC2
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+        run: |
+          ssh "$EC2_USER@$EC2_HOST" \
+            "bash -s -- '$DEPLOY_PATH' '$IMAGE_TAG' '$DOCKERHUB_USERNAME'" <<'REMOTE'
+          set -euo pipefail
+          DEPLOY_PATH="$1"
+          IMAGE_TAG="$2"
+          DOCKERHUB_USERNAME="$3"
+          cd "$DEPLOY_PATH"
+
+          update_env() {
+            KEY="$1"
+            VALUE="$2"
+            if grep -q "^${KEY}=" .env; then
+              sed -i "s|^${KEY}=.*|${KEY}=${VALUE}|" .env
+            else
+              printf '%s=%s\n' "$KEY" "$VALUE" >> .env
+            fi
+          }
+
+          update_env DOCKERHUB_USERNAME "$DOCKERHUB_USERNAME"
+          update_env IMAGE_TAG "$IMAGE_TAG"
+
+          # Migrate the old source-tree path to the certificate path bundled in the runtime image.
+          sed -i \
+            's|sslrootcert=src/main/resources/certs/global-bundle.pem|sslrootcert=/app/certs/global-bundle.pem|g' \
+            .env
+
+          docker compose pull app
+          docker compose up -d --no-deps app
+
+          for attempt in $(seq 1 12); do
+            if timeout 1 bash -c '</dev/tcp/127.0.0.1/8080' 2>/dev/null; then
+              docker image prune -f
+              exit 0
+            fi
+            sleep 5
+          done
+
+          docker compose logs --tail=100 app
+          exit 1
+          REMOTE
