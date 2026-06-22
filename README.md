@@ -189,6 +189,29 @@ Apply Java formatting:
 
 The Husky pre-commit hook also runs Spotless before committing.
 
+## Production Deployment
+
+Pull requests targeting `dev` or `main` run `.github/workflows/ci.yml`. A push to `main` runs
+`.github/workflows/deploy.yml`, which verifies the project, pushes immutable commit-SHA and `latest` images to Docker
+Hub, and replaces the application container on EC2. EC2 does not clone this repository.
+
+Configure these GitHub repository secrets:
+
+```text
+DOCKERHUB_USERNAME
+DOCKERHUB_TOKEN
+EC2_HOST
+EC2_USER
+EC2_SSH_PRIVATE_KEY
+EC2_SSH_KNOWN_HOSTS
+```
+
+The Amazon Linux instance uses `ec2-user`, so configure `EC2_USER=ec2-user` and set `EC2_HOST` to the Elastic IP in
+GitHub Secrets. Before the first deployment, install Docker with the Compose plugin and keep the existing
+`/home/ec2-user/app/docker-compose.yml` and `/home/ec2-user/app/.env` files on EC2. The workflow updates only
+`IMAGE_TAG` in that `.env`, pulls the exact image tagged with the main commit SHA, and recreates only the `app`
+container.
+
 ## Branches
 
 | Branch         | Purpose                                    |
