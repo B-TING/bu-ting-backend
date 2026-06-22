@@ -22,7 +22,7 @@ java {
 // Spotless 세부 규칙 정의 (Google Java Format 적용)
 spotless {
     java {
-        googleJavaFormat() // 구글 자바 스타일 가이드 기준 정렬
+        googleJavaFormat("1.33.0") // Java 25 compatible Google Java Format
         trimTrailingWhitespace() // 줄 끝 공백 제거
         endWithNewline() // 파일 끝에 개행 추가
         targetExclude("build/**/*") // 빌드 결과물은 포맷팅에서 제외
