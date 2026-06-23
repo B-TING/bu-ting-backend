@@ -23,6 +23,11 @@ public class OAuthLoginService {
 
   @Transactional
   public OAuth2LoginResDto login(OAuthLoginReqDto request) {
+    return login(request, null);
+  }
+
+  @Transactional
+  public OAuth2LoginResDto login(OAuthLoginReqDto request, String authorization) {
     OAuth2UserInfo userInfo =
         oAuthProviderTokenVerifier.verify(
             request.provider(),
@@ -31,7 +36,7 @@ public class OAuthLoginService {
             request.codeVerifier());
     requireEmail(userInfo);
     User user = findOrCreate(userInfo);
-    OpaqueTokenService.IssuedOpaqueToken token = opaqueTokenService.issue(user);
+    OpaqueTokenService.IssuedOpaqueToken token = opaqueTokenService.issue(user, authorization);
 
     return OAuth2LoginResDto.from(user, token.accessToken(), token.tokenType(), token.expiresIn());
   }
