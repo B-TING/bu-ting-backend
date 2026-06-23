@@ -7,18 +7,22 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class OpaqueTokenService {
 
   public static final long ACCESS_TOKEN_EXPIRES_IN_SECONDS = 60L * 60L * 24L * 14L;
   private static final String HASH_ALGORITHM = "SHA-256";
+  private static final String BEARER_PREFIX = "Bearer ";
 
   private final OpaqueTokenRepository opaqueTokenRepository;
   private final String hashAlgorithm;
@@ -36,6 +40,18 @@ public class OpaqueTokenService {
 
   @Transactional
   public IssuedOpaqueToken issue(User user) {
+    return issueNew(user);
+  }
+
+  @Transactional
+  public IssuedOpaqueToken issue(User user, String authorization) {
+    LocalDateTime now = LocalDateTime.now();
+    return extractBearerToken(authorization)
+        .flatMap(rawToken -> findReusableToken(user, rawToken, now))
+        .orElseGet(() -> issueNew(user));
+  }
+
+  private IssuedOpaqueToken issueNew(User user) {
     String rawToken = generateToken();
     LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(ACCESS_TOKEN_EXPIRES_IN_SECONDS);
 
@@ -52,6 +68,35 @@ public class OpaqueTokenService {
         .findByTokenHashAndRevokedAtIsNull(hash(rawToken))
         .filter(token -> token.isActive(now))
         .map(OpaqueToken::getUser);
+  }
+
+  private Optional<IssuedOpaqueToken> findReusableToken(
+      User user, String rawToken, LocalDateTime now) {
+    return opaqueTokenRepository
+        .findByTokenHashAndRevokedAtIsNull(hash(rawToken))
+        .filter(token -> token.isActive(now))
+        .filter(token -> belongsTo(token, user))
+        .map(token -> issueExisting(rawToken, token.getExpiresAt(), now));
+  }
+
+  private boolean belongsTo(OpaqueToken token, User user) {
+    return Objects.equals(token.getUser().getId(), user.getId());
+  }
+
+  private IssuedOpaqueToken issueExisting(
+      String rawToken, LocalDateTime expiresAt, LocalDateTime now) {
+    long expiresIn = Math.max(0L, Duration.between(now, expiresAt).toSeconds());
+    return new IssuedOpaqueToken(rawToken, "Bearer", expiresIn, expiresAt);
+  }
+
+  private Optional<String> extractBearerToken(String authorization) {
+    if (!StringUtils.hasText(authorization)
+        || !authorization.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
+      return Optional.empty();
+    }
+
+    String rawToken = authorization.substring(BEARER_PREFIX.length()).trim();
+    return StringUtils.hasText(rawToken) ? Optional.of(rawToken) : Optional.empty();
   }
 
   private String generateToken() {

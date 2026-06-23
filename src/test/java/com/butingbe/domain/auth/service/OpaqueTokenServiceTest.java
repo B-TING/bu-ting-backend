@@ -10,6 +10,9 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.support.AbstractContainerTest;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,6 +58,58 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("같은 사용자의 active opaque token이 전달되면 새로 발급하지 않고 기존 토큰을 재사용한다")
+  void reuseActiveOpaqueToken() {
+    User user =
+        userRepository.save(
+            User.builder()
+                .email("reuse-token@example.com")
+                .provider("google")
+                .providerId("google-reuse-token")
+                .name(new Name("홍", "길동"))
+                .nickname("reuse-token-user")
+                .role(UserRole.USER)
+                .build());
+
+    OpaqueTokenService.IssuedOpaqueToken firstToken = opaqueTokenService.issue(user);
+    OpaqueTokenService.IssuedOpaqueToken reusedToken =
+        opaqueTokenService.issue(user, "Bearer " + firstToken.accessToken());
+
+    assertThat(reusedToken.accessToken()).isEqualTo(firstToken.accessToken());
+    assertThat(reusedToken.expiresIn()).isLessThanOrEqualTo(firstToken.expiresIn());
+    assertThat(opaqueTokenRepository.findAll()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("전달된 opaque token이 만료된 경우 새 토큰을 발급한다")
+  void issueNewTokenWhenExistingTokenExpired() {
+    User user =
+        userRepository.save(
+            User.builder()
+                .email("expired-reissue@example.com")
+                .provider("google")
+                .providerId("google-expired-reissue")
+                .name(new Name("홍", "길동"))
+                .nickname("expired-reissue-user")
+                .role(UserRole.USER)
+                .build());
+    String expiredRawToken = "expired-raw-token";
+    opaqueTokenRepository.save(
+        com.butingbe.domain.auth.entity.OpaqueToken.builder()
+            .tokenHash(sha256(expiredRawToken))
+            .user(user)
+            .expiresAt(LocalDateTime.now().minusSeconds(1))
+            .build());
+
+    OpaqueTokenService.IssuedOpaqueToken issuedToken =
+        opaqueTokenService.issue(user, "Bearer " + expiredRawToken);
+
+    assertThat(issuedToken.accessToken()).isNotEqualTo(expiredRawToken);
+    assertThat(opaqueTokenRepository.findAll()).hasSize(2);
+    assertThat(opaqueTokenService.authenticate(issuedToken.accessToken())).contains(user);
+  }
+
+  @Test
   @DisplayName("만료되거나 폐기된 opaque token은 active 상태가 아니다")
   void inactiveOpaqueToken() {
     User user =
@@ -95,5 +150,19 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
     assertThatThrownBy(() -> service.authenticate("raw-token"))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("SHA-256 is not available.");
+  }
+
+  private String sha256(String rawToken) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      byte[] hashed = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
+      StringBuilder builder = new StringBuilder(hashed.length * 2);
+      for (byte value : hashed) {
+        builder.append("%02x".formatted(value));
+      }
+      return builder.toString();
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
   }
 }

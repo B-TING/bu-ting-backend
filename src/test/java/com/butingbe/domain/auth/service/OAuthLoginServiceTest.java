@@ -55,7 +55,7 @@ class OAuthLoginServiceTest {
     given(user.getEmail()).willReturn("oauth@example.com");
     given(user.getNickname()).willReturn("기존닉네임");
     given(user.getProvider()).willReturn("google");
-    given(opaqueTokenService.issue(user))
+    given(opaqueTokenService.issue(user, null))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
                 "opaque-token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));
@@ -94,7 +94,7 @@ class OAuthLoginServiceTest {
     given(savedUser.getEmail()).willReturn("kakao@example.com");
     given(savedUser.getNickname()).willReturn("카카오유저");
     given(savedUser.getProvider()).willReturn("kakao");
-    given(opaqueTokenService.issue(savedUser))
+    given(opaqueTokenService.issue(savedUser, null))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
                 "new-opaque-token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));
@@ -153,7 +153,7 @@ class OAuthLoginServiceTest {
     given(user.getEmail()).willReturn("naver@example.com");
     given(user.getNickname()).willReturn("네이버유저");
     given(user.getProvider()).willReturn("naver");
-    given(opaqueTokenService.issue(user))
+    given(opaqueTokenService.issue(user, null))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
                 "provider-token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));

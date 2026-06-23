@@ -2,6 +2,8 @@ package com.butingbe.domain.auth.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
+import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.restdocs.RestDocumentationContextProvider;
@@ -84,7 +87,7 @@ class AuthControllerTest {
   @Test
   @DisplayName("클라이언트 SSO provider token으로 로그인하면 opaque token을 발급한다")
   void loginWithOAuth() throws Exception {
-    given(oAuthLoginService.login(any(OAuthLoginReqDto.class)))
+    given(oAuthLoginService.login(any(OAuthLoginReqDto.class), any()))
         .willReturn(
             new OAuth2LoginResDto(
                 "550e8400-e29b-41d4-a716-446655440000",
@@ -101,6 +104,7 @@ class AuthControllerTest {
         .perform(
             post("/api/v1/auth/oauth/login")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer existing-opaque-token")
                 .content(
                     """
                     {
@@ -117,6 +121,10 @@ class AuthControllerTest {
         .andDo(
             document(
                 "auth-oauth-login",
+                requestHeaders(
+                    headerWithName(HttpHeaders.AUTHORIZATION)
+                        .optional()
+                        .description("기존 B-TING opaque token. 같은 사용자이고 만료 전이면 재사용됩니다.")),
                 requestFields(
                     fieldWithPath("provider").description("SSO provider: google, naver, kakao"),
                     fieldWithPath("providerToken")
