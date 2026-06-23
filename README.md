@@ -14,7 +14,6 @@ sign-in style lookup, duplicate email validation, and basic global API error han
 | Persistence  | Spring Data JPA, Hibernate                                 |
 | Database     | PostgreSQL                                                 |
 | Test         | JUnit 6, Mockito, Spring Boot Test, Testcontainers, JaCoCo |
-| Code Quality | SonarQube, SonarScanner for Gradle                         |
 | Formatting   | Spotless, Google Java Format                               |
 | Local Infra  | Docker Compose, PostgreSQL 16 Alpine                       |
 | Build        | Gradle Kotlin DSL                                          |
@@ -73,7 +72,7 @@ Check the container:
 docker compose -f docker-compose.local.yml ps
 ```
 
-Local PostgreSQL connection:
+Local PostgreSQL connection values:
 
 | Key      | Value        |
 |----------|--------------|
@@ -85,18 +84,22 @@ Local PostgreSQL connection:
 
 ## Run The Application
 
-Because `dev` currently keeps only the base `application.yaml`, pass local database properties when running the app:
+Create a `.env` file in the project root. The Gradle `bootRun` task loads this file before starting Spring Boot:
+
+```dotenv
+DB_URL=jdbc:postgresql://localhost:5433/mydb
+DB_USERNAME=myuser
+DB_PASSWORD=mypassword
+```
+
+Run the application:
 
 ```bash
-SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/mydb \
-SPRING_DATASOURCE_USERNAME=myuser \
-SPRING_DATASOURCE_PASSWORD=mypassword \
-SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver \
-SPRING_JPA_HIBERNATE_DDL_AUTO=update \
 ./gradlew bootRun
 ```
 
-The `bootRun` task keeps running while the server is alive. Stop it with `Ctrl + C`.
+The `bootRun` task keeps running while the server is alive. Stop it with `Ctrl + C`. When running the packaged JAR,
+provide the same `DB_*` values as process environment variables because `.env` loading is configured for `bootRun`.
 
 ## API Test Examples
 
@@ -130,7 +133,7 @@ curl -i "http://localhost:8080/api/v1/users/signin?email=test@example.com"
 Integration tests use Testcontainers. They start their own PostgreSQL container, so the local Docker Compose database
 does not need to be running for tests.
 
-## Coverage And SonarQube
+## Coverage
 
 The build enforces 100% line coverage for the current business API coverage target:
 
@@ -164,32 +167,7 @@ Run the same checks through the standard verification task:
 ./gradlew check
 ```
 
-Run SonarQube analysis after setting your SonarQube server and token:
-
-Start local SonarQube:
-
-```bash
-docker compose -f docker-compose.local.yml up -d sonarqube-local
-```
-
-Open SonarQube:
-
-```text
-http://localhost:9000
-```
-
-The first local login uses `admin` / `admin`. SonarQube will ask you to change the password. After logging in, create a
-project token from the SonarQube UI, then run:
-
-```bash
-SONAR_HOST_URL=http://localhost:9000 \
-SONAR_TOKEN=<your-token> \
-./gradlew sonar
-```
-
-The SonarQube Gradle task imports JaCoCo XML coverage from `build/reports/jacoco/test/jacocoTestReport.xml`.
-
-If you only want to run coverage locally without uploading metrics to SonarQube, use:
+To generate the coverage report directly, use:
 
 ```bash
 ./gradlew jacocoTestReport
@@ -210,6 +188,31 @@ Apply Java formatting:
 ```
 
 The Husky pre-commit hook also runs Spotless before committing.
+
+## Production Deployment
+
+Pull requests targeting `dev` or `main` run `.github/workflows/ci.yml`. A push to `main` runs
+`.github/workflows/deploy.yml`, which verifies the project, pushes immutable commit-SHA and `latest` images to Docker
+Hub, and replaces the application container on EC2. EC2 does not clone this repository.
+
+Configure these GitHub repository secrets:
+
+```text
+DOCKERHUB_USERNAME
+DOCKERHUB_TOKEN
+EC2_HOST
+EC2_USER
+EC2_SSH_PRIVATE_KEY
+EC2_SSH_KNOWN_HOSTS
+```
+
+The Amazon Linux instance uses `ec2-user`, so configure `EC2_USER=ec2-user` and set `EC2_HOST` to the Elastic IP in
+GitHub Secrets. Before the first deployment, install Docker with the Compose plugin and keep the existing
+`/home/ec2-user/app/docker-compose.yml` and `/home/ec2-user/app/.env` files on EC2. The workflow updates only
+the Docker Hub namespace and `IMAGE_TAG` in that `.env`, pulls the exact image tagged with the main commit SHA,
+and recreates only the `app` container. For an RDS connection using `sslmode=verify-full`, set the JDBC URL's
+certificate parameter to `sslrootcert=/app/certs/global-bundle.pem`. The AWS RDS global CA bundle is included at
+that path in the runtime image.
 
 ## Branches
 

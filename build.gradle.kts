@@ -5,7 +5,6 @@ plugins {
     jacoco
     id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
-    id("org.sonarqube") version "7.3.1.8318"
     // 코드 스타일 통일을 위한 Spotless 플러그인
     id("com.diffplug.spotless") version "6.25.0"
 }
@@ -23,7 +22,7 @@ java {
 // Spotless 세부 규칙 정의 (Google Java Format 적용)
 spotless {
     java {
-        googleJavaFormat() // 구글 자바 스타일 가이드 기준 정렬
+        googleJavaFormat("1.33.0") // Java 25 compatible Google Java Format
         trimTrailingWhitespace() // 줄 끝 공백 제거
         endWithNewline() // 파일 끝에 개행 추가
         targetExclude("build/**/*") // 빌드 결과물은 포맷팅에서 제외
@@ -80,24 +79,6 @@ tasks.jacocoTestCoverageVerification {
     }
 }
 
-sonar {
-    properties {
-        property("sonar.projectKey", "B-TING_bu-ting-backend")
-        property("sonar.projectName", "bu-ting-backend")
-        property(
-            "sonar.coverage.jacoco.xmlReportPaths",
-            layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile.path
-        )
-        property(
-            "sonar.coverage.exclusions",
-            listOf(
-                "**/ButingBeApplication.java",
-                "**/global/config/**",
-                "**/*Dto*"
-            ).joinToString(",")
-        )
-    }
-}
 repositories {
     mavenCentral()
 }
@@ -179,8 +160,4 @@ tasks.register<Copy>("openapi3") {
     dependsOn(tasks.test)
     from(layout.projectDirectory.file("src/main/resources/static/docs/openapi3.yaml"))
     into(layout.buildDirectory.dir("api-spec"))
-}
-
-tasks.sonar {
-    dependsOn(tasks.jacocoTestReport)
 }
