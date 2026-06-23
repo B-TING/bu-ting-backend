@@ -25,6 +25,9 @@ RUN ./gradlew bootJar -x test -x spotlessCheck --no-daemon
 FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
+ENV TZ=Asia/Seoul
+ENV JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Seoul"
+
 # 빌드 스테이지에서 생성된 껍데기 없는 순수 완제품 JAR 파일만 쏙 빼서 복사
 COPY --from=builder /build/build/libs/*-SNAPSHOT.jar app.jar
 
