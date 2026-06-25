@@ -7,4 +7,6 @@ import java.util.UUID;
 public interface TravelSurveyService {
 
   TravelSurveyProfileResDto upsertProfile(UUID userId, TravelSurveyProfileReqDto request);
+
+  TravelSurveyProfileResDto getProfile(UUID userId);
 }

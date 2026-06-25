@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,5 +31,15 @@ public class TravelSurveyController {
     }
 
     return ResponseEntity.ok(travelSurveyService.upsertProfile(user.id(), request));
+  }
+
+  @GetMapping
+  public ResponseEntity<TravelSurveyProfileResDto> getProfile(
+      @AuthenticationPrincipal AuthenticatedUser user) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(travelSurveyService.getProfile(user.id()));
   }
 }

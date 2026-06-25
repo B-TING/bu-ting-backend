@@ -36,4 +36,12 @@ public class TravelSurveyServiceImpl implements TravelSurveyService {
 
     return TravelSurveyProfileResDto.from(survey);
   }
+
+  @Override
+  public TravelSurveyProfileResDto getProfile(UUID userId) {
+    return travelSurveyRepository
+        .findById(userId)
+        .map(TravelSurveyProfileResDto::from)
+        .orElseThrow(() -> new IllegalArgumentException("travel survey profile not found."));
+  }
 }
