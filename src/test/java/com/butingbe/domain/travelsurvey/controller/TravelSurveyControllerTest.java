@@ -51,7 +51,7 @@ class TravelSurveyControllerTest extends AbstractContainerTest {
 
     mockMvc
         .perform(
-            put("/api/v1/users/me/profile")
+            put("/api/v1/travel-surveys")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -75,7 +75,7 @@ class TravelSurveyControllerTest extends AbstractContainerTest {
 
     mockMvc
         .perform(
-            get("/api/v1/users/me/profile")
+            get("/api/v1/travel-surveys")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.isPlanned").value(true))
@@ -90,7 +90,7 @@ class TravelSurveyControllerTest extends AbstractContainerTest {
 
     mockMvc
         .perform(
-            put("/api/v1/users/me/profile")
+            put("/api/v1/travel-surveys")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(

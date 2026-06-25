@@ -11,6 +11,8 @@ tags:
     description: Authentication APIs
   - name: User
     description: User APIs
+  - name: TravelSurvey
+    description: Travel survey profile APIs
 paths:
   /api/v1/auth/oauth/login:
     post:
@@ -148,6 +150,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/travel-surveys:
+    put:
+      tags:
+        - TravelSurvey
+      summary: 여행 성향 설문 저장/수정
+      description: |
+        로그인한 사용자의 여행 성향 설문을 저장하거나 수정합니다.
+        `skippedAll`이 `true`이면 성향 Boolean 값은 서버에서 모두 `null`로 처리됩니다.
+      security:
+        - opaqueToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelSurveyProfileRequest"
+            example:
+              preferredLanguage: ko
+              isPlanned: true
+              isRelaxed: false
+              isSolo: true
+              isLight: true
+              isFamiliar: false
+              purposes:
+                - food
+                - scenery
+              skippedSteps:
+                - 2
+              skippedAll: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelSurveyProfileResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    get:
+      tags:
+        - TravelSurvey
+      summary: 여행 성향 설문 조회
+      description: 로그인한 사용자의 여행 성향 설문 데이터를 조회합니다.
+      security:
+        - opaqueToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelSurveyProfileResponse"
+        "400":
+          description: Survey profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 components:
   securitySchemes:
     opaqueToken:
@@ -217,6 +293,73 @@ components:
         nickname:
           type: string
           example: 테스터
+    TravelSurveyProfileRequest:
+      type: object
+      properties:
+        preferredLanguage:
+          type: string
+          maxLength: 5
+          default: ko
+          example: ko
+        isPlanned:
+          type: boolean
+          nullable: true
+          description: "true: 계획적, false: 즉흥적"
+          example: true
+        isRelaxed:
+          type: boolean
+          nullable: true
+          description: "true: 여유롭게, false: 빡빡하게"
+          example: false
+        isSolo:
+          type: boolean
+          nullable: true
+          description: "true: 혼자 여행 선호, false: 동행 여행 선호"
+          example: true
+        isLight:
+          type: boolean
+          nullable: true
+          description: "true: 가볍게, false: 많이 챙김"
+          example: true
+        isFamiliar:
+          type: boolean
+          nullable: true
+          description: "true: 부산을 아는 편, false: 잘 모름"
+          example: false
+        purposes:
+          type: array
+          description: 여행 목적. PostgreSQL `varchar(30)[]`로 저장됩니다.
+          items:
+            type: string
+            maxLength: 30
+          example:
+            - food
+            - scenery
+        skippedSteps:
+          type: array
+          description: 스킵한 설문 단계. PostgreSQL `integer[]`로 저장됩니다.
+          items:
+            type: integer
+          example:
+            - 2
+        skippedAll:
+          type: boolean
+          default: false
+          example: false
+    TravelSurveyProfileResponse:
+      allOf:
+        - $ref: "#/components/schemas/TravelSurveyProfileRequest"
+        - type: object
+          properties:
+            completedAt:
+              type: string
+              format: date-time
+              nullable: true
+              example: "2026-06-25T13:14:33"
+            aiPromptContext:
+              type: string
+              nullable: true
+              example: preferred_language=ko; purposes=food,scenery; planned=true; relaxed=false; solo=true; light=true; familiar=false
     ApiErrorResponse:
       type: object
       properties:
