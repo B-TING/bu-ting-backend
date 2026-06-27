@@ -21,16 +21,11 @@ paths:
         클라이언트가 Google/Naver/Kakao SDK로 SSO 로그인 후 받은 provider token을 백엔드로 전달합니다.
         Google/Naver/Kakao는 provider token 또는 authorization code를 전달할 수 있습니다.
         백엔드는 provider token을 검증하고, 기존 회원 조회/연결 또는 신규 회원 생성을 수행한 뒤 B-TING 전용 opaque access token을 발급합니다.
-        기존 B-TING opaque token을 Authorization 헤더로 함께 보내면, 같은 사용자이고 만료 전인 경우 기존 토큰을 재사용합니다.
+        Swagger 상단 Authorize로 기존 B-TING opaque token을 인증해두면, 같은 사용자이고 만료 전인 경우 기존 토큰을 재사용합니다.
         기존 토큰이 없거나 만료/폐기/다른 사용자 토큰이면 새 opaque token을 발급합니다.
-      parameters:
-        - name: Authorization
-          in: header
-          required: false
-          description: 기존 B-TING opaque token. 같은 사용자이고 만료 전이면 재사용됩니다.
-          schema:
-            type: string
-            example: Bearer existing-opaque-token
+      security:
+        - opaqueToken: []
+        - {}
       requestBody:
         required: true
         content:
@@ -101,14 +96,6 @@ paths:
       description: 인증된 B-TING opaque token을 확인한 뒤 이메일과 닉네임으로 사용자를 생성합니다.
       security:
         - opaqueToken: []
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          description: B-TING opaque token. Bearer 형식으로 전달합니다.
-          schema:
-            type: string
-            example: Bearer opaque-token
       requestBody:
         required: true
         content:
@@ -131,6 +118,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/me:
+    get:
+      tags:
+        - User
+      summary: 내 프로필 조회
+      description: 로그인한 사용자의 프로필과 회원 정보를 조회합니다.
+      security:
+        - opaqueToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyProfileResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    patch:
+      tags:
+        - User
+      summary: 내 회원 정보 수정
+      description: 로그인한 사용자의 닉네임, 프로필 이미지, 이름 정보를 수정합니다.
+      security:
+        - opaqueToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyProfileRequest"
+            example:
+              nickname: 수정닉
+              profileImageUrl: https://example.com/profile.png
+              firstName: 길동
+              lastName: 홍
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyProfileResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - User
+      summary: 회원 탈퇴
+      description: 로그인한 사용자의 토큰과 회원 정보를 삭제합니다.
+      security:
+        - opaqueToken: []
+      responses:
+        "204":
+          description: No Content
         "401":
           description: Unauthorized
           content:
@@ -217,6 +278,51 @@ components:
         providerId:
           type: string
           example: google-123
+        firstName:
+          type: string
+          example: 길동
+        lastName:
+          type: string
+          example: 홍
+    UpdateMyProfileRequest:
+      type: object
+      properties:
+        nickname:
+          type: string
+          maxLength: 50
+          example: 수정닉
+        profileImageUrl:
+          type: string
+          maxLength: 500
+          example: https://example.com/profile.png
+        firstName:
+          type: string
+          maxLength: 50
+          example: 길동
+        lastName:
+          type: string
+          maxLength: 20
+          example: 홍
+    MyProfileResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        email:
+          type: string
+          format: email
+          example: test@example.com
+        nickname:
+          type: string
+          example: 테스터
+        profileImageUrl:
+          type: string
+          example: https://example.com/profile.png
+        provider:
+          type: string
+          example: google
         firstName:
           type: string
           example: 길동
