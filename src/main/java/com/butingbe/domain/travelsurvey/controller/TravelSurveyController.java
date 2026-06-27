@@ -30,7 +30,7 @@ public class TravelSurveyController {
       throw new UnauthenticatedException();
     }
 
-    return ResponseEntity.ok(travelSurveyService.upsertProfile(user.id(), request));
+    return ResponseEntity.ok(travelSurveyService.upsertProfile(user, request));
   }
 
   @GetMapping
@@ -40,6 +40,6 @@ public class TravelSurveyController {
       throw new UnauthenticatedException();
     }
 
-    return ResponseEntity.ok(travelSurveyService.getProfile(user.id()));
+    return ResponseEntity.ok(travelSurveyService.getProfile(user));
   }
 }
