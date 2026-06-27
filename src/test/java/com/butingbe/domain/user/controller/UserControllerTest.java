@@ -14,7 +14,9 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.requestF
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -22,6 +24,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.user.dto.request.SignUpReqDto;
+import com.butingbe.domain.user.dto.request.UpdateMyProfileReqDto;
+import com.butingbe.domain.user.dto.response.MyProfileResDto;
 import com.butingbe.domain.user.dto.response.UserResDto;
 import com.butingbe.domain.user.service.UserService;
 import com.butingbe.global.error.GlobalExceptionHandler;
@@ -110,6 +114,13 @@ class UserControllerTest {
     };
   }
 
+  private UsernamePasswordAuthenticationToken userAuthentication(UUID userId) {
+    AuthenticatedUser principal =
+        new AuthenticatedUser(
+            userId, "test@example.com", "테스터", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    return new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
+  }
+
   // ==========================================
   // 👤 SIGN UP (회원가입) TEST
   // ==========================================
@@ -119,14 +130,8 @@ class UserControllerTest {
   void signUpSuccess() throws Exception {
     // given
     doNothing().when(userService).signUp(any(SignUpReqDto.class));
-    AuthenticatedUser principal =
-        new AuthenticatedUser(
-            UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),
-            "test@example.com",
-            "테스터",
-            List.of(new SimpleGrantedAuthority("ROLE_USER")));
     UsernamePasswordAuthenticationToken authentication =
-        new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
+        userAuthentication(UUID.fromString("550e8400-e29b-41d4-a716-446655440000"));
 
     // when & then
     mockMvc
@@ -161,6 +166,192 @@ class UserControllerTest {
                     fieldWithPath("providerId").description("OAuth2 provider user id"),
                     fieldWithPath("firstName").description("이름"),
                     fieldWithPath("lastName").description("성"))));
+  }
+
+  // ==========================================
+  // 🙋 MY PROFILE TEST
+  // ==========================================
+
+  @Test
+  @DisplayName("인증된 사용자는 내 프로필 정보를 조회할 수 있다")
+  void getMyProfileSuccess() throws Exception {
+    // given
+    UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    given(userService.getMyProfile(any(AuthenticatedUser.class)))
+        .willReturn(
+            new MyProfileResDto(
+                userId.toString(),
+                "test@example.com",
+                "테스터",
+                "https://example.com/profile.png",
+                "google",
+                "길동",
+                "홍"));
+
+    // when & then
+    mockMvc
+        .perform(
+            get("/api/v1/users/me")
+                .with(authenticated(userAuthentication(userId)))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer opaque-token"))
+        .andDo(print())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.userId").value(userId.toString()))
+        .andExpect(jsonPath("$.email").value("test@example.com"))
+        .andExpect(jsonPath("$.nickname").value("테스터"))
+        .andExpect(jsonPath("$.profileImageUrl").value("https://example.com/profile.png"))
+        .andDo(
+            document(
+                "users-me-get",
+                responseFields(
+                    fieldWithPath("userId").description("사용자 ID"),
+                    fieldWithPath("email").description("이메일"),
+                    fieldWithPath("nickname").description("닉네임"),
+                    fieldWithPath("profileImageUrl").description("프로필 이미지 URL"),
+                    fieldWithPath("provider").description("OAuth2 provider"),
+                    fieldWithPath("firstName").description("이름"),
+                    fieldWithPath("lastName").description("성"))));
+  }
+
+  @Test
+  @DisplayName("개발 관리자 토큰으로 내 프로필 정보를 조회할 수 있다")
+  void getMyProfileSuccessWithDevelopmentAdmin() throws Exception {
+    // given
+    AuthenticatedUser principal = AuthenticatedUser.developmentAdmin();
+    UsernamePasswordAuthenticationToken authentication =
+        new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
+    UUID createdAdminId = UUID.fromString("660e8400-e29b-41d4-a716-446655440000");
+    given(userService.getMyProfile(any(AuthenticatedUser.class)))
+        .willReturn(
+            new MyProfileResDto(
+                createdAdminId.toString(),
+                principal.email(),
+                principal.nickname(),
+                null,
+                "development",
+                "관리자",
+                "개발"));
+
+    // when & then
+    mockMvc
+        .perform(
+            get("/api/v1/users/me")
+                .with(authenticated(authentication))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer admin-token"))
+        .andDo(print())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.userId").value(createdAdminId.toString()))
+        .andExpect(jsonPath("$.email").value("admin@local.dev"))
+        .andExpect(jsonPath("$.nickname").value("개발 관리자"))
+        .andExpect(jsonPath("$.provider").value("development"));
+  }
+
+  @Test
+  @DisplayName("인증된 사용자는 내 회원 정보를 수정할 수 있다")
+  void updateMyProfileSuccess() throws Exception {
+    // given
+    UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    given(
+            userService.updateMyProfile(
+                any(AuthenticatedUser.class), any(UpdateMyProfileReqDto.class)))
+        .willReturn(
+            new MyProfileResDto(
+                userId.toString(),
+                "test@example.com",
+                "수정닉",
+                "https://example.com/updated.png",
+                "google",
+                "길동",
+                "홍"));
+
+    // when & then
+    mockMvc
+        .perform(
+            patch("/api/v1/users/me")
+                .with(authenticated(userAuthentication(userId)))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer opaque-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                {
+                                  "nickname": "수정닉",
+                                  "profileImageUrl": "https://example.com/updated.png",
+                                  "firstName": "길동",
+                                  "lastName": "홍"
+                                }
+                                """))
+        .andDo(print())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.nickname").value("수정닉"))
+        .andExpect(jsonPath("$.profileImageUrl").value("https://example.com/updated.png"))
+        .andDo(
+            document(
+                "users-me-update",
+                requestFields(
+                    fieldWithPath("nickname").optional().description("닉네임"),
+                    fieldWithPath("profileImageUrl").optional().description("프로필 이미지 URL"),
+                    fieldWithPath("firstName").optional().description("이름"),
+                    fieldWithPath("lastName").optional().description("성")),
+                responseFields(
+                    fieldWithPath("userId").description("사용자 ID"),
+                    fieldWithPath("email").description("이메일"),
+                    fieldWithPath("nickname").description("닉네임"),
+                    fieldWithPath("profileImageUrl").description("프로필 이미지 URL"),
+                    fieldWithPath("provider").description("OAuth2 provider"),
+                    fieldWithPath("firstName").description("이름"),
+                    fieldWithPath("lastName").description("성"))));
+  }
+
+  @Test
+  @DisplayName("인증된 사용자는 회원 탈퇴할 수 있다")
+  void deleteMyAccountSuccess() throws Exception {
+    // given
+    UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    doNothing().when(userService).deleteMyAccount(any(AuthenticatedUser.class));
+
+    // when & then
+    mockMvc
+        .perform(
+            delete("/api/v1/users/me")
+                .with(authenticated(userAuthentication(userId)))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer opaque-token"))
+        .andDo(print())
+        .andExpect(status().isNoContent())
+        .andDo(document("users-me-delete"));
+  }
+
+  @Test
+  @DisplayName("내 프로필 조회 요청 시 인증 토큰이 없으면 401 Unauthorized를 반환한다")
+  void getMyProfileFailWithoutAuthentication() throws Exception {
+    // when & then
+    mockMvc.perform(get("/api/v1/users/me")).andDo(print()).andExpect(status().isUnauthorized());
+
+    verify(userService, never()).getMyProfile(any(AuthenticatedUser.class));
+  }
+
+  @Test
+  @DisplayName("회원가입 요청 시 인증 토큰이 없으면 401 Unauthorized를 반환한다")
+  void signUpFailWithoutAuthentication() throws Exception {
+    // when & then
+    mockMvc
+        .perform(
+            post("/api/v1/users/signup")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                {
+                                  "email": "test@example.com",
+                                  "nickname": "테스터",
+                                  "provider": "google",
+                                  "providerId": "google-123",
+                                  "firstName": "길동",
+                                  "lastName": "홍"
+                                }
+                                """))
+        .andDo(print())
+        .andExpect(status().isUnauthorized());
+
+    verify(userService, never()).signUp(any(SignUpReqDto.class));
   }
 
   @Test

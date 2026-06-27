@@ -9,8 +9,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 public record AuthenticatedUser(
     UUID id, String email, String nickname, Collection<? extends GrantedAuthority> authorities) {
 
-  private static final UUID DEVELOPMENT_ADMIN_ID =
-      UUID.fromString("00000000-0000-0000-0000-000000000001");
+  private static final String DEVELOPMENT_ADMIN_EMAIL = "admin@local.dev";
 
   public static AuthenticatedUser from(User user) {
     return new AuthenticatedUser(
@@ -22,9 +21,15 @@ public record AuthenticatedUser(
 
   public static AuthenticatedUser developmentAdmin() {
     return new AuthenticatedUser(
-        DEVELOPMENT_ADMIN_ID,
-        "admin@local.dev",
+        null,
+        DEVELOPMENT_ADMIN_EMAIL,
         "개발 관리자",
         java.util.List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+  }
+
+  public boolean isDevelopmentAdmin() {
+    return DEVELOPMENT_ADMIN_EMAIL.equals(email)
+        && authorities.stream()
+            .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
   }
 }
