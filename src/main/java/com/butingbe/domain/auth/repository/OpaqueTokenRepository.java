@@ -10,7 +10,15 @@ import org.springframework.data.repository.query.Param;
 
 public interface OpaqueTokenRepository extends JpaRepository<OpaqueToken, UUID> {
 
-  Optional<OpaqueToken> findByTokenHashAndRevokedAtIsNull(String tokenHash);
+  @Query(
+      """
+      select token
+      from OpaqueToken token
+      join fetch token.user
+      where token.tokenHash = :tokenHash
+        and token.revokedAt is null
+      """)
+  Optional<OpaqueToken> findByTokenHashAndRevokedAtIsNull(@Param("tokenHash") String tokenHash);
 
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("delete from OpaqueToken token where token.user.id = :userId")
