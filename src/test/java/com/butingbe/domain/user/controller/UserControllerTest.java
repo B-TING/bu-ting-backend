@@ -5,6 +5,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
+import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -154,6 +156,9 @@ class UserControllerTest {
         .andDo(
             document(
                 "users-sign-up",
+                requestHeaders(
+                    headerWithName(HttpHeaders.AUTHORIZATION)
+                        .description("B-TING opaque token. Bearer 형식으로 전달합니다.")),
                 requestFields(
                     fieldWithPath("email").description("이메일"),
                     fieldWithPath("nickname").description("닉네임"),
@@ -322,6 +327,31 @@ class UserControllerTest {
     mockMvc.perform(get("/api/v1/users/me")).andDo(print()).andExpect(status().isUnauthorized());
 
     verify(userService, never()).getMyProfile(any(AuthenticatedUser.class));
+  }
+
+  @Test
+  @DisplayName("회원가입 요청 시 인증 토큰이 없으면 401 Unauthorized를 반환한다")
+  void signUpFailWithoutAuthentication() throws Exception {
+    // when & then
+    mockMvc
+        .perform(
+            post("/api/v1/users/signup")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                {
+                                  "email": "test@example.com",
+                                  "nickname": "테스터",
+                                  "provider": "google",
+                                  "providerId": "google-123",
+                                  "firstName": "길동",
+                                  "lastName": "홍"
+                                }
+                                """))
+        .andDo(print())
+        .andExpect(status().isUnauthorized());
+
+    verify(userService, never()).signUp(any(SignUpReqDto.class));
   }
 
   @Test
