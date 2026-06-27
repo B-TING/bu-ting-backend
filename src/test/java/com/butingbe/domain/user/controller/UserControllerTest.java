@@ -5,6 +5,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
+import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -18,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.user.dto.request.SignUpReqDto;
 import com.butingbe.domain.user.dto.response.UserResDto;
 import com.butingbe.domain.user.service.UserService;
@@ -25,6 +28,8 @@ import com.butingbe.global.error.GlobalExceptionHandler;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,11 +37,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.bind.annotation.RestController;
@@ -72,8 +83,14 @@ class UserControllerTest {
             .setMessageConverters(new JacksonJsonHttpMessageConverter())
             .setValidator(validator)
             .setCustomHandlerMapping(this::apiPrefixHandlerMapping)
+            .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
             .apply(documentationConfiguration(restDocumentation))
             .build();
+  }
+
+  @AfterEach
+  void tearDown() {
+    SecurityContextHolder.clearContext();
   }
 
   private RequestMappingHandlerMapping apiPrefixHandlerMapping() {
@@ -86,6 +103,13 @@ class UserControllerTest {
     return handlerMapping;
   }
 
+  private RequestPostProcessor authenticated(UsernamePasswordAuthenticationToken authentication) {
+    return request -> {
+      SecurityContextHolder.getContext().setAuthentication(authentication);
+      return request;
+    };
+  }
+
   // ==========================================
   // 👤 SIGN UP (회원가입) TEST
   // ==========================================
@@ -95,7 +119,53 @@ class UserControllerTest {
   void signUpSuccess() throws Exception {
     // given
     doNothing().when(userService).signUp(any(SignUpReqDto.class));
+    AuthenticatedUser principal =
+        new AuthenticatedUser(
+            UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),
+            "test@example.com",
+            "테스터",
+            List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    UsernamePasswordAuthenticationToken authentication =
+        new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
 
+    // when & then
+    mockMvc
+        .perform(
+            post("/api/v1/users/signup")
+                .with(authenticated(authentication))
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer opaque-token")
+                .content(
+                    """
+                                {
+                                  "email": "test@example.com",
+                                  "nickname": "테스터",
+                                  "provider": "google",
+                                  "providerId": "google-123",
+                                  "firstName": "길동",
+                                  "lastName": "홍"
+                                }
+                                """))
+        .andDo(print())
+        .andExpect(status().isCreated())
+        .andDo(
+            document(
+                "users-sign-up",
+                requestHeaders(
+                    headerWithName(HttpHeaders.AUTHORIZATION)
+                        .description("B-TING opaque token. Bearer 형식으로 전달합니다.")),
+                requestFields(
+                    fieldWithPath("email").description("이메일"),
+                    fieldWithPath("nickname").description("닉네임"),
+                    fieldWithPath("provider").description("OAuth2 provider"),
+                    fieldWithPath("providerId").description("OAuth2 provider user id"),
+                    fieldWithPath("firstName").description("이름"),
+                    fieldWithPath("lastName").description("성"))));
+  }
+
+  @Test
+  @DisplayName("회원가입 요청 시 인증 토큰이 없으면 401 Unauthorized를 반환한다")
+  void signUpFailWithoutAuthentication() throws Exception {
     // when & then
     mockMvc
         .perform(
@@ -113,17 +183,9 @@ class UserControllerTest {
                                 }
                                 """))
         .andDo(print())
-        .andExpect(status().isCreated())
-        .andDo(
-            document(
-                "users-sign-up",
-                requestFields(
-                    fieldWithPath("email").description("이메일"),
-                    fieldWithPath("nickname").description("닉네임"),
-                    fieldWithPath("provider").description("OAuth2 provider"),
-                    fieldWithPath("providerId").description("OAuth2 provider user id"),
-                    fieldWithPath("firstName").description("이름"),
-                    fieldWithPath("lastName").description("성"))));
+        .andExpect(status().isUnauthorized());
+
+    verify(userService, never()).signUp(any(SignUpReqDto.class));
   }
 
   @Test
