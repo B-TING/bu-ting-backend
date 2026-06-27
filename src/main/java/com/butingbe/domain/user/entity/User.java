@@ -39,13 +39,23 @@ public class User extends BaseEntity {
   @Column(nullable = false, length = 50)
   private String nickname;
 
+  @Column(name = "profile_image_url", length = 500)
+  private String profileImageUrl;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private UserRole role;
 
   @Builder
   public User(
-      String email, String provider, String providerId, Name name, String nickname, UserRole role) {
+      UUID id,
+      String email,
+      String provider,
+      String providerId,
+      Name name,
+      String nickname,
+      UserRole role) {
+    this.id = id;
     this.email = email;
     this.provider = provider;
     this.providerId = providerId;
@@ -57,5 +67,20 @@ public class User extends BaseEntity {
   public void linkOAuthProvider(String provider, String providerId) {
     this.provider = provider;
     this.providerId = providerId;
+  }
+
+  public void updateProfile(
+      String nickname, String profileImageUrl, String firstName, String lastName) {
+    if (nickname != null) {
+      this.nickname = nickname;
+    }
+    if (profileImageUrl != null) {
+      this.profileImageUrl = profileImageUrl;
+    }
+    if (firstName != null || lastName != null) {
+      String updatedFirstName = firstName != null ? firstName : name.getFirstName();
+      String updatedLastName = lastName != null ? lastName : name.getLastName();
+      this.name = new Name(updatedLastName, updatedFirstName);
+    }
   }
 }
