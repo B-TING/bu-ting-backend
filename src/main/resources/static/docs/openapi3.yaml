@@ -98,7 +98,17 @@ paths:
       tags:
         - User
       summary: 사용자 회원가입
-      description: 이메일과 닉네임으로 사용자를 생성합니다.
+      description: 인증된 B-TING opaque token을 확인한 뒤 이메일과 닉네임으로 사용자를 생성합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: B-TING opaque token. Bearer 형식으로 전달합니다.
+          schema:
+            type: string
+            example: Bearer opaque-token
       requestBody:
         required: true
         content:
@@ -117,6 +127,12 @@ paths:
           description: Created
         "400":
           description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
           content:
             application/json:
               schema:
