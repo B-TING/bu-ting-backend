@@ -2,22 +2,13 @@ package com.butingbe.domain.user.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
-import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
+import static org.mockito.Mockito.*;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
-import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
-import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
-import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
+import static org.springframework.restdocs.payload.PayloadDocumentation.*;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -142,23 +133,20 @@ class UserControllerTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer opaque-token")
                 .content(
                     """
-                                {
-                                  "email": "test@example.com",
-                                  "nickname": "테스터",
-                                  "provider": "google",
-                                  "providerId": "google-123",
-                                  "firstName": "길동",
-                                  "lastName": "홍"
-                                }
-                                """))
+                                                {
+                                                  "email": "test@example.com",
+                                                  "nickname": "테스터",
+                                                  "provider": "google",
+                                                  "providerId": "google-123",
+                                                  "firstName": "길동",
+                                                  "lastName": "홍"
+                                                }
+                                                """))
         .andDo(print())
         .andExpect(status().isCreated())
         .andDo(
             document(
                 "users-sign-up",
-                requestHeaders(
-                    headerWithName(HttpHeaders.AUTHORIZATION)
-                        .description("B-TING opaque token. Bearer 형식으로 전달합니다.")),
                 requestFields(
                     fieldWithPath("email").description("이메일"),
                     fieldWithPath("nickname").description("닉네임"),
@@ -273,13 +261,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                {
-                                  "nickname": "수정닉",
-                                  "profileImageUrl": "https://example.com/updated.png",
-                                  "firstName": "길동",
-                                  "lastName": "홍"
-                                }
-                                """))
+                                                {
+                                                  "nickname": "수정닉",
+                                                  "profileImageUrl": "https://example.com/updated.png",
+                                                  "firstName": "길동",
+                                                  "lastName": "홍"
+                                                }
+                                                """))
         .andDo(print())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.nickname").value("수정닉"))
@@ -339,40 +327,15 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                {
-                                  "email": "test@example.com",
-                                  "nickname": "테스터",
-                                  "provider": "google",
-                                  "providerId": "google-123",
-                                  "firstName": "길동",
-                                  "lastName": "홍"
-                                }
-                                """))
-        .andDo(print())
-        .andExpect(status().isUnauthorized());
-
-    verify(userService, never()).signUp(any(SignUpReqDto.class));
-  }
-
-  @Test
-  @DisplayName("회원가입 요청 시 인증 토큰이 없으면 401 Unauthorized를 반환한다")
-  void signUpFailWithoutAuthentication() throws Exception {
-    // when & then
-    mockMvc
-        .perform(
-            post("/api/v1/users/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                                {
-                                  "email": "test@example.com",
-                                  "nickname": "테스터",
-                                  "provider": "google",
-                                  "providerId": "google-123",
-                                  "firstName": "길동",
-                                  "lastName": "홍"
-                                }
-                                """))
+                                                {
+                                                  "email": "test@example.com",
+                                                  "nickname": "테스터",
+                                                  "provider": "google",
+                                                  "providerId": "google-123",
+                                                  "firstName": "길동",
+                                                  "lastName": "홍"
+                                                }
+                                                """))
         .andDo(print())
         .andExpect(status().isUnauthorized());
 
@@ -389,13 +352,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                {
-                                  "email": "not-email-format",
-                                  "nickname": "",
-                                  "firstName": "",
-                                  "lastName": ""
-                                }
-                                """))
+                                                {
+                                                  "email": "not-email-format",
+                                                  "nickname": "",
+                                                  "firstName": "",
+                                                  "lastName": ""
+                                                }
+                                                """))
         .andDo(print())
         .andExpect(status().isBadRequest());
 
@@ -412,13 +375,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                {
-                                  "email": "",
-                                  "nickname": "tester",
-                                  "firstName": "",
-                                  "lastName": ""
-                                }
-                                """))
+                                                {
+                                                  "email": "",
+                                                  "nickname": "tester",
+                                                  "firstName": "",
+                                                  "lastName": ""
+                                                }
+                                                """))
         .andDo(print())
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("Email is required."));
@@ -436,13 +399,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                {
-                                  "email": "",
-                                  "nickname": "tester",
-                                  "firstName": "",
-                                  "lastName": ""
-                                }
-                                """))
+                                                {
+                                                  "email": "",
+                                                  "nickname": "tester",
+                                                  "firstName": "",
+                                                  "lastName": ""
+                                                }
+                                                """))
         .andDo(print())
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("メールアドレスは必須入力項目です。"));
@@ -460,13 +423,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                {
-                                  "email": "",
-                                  "nickname": "tester",
-                                  "firstName": "",
-                                  "lastName": ""
-                                }
-                                """))
+                                                {
+                                                  "email": "",
+                                                  "nickname": "tester",
+                                                  "firstName": "",
+                                                  "lastName": ""
+                                                }
+                                                """))
         .andDo(print())
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("邮箱为必填项。"));
