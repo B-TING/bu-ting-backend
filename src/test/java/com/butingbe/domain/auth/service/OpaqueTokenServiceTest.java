@@ -48,7 +48,7 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
     assertThat(issuedToken.tokenType()).isEqualTo("Bearer");
     assertThat(issuedToken.expiresIn())
         .isEqualTo(OpaqueTokenService.ACCESS_TOKEN_EXPIRES_IN_SECONDS);
-    assertThat(opaqueTokenRepository.findAll())
+    assertThat(opaqueTokensOf(user))
         .singleElement()
         .satisfies(
             token -> assertThat(token.getTokenHash()).isNotEqualTo(issuedToken.accessToken()));
@@ -77,7 +77,7 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
 
     assertThat(reusedToken.accessToken()).isEqualTo(firstToken.accessToken());
     assertThat(reusedToken.expiresIn()).isLessThanOrEqualTo(firstToken.expiresIn());
-    assertThat(opaqueTokenRepository.findAll()).hasSize(1);
+    assertThat(opaqueTokensOf(user)).hasSize(1);
   }
 
   @Test
@@ -98,7 +98,7 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
     OpaqueTokenService.IssuedOpaqueToken secondToken = opaqueTokenService.issue(user);
 
     assertThat(secondToken.accessToken()).isNotEqualTo(firstToken.accessToken());
-    assertThat(opaqueTokenRepository.findAll()).hasSize(1);
+    assertThat(opaqueTokensOf(user)).hasSize(1);
     assertThat(opaqueTokenService.authenticate(firstToken.accessToken())).isEmpty();
     assertThat(opaqueTokenService.authenticate(secondToken.accessToken()))
         .hasValueSatisfying(
@@ -130,7 +130,7 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
         opaqueTokenService.issue(user, "Bearer " + expiredRawToken);
 
     assertThat(issuedToken.accessToken()).isNotEqualTo(expiredRawToken);
-    assertThat(opaqueTokenRepository.findAll()).hasSize(2);
+    assertThat(opaqueTokensOf(user)).hasSize(2);
     assertThat(opaqueTokenService.authenticate(issuedToken.accessToken())).contains(user);
   }
 
@@ -189,5 +189,11 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
     }
+  }
+
+  private java.util.List<com.butingbe.domain.auth.entity.OpaqueToken> opaqueTokensOf(User user) {
+    return opaqueTokenRepository.findAll().stream()
+        .filter(token -> user.getId().equals(token.getUser().getId()))
+        .toList();
   }
 }
