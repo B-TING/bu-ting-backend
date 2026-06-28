@@ -26,7 +26,7 @@ public class ChatMember {
 
     @MapsId("userId") // ChatMemberId 내부의 userId 필드와 매핑
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_id", foreignKey = @ForeignKey(ConstraintMode.CONSTRAINT))
+    @JoinColumn(name = "user_id", foreignKey = @ForeignKey(ConstraintMode.CONSTRAINT))
     private User user;
 
     @CreationTimestamp
