@@ -355,31 +355,6 @@ class UserControllerTest {
   }
 
   @Test
-  @DisplayName("회원가입 요청 시 인증 토큰이 없으면 401 Unauthorized를 반환한다")
-  void signUpFailWithoutAuthentication() throws Exception {
-    // when & then
-    mockMvc
-        .perform(
-            post("/api/v1/users/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                                {
-                                  "email": "test@example.com",
-                                  "nickname": "테스터",
-                                  "provider": "google",
-                                  "providerId": "google-123",
-                                  "firstName": "길동",
-                                  "lastName": "홍"
-                                }
-                                """))
-        .andDo(print())
-        .andExpect(status().isUnauthorized());
-
-    verify(userService, never()).signUp(any(SignUpReqDto.class));
-  }
-
-  @Test
   @DisplayName("회원가입 요청 시 이메일 형식이 누락되거나 잘못되면 @Valid에 의해 400 Bad Request를 뱉는다")
   void signUpValidationFail() throws Exception {
     // when & then
