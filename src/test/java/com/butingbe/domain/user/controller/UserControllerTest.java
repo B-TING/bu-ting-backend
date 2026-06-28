@@ -8,7 +8,10 @@ import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.docu
 import static org.springframework.restdocs.payload.PayloadDocumentation.*;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -261,13 +264,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                {
-                                                  "nickname": "수정닉",
-                                                  "profileImageUrl": "https://example.com/updated.png",
-                                                  "firstName": "길동",
-                                                  "lastName": "홍"
-                                                }
-                                                """))
+                                {
+                                  "nickname": "수정닉",
+                                  "profileImageUrl": "https://example.com/updated.png",
+                                  "firstName": "길동",
+                                  "lastName": "홍"
+                                }
+                                """))
         .andDo(print())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.nickname").value("수정닉"))

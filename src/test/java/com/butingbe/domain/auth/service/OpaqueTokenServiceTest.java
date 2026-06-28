@@ -48,7 +48,7 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
     assertThat(issuedToken.tokenType()).isEqualTo("Bearer");
     assertThat(issuedToken.expiresIn())
         .isEqualTo(OpaqueTokenService.ACCESS_TOKEN_EXPIRES_IN_SECONDS);
-    assertThat(opaqueTokenRepository.findAll())
+    assertThat(opaqueTokensOf(user))
         .singleElement()
         .satisfies(
             token -> assertThat(token.getTokenHash()).isNotEqualTo(issuedToken.accessToken()));
@@ -77,7 +77,32 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
 
     assertThat(reusedToken.accessToken()).isEqualTo(firstToken.accessToken());
     assertThat(reusedToken.expiresIn()).isLessThanOrEqualTo(firstToken.expiresIn());
-    assertThat(opaqueTokenRepository.findAll()).hasSize(1);
+    assertThat(opaqueTokensOf(user)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("같은 사용자가 다시 로그인하면 기존 active opaque token을 제거하고 새 토큰만 유지한다")
+  void replaceActiveOpaqueTokenOnRepeatedLogin() {
+    User user =
+        userRepository.save(
+            User.builder()
+                .email("repeat-login@example.com")
+                .provider("google")
+                .providerId("google-repeat-login")
+                .name(new Name("홍", "길동"))
+                .nickname("repeat-login-user")
+                .role(UserRole.USER)
+                .build());
+
+    OpaqueTokenService.IssuedOpaqueToken firstToken = opaqueTokenService.issue(user);
+    OpaqueTokenService.IssuedOpaqueToken secondToken = opaqueTokenService.issue(user);
+
+    assertThat(secondToken.accessToken()).isNotEqualTo(firstToken.accessToken());
+    assertThat(opaqueTokensOf(user)).hasSize(1);
+    assertThat(opaqueTokenService.authenticate(firstToken.accessToken())).isEmpty();
+    assertThat(opaqueTokenService.authenticate(secondToken.accessToken()))
+        .hasValueSatisfying(
+            authenticated -> assertThat(authenticated.getId()).isEqualTo(user.getId()));
   }
 
   @Test
@@ -105,7 +130,7 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
         opaqueTokenService.issue(user, "Bearer " + expiredRawToken);
 
     assertThat(issuedToken.accessToken()).isNotEqualTo(expiredRawToken);
-    assertThat(opaqueTokenRepository.findAll()).hasSize(2);
+    assertThat(opaqueTokensOf(user)).hasSize(2);
     assertThat(opaqueTokenService.authenticate(issuedToken.accessToken())).contains(user);
   }
 
@@ -164,5 +189,11 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
     }
+  }
+
+  private java.util.List<com.butingbe.domain.auth.entity.OpaqueToken> opaqueTokensOf(User user) {
+    return opaqueTokenRepository.findAll().stream()
+        .filter(token -> user.getId().equals(token.getUser().getId()))
+        .toList();
   }
 }

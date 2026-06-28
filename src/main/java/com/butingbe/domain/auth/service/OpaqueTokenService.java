@@ -53,8 +53,10 @@ public class OpaqueTokenService {
 
   private IssuedOpaqueToken issueNew(User user) {
     String rawToken = generateToken();
-    LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(ACCESS_TOKEN_EXPIRES_IN_SECONDS);
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime expiresAt = now.plusSeconds(ACCESS_TOKEN_EXPIRES_IN_SECONDS);
 
+    opaqueTokenRepository.deleteActiveByUserId(user.getId(), now);
     opaqueTokenRepository.save(
         OpaqueToken.builder().tokenHash(hash(rawToken)).user(user).expiresAt(expiresAt).build());
 
