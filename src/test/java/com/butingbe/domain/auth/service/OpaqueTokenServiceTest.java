@@ -81,6 +81,31 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("같은 사용자가 다시 로그인하면 기존 active opaque token을 제거하고 새 토큰만 유지한다")
+  void replaceActiveOpaqueTokenOnRepeatedLogin() {
+    User user =
+        userRepository.save(
+            User.builder()
+                .email("repeat-login@example.com")
+                .provider("google")
+                .providerId("google-repeat-login")
+                .name(new Name("홍", "길동"))
+                .nickname("repeat-login-user")
+                .role(UserRole.USER)
+                .build());
+
+    OpaqueTokenService.IssuedOpaqueToken firstToken = opaqueTokenService.issue(user);
+    OpaqueTokenService.IssuedOpaqueToken secondToken = opaqueTokenService.issue(user);
+
+    assertThat(secondToken.accessToken()).isNotEqualTo(firstToken.accessToken());
+    assertThat(opaqueTokenRepository.findAll()).hasSize(1);
+    assertThat(opaqueTokenService.authenticate(firstToken.accessToken())).isEmpty();
+    assertThat(opaqueTokenService.authenticate(secondToken.accessToken()))
+        .hasValueSatisfying(
+            authenticated -> assertThat(authenticated.getId()).isEqualTo(user.getId()));
+  }
+
+  @Test
   @DisplayName("전달된 opaque token이 만료된 경우 새 토큰을 발급한다")
   void issueNewTokenWhenExistingTokenExpired() {
     User user =
