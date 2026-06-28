@@ -13,20 +13,11 @@ public record ChatroomCreateRequest(
 
         String description,
 
-        @NotBlank(message = "법정동 행정코드는 필수입니다.")
+        @NotBlank(message = "행정코드는 필수입니다.")
         String localCode,
 
-        @NotBlank(message = "Google Place ID는 필수입니다.")
-        String googlePlaceId,
-
-        @NotBlank(message = "랜드마크 명칭은 필수입니다.")
-        String landmarkName,
-
-        @NotNull(message = "위도는 필수입니다.")
-        BigDecimal latitude,
-
-        @NotNull(message = "경도는 필수입니다.")
-        BigDecimal longitude,
+        @NotBlank(message = "채팅 권역(Zone)은 필수입니다.")
+        String chatZone,
 
         @Min(value = 10, message = "최소 정원은 10명 이상입니다.")
         @Max(value = 500, message = "최대 정원은 500명 이하입니다.")

@@ -8,9 +8,8 @@ import java.util.UUID;
 public record ChatroomResponse(
         UUID roomId,
         String title,
-        String landmarkName,
-        BigDecimal latitude,
-        BigDecimal longitude,
+        String chatZone,
+        String description,
         Integer currentMembers,
         Integer maxMembers
 ) {
@@ -18,9 +17,8 @@ public record ChatroomResponse(
         return new ChatroomResponse(
                 chatroom.getRoomId(),
                 chatroom.getTitle(),
-                chatroom.getLandmarkName(),
-                chatroom.getLatitude(),
-                chatroom.getLongitude(),
+                chatroom.getChatZone().getZoneName(),
+                chatroom.getDescription(),
                 chatroom.getCurrentMembers(),
                 chatroom.getMaxMembers()
         );

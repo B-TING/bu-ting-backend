@@ -25,20 +25,10 @@ public class LocalChatroomService {
     private final LocalChatroomRepository localChatroomRepository;
     private final ChatMemberRepository chatMemberRepository;
 
-    /**
-     * 1. 범위 기반 오픈채팅방 리스트 조회
-     */
-    public List<ChatroomResponse> getRoomsWithinBounds(BigDecimal swLat, BigDecimal swLng, BigDecimal neLat, BigDecimal neLng) {
-        return localChatroomRepository.findChatroomsWithinBounds(swLat, swLng, neLat, neLng)
-                .stream()
-                .map(ChatroomResponse::from)
-                .toList();
-    }
 
 
     public List<ChatroomResponse> getRoomsByZone(ChatZone zone) {
-        List<String> prefixes = zone.getCityCodes();
-        return localChatroomRepository.findByLocalCodePrefixIn(prefixes)
+        return localChatroomRepository.findByChatZone(zone)
                 .stream()
                 .map(ChatroomResponse::from)
                 .toList();

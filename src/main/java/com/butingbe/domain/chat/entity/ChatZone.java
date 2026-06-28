@@ -54,9 +54,7 @@ public enum ChatZone {
         this.landmarks = landmarks;
     }
 
-    /**
-     * 프론트엔드에서 문자열(예: "HAEUNDAE_GIJANG")로 요청이 들어왔을 때 안전하게 객체를 매핑하기 위한 유틸리티 메서드
-     */
+
     public static ChatZone fromString(String value) {
         return Arrays.stream(ChatZone.values())
                 .filter(zone -> zone.name().equalsIgnoreCase(value))

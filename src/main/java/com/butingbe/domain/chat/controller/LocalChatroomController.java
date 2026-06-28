@@ -25,17 +25,6 @@ public class LocalChatroomController {
     private final LocalChatroomService localChatroomService;
 
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<ChatroomResponse>>> getRoomsWithinBounds(
-            @RequestParam BigDecimal swLat,
-            @RequestParam BigDecimal swLng,
-            @RequestParam BigDecimal neLat,
-            @RequestParam BigDecimal neLng
-    ) {
-        List<ChatroomResponse> rooms = localChatroomService.getRoomsWithinBounds(swLat, swLng, neLat, neLng);
-        return ResponseEntity.ok(ApiResponse.success("지역별 채팅방 조회", rooms));
-    }
-
     @GetMapping("/zone")
     public ResponseEntity<ApiResponse<List<ChatroomResponse>>> getRoomsByZone(
             @RequestParam String zone

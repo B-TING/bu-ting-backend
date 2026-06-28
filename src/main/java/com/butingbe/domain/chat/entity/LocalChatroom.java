@@ -13,18 +13,13 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(
-        name = "local_chatroom",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uq_chatroom_place_id", columnNames = "google_place_id")
-        }
-)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "local_chatroom")
 public class LocalChatroom {
 
     @Id
-    @Column(name = "room_id", columnDefinition = "UUID")
+    @GeneratedValue(generator = "UUID")
     private UUID roomId;
 
     @Column(name = "title", nullable = false, length = 100)
@@ -33,21 +28,8 @@ public class LocalChatroom {
     @Column(name = "description", length = 500)
     private String description;
 
-    @Column(name = "local_code", nullable = false, length = 20)
-    private String localCode;
-
-    @Column(name = "google_place_id", nullable = false, length = 100)
-    private String googlePlaceId;
-
-    @Column(name = "landmark_name", nullable = false, length = 100)
-    private String landmarkName;
-
-    // Google Map 연동을 위한 NUMERIC(10,7) 매핑
-    @Column(name = "latitude", nullable = false, precision = 10, scale = 7)
-    private BigDecimal latitude;
-
-    @Column(name = "longitude", nullable = false, precision = 10, scale = 7)
-    private BigDecimal longitude;
+    @Enumerated(EnumType.STRING)
+    private ChatZone chatZone;
 
     @Column(name = "max_members", nullable = false)
     private Integer maxMembers;
@@ -55,33 +37,17 @@ public class LocalChatroom {
     @Column(name = "current_members", nullable = false)
     private Integer currentMembers;
 
-    @Column(name = "creator_id", nullable = false)
-    private UUID creatorId;
-
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt;
-
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
     @Builder
-    public LocalChatroom(String title, String description, String localCode,
-                         String googlePlaceId, String landmarkName,
-                         BigDecimal latitude, BigDecimal longitude,
-                         Integer maxMembers, UUID creatorId) {
-        this.roomId = UUID.randomUUID(); // Java 애플리케이션 단에서 UUID 선할당
+    public LocalChatroom(String title, String description, String localCode, ChatZone chatZone, Integer maxMembers) {
         this.title = title;
         this.description = description;
-        this.localCode = localCode;
-        this.googlePlaceId = googlePlaceId;
-        this.landmarkName = landmarkName;
-        this.latitude = latitude;
-        this.longitude = longitude;
-        this.maxMembers = (maxMembers != null) ? maxMembers : 100;
+        this.chatZone = chatZone;
+        this.maxMembers = maxMembers;
         this.currentMembers = 0;
-        this.creatorId = creatorId;
     }
 
     // 비즈니스 로직: 유저 입장 시 인원수 증가 (정원 체크는 서비스 레이어에서 수행)
