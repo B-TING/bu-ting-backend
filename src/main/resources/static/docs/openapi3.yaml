@@ -22,8 +22,9 @@ paths:
         - Auth
       summary: 클라이언트 SSO 로그인
       description: |
-        클라이언트가 Google/Naver/Kakao SSO 로그인 후 받은 authorization code를 백엔드로 전달합니다.
-        백엔드는 각 provider token endpoint에서 token을 교환합니다.
+        웹 클라이언트는 Google/Naver/Kakao SSO 로그인 후 받은 authorization code를 백엔드로 전달합니다.
+        앱 클라이언트는 SDK에서 받은 Google/Kakao id_token을 providerToken으로 전달할 수 있습니다.
+        백엔드는 authorization code를 각 provider token endpoint에서 교환하거나, id_token의 audience(aud), issuer(iss), expiration(exp)을 검증합니다.
         백엔드는 provider token을 검증하고, 기존 회원 조회/연결 또는 신규 회원 생성을 수행한 뒤 B-TING 전용 opaque access token을 발급합니다.
         Swagger 상단 Authorize로 기존 B-TING opaque token을 인증해두면, 같은 사용자이고 만료 전인 경우 기존 토큰을 재사용합니다.
         기존 토큰이 없거나 만료/폐기/다른 사용자 토큰이면 새 opaque token을 발급합니다.
@@ -44,6 +45,11 @@ paths:
                   providerToken: GOOGLE_AUTHORIZATION_CODE
                   redirectUri: http://localhost:8080/login/oauth2/code/google
                   codeVerifier: GOOGLE_CODE_VERIFIER
+              googleAppIdToken:
+                summary: Google 앱 id_token 로그인
+                value:
+                  provider: google
+                  providerToken: GOOGLE_APP_ID_TOKEN
               naverCode:
                 summary: Naver PKCE authorization code 로그인
                 value:
@@ -58,6 +64,11 @@ paths:
                   providerToken: KAKAO_AUTHORIZATION_CODE
                   redirectUri: http://localhost:8080/login/oauth2/code/kakao
                   codeVerifier: KAKAO_CODE_VERIFIER
+              kakaoAppIdToken:
+                summary: Kakao 앱 id_token 로그인
+                value:
+                  provider: kakao
+                  providerToken: KAKAO_APP_ID_TOKEN
       responses:
         "200":
           description: OAuth login succeeded
@@ -311,16 +322,16 @@ components:
           example: google
         providerToken:
           type: string
-          description: Google/Naver/Kakao authorization code를 전달합니다. Naver처럼 state가 필요한 경우 code와 state를 query string 형식으로 전달할 수 있습니다.
+          description: 웹은 Google/Naver/Kakao authorization code를 전달합니다. 앱은 Google/Kakao id_token을 전달할 수 있습니다. Naver처럼 state가 필요한 경우 code와 state를 query string 형식으로 전달할 수 있습니다.
           example: GOOGLE_AUTHORIZATION_CODE
         redirectUri:
           type: string
           format: uri
-          description: Authorization code 발급 시 사용한 redirect_uri입니다.
+          description: Authorization code 발급 시 사용한 redirect_uri입니다. id_token 로그인에서는 생략합니다.
           example: http://localhost:8080/login/oauth2/code/google
         codeVerifier:
           type: string
-          description: PKCE authorization code flow에서 사용한 code_verifier입니다.
+          description: PKCE authorization code flow에서 사용한 code_verifier입니다. id_token 로그인에서는 생략합니다.
           example: GOOGLE_CODE_VERIFIER
     SignUpRequest:
       type: object
