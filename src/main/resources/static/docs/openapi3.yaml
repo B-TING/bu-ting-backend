@@ -533,4 +533,4 @@ components:
         expiresIn:
           type: integer
           format: int64
-          example: 1209600
+          example: 3600
