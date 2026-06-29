@@ -5,7 +5,6 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.butingbe.domain.user.oauth.OAuth2UserInfo;
@@ -17,7 +16,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -32,41 +30,6 @@ class RestClientOAuthProviderTokenVerifierTest {
     String codeChallenge = codeChallengeS256(codeVerifier);
 
     assertThat(codeChallenge).isEqualTo("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
-  }
-
-  @Test
-  @DisplayName("Kakao provider token에 Bearer 접두어가 포함돼도 access token만 전달해 사용자 정보를 조회한다")
-  void verifyKakaoWithBearerPrefixedToken() {
-    RestClient.Builder builder = RestClient.builder();
-    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-    RestClientOAuthProviderTokenVerifier verifier =
-        new RestClientOAuthProviderTokenVerifier(
-            builder.build(), "", "", "", "", "", "", "", "", "");
-
-    server
-        .expect(requestTo("https://kapi.kakao.com/v2/user/me"))
-        .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer KAKAO_ACCESS_TOKEN"))
-        .andRespond(
-            withSuccess(
-                """
-                {
-                  "id": 12345,
-                  "kakao_account": {
-                    "email": "kakao@example.com",
-                    "profile": {
-                      "nickname": "카카오유저"
-                    }
-                  }
-                }
-                """,
-                MediaType.APPLICATION_JSON));
-
-    OAuth2UserInfo userInfo = verifier.verify("kakao", "Bearer KAKAO_ACCESS_TOKEN", null, null);
-
-    assertThat(userInfo.provider()).isEqualTo("kakao");
-    assertThat(userInfo.providerId()).isEqualTo("12345");
-    assertThat(userInfo.email()).isEqualTo("kakao@example.com");
-    server.verify();
   }
 
   @Test
@@ -86,12 +49,6 @@ class RestClientOAuthProviderTokenVerifierTest {
             "KAKAO_REST_API_KEY",
             "KAKAO_CLIENT_SECRET",
             "http://localhost:3000/oauth/kakao/callback");
-
-    server
-        .expect(requestTo("https://kapi.kakao.com/v2/user/me"))
-        .andExpect(method(HttpMethod.GET))
-        .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer KAKAO_AUTHORIZATION_CODE"))
-        .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
     server
         .expect(requestTo("https://kauth.kakao.com/oauth/token"))
@@ -144,7 +101,7 @@ class RestClientOAuthProviderTokenVerifierTest {
   }
 
   @Test
-  @DisplayName("Google provider token이 authorization code면 token endpoint 교환 후 사용자 정보를 조회한다")
+  @DisplayName("Google provider token은 authorization code로 받아 token endpoint 교환 후 사용자 정보를 조회한다")
   void verifyGoogleWithAuthorizationCode() {
     String codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
     String codeChallenge = codeChallengeS256(codeVerifier);
@@ -164,12 +121,6 @@ class RestClientOAuthProviderTokenVerifierTest {
             "");
 
     assertThat(codeChallenge).isEqualTo("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
-
-    server
-        .expect(
-            requestTo("https://oauth2.googleapis.com/tokeninfo?id_token=GOOGLE_AUTHORIZATION_CODE"))
-        .andExpect(method(HttpMethod.GET))
-        .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
     server
         .expect(requestTo("https://oauth2.googleapis.com/token"))
@@ -234,15 +185,6 @@ class RestClientOAuthProviderTokenVerifierTest {
             "",
             "",
             "");
-
-    server
-        .expect(requestTo("https://openapi.naver.com/v1/nid/me"))
-        .andExpect(method(HttpMethod.GET))
-        .andExpect(
-            header(
-                HttpHeaders.AUTHORIZATION,
-                "Bearer code=NAVER_AUTHORIZATION_CODE&state=NAVER_STATE"))
-        .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
     server
         .expect(requestTo("https://nid.naver.com/oauth2.0/token"))

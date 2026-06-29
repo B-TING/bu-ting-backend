@@ -9,12 +9,10 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
@@ -109,16 +107,14 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
         : token;
   }
 
-  private OAuth2UserInfo verifyGoogle(String idToken, String redirectUri, String codeVerifier) {
-    try {
-      return fetchGoogleIdTokenInfo(idToken);
-    } catch (RestClientResponseException e) {
-      if (!isUnauthorizedTokenResponse(e) || !hasGoogleCodeExchangeConfig(redirectUri)) {
-        throw e;
-      }
-      return verifyGoogleTokenResponse(
-          exchangeGoogleAuthorizationCode(idToken, redirectUri, codeVerifier));
+  private OAuth2UserInfo verifyGoogle(
+      String authorizationCode, String redirectUri, String codeVerifier) {
+    if (!hasGoogleCodeExchangeConfig(redirectUri)) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
     }
+
+    return verifyGoogleTokenResponse(
+        exchangeGoogleAuthorizationCode(authorizationCode, redirectUri, codeVerifier));
   }
 
   private OAuth2UserInfo fetchGoogleIdTokenInfo(String idToken) {
@@ -138,16 +134,14 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
     return OAuth2UserInfoFactory.from("google", attributes);
   }
 
-  private OAuth2UserInfo verifyNaver(String accessToken, String redirectUri, String codeVerifier) {
-    try {
-      return fetchNaverUserInfo(accessToken);
-    } catch (RestClientResponseException e) {
-      if (!isUnauthorizedTokenResponse(e) || !hasNaverCodeExchangeConfig()) {
-        throw e;
-      }
-      return fetchNaverUserInfo(
-          exchangeNaverAuthorizationCode(accessToken, redirectUri, codeVerifier));
+  private OAuth2UserInfo verifyNaver(
+      String authorizationCode, String redirectUri, String codeVerifier) {
+    if (!hasNaverCodeExchangeConfig()) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
     }
+
+    return fetchNaverUserInfo(
+        exchangeNaverAuthorizationCode(authorizationCode, redirectUri, codeVerifier));
   }
 
   private OAuth2UserInfo fetchNaverUserInfo(String accessToken) {
@@ -185,16 +179,14 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
     return OAuth2UserInfoFactory.from("google", attributes);
   }
 
-  private OAuth2UserInfo verifyKakao(String accessToken, String redirectUri, String codeVerifier) {
-    try {
-      return fetchKakaoUserInfo(accessToken);
-    } catch (RestClientResponseException e) {
-      if (!isUnauthorizedTokenResponse(e) || !hasKakaoCodeExchangeConfig(redirectUri)) {
-        throw e;
-      }
-      return fetchKakaoUserInfo(
-          exchangeKakaoAuthorizationCode(accessToken, redirectUri, codeVerifier));
+  private OAuth2UserInfo verifyKakao(
+      String authorizationCode, String redirectUri, String codeVerifier) {
+    if (!hasKakaoCodeExchangeConfig(redirectUri)) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
     }
+
+    return fetchKakaoUserInfo(
+        exchangeKakaoAuthorizationCode(authorizationCode, redirectUri, codeVerifier));
   }
 
   private OAuth2UserInfo fetchKakaoUserInfo(String accessToken) {
@@ -321,11 +313,6 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
     }
 
     return body.toString();
-  }
-
-  private boolean isUnauthorizedTokenResponse(RestClientResponseException e) {
-    HttpStatusCode statusCode = e.getStatusCode();
-    return statusCode.value() == 400 || statusCode.value() == 401;
   }
 
   private boolean hasKakaoCodeExchangeConfig(String redirectUri) {
