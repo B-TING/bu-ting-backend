@@ -1,6 +1,7 @@
 package com.butingbe.domain.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -8,9 +9,11 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.butingbe.domain.user.oauth.OAuth2UserInfo;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.Base64;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -101,6 +104,94 @@ class RestClientOAuthProviderTokenVerifierTest {
   }
 
   @Test
+  @DisplayName("Google 앱 id_token은 aud, iss, exp 검증 후 사용자 정보로 변환한다")
+  void verifyGoogleWithAppIdToken() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "GOOGLE_WEB_CLIENT_ID",
+            "",
+            "",
+            "GOOGLE_ANDROID_CLIENT_ID",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "");
+
+    server
+        .expect(requestTo("https://oauth2.googleapis.com/tokeninfo?id_token=GOOGLE.ID.TOKEN"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "iss": "https://accounts.google.com",
+                  "aud": "GOOGLE_ANDROID_CLIENT_ID",
+                  "exp": "%d",
+                  "sub": "google-app-123",
+                  "email": "google-app@example.com",
+                  "name": "Google App User"
+                }
+                """
+                    .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
+                MediaType.APPLICATION_JSON));
+
+    OAuth2UserInfo userInfo = verifier.verify("google", "GOOGLE.ID.TOKEN", null, null);
+
+    assertThat(userInfo.provider()).isEqualTo("google");
+    assertThat(userInfo.providerId()).isEqualTo("google-app-123");
+    assertThat(userInfo.email()).isEqualTo("google-app@example.com");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Google 앱 id_token의 aud가 허용 목록과 다르면 인증 실패 처리한다")
+  void verifyGoogleWithAppIdTokenFailsWithInvalidAudience() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "GOOGLE_WEB_CLIENT_ID",
+            "",
+            "",
+            "GOOGLE_ANDROID_CLIENT_ID",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "");
+
+    server
+        .expect(requestTo("https://oauth2.googleapis.com/tokeninfo?id_token=GOOGLE.ID.TOKEN"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "iss": "https://accounts.google.com",
+                  "aud": "OTHER_CLIENT_ID",
+                  "exp": "%d",
+                  "sub": "google-app-123",
+                  "email": "google-app@example.com"
+                }
+                """
+                    .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
+                MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> verifier.verify("google", "GOOGLE.ID.TOKEN", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    server.verify();
+  }
+
+  @Test
   @DisplayName("Google provider token은 authorization code로 받아 token endpoint 교환 후 사용자 정보를 조회한다")
   void verifyGoogleWithAuthorizationCode() {
     String codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
@@ -165,6 +256,52 @@ class RestClientOAuthProviderTokenVerifierTest {
     assertThat(userInfo.provider()).isEqualTo("google");
     assertThat(userInfo.providerId()).isEqualTo("google-123");
     assertThat(userInfo.email()).isEqualTo("google@example.com");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Kakao 앱 id_token은 aud, iss, exp 검증 후 사용자 정보로 변환한다")
+  void verifyKakaoWithAppIdToken() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "KAKAO_REST_API_KEY",
+            "",
+            "",
+            "KAKAO_NATIVE_APP_KEY");
+
+    server
+        .expect(requestTo("https://kauth.kakao.com/oauth/tokeninfo?id_token=KAKAO.ID.TOKEN"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "iss": "https://kauth.kakao.com",
+                  "aud": "KAKAO_NATIVE_APP_KEY",
+                  "exp": %d,
+                  "sub": "12345",
+                  "email": "kakao-app@example.com",
+                  "nickname": "카카오앱유저"
+                }
+                """
+                    .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
+                MediaType.APPLICATION_JSON));
+
+    OAuth2UserInfo userInfo = verifier.verify("kakao", "KAKAO.ID.TOKEN", null, null);
+
+    assertThat(userInfo.provider()).isEqualTo("kakao");
+    assertThat(userInfo.providerId()).isEqualTo("12345");
+    assertThat(userInfo.email()).isEqualTo("kakao-app@example.com");
     server.verify();
   }
 
