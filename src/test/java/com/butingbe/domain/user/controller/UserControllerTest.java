@@ -399,13 +399,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                {
-                                                  "nickname": "수정닉",
-                                                  "profileImageUrl": "https://example.com/updated.png",
-                                                  "firstName": "길동",
-                                                  "lastName": "홍"
-                                                }
-                                                """))
+                                {
+                                  "nickname": "수정닉",
+                                  "profileImageUrl": "https://example.com/updated.png",
+                                  "firstName": "길동",
+                                  "lastName": "홍"
+                                }
+                                """))
         .andDo(print())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.nickname").value("수정닉"))
