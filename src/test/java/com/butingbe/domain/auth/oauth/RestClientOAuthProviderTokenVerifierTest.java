@@ -262,6 +262,14 @@ class RestClientOAuthProviderTokenVerifierTest {
   @Test
   @DisplayName("Kakao 앱 id_token은 aud, iss, exp 검증 후 사용자 정보로 변환한다")
   void verifyKakaoWithAppIdToken() {
+    String kakaoIdToken =
+        jwtWithPayload(
+            """
+            {
+              "email": "kakao-app@example.com",
+              "nickname": "카카오앱유저"
+            }
+            """);
     RestClient.Builder builder = RestClient.builder();
     MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
     RestClientOAuthProviderTokenVerifier verifier =
@@ -280,7 +288,7 @@ class RestClientOAuthProviderTokenVerifierTest {
             "KAKAO_NATIVE_APP_KEY");
 
     server
-        .expect(requestTo("https://kauth.kakao.com/oauth/tokeninfo?id_token=KAKAO.ID.TOKEN"))
+        .expect(requestTo("https://kauth.kakao.com/oauth/tokeninfo?id_token=" + kakaoIdToken))
         .andExpect(method(HttpMethod.GET))
         .andRespond(
             withSuccess(
@@ -289,15 +297,13 @@ class RestClientOAuthProviderTokenVerifierTest {
                   "iss": "https://kauth.kakao.com",
                   "aud": "KAKAO_NATIVE_APP_KEY",
                   "exp": %d,
-                  "sub": "12345",
-                  "email": "kakao-app@example.com",
-                  "nickname": "카카오앱유저"
+                  "sub": "12345"
                 }
                 """
                     .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
                 MediaType.APPLICATION_JSON));
 
-    OAuth2UserInfo userInfo = verifier.verify("kakao", "KAKAO.ID.TOKEN", null, null);
+    OAuth2UserInfo userInfo = verifier.verify("kakao", kakaoIdToken, null, null);
 
     assertThat(userInfo.provider()).isEqualTo("kakao");
     assertThat(userInfo.providerId()).isEqualTo("12345");
@@ -384,5 +390,13 @@ class RestClientOAuthProviderTokenVerifierTest {
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
     }
+  }
+
+  private String jwtWithPayload(String payload) {
+    return "header."
+        + Base64.getUrlEncoder()
+            .withoutPadding()
+            .encodeToString(payload.getBytes(StandardCharsets.UTF_8))
+        + ".signature";
   }
 }
