@@ -109,7 +109,7 @@ class AuthControllerTest {
                     """
                     {
                       "provider": "google",
-                      "providerToken": "GOOGLE_ID_TOKEN"
+                      "providerToken": "GOOGLE_AUTHORIZATION_CODE"
                     }
                     """))
         .andDo(print())
@@ -127,8 +127,7 @@ class AuthControllerTest {
                         .description("기존 B-TING opaque token. 같은 사용자이고 만료 전이면 재사용됩니다.")),
                 requestFields(
                     fieldWithPath("provider").description("SSO provider: google, naver, kakao"),
-                    fieldWithPath("providerToken")
-                        .description("Provider token, or OAuth authorization code when using PKCE"),
+                    fieldWithPath("providerToken").description("OAuth authorization code"),
                     fieldWithPath("redirectUri")
                         .optional()
                         .type(JsonFieldType.STRING)
