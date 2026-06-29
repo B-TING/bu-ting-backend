@@ -98,7 +98,7 @@ class AuthControllerTest {
                 false,
                 "opaque-token",
                 "Bearer",
-                1209600));
+                3600));
 
     mockMvc
         .perform(

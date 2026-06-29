@@ -59,7 +59,7 @@ class OAuthLoginServiceTest {
     given(opaqueTokenService.issue(user, null))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "opaque-token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));
+                "opaque-token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
 
     OAuth2LoginResDto response = oAuthLoginService.login(request);
 
@@ -99,7 +99,7 @@ class OAuthLoginServiceTest {
     given(opaqueTokenService.issue(savedUser, null))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "new-opaque-token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));
+                "new-opaque-token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
 
     OAuth2LoginResDto response = oAuthLoginService.login(request);
 
@@ -160,7 +160,7 @@ class OAuthLoginServiceTest {
     given(opaqueTokenService.issue(user, null))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "provider-token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));
+                "provider-token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
 
     OAuth2LoginResDto response = oAuthLoginService.login(request);
 

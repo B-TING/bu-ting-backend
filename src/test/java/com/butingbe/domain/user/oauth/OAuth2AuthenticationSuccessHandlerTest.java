@@ -46,7 +46,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
     given(opaqueTokenService.issue(user))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "opaque-token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));
+                "opaque-token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
 
     MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -65,7 +65,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
         .contains("\"emailRequired\":false")
         .contains("\"accessToken\":\"opaque-token\"")
         .contains("\"tokenType\":\"Bearer\"")
-        .contains("\"expiresIn\":1209600");
+        .contains("\"expiresIn\":3600");
   }
 
   @Test
@@ -87,7 +87,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
     given(opaqueTokenService.issue(user))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "opaque\"token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));
+                "opaque\"token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
 
     MockHttpServletResponse response = new MockHttpServletResponse();
 

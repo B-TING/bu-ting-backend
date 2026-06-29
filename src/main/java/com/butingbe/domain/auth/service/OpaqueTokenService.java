@@ -20,7 +20,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class OpaqueTokenService {
 
-  public static final long ACCESS_TOKEN_EXPIRES_IN_SECONDS = 60L * 60L * 24L * 14L;
+  public static final long ACCESS_TOKEN_EXPIRES_IN_SECONDS = 60L * 60L;
   private static final String HASH_ALGORITHM = "SHA-256";
   private static final String BEARER_PREFIX = "Bearer ";
 
