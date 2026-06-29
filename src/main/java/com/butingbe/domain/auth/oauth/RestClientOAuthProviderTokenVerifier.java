@@ -3,10 +3,14 @@ package com.butingbe.domain.auth.oauth;
 import com.butingbe.domain.user.oauth.OAuth2UserInfo;
 import com.butingbe.domain.user.oauth.OAuth2UserInfoFactory;
 import com.butingbe.global.error.exception.UnauthenticatedException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -26,6 +30,8 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
 
   private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
       new ParameterizedTypeReference<>() {};
+  private static final TypeReference<Map<String, Object>> JSON_MAP_TYPE = new TypeReference<>() {};
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String BEARER_PREFIX = "Bearer ";
   private static final long EXPIRATION_CLOCK_SKEW_SECONDS = 60L;
   private static final Set<String> GOOGLE_ISSUERS =
@@ -245,7 +251,7 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
   }
 
   private OAuth2UserInfo verifyKakaoIdToken(String idToken) {
-    Map<String, Object> claims =
+    Map<String, Object> tokenInfoClaims =
         restClient
             .get()
             .uri(
@@ -258,8 +264,9 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
                         .build())
             .retrieve()
             .body(MAP_TYPE);
-    validateIdTokenClaims(claims, kakaoAllowedAudiences, KAKAO_ISSUERS);
-    return OAuth2UserInfoFactory.from("kakao", kakaoIdTokenAttributes(claims));
+    validateIdTokenClaims(tokenInfoClaims, kakaoAllowedAudiences, KAKAO_ISSUERS);
+    return OAuth2UserInfoFactory.from(
+        "kakao", kakaoIdTokenAttributes(mergeIdTokenPayload(idToken, tokenInfoClaims)));
   }
 
   private OAuth2UserInfo fetchKakaoUserInfo(String accessToken) {
@@ -441,7 +448,7 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
 
   private Map<String, Object> kakaoIdTokenAttributes(Map<String, Object> claims) {
     Map<String, Object> profile = new LinkedHashMap<>();
-    String nickname = value(claims.get("nickname"));
+    String nickname = firstText(claims.get("nickname"), claims.get("name"));
     if (StringUtils.hasText(nickname)) {
       profile.put("nickname", nickname);
     }
@@ -457,6 +464,29 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
     attributes.put("id", value(claims.get("sub")));
     attributes.put("kakao_account", account);
     return attributes;
+  }
+
+  private Map<String, Object> mergeIdTokenPayload(
+      String idToken, Map<String, Object> tokenInfoClaims) {
+    Map<String, Object> mergedClaims = new LinkedHashMap<>(jwtPayload(idToken));
+    if (tokenInfoClaims != null) {
+      mergedClaims.putAll(tokenInfoClaims);
+    }
+    return mergedClaims;
+  }
+
+  private Map<String, Object> jwtPayload(String idToken) {
+    String[] parts = idToken.split("\\.", -1);
+    if (parts.length != 3) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
+
+    try {
+      byte[] payload = Base64.getUrlDecoder().decode(parts[1]);
+      return OBJECT_MAPPER.readValue(payload, JSON_MAP_TYPE);
+    } catch (IllegalArgumentException | IOException e) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
   }
 
   private String codePart(String providerToken) {
@@ -483,6 +513,11 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
 
   private String value(Object value) {
     return value == null ? null : String.valueOf(value);
+  }
+
+  private String firstText(Object first, Object second) {
+    String firstValue = value(first);
+    return StringUtils.hasText(firstValue) ? firstValue : value(second);
   }
 
   private long longValue(Object value) {
