@@ -253,15 +253,10 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
   private OAuth2UserInfo verifyKakaoIdToken(String idToken) {
     Map<String, Object> tokenInfoClaims =
         restClient
-            .get()
-            .uri(
-                uriBuilder ->
-                    uriBuilder
-                        .scheme("https")
-                        .host("kauth.kakao.com")
-                        .path("/oauth/tokeninfo")
-                        .queryParam("id_token", idToken)
-                        .build())
+            .post()
+            .uri("https://kauth.kakao.com/oauth/tokeninfo")
+            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+            .body("id_token=" + formValue(idToken))
             .retrieve()
             .body(MAP_TYPE);
     validateIdTokenClaims(tokenInfoClaims, kakaoAllowedAudiences, KAKAO_ISSUERS);
