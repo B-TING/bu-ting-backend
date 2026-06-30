@@ -288,8 +288,9 @@ class RestClientOAuthProviderTokenVerifierTest {
             "KAKAO_NATIVE_APP_KEY");
 
     server
-        .expect(requestTo("https://kauth.kakao.com/oauth/tokeninfo?id_token=" + kakaoIdToken))
-        .andExpect(method(HttpMethod.GET))
+        .expect(requestTo("https://kauth.kakao.com/oauth/tokeninfo"))
+        .andExpect(method(HttpMethod.POST))
+        .andExpect(content().string("id_token=" + kakaoIdToken))
         .andRespond(
             withSuccess(
                 """
@@ -308,6 +309,55 @@ class RestClientOAuthProviderTokenVerifierTest {
     assertThat(userInfo.provider()).isEqualTo("kakao");
     assertThat(userInfo.providerId()).isEqualTo("12345");
     assertThat(userInfo.email()).isEqualTo("kakao-app@example.com");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Kakao tokeninfo 응답의 aud가 허용 client id와 다르면 인증 실패 처리한다")
+  void verifyKakaoWithAppIdTokenFailsWithInvalidAudience() {
+    String kakaoIdToken =
+        jwtWithPayload(
+            """
+            {
+              "email": "kakao-app@example.com"
+            }
+            """);
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "KAKAO_REST_API_KEY",
+            "",
+            "",
+            "KAKAO_NATIVE_APP_KEY");
+
+    server
+        .expect(requestTo("https://kauth.kakao.com/oauth/tokeninfo"))
+        .andExpect(method(HttpMethod.POST))
+        .andExpect(content().string("id_token=" + kakaoIdToken))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "iss": "https://kauth.kakao.com",
+                  "aud": "OTHER_NATIVE_APP_KEY",
+                  "exp": %d,
+                  "sub": "12345"
+                }
+                """
+                    .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
+                MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> verifier.verify("kakao", kakaoIdToken, null, null))
+        .isInstanceOf(UnauthenticatedException.class);
     server.verify();
   }
 
