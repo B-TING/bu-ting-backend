@@ -127,7 +127,9 @@ class AuthControllerTest {
                         .description("기존 B-TING opaque token. 같은 사용자이고 만료 전이면 재사용됩니다.")),
                 requestFields(
                     fieldWithPath("provider").description("SSO provider: google, naver, kakao"),
-                    fieldWithPath("providerToken").description("OAuth authorization code"),
+                    fieldWithPath("providerToken")
+                        .description(
+                            "웹 클라이언트는 OAuth authorization code를 전달하고, 앱 클라이언트는 Google/Kakao id_token을 전달합니다."),
                     fieldWithPath("redirectUri")
                         .optional()
                         .type(JsonFieldType.STRING)
