@@ -119,6 +119,45 @@ class TravelSurveyControllerTest extends AbstractContainerTest {
     assertThat(survey.getFamiliar()).isNull();
   }
 
+  @Test
+  @DisplayName("개발 관리자 토큰으로 여행 설문을 저장하고 조회할 수 있다")
+  void upsertAndGetProfileWithDevelopmentAdminToken() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/travel-surveys")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer test-admin-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "preferredLanguage": "ko",
+                      "isPlanned": false,
+                      "isRelaxed": true,
+                      "isSolo": false,
+                      "isLight": true,
+                      "isFamiliar": true,
+                      "purposes": ["culture"],
+                      "skippedSteps": [],
+                      "skippedAll": false
+                    }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.preferredLanguage").value("ko"))
+        .andExpect(jsonPath("$.purposes[0]").value("culture"));
+
+    User admin =
+        userRepository.findByProviderAndProviderId("development", "admin-token").orElseThrow();
+    assertThat(admin.getId()).isNotNull();
+
+    mockMvc
+        .perform(
+            get("/api/v1/travel-surveys")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer test-admin-token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.isRelaxed").value(true))
+        .andExpect(jsonPath("$.purposes[0]").value("culture"));
+  }
+
   private User createUser(String email, String nickname) {
     return User.builder()
         .email(email)

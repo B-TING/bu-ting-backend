@@ -3,18 +3,26 @@ package com.butingbe.domain.auth.oauth;
 import com.butingbe.domain.user.oauth.OAuth2UserInfo;
 import com.butingbe.domain.user.oauth.OAuth2UserInfoFactory;
 import com.butingbe.global.error.exception.UnauthenticatedException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
@@ -22,41 +30,53 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
 
   private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
       new ParameterizedTypeReference<>() {};
+  private static final TypeReference<Map<String, Object>> JSON_MAP_TYPE = new TypeReference<>() {};
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String BEARER_PREFIX = "Bearer ";
+  private static final long EXPIRATION_CLOCK_SKEW_SECONDS = 60L;
+  private static final Set<String> GOOGLE_ISSUERS =
+      Set.of("accounts.google.com", "https://accounts.google.com");
+  private static final Set<String> KAKAO_ISSUERS = Set.of("https://kauth.kakao.com");
 
   private final RestClient restClient;
   private final String googleClientId;
   private final String googleClientSecret;
   private final String googleRedirectUri;
+  private final Set<String> googleAllowedAudiences;
   private final String naverClientId;
   private final String naverClientSecret;
   private final String naverRedirectUri;
   private final String kakaoClientId;
   private final String kakaoClientSecret;
   private final String kakaoRedirectUri;
+  private final Set<String> kakaoAllowedAudiences;
 
   @Autowired
   public RestClientOAuthProviderTokenVerifier(
       @Value("${oauth.google.client-id:}") String googleClientId,
       @Value("${oauth.google.client-secret:}") String googleClientSecret,
       @Value("${oauth.google.redirect-uri:}") String googleRedirectUri,
+      @Value("${oauth.google.allowed-audiences:}") String googleAllowedAudiences,
       @Value("${oauth.naver.client-id:}") String naverClientId,
       @Value("${oauth.naver.client-secret:}") String naverClientSecret,
       @Value("${oauth.naver.redirect-uri:}") String naverRedirectUri,
       @Value("${oauth.kakao.client-id:}") String kakaoClientId,
       @Value("${oauth.kakao.client-secret:}") String kakaoClientSecret,
-      @Value("${oauth.kakao.redirect-uri:}") String kakaoRedirectUri) {
+      @Value("${oauth.kakao.redirect-uri:}") String kakaoRedirectUri,
+      @Value("${oauth.kakao.allowed-audiences:}") String kakaoAllowedAudiences) {
     this(
         RestClient.create(),
         googleClientId,
         googleClientSecret,
         googleRedirectUri,
+        googleAllowedAudiences,
         naverClientId,
         naverClientSecret,
         naverRedirectUri,
         kakaoClientId,
         kakaoClientSecret,
-        kakaoRedirectUri);
+        kakaoRedirectUri,
+        kakaoAllowedAudiences);
   }
 
   RestClientOAuthProviderTokenVerifier(
@@ -70,16 +90,46 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
       String kakaoClientId,
       String kakaoClientSecret,
       String kakaoRedirectUri) {
+    this(
+        restClient,
+        googleClientId,
+        googleClientSecret,
+        googleRedirectUri,
+        "",
+        naverClientId,
+        naverClientSecret,
+        naverRedirectUri,
+        kakaoClientId,
+        kakaoClientSecret,
+        kakaoRedirectUri,
+        "");
+  }
+
+  RestClientOAuthProviderTokenVerifier(
+      RestClient restClient,
+      String googleClientId,
+      String googleClientSecret,
+      String googleRedirectUri,
+      String googleAllowedAudiences,
+      String naverClientId,
+      String naverClientSecret,
+      String naverRedirectUri,
+      String kakaoClientId,
+      String kakaoClientSecret,
+      String kakaoRedirectUri,
+      String kakaoAllowedAudiences) {
     this.restClient = restClient;
     this.googleClientId = googleClientId;
     this.googleClientSecret = googleClientSecret;
     this.googleRedirectUri = googleRedirectUri;
+    this.googleAllowedAudiences = allowedAudiences(googleAllowedAudiences, googleClientId);
     this.naverClientId = naverClientId;
     this.naverClientSecret = naverClientSecret;
     this.naverRedirectUri = naverRedirectUri;
     this.kakaoClientId = kakaoClientId;
     this.kakaoClientSecret = kakaoClientSecret;
     this.kakaoRedirectUri = kakaoRedirectUri;
+    this.kakaoAllowedAudiences = allowedAudiences(kakaoAllowedAudiences, kakaoClientId);
   }
 
   @Override
@@ -109,19 +159,21 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
         : token;
   }
 
-  private OAuth2UserInfo verifyGoogle(String idToken, String redirectUri, String codeVerifier) {
-    try {
-      return fetchGoogleIdTokenInfo(idToken);
-    } catch (RestClientResponseException e) {
-      if (!isUnauthorizedTokenResponse(e) || !hasGoogleCodeExchangeConfig(redirectUri)) {
-        throw e;
-      }
-      return verifyGoogleTokenResponse(
-          exchangeGoogleAuthorizationCode(idToken, redirectUri, codeVerifier));
+  private OAuth2UserInfo verifyGoogle(
+      String providerToken, String redirectUri, String codeVerifier) {
+    if (isJwt(providerToken)) {
+      return verifyGoogleIdToken(providerToken);
     }
+
+    if (!hasGoogleCodeExchangeConfig(redirectUri)) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
+
+    return verifyGoogleTokenResponse(
+        exchangeGoogleAuthorizationCode(providerToken, redirectUri, codeVerifier));
   }
 
-  private OAuth2UserInfo fetchGoogleIdTokenInfo(String idToken) {
+  private OAuth2UserInfo verifyGoogleIdToken(String idToken) {
     Map<String, Object> attributes =
         restClient
             .get()
@@ -135,19 +187,18 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
                         .build())
             .retrieve()
             .body(MAP_TYPE);
+    validateIdTokenClaims(attributes, googleAllowedAudiences, GOOGLE_ISSUERS);
     return OAuth2UserInfoFactory.from("google", attributes);
   }
 
-  private OAuth2UserInfo verifyNaver(String accessToken, String redirectUri, String codeVerifier) {
-    try {
-      return fetchNaverUserInfo(accessToken);
-    } catch (RestClientResponseException e) {
-      if (!isUnauthorizedTokenResponse(e) || !hasNaverCodeExchangeConfig()) {
-        throw e;
-      }
-      return fetchNaverUserInfo(
-          exchangeNaverAuthorizationCode(accessToken, redirectUri, codeVerifier));
+  private OAuth2UserInfo verifyNaver(
+      String authorizationCode, String redirectUri, String codeVerifier) {
+    if (!hasNaverCodeExchangeConfig()) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
     }
+
+    return fetchNaverUserInfo(
+        exchangeNaverAuthorizationCode(authorizationCode, redirectUri, codeVerifier));
   }
 
   private OAuth2UserInfo fetchNaverUserInfo(String accessToken) {
@@ -164,7 +215,7 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
   private OAuth2UserInfo verifyGoogleTokenResponse(Map<String, Object> tokenResponse) {
     String idToken = value(tokenResponse == null ? null : tokenResponse.get("id_token"));
     if (StringUtils.hasText(idToken)) {
-      return fetchGoogleIdTokenInfo(idToken);
+      return verifyGoogleIdToken(idToken);
     }
 
     String accessToken = value(tokenResponse == null ? null : tokenResponse.get("access_token"));
@@ -185,16 +236,32 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
     return OAuth2UserInfoFactory.from("google", attributes);
   }
 
-  private OAuth2UserInfo verifyKakao(String accessToken, String redirectUri, String codeVerifier) {
-    try {
-      return fetchKakaoUserInfo(accessToken);
-    } catch (RestClientResponseException e) {
-      if (!isUnauthorizedTokenResponse(e) || !hasKakaoCodeExchangeConfig(redirectUri)) {
-        throw e;
-      }
-      return fetchKakaoUserInfo(
-          exchangeKakaoAuthorizationCode(accessToken, redirectUri, codeVerifier));
+  private OAuth2UserInfo verifyKakao(
+      String providerToken, String redirectUri, String codeVerifier) {
+    if (isJwt(providerToken)) {
+      return verifyKakaoIdToken(providerToken);
     }
+
+    if (!hasKakaoCodeExchangeConfig(redirectUri)) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
+
+    return fetchKakaoUserInfo(
+        exchangeKakaoAuthorizationCode(providerToken, redirectUri, codeVerifier));
+  }
+
+  private OAuth2UserInfo verifyKakaoIdToken(String idToken) {
+    Map<String, Object> tokenInfoClaims =
+        restClient
+            .post()
+            .uri("https://kauth.kakao.com/oauth/tokeninfo")
+            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+            .body("id_token=" + formValue(idToken))
+            .retrieve()
+            .body(MAP_TYPE);
+    validateIdTokenClaims(tokenInfoClaims, kakaoAllowedAudiences, KAKAO_ISSUERS);
+    return OAuth2UserInfoFactory.from(
+        "kakao", kakaoIdTokenAttributes(mergeIdTokenPayload(idToken, tokenInfoClaims)));
   }
 
   private OAuth2UserInfo fetchKakaoUserInfo(String accessToken) {
@@ -323,11 +390,6 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
     return body.toString();
   }
 
-  private boolean isUnauthorizedTokenResponse(RestClientResponseException e) {
-    HttpStatusCode statusCode = e.getStatusCode();
-    return statusCode.value() == 400 || statusCode.value() == 401;
-  }
-
   private boolean hasKakaoCodeExchangeConfig(String redirectUri) {
     return StringUtils.hasText(kakaoClientId)
         && StringUtils.hasText(effectiveRedirectUri(redirectUri, kakaoRedirectUri));
@@ -340,6 +402,86 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
 
   private boolean hasNaverCodeExchangeConfig() {
     return StringUtils.hasText(naverClientId) && StringUtils.hasText(naverClientSecret);
+  }
+
+  private boolean isJwt(String providerToken) {
+    return providerToken.chars().filter(character -> character == '.').count() == 2;
+  }
+
+  private void validateIdTokenClaims(
+      Map<String, Object> claims, Set<String> allowedAudiences, Set<String> allowedIssuers) {
+    if (claims == null || allowedAudiences.isEmpty()) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
+
+    Set<String> tokenAudiences = tokenAudiences(claims.get("aud"));
+    if (tokenAudiences.stream().noneMatch(allowedAudiences::contains)) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
+
+    String issuer = value(claims.get("iss"));
+    if (!allowedIssuers.contains(issuer)) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
+
+    long expiresAt = longValue(claims.get("exp"));
+    if (expiresAt <= Instant.now().getEpochSecond() - EXPIRATION_CLOCK_SKEW_SECONDS) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
+  }
+
+  private Set<String> tokenAudiences(Object aud) {
+    if (aud instanceof Collection<?> values) {
+      Set<String> audiences = new HashSet<>();
+      values.stream().map(this::value).filter(StringUtils::hasText).forEach(audiences::add);
+      return audiences;
+    }
+
+    String audience = value(aud);
+    return StringUtils.hasText(audience) ? Set.of(audience) : Set.of();
+  }
+
+  private Map<String, Object> kakaoIdTokenAttributes(Map<String, Object> claims) {
+    Map<String, Object> profile = new LinkedHashMap<>();
+    String nickname = firstText(claims.get("nickname"), claims.get("name"));
+    if (StringUtils.hasText(nickname)) {
+      profile.put("nickname", nickname);
+    }
+
+    Map<String, Object> account = new LinkedHashMap<>();
+    String email = value(claims.get("email"));
+    if (StringUtils.hasText(email)) {
+      account.put("email", email);
+    }
+    account.put("profile", profile);
+
+    Map<String, Object> attributes = new LinkedHashMap<>(claims);
+    attributes.put("id", value(claims.get("sub")));
+    attributes.put("kakao_account", account);
+    return attributes;
+  }
+
+  private Map<String, Object> mergeIdTokenPayload(
+      String idToken, Map<String, Object> tokenInfoClaims) {
+    Map<String, Object> mergedClaims = new LinkedHashMap<>(jwtPayload(idToken));
+    if (tokenInfoClaims != null) {
+      mergedClaims.putAll(tokenInfoClaims);
+    }
+    return mergedClaims;
+  }
+
+  private Map<String, Object> jwtPayload(String idToken) {
+    String[] parts = idToken.split("\\.", -1);
+    if (parts.length != 3) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
+
+    try {
+      byte[] payload = Base64.getUrlDecoder().decode(parts[1]);
+      return OBJECT_MAPPER.readValue(payload, JSON_MAP_TYPE);
+    } catch (IllegalArgumentException | IOException e) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
   }
 
   private String codePart(String providerToken) {
@@ -366,6 +508,33 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
 
   private String value(Object value) {
     return value == null ? null : String.valueOf(value);
+  }
+
+  private String firstText(Object first, Object second) {
+    String firstValue = value(first);
+    return StringUtils.hasText(firstValue) ? firstValue : value(second);
+  }
+
+  private long longValue(Object value) {
+    try {
+      return Long.parseLong(value(value));
+    } catch (RuntimeException e) {
+      throw new UnauthenticatedException("error.auth.unauthenticated");
+    }
+  }
+
+  private Set<String> allowedAudiences(String configuredAudiences, String fallbackAudience) {
+    Set<String> audiences = new HashSet<>();
+    if (StringUtils.hasText(fallbackAudience)) {
+      audiences.add(fallbackAudience);
+    }
+    if (StringUtils.hasText(configuredAudiences)) {
+      Arrays.stream(configuredAudiences.split(","))
+          .map(String::trim)
+          .filter(StringUtils::hasText)
+          .forEach(audiences::add);
+    }
+    return audiences;
   }
 
   private String formValue(String value) {

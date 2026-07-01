@@ -1,23 +1,24 @@
 package com.butingbe.domain.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.butingbe.domain.user.oauth.OAuth2UserInfo;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.Base64;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -32,41 +33,6 @@ class RestClientOAuthProviderTokenVerifierTest {
     String codeChallenge = codeChallengeS256(codeVerifier);
 
     assertThat(codeChallenge).isEqualTo("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
-  }
-
-  @Test
-  @DisplayName("Kakao provider token에 Bearer 접두어가 포함돼도 access token만 전달해 사용자 정보를 조회한다")
-  void verifyKakaoWithBearerPrefixedToken() {
-    RestClient.Builder builder = RestClient.builder();
-    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-    RestClientOAuthProviderTokenVerifier verifier =
-        new RestClientOAuthProviderTokenVerifier(
-            builder.build(), "", "", "", "", "", "", "", "", "");
-
-    server
-        .expect(requestTo("https://kapi.kakao.com/v2/user/me"))
-        .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer KAKAO_ACCESS_TOKEN"))
-        .andRespond(
-            withSuccess(
-                """
-                {
-                  "id": 12345,
-                  "kakao_account": {
-                    "email": "kakao@example.com",
-                    "profile": {
-                      "nickname": "카카오유저"
-                    }
-                  }
-                }
-                """,
-                MediaType.APPLICATION_JSON));
-
-    OAuth2UserInfo userInfo = verifier.verify("kakao", "Bearer KAKAO_ACCESS_TOKEN", null, null);
-
-    assertThat(userInfo.provider()).isEqualTo("kakao");
-    assertThat(userInfo.providerId()).isEqualTo("12345");
-    assertThat(userInfo.email()).isEqualTo("kakao@example.com");
-    server.verify();
   }
 
   @Test
@@ -86,12 +52,6 @@ class RestClientOAuthProviderTokenVerifierTest {
             "KAKAO_REST_API_KEY",
             "KAKAO_CLIENT_SECRET",
             "http://localhost:3000/oauth/kakao/callback");
-
-    server
-        .expect(requestTo("https://kapi.kakao.com/v2/user/me"))
-        .andExpect(method(HttpMethod.GET))
-        .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer KAKAO_AUTHORIZATION_CODE"))
-        .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
     server
         .expect(requestTo("https://kauth.kakao.com/oauth/token"))
@@ -144,7 +104,95 @@ class RestClientOAuthProviderTokenVerifierTest {
   }
 
   @Test
-  @DisplayName("Google provider token이 authorization code면 token endpoint 교환 후 사용자 정보를 조회한다")
+  @DisplayName("Google 앱 id_token은 aud, iss, exp 검증 후 사용자 정보로 변환한다")
+  void verifyGoogleWithAppIdToken() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "GOOGLE_WEB_CLIENT_ID",
+            "",
+            "",
+            "GOOGLE_ANDROID_CLIENT_ID",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "");
+
+    server
+        .expect(requestTo("https://oauth2.googleapis.com/tokeninfo?id_token=GOOGLE.ID.TOKEN"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "iss": "https://accounts.google.com",
+                  "aud": "GOOGLE_ANDROID_CLIENT_ID",
+                  "exp": "%d",
+                  "sub": "google-app-123",
+                  "email": "google-app@example.com",
+                  "name": "Google App User"
+                }
+                """
+                    .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
+                MediaType.APPLICATION_JSON));
+
+    OAuth2UserInfo userInfo = verifier.verify("google", "GOOGLE.ID.TOKEN", null, null);
+
+    assertThat(userInfo.provider()).isEqualTo("google");
+    assertThat(userInfo.providerId()).isEqualTo("google-app-123");
+    assertThat(userInfo.email()).isEqualTo("google-app@example.com");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Google 앱 id_token의 aud가 허용 목록과 다르면 인증 실패 처리한다")
+  void verifyGoogleWithAppIdTokenFailsWithInvalidAudience() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "GOOGLE_WEB_CLIENT_ID",
+            "",
+            "",
+            "GOOGLE_ANDROID_CLIENT_ID",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "");
+
+    server
+        .expect(requestTo("https://oauth2.googleapis.com/tokeninfo?id_token=GOOGLE.ID.TOKEN"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "iss": "https://accounts.google.com",
+                  "aud": "OTHER_CLIENT_ID",
+                  "exp": "%d",
+                  "sub": "google-app-123",
+                  "email": "google-app@example.com"
+                }
+                """
+                    .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
+                MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> verifier.verify("google", "GOOGLE.ID.TOKEN", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Google provider token은 authorization code로 받아 token endpoint 교환 후 사용자 정보를 조회한다")
   void verifyGoogleWithAuthorizationCode() {
     String codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
     String codeChallenge = codeChallengeS256(codeVerifier);
@@ -164,12 +212,6 @@ class RestClientOAuthProviderTokenVerifierTest {
             "");
 
     assertThat(codeChallenge).isEqualTo("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
-
-    server
-        .expect(
-            requestTo("https://oauth2.googleapis.com/tokeninfo?id_token=GOOGLE_AUTHORIZATION_CODE"))
-        .andExpect(method(HttpMethod.GET))
-        .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
     server
         .expect(requestTo("https://oauth2.googleapis.com/token"))
@@ -218,6 +260,108 @@ class RestClientOAuthProviderTokenVerifierTest {
   }
 
   @Test
+  @DisplayName("Kakao 앱 id_token은 aud, iss, exp 검증 후 사용자 정보로 변환한다")
+  void verifyKakaoWithAppIdToken() {
+    String kakaoIdToken =
+        jwtWithPayload(
+            """
+            {
+              "email": "kakao-app@example.com",
+              "nickname": "카카오앱유저"
+            }
+            """);
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "KAKAO_REST_API_KEY",
+            "",
+            "",
+            "KAKAO_NATIVE_APP_KEY");
+
+    server
+        .expect(requestTo("https://kauth.kakao.com/oauth/tokeninfo"))
+        .andExpect(method(HttpMethod.POST))
+        .andExpect(content().string("id_token=" + kakaoIdToken))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "iss": "https://kauth.kakao.com",
+                  "aud": "KAKAO_NATIVE_APP_KEY",
+                  "exp": %d,
+                  "sub": "12345"
+                }
+                """
+                    .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
+                MediaType.APPLICATION_JSON));
+
+    OAuth2UserInfo userInfo = verifier.verify("kakao", kakaoIdToken, null, null);
+
+    assertThat(userInfo.provider()).isEqualTo("kakao");
+    assertThat(userInfo.providerId()).isEqualTo("12345");
+    assertThat(userInfo.email()).isEqualTo("kakao-app@example.com");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Kakao tokeninfo 응답의 aud가 허용 client id와 다르면 인증 실패 처리한다")
+  void verifyKakaoWithAppIdTokenFailsWithInvalidAudience() {
+    String kakaoIdToken =
+        jwtWithPayload(
+            """
+            {
+              "email": "kakao-app@example.com"
+            }
+            """);
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "KAKAO_REST_API_KEY",
+            "",
+            "",
+            "KAKAO_NATIVE_APP_KEY");
+
+    server
+        .expect(requestTo("https://kauth.kakao.com/oauth/tokeninfo"))
+        .andExpect(method(HttpMethod.POST))
+        .andExpect(content().string("id_token=" + kakaoIdToken))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "iss": "https://kauth.kakao.com",
+                  "aud": "OTHER_NATIVE_APP_KEY",
+                  "exp": %d,
+                  "sub": "12345"
+                }
+                """
+                    .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
+                MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> verifier.verify("kakao", kakaoIdToken, null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    server.verify();
+  }
+
+  @Test
   @DisplayName("Naver provider token이 authorization code와 state면 access token으로 교환 후 사용자 정보를 조회한다")
   void verifyNaverWithAuthorizationCodeAndState() {
     RestClient.Builder builder = RestClient.builder();
@@ -234,15 +378,6 @@ class RestClientOAuthProviderTokenVerifierTest {
             "",
             "",
             "");
-
-    server
-        .expect(requestTo("https://openapi.naver.com/v1/nid/me"))
-        .andExpect(method(HttpMethod.GET))
-        .andExpect(
-            header(
-                HttpHeaders.AUTHORIZATION,
-                "Bearer code=NAVER_AUTHORIZATION_CODE&state=NAVER_STATE"))
-        .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
     server
         .expect(requestTo("https://nid.naver.com/oauth2.0/token"))
@@ -305,5 +440,13 @@ class RestClientOAuthProviderTokenVerifierTest {
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
     }
+  }
+
+  private String jwtWithPayload(String payload) {
+    return "header."
+        + Base64.getUrlEncoder()
+            .withoutPadding()
+            .encodeToString(payload.getBytes(StandardCharsets.UTF_8))
+        + ".signature";
   }
 }

@@ -34,7 +34,8 @@ class OAuthLoginServiceTest {
   @Test
   @DisplayName("provider token 검증 후 기존 이메일 회원에 provider를 연결하고 opaque token을 발급한다")
   void loginWithExistingEmailUser() {
-    OAuthLoginReqDto request = new OAuthLoginReqDto("google", "GOOGLE_ID_TOKEN", null, null);
+    OAuthLoginReqDto request =
+        new OAuthLoginReqDto("google", "GOOGLE_AUTHORIZATION_CODE", null, null);
     OAuth2UserInfo userInfo =
         new OAuth2UserInfo(
             "google", "google-123", "oauth@example.com", "구글유저", "길동", "홍", Map.of());
@@ -58,7 +59,7 @@ class OAuthLoginServiceTest {
     given(opaqueTokenService.issue(user, null))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "opaque-token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));
+                "opaque-token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
 
     OAuth2LoginResDto response = oAuthLoginService.login(request);
 
@@ -72,7 +73,8 @@ class OAuthLoginServiceTest {
   @Test
   @DisplayName("provider와 email이 모두 신규이면 OAuth 사용자로 회원을 생성하고 opaque token을 발급한다")
   void loginWithNewOAuthUser() {
-    OAuthLoginReqDto request = new OAuthLoginReqDto("kakao", "KAKAO_ACCESS_TOKEN", null, null);
+    OAuthLoginReqDto request =
+        new OAuthLoginReqDto("kakao", "KAKAO_AUTHORIZATION_CODE", null, null);
     OAuth2UserInfo userInfo =
         new OAuth2UserInfo(
             "kakao", "12345", "kakao@example.com", "카카오유저", "카카오유저", "kakao", Map.of());
@@ -97,7 +99,7 @@ class OAuthLoginServiceTest {
     given(opaqueTokenService.issue(savedUser, null))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "new-opaque-token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));
+                "new-opaque-token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
 
     OAuth2LoginResDto response = oAuthLoginService.login(request);
 
@@ -111,7 +113,8 @@ class OAuthLoginServiceTest {
   @Test
   @DisplayName("provider가 이메일을 제공하지 않으면 회원을 생성하지 않고 인증 실패 처리한다")
   void loginFailsWhenOAuthUserHasNoEmail() {
-    OAuthLoginReqDto request = new OAuthLoginReqDto("kakao", "KAKAO_ACCESS_TOKEN", null, null);
+    OAuthLoginReqDto request =
+        new OAuthLoginReqDto("kakao", "KAKAO_AUTHORIZATION_CODE", null, null);
     OAuth2UserInfo userInfo =
         new OAuth2UserInfo("kakao", "99999", null, "카카오유저", "카카오유저", "kakao", Map.of());
 
@@ -133,7 +136,8 @@ class OAuthLoginServiceTest {
   @Test
   @DisplayName("이미 provider로 연결된 회원이면 이메일 조회 없이 opaque token을 발급한다")
   void loginWithExistingProviderUser() {
-    OAuthLoginReqDto request = new OAuthLoginReqDto("naver", "NAVER_ACCESS_TOKEN", null, null);
+    OAuthLoginReqDto request =
+        new OAuthLoginReqDto("naver", "NAVER_AUTHORIZATION_CODE", null, null);
     OAuth2UserInfo userInfo =
         new OAuth2UserInfo(
             "naver", "naver-123", "naver@example.com", "네이버유저", "네이버유저", "naver", Map.of());
@@ -156,7 +160,7 @@ class OAuthLoginServiceTest {
     given(opaqueTokenService.issue(user, null))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "provider-token", "Bearer", 1209600, LocalDateTime.now().plusDays(14)));
+                "provider-token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
 
     OAuth2LoginResDto response = oAuthLoginService.login(request);
 

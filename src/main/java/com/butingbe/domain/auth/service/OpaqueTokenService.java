@@ -20,7 +20,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class OpaqueTokenService {
 
-  public static final long ACCESS_TOKEN_EXPIRES_IN_SECONDS = 60L * 60L * 24L * 14L;
+  public static final long ACCESS_TOKEN_EXPIRES_IN_SECONDS = 60L * 60L;
   private static final String HASH_ALGORITHM = "SHA-256";
   private static final String BEARER_PREFIX = "Bearer ";
 
@@ -53,8 +53,10 @@ public class OpaqueTokenService {
 
   private IssuedOpaqueToken issueNew(User user) {
     String rawToken = generateToken();
-    LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(ACCESS_TOKEN_EXPIRES_IN_SECONDS);
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime expiresAt = now.plusSeconds(ACCESS_TOKEN_EXPIRES_IN_SECONDS);
 
+    opaqueTokenRepository.deleteActiveByUserId(user.getId(), now);
     opaqueTokenRepository.save(
         OpaqueToken.builder().tokenHash(hash(rawToken)).user(user).expiresAt(expiresAt).build());
 

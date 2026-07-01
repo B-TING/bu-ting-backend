@@ -98,7 +98,7 @@ class AuthControllerTest {
                 false,
                 "opaque-token",
                 "Bearer",
-                1209600));
+                3600));
 
     mockMvc
         .perform(
@@ -109,7 +109,7 @@ class AuthControllerTest {
                     """
                     {
                       "provider": "google",
-                      "providerToken": "GOOGLE_ID_TOKEN"
+                      "providerToken": "GOOGLE_AUTHORIZATION_CODE"
                     }
                     """))
         .andDo(print())
@@ -128,7 +128,8 @@ class AuthControllerTest {
                 requestFields(
                     fieldWithPath("provider").description("SSO provider: google, naver, kakao"),
                     fieldWithPath("providerToken")
-                        .description("Provider token, or OAuth authorization code when using PKCE"),
+                        .description(
+                            "웹 클라이언트는 OAuth authorization code를 전달하고, 앱 클라이언트는 Google/Kakao id_token을 전달합니다."),
                     fieldWithPath("redirectUri")
                         .optional()
                         .type(JsonFieldType.STRING)
