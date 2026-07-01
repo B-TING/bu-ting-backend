@@ -13,6 +13,8 @@ tags:
     description: Authentication APIs
   - name: User
     description: User APIs
+  - name: Place
+    description: Place search APIs
   - name: TravelSurvey
     description: Travel survey profile APIs
 paths:
@@ -90,6 +92,131 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/places:
+    get:
+      tags:
+        - Place
+      summary: 장소 목록 조회
+      description: |
+        한국관광공사 지역기반 관광정보(areaBasedList2)를 조회한 뒤, 프론트에서 필요한 장소 표시용 필드만 반환합니다.
+        부산 법정동 시도 코드 `26`은 백엔드에서 고정으로 사용합니다.
+        공공데이터 serviceKey, MobileOS, MobileApp, _type, arrange 값은 백엔드에서 관리합니다.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: 페이지 번호
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+        - name: size
+          in: query
+          required: false
+          description: 한 페이지 결과 수
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: districtCode
+          in: query
+          required: false
+          description: "부산 법정동 시군구 코드: 110 중구, 140 서구, 170 동구, 200 영도구, 230 부산진구, 260 동래구, 290 남구, 320 북구, 350 해운대구, 380 사하구, 410 금정구, 440 강서구, 470 연제구, 500 수영구, 530 사상구, 710 기장군"
+          schema:
+            type: string
+            enum:
+              - "110"
+              - "140"
+              - "170"
+              - "200"
+              - "230"
+              - "260"
+              - "290"
+              - "320"
+              - "350"
+              - "380"
+              - "410"
+              - "440"
+              - "470"
+              - "500"
+              - "530"
+              - "710"
+          example: "440"
+        - name: contentTypeId
+          in: query
+          required: false
+          description: "관광타입 ID: 12 관광지, 14 문화시설, 15 축제공연행사, 25 여행코스, 28 레포츠, 32 숙박, 38 쇼핑, 39 음식점"
+          schema:
+            type: string
+            enum:
+              - "12"
+              - "14"
+              - "15"
+              - "25"
+              - "28"
+              - "32"
+              - "38"
+              - "39"
+          example: "39"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceSearchResponse"
+  /api/v1/places/{contentId}/detail:
+    get:
+      tags:
+        - Place
+      summary: 장소 상세 정보 조회
+      description: |
+        한국관광공사 상세소개(detailIntro2)를 조회한 뒤, 콘텐츠 타입별 상세 필드를 반환합니다.
+        공공데이터 serviceKey, MobileOS, MobileApp, _type 값은 백엔드에서 관리합니다.
+        contentTypeId에 따라 응답 필드가 달라지므로 빈 값과 식별자 필드를 제외한 상세 값을 details 객체로 제공합니다.
+        googleSearchText를 전달하면 해당 텍스트를 우선 사용해 Google Places 리뷰, 평점, 가격대, 운영시간을 조회합니다.
+        googleSearchText가 없으면 관광공사 detailCommon2의 제목/주소를 fallback으로 사용합니다.
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          description: 한국관광공사 콘텐츠 ID
+          schema:
+            type: string
+          example: "2651318"
+        - name: contentTypeId
+          in: query
+          required: true
+          description: "관광타입 ID: 12 관광지, 14 문화시설, 15 축제공연행사, 25 여행코스, 28 레포츠, 32 숙박, 38 쇼핑, 39 음식점"
+          schema:
+            type: string
+            enum:
+              - "12"
+              - "14"
+              - "15"
+              - "25"
+              - "28"
+              - "32"
+              - "38"
+              - "39"
+          example: "32"
+        - name: googleSearchText
+          in: query
+          required: false
+          description: Google Places 검색에 사용할 장소명 또는 장소명+주소 텍스트입니다. 값이 있으면 관광공사 detailCommon2 조회 없이 이 텍스트로 Google 장소를 찾습니다.
+          schema:
+            type: string
+          example: 파라다이스 호텔 부산
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceDetailResponse"
   /api/v1/users/signup:
     post:
       tags:
@@ -335,6 +462,137 @@ components:
           type: string
           description: PKCE authorization code flow에서 사용한 code_verifier입니다. id_token 로그인에서는 생략합니다.
           example: GOOGLE_CODE_VERIFIER
+    PlaceSearchResponse:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 20
+        totalCount:
+          type: integer
+          example: 120
+        places:
+          type: array
+          items:
+            $ref: "#/components/schemas/Place"
+    PlaceDetailResponse:
+      type: object
+      properties:
+        contentId:
+          type: string
+          description: 한국관광공사 콘텐츠 ID
+          example: "2651318"
+        contentTypeId:
+          type: string
+          description: "관광타입 ID: 12 관광지, 14 문화시설, 15 축제공연행사, 25 여행코스, 28 레포츠, 32 숙박, 38 쇼핑, 39 음식점"
+          example: "32"
+        details:
+          type: object
+          description: contentTypeId별 상세소개 필드입니다. 빈 값, contentid, contenttypeid는 제외합니다.
+          additionalProperties:
+            type: string
+          example:
+            checkintime: "15:00"
+            checkouttime: "11:00"
+            parkinglodging: 주차 가능
+            reservationurl: https://example.com
+        googlePlace:
+          $ref: "#/components/schemas/GooglePlaceInfo"
+    GooglePlaceInfo:
+      type: object
+      nullable: true
+      description: Google Places API에서 조회한 리뷰, 평점, 가격대, 운영시간 보강 정보입니다. Google API 키가 없거나 매칭되는 장소가 없으면 null입니다.
+      properties:
+        placeId:
+          type: string
+          example: google-place-id
+        rating:
+          type: number
+          format: double
+          description: Google 장소 평점
+          example: 4.4
+        reviewCount:
+          type: integer
+          description: Google 리뷰 개수
+          example: 128
+        priceLevel:
+          type: string
+          description: Google 가격대 코드
+          example: PRICE_LEVEL_MODERATE
+        openingHours:
+          type: array
+          description: 요일별 운영시간 설명
+          items:
+            type: string
+          example:
+            - "월요일: 오전 9:00 ~ 오후 6:00"
+            - "화요일: 오전 9:00 ~ 오후 6:00"
+        reviews:
+          type: array
+          description: Google 리뷰 목록
+          items:
+            $ref: "#/components/schemas/GoogleReview"
+    GoogleReview:
+      type: object
+      properties:
+        rating:
+          type: integer
+          example: 5
+        text:
+          type: string
+          example: 좋았어요
+        authorName:
+          type: string
+          example: 리뷰어
+        relativePublishTimeDescription:
+          type: string
+          example: 1개월 전
+        publishTime:
+          type: string
+          format: date-time
+          example: 2026-06-01T00:00:00Z
+    Place:
+      type: object
+      properties:
+        contentId:
+          type: string
+          description: 한국관광공사 콘텐츠 ID
+          example: "2869277"
+        contentTypeId:
+          type: string
+          description: "관광타입 ID: 12 관광지, 14 문화시설, 15 축제공연행사, 25 여행코스, 28 레포츠, 32 숙박, 38 쇼핑, 39 음식점"
+          example: "39"
+        title:
+          type: string
+          example: 오플로우
+        address:
+          type: string
+          example: 부산광역시 강서구 가락대로 1206 (봉림동)
+        imageUrl:
+          type: string
+          example: https://tong.visitkorea.or.kr/cms/resource/70/2869270_image2_1.jpg
+        thumbnailUrl:
+          type: string
+          example: https://tong.visitkorea.or.kr/cms/resource/70/2869270_image3_1.jpg
+        longitude:
+          type: number
+          format: double
+          example: 128.9010323937
+        latitude:
+          type: number
+          format: double
+          example: 35.1724954738
+        regionCode:
+          type: string
+          description: 법정동 시도 코드
+          example: "26"
+        districtCode:
+          type: string
+          description: 법정동 시군구 코드
+          example: "440"
     SignUpRequest:
       type: object
       required:
