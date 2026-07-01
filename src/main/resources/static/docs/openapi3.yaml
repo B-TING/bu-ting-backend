@@ -265,53 +265,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
-
-  /api/v1/chat/rooms/{roomId}/join:
-    post:
-      tags:
-        - Chat
-      summary: 특정 오픈채팅방 참여 (입장)
-      description: |
-        미리 개설된 오픈채팅방에 참여합니다.
-        **제약 조건**: 이미 참여 중인 방이거나, 방의 정원(`maxMembers`)이 가득 찬 경우 에러를 반환합니다.
-      security:
-        - opaqueToken: []
-      parameters:
-        - name: roomId
-          in: path
-          required: true
-          description: 참여할 채팅방 UUID
-          schema:
-            type: string
-            format: uuid
-            example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
-      responses:
-        "200":
-          description: 채팅방 입장 성공
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: "채팅방 입장에 성공했습니다."
-        "400":
-          description: 정원 초과 또는 존재하지 않는 방
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiErrorResponse"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiErrorResponse"
-
   /api/v1/chat/rooms/{roomId}/exit:
     post:
       tags:
@@ -349,6 +302,47 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/chat/rooms/{roomId}/enter:
+    post:
+      tags:
+        - Chat
+      summary: 채팅방 입장 및 과거 대화 내역 조회
+      description: |
+        사용자가 오픈채팅방에 진입할 때 호출합니다. 
+        인증된 유저 정보를 기반으로 과거 최근 대화 내역 상위 50개를 최신순(내림차순) 정렬하여 반환합니다.
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          description: 입장하고 과거 내역을 조회할 채팅방 UUID
+          schema:
+            type: string
+            format: uuid
+            example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+      responses:
+        "200":
+          description: 과거 대화 내역 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessageResponse"
+        "400":
+          description: 존재하지 않는 방 ID이거나 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized (만료되거나 누락된 Opaque 토큰)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /websocket-guide/connect:
     get:
       tags:
@@ -630,3 +624,34 @@ components:
           type: string
           format: date-time
           example: "2026-06-30T10:47:06Z"
+    ChatMessageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 메시지 고유 식별자 ID (uuid)
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa3
+        roomId:
+          type: string
+          format: uuid
+          description: 채팅방 고유 UUID
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        userId:
+          type: string
+          format: uuid
+          description: 메시지를 보낸 유저 고유 UUID
+          example: d1234567-89ab-cdef-0123-456789abcdef
+        senderNickname:
+          type: string
+          description: 보낸 유저의 닉네임
+          example: "광안리보이"
+        content:
+          type: string
+          description: 채팅 메시지 본문 내용
+          example: "안녕하세요! 지난 대화들 확인하고 들어왔습니다."
+        createdAt:
+          type: string
+          format: date-time
+          description: 메시지 생성 일시 (ISO 8601 포맷)
+          example: "2026-07-01T23:15:00Z"

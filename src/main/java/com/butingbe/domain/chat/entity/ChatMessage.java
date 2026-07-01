@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
@@ -23,7 +24,7 @@ public class ChatMessage {
     private UUID userId;
     private String senderNickname;
     private String content;
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     @Builder
     public ChatMessage(UUID roomId, UUID userId, String senderNickname, String content) {
@@ -31,6 +32,6 @@ public class ChatMessage {
         this.userId = userId;
         this.senderNickname = senderNickname;
         this.content = content;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = OffsetDateTime.now();
     }
 }

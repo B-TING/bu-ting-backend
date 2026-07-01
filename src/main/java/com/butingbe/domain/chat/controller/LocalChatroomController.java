@@ -1,5 +1,6 @@
 package com.butingbe.domain.chat.controller;
 
+import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.dto.ChatroomCreateRequest;
 import com.butingbe.domain.chat.dto.ChatroomResponse;
 import com.butingbe.domain.chat.entity.ChatZone;
@@ -19,7 +20,7 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/chat/rooms")
+@RequestMapping("/chat/rooms")
 public class LocalChatroomController {
 
     private final LocalChatroomService localChatroomService;
@@ -35,17 +36,21 @@ public class LocalChatroomController {
         return ResponseEntity.ok(ApiResponse.success("지역별 채팅방 조회", rooms));
     }
 
-    @PostMapping("/{room_id}/join")
-    public ResponseEntity<ApiResponse<Void>> joinChatroom(@PathVariable UUID roomId, @AuthenticationPrincipal User loginUser) {
 
-        localChatroomService.joinChatroom(roomId, loginUser.getId());
-        return ResponseEntity.ok(ApiResponse.success("채팅방 성공",null));
-    }
-
-    @DeleteMapping("/{room_id}/exit")
+    @DeleteMapping("/{roomId}/exit")
     public ResponseEntity<ApiResponse<Void>> exitRoom(@PathVariable UUID roomId, @AuthenticationPrincipal User loginUser) {
 
         localChatroomService.exitChatroom(roomId, loginUser.getId());
         return ResponseEntity.ok(ApiResponse.success("채팅방 나가기 완료", null));
+    }
+
+    @PostMapping("/{roomId}/enter")
+    public ResponseEntity<List<ChatMessageResponse>> enterRoom(@PathVariable UUID roomId, @AuthenticationPrincipal User loginUser) {
+
+        // 과거 내역 조회 수행
+        List<ChatMessageResponse> history = localChatroomService.enterChatRoom(roomId, loginUser.getId());
+
+        // 200 OK 상태코드와 함께 과거 메시지 리스트 반환
+        return ResponseEntity.ok(history);
     }
 }
