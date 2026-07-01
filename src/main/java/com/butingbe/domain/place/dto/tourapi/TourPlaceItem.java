@@ -10,4 +10,6 @@ public record TourPlaceItem(
     String mapx,
     String mapy,
     String lDongRegnCd,
-    String lDongSignguCd) {}
+    String lDongSignguCd,
+    String eventstartdate,
+    String eventenddate) {}

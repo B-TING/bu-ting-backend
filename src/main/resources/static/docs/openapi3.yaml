@@ -281,6 +281,97 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PlaceSearchResponse"
+  /api/v1/places/festivals:
+    get:
+      tags:
+        - Place
+      summary: 행사 정보 목록 조회
+      description: |
+        한국관광공사 행사정보(searchFestival2)를 조회한 뒤, 요청한 행사 시작일/종료일 기준의 행사 목록을 반환합니다.
+        부산 법정동 시도 코드 `26`은 백엔드에서 고정으로 사용합니다.
+        eventStartDate는 공공데이터 필수값이며, eventEndDate는 선택값입니다.
+      parameters:
+        - name: eventStartDate
+          in: query
+          required: true
+          description: 행사 시작일, YYYYMMDD
+          schema:
+            type: string
+            pattern: "^\\d{8}$"
+          example: "20260701"
+        - name: eventEndDate
+          in: query
+          required: false
+          description: 행사 종료일, YYYYMMDD
+          schema:
+            type: string
+            pattern: "^\\d{8}$"
+          example: "20260731"
+        - name: page
+          in: query
+          required: false
+          description: 페이지 번호
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+        - name: size
+          in: query
+          required: false
+          description: 한 페이지 결과 수
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: districtCode
+          in: query
+          required: false
+          description: "부산 법정동 시군구 코드: 110 중구, 140 서구, 170 동구, 200 영도구, 230 부산진구, 260 동래구, 290 남구, 320 북구, 350 해운대구, 380 사하구, 410 금정구, 440 강서구, 470 연제구, 500 수영구, 530 사상구, 710 기장군"
+          schema:
+            type: string
+            enum:
+              - "110"
+              - "140"
+              - "170"
+              - "200"
+              - "230"
+              - "260"
+              - "290"
+              - "320"
+              - "350"
+              - "380"
+              - "410"
+              - "440"
+              - "470"
+              - "500"
+              - "530"
+              - "710"
+          example: "350"
+        - name: arrange
+          in: query
+          required: false
+          description: "정렬 구분: A 제목순, C 수정일순, D 생성일순, O 대표이미지 있는 제목순, Q 대표이미지 있는 수정일순, R 대표이미지 있는 생성일순"
+          schema:
+            type: string
+            enum:
+              - A
+              - C
+              - D
+              - O
+              - Q
+              - R
+            default: C
+          example: C
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FestivalSearchResponse"
   /api/v1/places/{contentId}/detail:
     get:
       tags:
@@ -591,6 +682,31 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Place"
+    FestivalSearchResponse:
+      type: object
+      properties:
+        eventStartDate:
+          type: string
+          description: 요청한 행사 시작일, YYYYMMDD
+          example: "20260701"
+        eventEndDate:
+          type: string
+          nullable: true
+          description: 요청한 행사 종료일, YYYYMMDD
+          example: "20260731"
+        page:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 20
+        totalCount:
+          type: integer
+          example: 5
+        festivals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Festival"
     PlaceDetailResponse:
       type: object
       properties:
@@ -706,6 +822,53 @@ components:
           type: string
           description: 법정동 시군구 코드
           example: "440"
+    Festival:
+      type: object
+      properties:
+        contentId:
+          type: string
+          description: 한국관광공사 콘텐츠 ID
+          example: "3000001"
+        contentTypeId:
+          type: string
+          description: 행사 관광타입 ID
+          example: "15"
+        title:
+          type: string
+          example: 부산바다축제
+        address:
+          type: string
+          example: 부산광역시 해운대구
+        imageUrl:
+          type: string
+          example: https://example.com/festival.jpg
+        thumbnailUrl:
+          type: string
+          example: https://example.com/festival-thumb.jpg
+        longitude:
+          type: number
+          format: double
+          example: 129.16
+        latitude:
+          type: number
+          format: double
+          example: 35.163
+        regionCode:
+          type: string
+          description: 법정동 시도 코드
+          example: "26"
+        districtCode:
+          type: string
+          description: 법정동 시군구 코드
+          example: "350"
+        eventStartDate:
+          type: string
+          description: 행사 시작일, YYYYMMDD
+          example: "20260601"
+        eventEndDate:
+          type: string
+          description: 행사 종료일, YYYYMMDD
+          example: "20260710"
     SignUpRequest:
       type: object
       required:

@@ -7,8 +7,10 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.butingbe.domain.place.dto.request.FestivalSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceLocationSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceSearchReqDto;
+import com.butingbe.domain.place.dto.response.FestivalSearchResDto;
 import com.butingbe.domain.place.dto.response.PlaceDetailResDto;
 import com.butingbe.domain.place.dto.response.PlaceSearchResDto;
 import org.junit.jupiter.api.DisplayName;
@@ -168,6 +170,82 @@ class TourApiPlaceServiceTest {
     assertThat(response.places().getFirst().title()).isEqualTo("부산 호텔");
     assertThat(response.places().getFirst().longitude()).isEqualTo(129.160);
     assertThat(response.places().getFirst().latitude()).isEqualTo(35.163);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("공공데이터 행사정보를 Festival DTO 필드로 변환한다")
+  void searchFestivalsMapsTourApiItemsToFestivalDtos() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(
+            requestTo(
+                "https://tour.example.com/searchFestival2"
+                    + "?numOfRows=10"
+                    + "&pageNo=1"
+                    + "&MobileOS=WEB"
+                    + "&MobileApp=buting"
+                    + "&_type=json"
+                    + "&arrange=C"
+                    + "&eventStartDate=20260601"
+                    + "&serviceKey=SERVICE_KEY"
+                    + "&lDongRegnCd=26"
+                    + "&lDongSignguCd=350"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "response": {
+                    "header": {
+                      "resultCode": "0000",
+                      "resultMsg": "OK"
+                    },
+                    "body": {
+                      "numOfRows": 10,
+                      "pageNo": 1,
+                      "totalCount": 1,
+                      "items": {
+                        "item": [
+                          {
+                            "addr1": "부산광역시 해운대구",
+                            "contentid": "3000001",
+                            "contenttypeid": "15",
+                            "firstimage": "https://example.com/festival.jpg",
+                            "firstimage2": "https://example.com/festival-thumb.jpg",
+                            "mapx": "129.160",
+                            "mapy": "35.163",
+                            "title": "진행중 행사",
+                            "lDongRegnCd": "26",
+                            "lDongSignguCd": "350",
+                            "eventstartdate": "20260601",
+                            "eventenddate": "20260710"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                """,
+                MediaType.APPLICATION_JSON));
+
+    FestivalSearchResDto response =
+        placeService.searchFestivals(new FestivalSearchReqDto("20260601", null, 1, 10, "350", "C"));
+
+    assertThat(response.eventStartDate()).isEqualTo("20260601");
+    assertThat(response.eventEndDate()).isNull();
+    assertThat(response.page()).isEqualTo(1);
+    assertThat(response.size()).isEqualTo(10);
+    assertThat(response.totalCount()).isEqualTo(1);
+    assertThat(response.festivals()).hasSize(1);
+    assertThat(response.festivals().getFirst().contentId()).isEqualTo("3000001");
+    assertThat(response.festivals().getFirst().title()).isEqualTo("진행중 행사");
+    assertThat(response.festivals().getFirst().eventStartDate()).isEqualTo("20260601");
+    assertThat(response.festivals().getFirst().eventEndDate()).isEqualTo("20260710");
     server.verify();
   }
 
