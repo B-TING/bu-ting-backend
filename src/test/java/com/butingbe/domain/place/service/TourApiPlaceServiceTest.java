@@ -261,7 +261,7 @@ class TourApiPlaceServiceTest {
         .expect(
             requestTo(
                 "https://tour.example.com/detailIntro2"
-                    + "?MobileOS=AND"
+                    + "?MobileOS=WEB"
                     + "&MobileApp=buting"
                     + "&_type=json"
                     + "&contentId=2651318"
@@ -326,7 +326,7 @@ class TourApiPlaceServiceTest {
         .expect(
             requestTo(
                 "https://tour.example.com/detailIntro2"
-                    + "?MobileOS=AND"
+                    + "?MobileOS=WEB"
                     + "&MobileApp=buting"
                     + "&_type=json"
                     + "&contentId=2651318"
@@ -356,7 +356,7 @@ class TourApiPlaceServiceTest {
         .expect(
             requestTo(
                 "https://tour.example.com/detailCommon2"
-                    + "?MobileOS=AND"
+                    + "?MobileOS=WEB"
                     + "&MobileApp=buting"
                     + "&_type=json"
                     + "&contentId=2651318"
@@ -495,7 +495,7 @@ class TourApiPlaceServiceTest {
         .expect(
             requestTo(
                 "https://tour.example.com/detailIntro2"
-                    + "?MobileOS=AND"
+                    + "?MobileOS=WEB"
                     + "&MobileApp=buting"
                     + "&_type=json"
                     + "&contentId=2651318"

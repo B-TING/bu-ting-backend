@@ -43,7 +43,6 @@ public class TourApiPlaceService implements PlaceService {
   private static final String DEFAULT_MOBILE_APP = "buting";
   private static final String DEFAULT_RESPONSE_TYPE = "json";
   private static final String BUSAN_REGION_CODE = "26";
-  private static final String DETAIL_MOBILE_OS = "AND";
   private static final String GOOGLE_LANGUAGE_CODE = "ko";
   private static final String GOOGLE_REGION_CODE = "KR";
   private static final int GOOGLE_SEARCH_MAX_RESULT_COUNT = 1;
@@ -235,7 +234,7 @@ public class TourApiPlaceService implements PlaceService {
                 baseUrl + "/detailIntro2",
                 uriBuilder ->
                     uriBuilder
-                        .queryParam("MobileOS", DETAIL_MOBILE_OS)
+                        .queryParam("MobileOS", DEFAULT_MOBILE_OS)
                         .queryParam("MobileApp", DEFAULT_MOBILE_APP)
                         .queryParam("_type", DEFAULT_RESPONSE_TYPE)
                         .queryParam("contentId", contentId)
@@ -353,7 +352,7 @@ public class TourApiPlaceService implements PlaceService {
                 baseUrl + "/detailCommon2",
                 uriBuilder ->
                     uriBuilder
-                        .queryParam("MobileOS", DETAIL_MOBILE_OS)
+                        .queryParam("MobileOS", DEFAULT_MOBILE_OS)
                         .queryParam("MobileApp", DEFAULT_MOBILE_APP)
                         .queryParam("_type", DEFAULT_RESPONSE_TYPE)
                         .queryParam("contentId", contentId)
