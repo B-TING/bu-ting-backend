@@ -7,6 +7,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.butingbe.domain.place.dto.request.PlaceLocationSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceSearchReqDto;
 import com.butingbe.domain.place.dto.response.PlaceDetailResDto;
 import com.butingbe.domain.place.dto.response.PlaceSearchResDto;
@@ -80,7 +81,7 @@ class TourApiPlaceServiceTest {
                 MediaType.APPLICATION_JSON));
 
     PlaceSearchResDto response =
-        placeService.searchPlaces(new PlaceSearchReqDto(2, 10, null, "39"));
+        placeService.searchPlaces(new PlaceSearchReqDto(2, 10, null, "39", "C"));
 
     assertThat(response.page()).isEqualTo(2);
     assertThat(response.size()).isEqualTo(10);
@@ -93,6 +94,80 @@ class TourApiPlaceServiceTest {
     assertThat(response.places().getFirst().latitude()).isEqualTo(35.1724954738);
     assertThat(response.places().getFirst().regionCode()).isEqualTo("26");
     assertThat(response.places().getFirst().districtCode()).isEqualTo("440");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("공공데이터 위치기반 관광정보를 필요한 Place DTO 필드로 변환한다")
+  void searchPlacesByLocationMapsTourApiItemsToPlaceDtos() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(
+            requestTo(
+                "https://tour.example.com/locationBasedList2"
+                    + "?numOfRows=5"
+                    + "&pageNo=1"
+                    + "&MobileOS=WEB"
+                    + "&MobileApp=buting"
+                    + "&_type=json"
+                    + "&arrange=E"
+                    + "&mapX=129.16"
+                    + "&mapY=35.163"
+                    + "&radius=1000"
+                    + "&serviceKey=SERVICE_KEY"
+                    + "&contentTypeId=32"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "response": {
+                    "header": {
+                      "resultCode": "0000",
+                      "resultMsg": "OK"
+                    },
+                    "body": {
+                      "numOfRows": 5,
+                      "pageNo": 1,
+                      "totalCount": 1,
+                      "items": {
+                        "item": [
+                          {
+                            "addr1": "부산광역시 해운대구",
+                            "contentid": "2651318",
+                            "contenttypeid": "32",
+                            "firstimage": "https://example.com/image.jpg",
+                            "firstimage2": "https://example.com/thumb.jpg",
+                            "mapx": "129.160",
+                            "mapy": "35.163",
+                            "title": "부산 호텔",
+                            "lDongRegnCd": "26",
+                            "lDongSignguCd": "350"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                """,
+                MediaType.APPLICATION_JSON));
+
+    PlaceSearchResDto response =
+        placeService.searchPlacesByLocation(
+            new PlaceLocationSearchReqDto(1, 5, 129.160, 35.163, 1000, "32", "E"));
+
+    assertThat(response.page()).isEqualTo(1);
+    assertThat(response.size()).isEqualTo(5);
+    assertThat(response.totalCount()).isEqualTo(1);
+    assertThat(response.places()).hasSize(1);
+    assertThat(response.places().getFirst().contentId()).isEqualTo("2651318");
+    assertThat(response.places().getFirst().title()).isEqualTo("부산 호텔");
+    assertThat(response.places().getFirst().longitude()).isEqualTo(129.160);
+    assertThat(response.places().getFirst().latitude()).isEqualTo(35.163);
     server.verify();
   }
 
