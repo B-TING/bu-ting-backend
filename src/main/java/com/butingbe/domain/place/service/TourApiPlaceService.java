@@ -6,7 +6,11 @@ import com.butingbe.domain.place.dto.googleplaces.GooglePlaceSearchRequest.Circl
 import com.butingbe.domain.place.dto.googleplaces.GooglePlaceSearchRequest.Coordinate;
 import com.butingbe.domain.place.dto.googleplaces.GooglePlaceSearchRequest.LocationBias;
 import com.butingbe.domain.place.dto.googleplaces.GooglePlaceSearchResponse;
+import com.butingbe.domain.place.dto.request.FestivalSearchReqDto;
+import com.butingbe.domain.place.dto.request.PlaceLocationSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceSearchReqDto;
+import com.butingbe.domain.place.dto.response.FestivalResDto;
+import com.butingbe.domain.place.dto.response.FestivalSearchResDto;
 import com.butingbe.domain.place.dto.response.GooglePlaceInfoResDto;
 import com.butingbe.domain.place.dto.response.PlaceDetailResDto;
 import com.butingbe.domain.place.dto.response.PlaceResDto;
@@ -38,9 +42,7 @@ public class TourApiPlaceService implements PlaceService {
   private static final String DEFAULT_MOBILE_OS = "WEB";
   private static final String DEFAULT_MOBILE_APP = "buting";
   private static final String DEFAULT_RESPONSE_TYPE = "json";
-  private static final String DEFAULT_ARRANGE = "C";
   private static final String BUSAN_REGION_CODE = "26";
-  private static final String DETAIL_MOBILE_OS = "AND";
   private static final String GOOGLE_LANGUAGE_CODE = "ko";
   private static final String GOOGLE_REGION_CODE = "KR";
   private static final int GOOGLE_SEARCH_MAX_RESULT_COUNT = 1;
@@ -105,13 +107,102 @@ public class TourApiPlaceService implements PlaceService {
                       .queryParam("MobileOS", DEFAULT_MOBILE_OS)
                       .queryParam("MobileApp", DEFAULT_MOBILE_APP)
                       .queryParam("_type", DEFAULT_RESPONSE_TYPE)
-                      .queryParam("arrange", DEFAULT_ARRANGE)
+                      .queryParam("arrange", request.arrangeOrDefault())
                       .queryParam("serviceKey", serviceKey)
                       .queryParam("lDongRegnCd", BUSAN_REGION_CODE);
 
                   if (StringUtils.hasText(request.districtCodeOrNull())) {
                     uriBuilder.queryParam("lDongSignguCd", request.districtCodeOrNull());
                   }
+                  if (StringUtils.hasText(request.contentTypeIdOrNull())) {
+                    uriBuilder.queryParam("contentTypeId", request.contentTypeIdOrNull());
+                  }
+                  return uriBuilder.build();
+                })
+            .retrieve()
+            .body(TourApiResponse.class);
+
+    TourApiResponse.Body body = body(response);
+    List<PlaceResDto> places =
+        items(body).stream().filter(Objects::nonNull).map(PlaceResDto::from).toList();
+    return new PlaceSearchResDto(body.pageNo(), body.numOfRows(), body.totalCount(), places);
+  }
+
+  @Override
+  public FestivalSearchResDto searchFestivals(FestivalSearchReqDto request) {
+    if (!StringUtils.hasText(serviceKey)) {
+      throw new IllegalStateException("Tour API service key is not configured.");
+    }
+
+    int page = request.pageOrDefault();
+    int size = request.sizeOrDefault();
+
+    TourApiResponse response =
+        restClient
+            .get()
+            .uri(
+                baseUrl + "/searchFestival2",
+                uriBuilder -> {
+                  uriBuilder
+                      .queryParam("numOfRows", size)
+                      .queryParam("pageNo", page)
+                      .queryParam("MobileOS", DEFAULT_MOBILE_OS)
+                      .queryParam("MobileApp", DEFAULT_MOBILE_APP)
+                      .queryParam("_type", DEFAULT_RESPONSE_TYPE)
+                      .queryParam("arrange", request.arrangeOrDefault())
+                      .queryParam("eventStartDate", request.eventStartDate())
+                      .queryParam("serviceKey", serviceKey)
+                      .queryParam("lDongRegnCd", BUSAN_REGION_CODE);
+
+                  if (StringUtils.hasText(request.eventEndDateOrNull())) {
+                    uriBuilder.queryParam("eventEndDate", request.eventEndDateOrNull());
+                  }
+                  if (StringUtils.hasText(request.districtCodeOrNull())) {
+                    uriBuilder.queryParam("lDongSignguCd", request.districtCodeOrNull());
+                  }
+                  return uriBuilder.build();
+                })
+            .retrieve()
+            .body(TourApiResponse.class);
+
+    TourApiResponse.Body body = body(response);
+    List<FestivalResDto> festivals =
+        items(body).stream().filter(Objects::nonNull).map(FestivalResDto::from).toList();
+    return new FestivalSearchResDto(
+        request.eventStartDate(),
+        request.eventEndDateOrNull(),
+        body.pageNo(),
+        body.numOfRows(),
+        body.totalCount(),
+        festivals);
+  }
+
+  @Override
+  public PlaceSearchResDto searchPlacesByLocation(PlaceLocationSearchReqDto request) {
+    if (!StringUtils.hasText(serviceKey)) {
+      throw new IllegalStateException("Tour API service key is not configured.");
+    }
+
+    int page = request.pageOrDefault();
+    int size = request.sizeOrDefault();
+    TourApiResponse response =
+        restClient
+            .get()
+            .uri(
+                baseUrl + "/locationBasedList2",
+                uriBuilder -> {
+                  uriBuilder
+                      .queryParam("numOfRows", size)
+                      .queryParam("pageNo", page)
+                      .queryParam("MobileOS", DEFAULT_MOBILE_OS)
+                      .queryParam("MobileApp", DEFAULT_MOBILE_APP)
+                      .queryParam("_type", DEFAULT_RESPONSE_TYPE)
+                      .queryParam("arrange", request.arrangeOrDefault())
+                      .queryParam("mapX", request.mapX())
+                      .queryParam("mapY", request.mapY())
+                      .queryParam("radius", request.radius())
+                      .queryParam("serviceKey", serviceKey);
+
                   if (StringUtils.hasText(request.contentTypeIdOrNull())) {
                     uriBuilder.queryParam("contentTypeId", request.contentTypeIdOrNull());
                   }
@@ -143,7 +234,7 @@ public class TourApiPlaceService implements PlaceService {
                 baseUrl + "/detailIntro2",
                 uriBuilder ->
                     uriBuilder
-                        .queryParam("MobileOS", DETAIL_MOBILE_OS)
+                        .queryParam("MobileOS", DEFAULT_MOBILE_OS)
                         .queryParam("MobileApp", DEFAULT_MOBILE_APP)
                         .queryParam("_type", DEFAULT_RESPONSE_TYPE)
                         .queryParam("contentId", contentId)
@@ -261,7 +352,7 @@ public class TourApiPlaceService implements PlaceService {
                 baseUrl + "/detailCommon2",
                 uriBuilder ->
                     uriBuilder
-                        .queryParam("MobileOS", DETAIL_MOBILE_OS)
+                        .queryParam("MobileOS", DEFAULT_MOBILE_OS)
                         .queryParam("MobileApp", DEFAULT_MOBILE_APP)
                         .queryParam("_type", DEFAULT_RESPONSE_TYPE)
                         .queryParam("contentId", contentId)
