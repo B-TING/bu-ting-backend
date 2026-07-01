@@ -128,6 +128,8 @@ dependencies {
     testImplementation("org.testcontainers:postgresql:1.20.1")
 
     testImplementation("org.springframework.security:spring-security-test")
+
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
 }
 
 tasks.withType<Test> {

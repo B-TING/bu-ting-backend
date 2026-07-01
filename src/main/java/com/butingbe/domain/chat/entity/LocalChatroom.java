@@ -42,7 +42,7 @@ public class LocalChatroom {
     private OffsetDateTime updatedAt;
 
     @Builder
-    public LocalChatroom(String title, String description, String localCode, ChatZone chatZone, Integer maxMembers) {
+    public LocalChatroom(String title, String description, ChatZone chatZone, Integer maxMembers) { // 💡 localCode 인자 완벽 제거!
         this.title = title;
         this.description = description;
         this.chatZone = chatZone;

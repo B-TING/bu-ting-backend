@@ -13,6 +13,11 @@ tags:
     description: User APIs
   - name: TravelSurvey
     description: Travel survey profile APIs
+  - name: Chat
+    description: Chat APIs
+  - name: WebSocket STOMP
+    description: 웹소켓 연결 및 실시간 메시지 송수신 명세 가이드 (REST API가 아님)
+
 paths:
   /api/v1/auth/oauth/login:
     post:
@@ -240,7 +245,10 @@ paths:
             enum:
               - SUYEONG_NAMGU
               - HAEUNDAE_GIJANG
-              - JUNG_YEONGDO
+              - YEONGDO
+              - CENTRAL_NORTH
+              - OLD_DOWNTOWN
+              - WESTERN_BUSAN
             example: SUYEONG_NAMGU
       responses:
         "200":
@@ -341,6 +349,66 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /websocket-guide/connect:
+    get:
+      tags:
+        - 실시간 채팅 (WebSocket STOMP)
+      summary: "[1] 웹소켓 연결 및 인증 가이드"
+      description: |
+        ### ▶ **Connection URL**
+        `ws://localhost:8080/ws-stomp`
+        
+        ### ▶ **연결 시 필수 헤더(Headers)**
+        - `Authorization`: `Bearer {Opaque_Token}`
+        
+        ※ STOMP `CONNECT` 프레임 요청 시 헤더에 토큰을 실어 보내야 인증이 완료됩니다.
+      responses:
+        "200":
+          description: OK
+
+  /websocket-guide/send:
+    post:
+      tags:
+        - ⚡ 실시간 채팅 (WebSocket STOMP)
+      summary: "[2] 채팅 메시지 발행 (SEND)"
+      description: |
+        ### ▶ **발행(Destination) 채널**
+        `/pub/chat/message`
+
+        ### ▶ **보낼 JSON 본문 (Payload)**
+        ```json
+        {
+          "roomId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "content": "안녕하세요! 반갑습니다."
+        }
+        ```
+      responses:
+        "200":
+          description: OK
+
+  /websocket-guide/subscribe:
+    get:
+      tags:
+        - ⚡ 실시간 채팅 (WebSocket STOMP)
+      summary: "[3] 채팅방 메시지 구독 (SUBSCRIBE)"
+      description: |
+        ### ▶ **구독(Destination) 채널**
+        `/sub/chat/room/{roomId}`
+
+        ### ▶ **수신하게 될 실시간 JSON 데이터 형식**
+        ```json
+        {
+          "messageId": "uuid-value",
+          "roomId": "uuid-value",
+          "userId": "uuid-value",
+          "senderNickname": "홍길동",
+          "content": "안녕하세요! 반갑습니다.",
+          "createdAt": "2026-06-30T10:47:06"
+        }
+        ```
+      responses:
+        "200":
+          description: OK
 components:
   securitySchemes:
     opaqueToken:

@@ -28,7 +28,6 @@ class LocalChatroomRepositoryTest {
         UUID creatorId = UUID.randomUUID();
         LocalChatroom suyeongRoom = LocalChatroom.builder()
                 .title("수영구 남구")
-                .localCode("26500")
                 .description("수영 남구 야호!!!!!")
                 .chatZone(ChatZone.SUYEONG_NAMGU)
                 .maxMembers(30)
