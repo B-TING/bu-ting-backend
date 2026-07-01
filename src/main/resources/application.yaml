@@ -41,3 +41,11 @@ oauth:
     client-secret: ${KAKAO_CLIENT_SECRET:}
     redirect-uri: ${KAKAO_REDIRECT_URI:}
     allowed-audiences: ${KAKAO_ALLOWED_AUDIENCES:${KAKAO_AND_DEBUG_CLIENT_ID:}}
+
+place:
+  tour-api:
+    base-url: ${TOUR_API_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
+    service-key: ${TOURISM_API_KEY:}
+  google-places:
+    base-url: ${GOOGLE_PLACES_BASE_URL:https://places.googleapis.com/v1/places}
+    api-key: ${GOOGLE_PLACES_API_KEY:}
