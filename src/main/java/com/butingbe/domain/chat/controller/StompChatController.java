@@ -8,6 +8,7 @@ import com.butingbe.domain.chat.repository.ChatMessageRepository;
 import com.butingbe.domain.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -25,29 +26,25 @@ public class StompChatController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final ChatMessageRepository chatMessageRepository;
-    private final OpaqueTokenService opaqueTokenService;
 
     @MessageMapping("/chat/message")
-    public void handleMessage(ChatMessageRequest dto, SimpMessageHeaderAccessor accessor) {
-        // 1. 헤더에서 토큰 추출
-        String bearerToken = accessor.getFirstNativeHeader("Authorization");
+    public void handleMessage(@Payload ChatMessageRequest dto, SimpMessageHeaderAccessor accessor) {
 
-        // 2. 토큰 검증 및 유저 정보 획득 (유효하지 않으면 예외 발생)
-        if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
-            throw new IllegalStateException("인증 토큰이 누락되었거나 형식이 잘못되었습니다.");
+        if (accessor.getSessionAttributes() == null) {
+            throw new IllegalStateException("세션 속성이 존재하지 않습니다.");
         }
 
-        String rawToken = bearerToken.substring(7).trim();
+        // 💡 Config에서 'AuthenticatedUser'로 넣었으므로 꺼낼 때도 똑같이 맞춰줍니다!
+        AuthenticatedUser user = (AuthenticatedUser) accessor.getSessionAttributes().get("LOGIN_USER");
+        if (user == null) {
+            throw new IllegalStateException("인증되지 않은 사용자입니다.");
+        }
 
-        // 인증 성공 시에만 로직 진행
-        User user = opaqueTokenService.authenticate(rawToken)
-                .orElseThrow(() -> new IllegalStateException("유효하지 않은 토큰입니다. 인증에 실패했습니다."));
-
-        // 3. 정상적인 유저 정보로 채팅 저장 및 브로드캐스팅
+        // record 형식이면 user.id(), 일반 클래스면 user.getId() 등 프로젝트 규격에 맞게 꺼내 쓰시면 됩니다.
         ChatMessage chatMessage = ChatMessage.builder()
                 .roomId(dto.roomId())
-                .userId(user.getId())
-                .senderNickname(user.getNickname())
+                .userId(user.id())
+                .senderNickname(user.nickname())
                 .content(dto.content())
                 .build();
 
