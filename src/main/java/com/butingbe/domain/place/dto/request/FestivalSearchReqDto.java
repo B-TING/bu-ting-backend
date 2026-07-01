@@ -2,12 +2,15 @@ package com.butingbe.domain.place.dto.request;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
-public record PlaceSearchReqDto(
+public record FestivalSearchReqDto(
+    @NotBlank @Pattern(regexp = "\\d{8}") String eventStartDate,
+    @Pattern(regexp = "\\d{8}") String eventEndDate,
     @Min(1) Integer page,
     @Min(1) @Max(100) Integer size,
     String districtCode,
-    String contentTypeId,
     String arrange) {
 
   private static final int DEFAULT_PAGE = 1;
@@ -26,8 +29,8 @@ public record PlaceSearchReqDto(
     return hasText(districtCode) ? districtCode : null;
   }
 
-  public String contentTypeIdOrNull() {
-    return hasText(contentTypeId) ? contentTypeId : null;
+  public String eventEndDateOrNull() {
+    return hasText(eventEndDate) ? eventEndDate : null;
   }
 
   public String arrangeOrDefault() {

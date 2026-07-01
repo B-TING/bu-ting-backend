@@ -1,6 +1,9 @@
 package com.butingbe.domain.place.controller;
 
+import com.butingbe.domain.place.dto.request.FestivalSearchReqDto;
+import com.butingbe.domain.place.dto.request.PlaceLocationSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceSearchReqDto;
+import com.butingbe.domain.place.dto.response.FestivalSearchResDto;
 import com.butingbe.domain.place.dto.response.PlaceDetailResDto;
 import com.butingbe.domain.place.dto.response.PlaceSearchResDto;
 import com.butingbe.domain.place.service.PlaceService;
@@ -25,6 +28,18 @@ public class PlaceController {
   public ResponseEntity<PlaceSearchResDto> searchPlaces(
       @ModelAttribute @Valid PlaceSearchReqDto request) {
     return ResponseEntity.ok(placeService.searchPlaces(request));
+  }
+
+  @GetMapping("/location")
+  public ResponseEntity<PlaceSearchResDto> searchPlacesByLocation(
+      @ModelAttribute @Valid PlaceLocationSearchReqDto request) {
+    return ResponseEntity.ok(placeService.searchPlacesByLocation(request));
+  }
+
+  @GetMapping("/festivals")
+  public ResponseEntity<FestivalSearchResDto> searchFestivals(
+      @ModelAttribute @Valid FestivalSearchReqDto request) {
+    return ResponseEntity.ok(placeService.searchFestivals(request));
   }
 
   @GetMapping("/{contentId}/detail")
