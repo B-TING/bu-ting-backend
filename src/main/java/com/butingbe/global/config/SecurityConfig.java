@@ -20,47 +20,49 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-  private final CustomOAuth2UserService customOAuth2UserService;
-  private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
-  private final OpaqueTokenAuthenticationFilter opaqueTokenAuthenticationFilter;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
+    private final OpaqueTokenAuthenticationFilter opaqueTokenAuthenticationFilter;
 
-  @Bean
-  public SecurityFilterChain securityFilterChain(
-      HttpSecurity http, ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository)
-      throws Exception {
-    http.csrf(AbstractHttpConfigurer::disable)
-        .cors(cors -> {})
-        .authorizeHttpRequests(
-            authorize ->
-                authorize
-                    .requestMatchers("/api/v1/**", "/actuator/**", "/error")
-                    .permitAll()
-                    .anyRequest()
-                    .permitAll())
-        .addFilterBefore(
-            opaqueTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http, ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository)
+            throws Exception {
+        http.csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> {
+                })
+                .authorizeHttpRequests(
+                        authorize ->
+                                authorize
+                                        .requestMatchers("/api/v1/**", "/actuator/**", "/error")
+                                        .permitAll()
+                                        .anyRequest()
+                                        .permitAll())
+                .addFilterBefore(
+                        opaqueTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-    if (clientRegistrationRepository.getIfAvailable() != null) {
-      http.oauth2Login(
-          oauth2 ->
-              oauth2
-                  .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
-                  .successHandler(oAuth2AuthenticationSuccessHandler));
+        if (clientRegistrationRepository.getIfAvailable() != null) {
+            http.oauth2Login(
+                    oauth2 ->
+                            oauth2
+                                    .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+                                    .successHandler(oAuth2AuthenticationSuccessHandler));
+        }
+
+        return http.build();
     }
 
-    return http.build();
-  }
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
 
-  @Bean
-  public CorsConfigurationSource corsConfigurationSource() {
-    CorsConfiguration configuration = new CorsConfiguration();
+        configuration.addAllowedOrigin("http://localhost:3000");
+        configuration.addAllowedOrigin("https://dev.buting.store");
+        configuration.addAllowedMethod("*"); // 모든 HTTP Method 일단 허용 (GET, POST 등)
+        configuration.addAllowedHeader("*"); // 모든 헤더 허용
 
-    configuration.addAllowedOrigin("http://localhost:3000");
-    configuration.addAllowedMethod("*"); // 모든 HTTP Method 일단 허용 (GET, POST 등)
-    configuration.addAllowedHeader("*"); // 모든 헤더 허용
-
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", configuration);
-    return source;
-  }
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
 }
