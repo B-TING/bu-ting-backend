@@ -5,12 +5,10 @@ import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.dto.ChatroomResponse;
 import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.chat.service.LocalChatroomService;
-import com.butingbe.domain.user.entity.User;
 import com.butingbe.global.common.ApiResponse;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.List;
 import java.util.UUID;
-
-import com.butingbe.global.error.exception.UnauthenticatedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
