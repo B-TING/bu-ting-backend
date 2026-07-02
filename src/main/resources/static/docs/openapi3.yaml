@@ -637,7 +637,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
-  /api/v1/chat/rooms:
+  /api/v1/chat/rooms/zone:
     get:
       tags:
         - Chat
@@ -689,7 +689,7 @@ paths:
           schema:
             type: string
             format: uuid
-            example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+            example: cf7cabe7-68ef-4296-a33c-9a912d708734
       responses:
         "200":
           description: 채팅방 퇴장 성공
@@ -728,7 +728,7 @@ paths:
           schema:
             type: string
             format: uuid
-            example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+            example: cf7cabe7-68ef-4296-a33c-9a912d708734
       responses:
         "200":
           description: 과거 대화 내역 조회 성공

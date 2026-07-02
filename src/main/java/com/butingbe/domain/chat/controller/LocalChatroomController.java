@@ -1,5 +1,6 @@
 package com.butingbe.domain.chat.controller;
 
+import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.dto.ChatroomResponse;
 import com.butingbe.domain.chat.entity.ChatZone;
@@ -8,6 +9,8 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.global.common.ApiResponse;
 import java.util.List;
 import java.util.UUID;
+
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -31,19 +34,24 @@ public class LocalChatroomController {
 
   @DeleteMapping("/{roomId}/exit")
   public ResponseEntity<ApiResponse<Void>> exitRoom(
-      @PathVariable UUID roomId, @AuthenticationPrincipal User loginUser) {
-
-    localChatroomService.exitChatroom(roomId, loginUser.getId());
+      @PathVariable UUID roomId, @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+    if (authenticatedUser == null) {
+      throw new UnauthenticatedException();
+    }
+    localChatroomService.exitChatroom(roomId, authenticatedUser.id());
     return ResponseEntity.ok(ApiResponse.success("채팅방 나가기 완료", null));
   }
 
   @PostMapping("/{roomId}/enter")
   public ResponseEntity<List<ChatMessageResponse>> enterRoom(
-      @PathVariable UUID roomId, @AuthenticationPrincipal User loginUser) {
+      @PathVariable UUID roomId, @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+    if (authenticatedUser == null) {
+      throw new UnauthenticatedException();
+    }
 
     // 과거 내역 조회 수행
     List<ChatMessageResponse> history =
-        localChatroomService.enterChatRoom(roomId, loginUser.getId());
+        localChatroomService.enterChatRoom(roomId, authenticatedUser.id());
 
     // 200 OK 상태코드와 함께 과거 메시지 리스트 반환
     return ResponseEntity.ok(history);
