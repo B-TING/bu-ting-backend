@@ -2,6 +2,7 @@ package com.butingbe.domain.chat.repository;
 
 import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.chat.entity.LocalChatroom;
+import com.butingbe.support.AbstractContainerTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +17,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest // 전체 컨텍스트를 로드하여 빈을 주입받음
 @Transactional  // 테스트 완료 후 DB에 insert된 데이터를 자동 롤백시킴
-class LocalChatroomRepositoryTest {
+// 💡 Testcontainers 환경을 적용하기 위해 부모 클래스를 상속받습니다!
+class LocalChatroomRepositoryTest extends AbstractContainerTest {
 
     @Autowired
     private LocalChatroomRepository localChatroomRepository;
@@ -25,7 +27,6 @@ class LocalChatroomRepositoryTest {
     @DisplayName("특정 ChatZone을 인자로 던지면 해당 권역에 속한 오픈채팅방만 정확히 필터링하여 조회한다")
     void findByChatZone_success() {
         // Given
-        UUID creatorId = UUID.randomUUID();
         LocalChatroom suyeongRoom = LocalChatroom.builder()
                 .title("수영구 남구")
                 .description("수영 남구 야호!!!!!")
@@ -39,6 +40,6 @@ class LocalChatroomRepositoryTest {
 
         // Then
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getTitle()).isEqualTo("광안리 모여라");
+        assertThat(result.get(0).getTitle()).isEqualTo("수영구 남구");
     }
 }

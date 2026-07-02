@@ -37,9 +37,10 @@ public class ChatMember {
     private OffsetDateTime lastReadAt;
 
     @Builder
-    public ChatMember(LocalChatroom chatroom, java.util.UUID userId) {
-        this.id = new ChatMemberId(chatroom.getRoomId(), userId);
+    public ChatMember(LocalChatroom chatroom, User user) {
+        this.id = new ChatMemberId(chatroom.getRoomId(), user.getId());
         this.chatroom = chatroom;
+        this.user = user;
         this.joinedAt = OffsetDateTime.now();
         this.lastReadAt = OffsetDateTime.now();
     }

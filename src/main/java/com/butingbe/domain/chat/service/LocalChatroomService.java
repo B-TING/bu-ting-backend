@@ -7,6 +7,8 @@ import com.butingbe.domain.chat.entity.*;
 import com.butingbe.domain.chat.repository.ChatMemberRepository;
 import com.butingbe.domain.chat.repository.ChatMessageRepository;
 import com.butingbe.domain.chat.repository.LocalChatroomRepository;
+import com.butingbe.domain.user.entity.User;
+import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ public class LocalChatroomService {
     private final LocalChatroomRepository localChatroomRepository;
     private final ChatMemberRepository chatMemberRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
     public List<ChatMessageResponse> enterChatRoom(UUID roomId, UUID userId) {
@@ -33,6 +36,8 @@ public class LocalChatroomService {
         LocalChatroom chatroom = localChatroomRepository.findById(roomId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 오픈채팅방입니다."));
 
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
         if (!chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
             if (chatroom.getCurrentMembers() >= chatroom.getMaxMembers()) {
                 throw new IllegalStateException("채팅방 정원이 가득 찼습니다."); // GlobalHandler가 409(CONFLICT)로 처리
@@ -40,7 +45,7 @@ public class LocalChatroomService {
 
             ChatMember newMember = ChatMember.builder()
                     .chatroom(chatroom)
-                    .userId(userId)
+                    .user(user)
                     .build();
             chatMemberRepository.save(newMember);
 
@@ -72,32 +77,6 @@ public class LocalChatroomService {
                 .toList();
     }
 
-    @Transactional
-    public void joinChatroom(UUID roomId, UUID userId) {
-        // 해당 채팅방이 존재하는지 조회
-        LocalChatroom chatroom = localChatroomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채팅방입니다."));
-
-        // 중복 가입 검증: 이미 해당 방의 멤버라면 추가 로직 없이 무시하거나 예외 투척
-        if (chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
-            throw new DuplicateResourceException("error.chatroom.already_joined"); // 기존 핸들러에 맞춤
-        }
-
-        // 정원 초과 검증: 현재 인원이 최대 인원과 같거나 크다면 입장 차단
-        if (chatroom.getCurrentMembers() >= chatroom.getMaxMembers()) {
-            throw new IllegalStateException("채팅방 정원이 가득 찼습니다."); // GlobalHandler가 409(CONFLICT)로 처리
-        }
-
-        ChatMember newMember = ChatMember.builder()
-                .chatroom(chatroom)
-                .userId(userId)
-                .build();
-        chatMemberRepository.save(newMember);
-
-        // 채팅방 인원수 증가
-        chatroom.incrementCurrentMembers();
-
-    }
 
 
     @Transactional
