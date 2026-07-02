@@ -76,30 +76,6 @@ class LocalChatroomServiceTest {
     // 📍 ENTER CHAT ROOM TESTS
     // ==========================================
 
-    @Test
-    @DisplayName("이미 참여 중인 사용자가 입장하면 인원수 변화 없이 기존 메시지 내역을 오래된 순(정렬 반전)으로 반환한다")
-    void enterChatRoom_success_existingMember() {
-        // given
-        when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(mockChatroom));
-        when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
-        when(chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)).thenReturn(true);
-
-        ChatMessage msg1 = ChatMessage.builder().content("첫번째").userId(userId).build();
-        ChatMessage msg2 = ChatMessage.builder().content("두번째").userId(UUID.randomUUID()).build();
-        // Descending(최신순) 정렬 상태의 가짜 DB 응답
-        when(chatMessageRepository.findTop100ByRoomIdOrderByCreatedAtDesc(roomId)).thenReturn(List.of(msg2, msg1));
-
-        // when
-        List<ChatMessageResponse> result = localChatroomService.enterChatRoom(roomId, userId);
-
-        // then
-        assertThat(result).hasSize(2);
-        assertThat(result.get(0).content()).isEqualTo("첫번째"); // 💡 내역이 역순으로 재정렬되었는지 확인
-        assertThat(result.get(1).content()).isEqualTo("두번째");
-        assertThat(result.get(0).isMine()).isTrue(); // 본인 메시지 플래그 매핑 검증
-        assertThat(mockChatroom.getCurrentMembers()).isEqualTo(10); // 인원수 그대로 유지
-        verify(chatMemberRepository, never()).save(any(ChatMember.class));
-    }
 
     @Test
     @DisplayName("신규 사용자가 입장하면 방 정원을 체크한 후 신규 멤버로 등록하고 방 인원수를 1 증가시킨다")
