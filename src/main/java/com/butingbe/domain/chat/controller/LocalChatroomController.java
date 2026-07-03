@@ -31,8 +31,8 @@ public class LocalChatroomController {
   }
 
   @PostMapping("/{roomId}/join")
-  public ResponseEntity<ApiResponse<Void>> joinChatroom(@PathVariable UUID roomId,
-                                                               @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+  public ResponseEntity<ApiResponse<Void>> joinChatroom(
+      @PathVariable UUID roomId, @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
     if (authenticatedUser == null) {
       throw new UnauthenticatedException();
     }

@@ -12,7 +12,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,17 +27,21 @@ public class LocalChatroomService {
   private final UserRepository userRepository;
 
   public List<ChatMessageResponse> getChatRoom(UUID roomId, UUID userId) {
-    LocalChatroom chatroom = localChatroomRepository.findById(roomId)
+    LocalChatroom chatroom =
+        localChatroomRepository
+            .findById(roomId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 오픈채팅방입니다."));
 
-    List<ChatMessage> chatHistory = chatMessageRepository.findTop100ByRoomIdOrderByCreatedAtDesc(roomId);
+    List<ChatMessage> chatHistory =
+        chatMessageRepository.findTop100ByRoomIdOrderByCreatedAtDesc(roomId);
 
-    List<ChatMessageResponse> messageList = chatHistory.stream()
-            .map(chatMessage -> ChatMessageResponse.from(
-                    chatMessage,
-                    userId.equals(chatMessage.getUserId())
-            ))
-            .collect(Collectors.toList()); // 💡 .toList() 대신 이걸 써야 Collections.reverse 시 500 에러가 안 납니다!
+    List<ChatMessageResponse> messageList =
+        chatHistory.stream()
+            .map(
+                chatMessage ->
+                    ChatMessageResponse.from(chatMessage, userId.equals(chatMessage.getUserId())))
+            .collect(
+                Collectors.toList()); // 💡 .toList() 대신 이걸 써야 Collections.reverse 시 500 에러가 안 납니다!
 
     Collections.reverse(messageList);
 
@@ -66,19 +69,17 @@ public class LocalChatroomService {
     chatroom.decrementCurrentMembers();
   }
 
-
-
   @Transactional
   public void joinRoom(UUID roomId, UUID userId) {
     LocalChatroom chatroom =
-            localChatroomRepository
-                    .findById(roomId)
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 오픈채팅방입니다."));
+        localChatroomRepository
+            .findById(roomId)
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 오픈채팅방입니다."));
 
     User user =
-            userRepository
-                    .findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
     if (!chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
       if (chatroom.getCurrentMembers() >= chatroom.getMaxMembers()) {
         throw new IllegalStateException("채팅방 정원이 가득 찼습니다."); // GlobalHandler가 409(CONFLICT)로 처리
