@@ -131,8 +131,9 @@ public class LocalChatroomService {
         localChatroomRepository
             .findById(roomId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채팅방입니다."));
-
-    chatroom.decrementCurrentMembers(); // 인원수 -1
+    if (chatroom.getCurrentMembers() > 0) {
+      chatroom.decrementCurrentMembers(); // 인원수 -1
+    }
 
     broadcastRoomStatus(roomId, chatroom.getCurrentMembers());
   }
