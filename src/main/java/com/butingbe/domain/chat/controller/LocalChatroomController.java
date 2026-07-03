@@ -30,6 +30,17 @@ public class LocalChatroomController {
     return ResponseEntity.ok(ApiResponse.success("지역별 채팅방 조회", rooms));
   }
 
+  @PostMapping("/{roomId}/join")
+  public ResponseEntity<ApiResponse<Void>> joinChatroom(@PathVariable UUID roomId,
+                                                               @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+    if (authenticatedUser == null) {
+      throw new UnauthenticatedException();
+    }
+    localChatroomService.joinRoom(roomId, authenticatedUser.id());
+
+    return ResponseEntity.ok(ApiResponse.success("채팅방 가입 완료", null));
+  }
+
   @DeleteMapping("/{roomId}/exit")
   public ResponseEntity<ApiResponse<Void>> exitRoom(
       @PathVariable UUID roomId, @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
@@ -40,8 +51,8 @@ public class LocalChatroomController {
     return ResponseEntity.ok(ApiResponse.success("채팅방 나가기 완료", null));
   }
 
-  @PostMapping("/{roomId}/enter")
-  public ResponseEntity<List<ChatMessageResponse>> enterRoom(
+  @GetMapping("/{roomId}/messages")
+  public ResponseEntity<List<ChatMessageResponse>> getMessages(
       @PathVariable UUID roomId, @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
     if (authenticatedUser == null) {
       throw new UnauthenticatedException();
@@ -49,7 +60,7 @@ public class LocalChatroomController {
 
     // 과거 내역 조회 수행
     List<ChatMessageResponse> history =
-        localChatroomService.enterChatRoom(roomId, authenticatedUser.id());
+        localChatroomService.getChatRoom(roomId, authenticatedUser.id());
 
     // 200 OK 상태코드와 함께 과거 메시지 리스트 반환
     return ResponseEntity.ok(history);

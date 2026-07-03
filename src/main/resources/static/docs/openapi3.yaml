@@ -673,6 +673,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/chat/rooms/{roomId}/join:
+    post:
+      tags:
+        - Chat
+      summary: 특정 오픈채팅방 가입하기
+      description: 특정 오픈채팅방을 가입하기, 방인원수는 1증가
+      security:
+        - opaqueToken: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          description: 가입할 채팅방 UUID
+          schema:
+            type: string
+            format: uuid
+            example: cf7cabe7-68ef-4296-a33c-9a912d708734
+      responses:
+        "200":
+          description: 채팅방 가입 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "채팅방 가입 완료"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/chat/rooms/{roomId}/exit:
     post:
       tags:
@@ -710,11 +747,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
-  /api/v1/chat/rooms/{roomId}/enter:
-    post:
+  /api/v1/chat/rooms/{roomId}/messages:
+    get:
       tags:
         - Chat
-      summary: 채팅방 입장 및 과거 대화 내역 조회
+      summary: 채팅방 과거 대화 내역 조회
       description: |
         사용자가 오픈채팅방에 진입할 때 호출합니다. 
         인증된 유저 정보를 기반으로 과거 최근 대화 내역 상위 100개를 최신순(내림차순) 정렬하여 반환합니다.
@@ -724,7 +761,7 @@ paths:
         - name: roomId
           in: path
           required: true
-          description: 입장하고 과거 내역을 조회할 채팅방 UUID
+          description: 과거 내역을 조회할 채팅방 UUID
           schema:
             type: string
             format: uuid
