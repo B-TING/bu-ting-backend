@@ -7,9 +7,12 @@ import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.chat.service.LocalChatroomService;
 import com.butingbe.global.common.ApiResponse;
 import com.butingbe.global.error.exception.UnauthenticatedException;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -53,16 +56,17 @@ public class LocalChatroomController {
 
   @GetMapping("/{roomId}/messages")
   public ResponseEntity<List<ChatMessageResponse>> getMessages(
-      @PathVariable UUID roomId, @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+          @PathVariable UUID roomId,
+          @RequestParam(required = false) UUID lastMessageId,
+          @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+
     if (authenticatedUser == null) {
       throw new UnauthenticatedException();
     }
 
-    // 과거 내역 조회 수행
     List<ChatMessageResponse> history =
-        localChatroomService.getChatRoom(roomId, authenticatedUser.id());
+            localChatroomService.getChatRoom(roomId, authenticatedUser.id(), lastMessageId);
 
-    // 200 OK 상태코드와 함께 과거 메시지 리스트 반환
     return ResponseEntity.ok(history);
   }
 }
