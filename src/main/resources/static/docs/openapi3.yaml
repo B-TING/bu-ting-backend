@@ -751,24 +751,36 @@ paths:
     get:
       tags:
         - Chat
-      summary: 채팅방 과거 대화 내역 조회
+      summary: 채팅방 과거 대화 내역 조회 (커서 기반 페이징)
       description: |
-        사용자가 오픈채팅방에 진입할 때 호출합니다. 
-        인증된 유저 정보를 기반으로 과거 최근 대화 내역 상위 100개를 최신순(내림차순) 정렬하여 반환합니다.
+        사용자가 오픈채팅방에 진입하거나 스크롤을 위로 올려 과거 내역을 더 불러올 때 호출합니다.
+
+        - **첫 진입 시**: `lastMessageId`를 비우고 요청하면 가장 최신 메시지 100개를 과거->최신(오름차순) 순으로 정렬하여 반환합니다.
+        - **더보기 요청 시**: 현재 클라이언트가 가진 메시지 중 가장 오래된 메시지의 `UUID`를 `lastMessageId`로 실어서 보내면, 해당 메시지 이전의 대화 내역 100개를 반환합니다.
       security:
         - opaqueToken: [ ]
       parameters:
         - name: roomId
           in: path
           required: true
-          description: 과거 내역을 조회할 채팅방 UUID
+          description: 내역을 조회할 채팅방 UUID
           schema:
             type: string
             format: uuid
             example: cf7cabe7-68ef-4296-a33c-9a912d708734
+        - name: lastMessageId
+          in: query
+          required: false
+          description: |
+            더보기 페이징용 커서 ID. 
+            현재 화면에 보이는 가장 오래된(상단) 메시지의 messageId를 전달합니다. (첫 진입 시 생략)
+          schema:
+            type: string
+            format: uuid
+            example: 52a58863-2360-4950-862f-2ba410a9d422
       responses:
         "200":
-          description: 과거 대화 내역 조회 성공
+          description: 과거 대화 내역 조회 성공 (최대 100건, 과거 -> 최신순 정렬 배열)
           content:
             application/json:
               schema:
@@ -776,7 +788,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/ChatMessageResponse"
         "400":
-          description: 존재하지 않는 방 ID이거나 잘못된 요청
+          description: 존재하지 않는 방 ID, 존재하지 않는 기준 메시지 ID(커서)이거나 잘못된 요청
           content:
             application/json:
               schema:
