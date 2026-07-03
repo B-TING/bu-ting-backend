@@ -18,7 +18,6 @@ import com.butingbe.domain.chat.repository.ChatMessageRepository;
 import com.butingbe.domain.chat.repository.LocalChatroomRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
-
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,7 +79,7 @@ class LocalChatroomServiceTest {
     // DB에서 긁어온 최신순(Desc) 가짜 데이터 리스트
     List<ChatMessage> mockHistory = new ArrayList<>(List.of(msg2, msg1));
     when(chatMessageRepository.findTop100ByRoomIdOrderByCreatedAtDesc(roomId))
-            .thenReturn(mockHistory);
+        .thenReturn(mockHistory);
 
     // when
     List<ChatMessageResponse> result = localChatroomService.getChatRoom(roomId, userId, null);
@@ -100,32 +99,31 @@ class LocalChatroomServiceTest {
     OffsetDateTime lastMessageTime = OffsetDateTime.now();
 
     // 1. 프로덕션 빌더 그대로 생성 (이 시점에는 messageId가 null입니다)
-    ChatMessage lastMessage = ChatMessage.builder()
-            .roomId(roomId)
-            .content("기준 메시지")
-            .userId(UUID.randomUUID())
-            .build();
+    ChatMessage lastMessage =
+        ChatMessage.builder().roomId(roomId).content("기준 메시지").userId(UUID.randomUUID()).build();
 
     // 2. 📌 Reflection을 이용해 private 필드인 messageId와 createdAt에 강제로 값 주입
-    org.springframework.test.util.ReflectionTestUtils.setField(lastMessage, "messageId", lastMessageId);
-    org.springframework.test.util.ReflectionTestUtils.setField(lastMessage, "createdAt", lastMessageTime);
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        lastMessage, "messageId", lastMessageId);
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        lastMessage, "createdAt", lastMessageTime);
 
     when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(mockChatroom));
     when(chatMessageRepository.findById(lastMessageId)).thenReturn(Optional.of(lastMessage));
 
     ChatMessage pastMsg1 = ChatMessage.builder().content("더 옛날대화1").userId(userId).build();
-    ChatMessage pastMsg2 = ChatMessage.builder().content("더 옛날대화2").userId(UUID.randomUUID()).build();
+    ChatMessage pastMsg2 =
+        ChatMessage.builder().content("더 옛날대화2").userId(UUID.randomUUID()).build();
     List<ChatMessage> mockHistory = new ArrayList<>(List.of(pastMsg2, pastMsg1));
 
     // 3. 📌 시간 차이 미스매치를 방지하기 위해 Mockito 매처(any) 활용
     when(chatMessageRepository.findTop100ByRoomIdAndCursor(
-            eq(roomId),
-            any(OffsetDateTime.class),
-            eq(lastMessageId)))
-            .thenReturn(mockHistory);
+            eq(roomId), any(OffsetDateTime.class), eq(lastMessageId)))
+        .thenReturn(mockHistory);
 
     // when
-    List<ChatMessageResponse> result = localChatroomService.getChatRoom(roomId, userId, lastMessageId);
+    List<ChatMessageResponse> result =
+        localChatroomService.getChatRoom(roomId, userId, lastMessageId);
 
     // then
     assertThat(result).hasSize(2);
@@ -140,8 +138,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.getChatRoom(roomId, userId, null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("존재하지 않는 오픈채팅방입니다.");
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("존재하지 않는 오픈채팅방입니다.");
   }
 
   @Test
@@ -154,8 +152,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.getChatRoom(roomId, userId, invalidMessageId))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("기준이 되는 메시지가 존재하지 않습니다.");
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("기준이 되는 메시지가 존재하지 않습니다.");
   }
 
   // ==========================================
@@ -186,8 +184,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.joinRoom(roomId, userId))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("존재하지 않는 오픈채팅방입니다.");
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("존재하지 않는 오픈채팅방입니다.");
   }
 
   @Test
@@ -199,8 +197,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.joinRoom(roomId, userId))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("존재하지 않는 사용자입니다.");
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("존재하지 않는 사용자입니다.");
   }
 
   @Test
@@ -213,8 +211,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.joinRoom(roomId, userId))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("이미 가입한 사용자입니다.");
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("이미 가입한 사용자입니다.");
   }
 
   @Test
@@ -222,7 +220,7 @@ class LocalChatroomServiceTest {
   void joinRoom_fail_roomFull() {
     // given
     LocalChatroom fullChatroom =
-            LocalChatroom.builder().chatZone(ChatZone.SUYEONG_NAMGU).maxMembers(10).build();
+        LocalChatroom.builder().chatZone(ChatZone.SUYEONG_NAMGU).maxMembers(10).build();
     setChatroomMembers(fullChatroom, 10); // 10명 정원에 10명 가득 찬 상태로 모킹
 
     when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(fullChatroom));
@@ -231,8 +229,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.joinRoom(roomId, userId))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("채팅방 정원이 가득 찼습니다.");
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("채팅방 정원이 가득 찼습니다.");
   }
 
   // ==========================================
@@ -244,7 +242,7 @@ class LocalChatroomServiceTest {
   void getRoomsByZone_success() {
     // given
     when(localChatroomRepository.findByChatZone(ChatZone.SUYEONG_NAMGU))
-            .thenReturn(List.of(mockChatroom));
+        .thenReturn(List.of(mockChatroom));
 
     // when
     List<ChatroomResponse> result = localChatroomService.getRoomsByZone(ChatZone.SUYEONG_NAMGU);
@@ -280,8 +278,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.exitChatroom(roomId, userId))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("존재하지 않는 채팅방입니다.");
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("존재하지 않는 채팅방입니다.");
   }
 
   @Test
@@ -293,7 +291,7 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.exitChatroom(roomId, userId))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("참여하고 있지 않은 채팅방입니다.");
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("참여하고 있지 않은 채팅방입니다.");
   }
 }

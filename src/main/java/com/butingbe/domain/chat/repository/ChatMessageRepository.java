@@ -1,8 +1,6 @@
 package com.butingbe.domain.chat.repository;
 
 import com.butingbe.domain.chat.entity.ChatMessage;
-
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -14,17 +12,17 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
 
   List<ChatMessage> findTop100ByRoomIdOrderByCreatedAtDesc(UUID roomId);
 
-  @Query("SELECT cm FROM ChatMessage cm " +
-          "WHERE cm.roomId = :roomId " +
-          "AND (" +
-          "  cm.createdAt < :lastCreatedAt " +
-          "  OR " +
-          "  (cm.createdAt = :lastCreatedAt AND cm.messageId < :lastMessageId)" +
-          ") " +
-          "ORDER BY cm.createdAt DESC, cm.messageId DESC")
+  @Query(
+      "SELECT cm FROM ChatMessage cm "
+          + "WHERE cm.roomId = :roomId "
+          + "AND ("
+          + "  cm.createdAt < :lastCreatedAt "
+          + "  OR "
+          + "  (cm.createdAt = :lastCreatedAt AND cm.messageId < :lastMessageId)"
+          + ") "
+          + "ORDER BY cm.createdAt DESC, cm.messageId DESC")
   List<ChatMessage> findTop100ByRoomIdAndCursor(
-          @Param("roomId") UUID roomId,
-          @Param("lastCreatedAt") OffsetDateTime lastCreatedAt,
-          @Param("lastMessageId") UUID lastMessageId
-  );
+      @Param("roomId") UUID roomId,
+      @Param("lastCreatedAt") OffsetDateTime lastCreatedAt,
+      @Param("lastMessageId") UUID lastMessageId);
 }

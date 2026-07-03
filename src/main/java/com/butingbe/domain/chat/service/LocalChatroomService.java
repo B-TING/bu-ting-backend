@@ -8,8 +8,6 @@ import com.butingbe.domain.chat.repository.ChatMessageRepository;
 import com.butingbe.domain.chat.repository.LocalChatroomRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
-
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -31,8 +29,9 @@ public class LocalChatroomService {
   @Transactional(readOnly = true)
   public List<ChatMessageResponse> getChatRoom(UUID roomId, UUID userId, UUID lastMessageId) {
 
-    localChatroomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 오픈채팅방입니다."));
+    localChatroomRepository
+        .findById(roomId)
+        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 오픈채팅방입니다."));
 
     List<ChatMessage> chatHistory;
 
@@ -41,16 +40,22 @@ public class LocalChatroomService {
       chatHistory = chatMessageRepository.findTop100ByRoomIdOrderByCreatedAtDesc(roomId);
     } else {
       // 2. 더보기 요청 시 기준 메시지 식별
-      ChatMessage lastMessage = chatMessageRepository.findById(lastMessageId)
+      ChatMessage lastMessage =
+          chatMessageRepository
+              .findById(lastMessageId)
               .orElseThrow(() -> new IllegalArgumentException("기준이 되는 메시지가 존재하지 않습니다."));
 
       // 안전하게 시간과 ID를 추출하여 전달
-      chatHistory = chatMessageRepository.findTop100ByRoomIdAndCursor(
+      chatHistory =
+          chatMessageRepository.findTop100ByRoomIdAndCursor(
               roomId, lastMessage.getCreatedAt(), lastMessage.getMessageId());
     }
 
-    List<ChatMessageResponse> messageList = chatHistory.stream()
-            .map(chatMessage -> ChatMessageResponse.from(chatMessage, userId.equals(chatMessage.getUserId())))
+    List<ChatMessageResponse> messageList =
+        chatHistory.stream()
+            .map(
+                chatMessage ->
+                    ChatMessageResponse.from(chatMessage, userId.equals(chatMessage.getUserId())))
             .collect(Collectors.toList());
 
     Collections.reverse(messageList);
