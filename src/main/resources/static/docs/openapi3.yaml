@@ -803,15 +803,15 @@ paths:
   /websocket-guide/connect:
     get:
       tags:
-        - 실시간 채팅 (WebSocket STOMP)
+        - ⚡ 실시간 채팅 (WebSocket STOMP 가이드)
       summary: "[1] 웹소켓 연결 및 인증 가이드"
       description: |
         ### ▶ **Connection URL**
         `ws://localhost:8080/ws-stomp`
-        
+
         ### ▶ **연결 시 필수 헤더(Headers)**
         - `Authorization`: `Bearer {Opaque_Token}`
-        
+
         ※ STOMP `CONNECT` 프레임 요청 시 헤더에 토큰을 실어 보내야 인증이 완료됩니다.
       responses:
         "200":
@@ -820,7 +820,7 @@ paths:
   /websocket-guide/send:
     post:
       tags:
-        - ⚡ 실시간 채팅 (WebSocket STOMP)
+        - ⚡ 실시간 채팅 (WebSocket STOMP 가이드)
       summary: "[2] 채팅 메시지 발행 (SEND)"
       description: |
         ### ▶ **발행(Destination) 채널**
@@ -840,7 +840,7 @@ paths:
   /websocket-guide/subscribe:
     get:
       tags:
-        - ⚡ 실시간 채팅 (WebSocket STOMP)
+        - ⚡ 실시간 채팅 (WebSocket STOMP 가이드)
       summary: "[3] 채팅방 메시지 구독 (SUBSCRIBE)"
       description: |
         ### ▶ **구독(Destination) 채널**
@@ -849,12 +849,37 @@ paths:
         ### ▶ **수신하게 될 실시간 JSON 데이터 형식**
         ```json
         {
-          "messageId": "uuid-value",
-          "roomId": "uuid-value",
-          "userId": "uuid-value",
-          "senderNickname": "홍길동",
+          "messageId": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+          "roomId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "userId": "7b8c9d0e-1f2a-3b4c-5d6e-7f8a9b0c1d2e",
+          "senderNickname": "수영구보안관",
           "content": "안녕하세요! 반갑습니다.",
-          "createdAt": "2026-06-30T10:47:06"
+          "createdAt": "2026-07-03T15:10:12.793+09:00"
+        }
+        ```
+      responses:
+        "200":
+          description: OK
+
+  /websocket-guide/subscribe-status:
+    get:
+      tags:
+        - ⚡ 실시간 채팅 (WebSocket STOMP 가이드)
+      summary: "[4] 실시간 인원수 상태 구독 (SUBSCRIBE)"
+      description: |
+        ### ▶ **구독(Destination) 채널**
+        `/sub/chat/room/{roomId}/status`
+
+        ### ▶ **동작 가이드**
+        유튜브 라이브 스트리밍 방식으로 동작하므로, 사용자가 해당 채널을 **구독(SUBSCRIBE)하는 순간 실시간 인원수가 1 증가**하고, **브라우저 종료나 앱 강제 종료(DISCONNECT) 시 인원수가 자동으로 1 감소**합니다.
+
+        채팅방 진입 시 `[3]번 메시지 채널`과 `[4]번 상태 채널`을 **동시에 구독**해야 실시간 인원 갱신이 화면에 새로고침 없이 반영됩니다.
+
+        ### ▶ **수신하게 될 실시간 JSON 데이터 형식**
+        ```json
+        {
+          "roomId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "currentMembers": 15
         }
         ```
       responses:

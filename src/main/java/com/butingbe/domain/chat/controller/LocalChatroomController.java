@@ -43,7 +43,7 @@ public class LocalChatroomController {
 
   @DeleteMapping("/{roomId}/exit")
   public ResponseEntity<ApiResponse<Void>> exitRoom(
-          @PathVariable UUID roomId, @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+      @PathVariable UUID roomId, @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
     if (authenticatedUser == null) {
       throw new UnauthenticatedException();
     }

@@ -10,9 +10,11 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,7 @@ public class LocalChatroomService {
   private final ChatMemberRepository chatMemberRepository;
   private final ChatMessageRepository chatMessageRepository;
   private final UserRepository userRepository;
+  private final SimpMessagingTemplate messagingTemplate;
 
   @Transactional(readOnly = true)
   public List<ChatMessageResponse> getChatRoom(UUID roomId, UUID userId, UUID lastMessageId) {
@@ -108,5 +111,39 @@ public class LocalChatroomService {
     } else {
       throw new IllegalStateException("이미 가입한 사용자입니다.");
     }
+  }
+
+  @Transactional
+  public void enterLiveChatroom(UUID roomId) {
+    LocalChatroom chatroom =
+        localChatroomRepository
+            .findById(roomId)
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채팅방입니다."));
+
+    chatroom.incrementCurrentMembers(); // 인원수 +1
+
+    broadcastRoomStatus(roomId, chatroom.getCurrentMembers());
+  }
+
+  @Transactional
+  public void exitLiveChatroom(UUID roomId) {
+    LocalChatroom chatroom =
+        localChatroomRepository
+            .findById(roomId)
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채팅방입니다."));
+
+    chatroom.decrementCurrentMembers(); // 인원수 -1
+
+    broadcastRoomStatus(roomId, chatroom.getCurrentMembers());
+  }
+
+  // 💡 실시간 브로드캐스팅 공통 메서드
+  private void broadcastRoomStatus(UUID roomId, int currentMembers) {
+    Object statusPayload =
+        Map.of(
+            "roomId", roomId,
+            "currentMembers", currentMembers);
+
+    messagingTemplate.convertAndSend("/sub/chat/room/" + roomId + "/status", statusPayload);
   }
 }
