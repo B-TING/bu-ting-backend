@@ -1,4 +1,4 @@
-package com.butingbe.domain.temp;
+package com.butingbe.domain.travelteam.entity;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
