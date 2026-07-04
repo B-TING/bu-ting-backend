@@ -1,10 +1,12 @@
 package com.butingbe.domain.travel.service;
 
+import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.response.TravelResDto;
 import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.TravelRepository;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +20,8 @@ public class TravelServiceImpl implements TravelService {
 
   @Override
   @Transactional
-  public TravelResDto createTravel(TravelCreateReqDto request) {
+  public TravelResDto createTravel(AuthenticatedUser authenticatedUser, TravelCreateReqDto request) {
+    validateAuthenticatedUser(authenticatedUser);
     validateTravelDate(request);
 
     Travel travel =
@@ -39,6 +42,16 @@ public class TravelServiceImpl implements TravelService {
             .build();
 
     return TravelResDto.from(travelRepository.save(travel));
+  }
+
+  private void validateAuthenticatedUser(AuthenticatedUser authenticatedUser) {
+    if (authenticatedUser == null) {
+      throw new UnauthenticatedException();
+    }
+
+    if (authenticatedUser.id() == null && !authenticatedUser.isDevelopmentAdmin()) {
+      throw new UnauthenticatedException();
+    }
   }
 
   private void validateTravelDate(TravelCreateReqDto request) {

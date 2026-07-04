@@ -1,9 +1,10 @@
 package com.butingbe.domain.travel.service;
 
+import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.response.TravelResDto;
 
 public interface TravelService {
 
-  TravelResDto createTravel(TravelCreateReqDto request);
+  TravelResDto createTravel(AuthenticatedUser authenticatedUser, TravelCreateReqDto request);
 }
