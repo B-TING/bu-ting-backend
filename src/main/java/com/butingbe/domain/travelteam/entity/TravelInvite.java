@@ -2,11 +2,15 @@ package com.butingbe.domain.travelteam.entity;
 
 import com.butingbe.domain.temp.entity.TravelTemp;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
+@Getter
+@Setter
 public class TravelInvite {
     @Id
     @GeneratedValue(generator = "UUID")
@@ -27,4 +31,10 @@ public class TravelInvite {
 
     @Column(nullable = false)
     private OffsetDateTime expiredAt;
+
+    public boolean isExpired() {
+        return OffsetDateTime.now().isAfter(this.expiredAt);
+    }
+
+
 }
