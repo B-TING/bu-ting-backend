@@ -23,9 +23,13 @@ public class WebSocketEventListener {
     StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
     String destination = accessor.getDestination();
 
-    if (destination != null && destination.startsWith("/sub/chat/room/")) {
+    if (destination != null && destination.startsWith("/sub/chat/room/")
+            && !destination.endsWith("/status")) {
       // 주소에서 roomId 추출 (/sub/chat/room/{roomId})
-      String roomIdStr = destination.substring("/sub/chat/room/".length());
+      String roomIdStr = destination
+              .substring("/sub/chat/room/".length())
+              .split("/")[0];
+
       UUID roomId = UUID.fromString(roomIdStr);
 
       // 세션에 현재 방 ID 저장 (나중에 disconnect 때 쓰기 위함)
