@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelteam.entity;
 
 import com.butingbe.domain.temp.entity.TravelTemp;
+import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.user.entity.User;
 import jakarta.persistence.*;
 
@@ -17,7 +18,7 @@ public class TravelMember {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "travel_id")
-    private TravelTemp travel;  // 임시 Travel 연결
+    private Travel travel;  // 임시 Travel 연결
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
