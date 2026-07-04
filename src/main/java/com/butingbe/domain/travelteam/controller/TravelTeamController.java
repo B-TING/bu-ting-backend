@@ -5,10 +5,10 @@ import com.butingbe.domain.travelteam.service.TravelTeamService;
 import com.butingbe.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -20,5 +20,15 @@ public class TravelTeamController {
     public ResponseEntity<ApiResponse<InviteVerificationResponse>> verifyInvite(@RequestParam("token") String token) {
         InviteVerificationResponse response = travelTeamService.verifyToken(token);
         return ResponseEntity.ok(ApiResponse.success("토큰 검증 완료" ,response));
+    }
+
+    @PostMapping("/{teamId}/invite")
+    public ResponseEntity<Map<String, String>> createInviteLink(@PathVariable("teamId") Long teamId) {
+        String inviteLink = travelTeamService.createInviteLink(teamId);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("inviteLink", inviteLink);
+
+        return ResponseEntity.ok(response);
     }
 }
