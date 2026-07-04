@@ -1,62 +1,109 @@
 package com.butingbe.domain.travelteam.service;
 
-
+import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
 import com.butingbe.domain.travelteam.entity.TravelInvite;
+import com.butingbe.domain.travelteam.entity.TravelMember;
+import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.repository.TravelInviteRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
+import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
+import com.butingbe.domain.user.entity.User;
+import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class TravelTeamService {
 
-    private final TravelInviteRepository travelInviteRepository;
-    private final TravelRepository travelTeampRepository; // 임시로 설정해놓은거임
+  private final TravelInviteRepository travelInviteRepository;
+  private final TravelMemberRepository travelMemberRepository;
+  private final TravelRepository travelRepository;
+  private final UserRepository userRepository;
 
-    public InviteVerificationResponse verifyToken(String token) {
+  public InviteVerificationResponse verifyToken(String token) {
+    TravelInvite invite = findUsableInvite(token);
+    return InviteVerificationResponse.from(invite.getTravel(), true);
+  }
 
-        TravelInvite invite = travelInviteRepository.findByToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 초대 링크입니다."));
+  @Transactional
+  public String createInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
+    validateLeader(authenticatedUser, travelId);
 
-        if (invite.isExpired()) {
-            throw new IllegalStateException("만료된 초대 링크입니다.");
-        }
+    Travel travel =
+        travelRepository
+            .findById(travelId)
+            .orElseThrow(() -> new IllegalArgumentException("Travel not found."));
 
-        if (invite.getUsed()) {
-            throw new IllegalStateException("이미 사용된 초대 링크입니다.");
-        }
-        invite.setUsed(true);
+    String token = UUID.randomUUID().toString();
+    OffsetDateTime expiredAt = OffsetDateTime.now().plusHours(24);
 
+    TravelInvite travelInvite =
+        TravelInvite.builder().travel(travel).token(token).expiredAt(expiredAt).build();
 
-        return new InviteVerificationResponse(invite.getTravel().getId(), invite.getTravel().getTitle(), true);
+    travelInviteRepository.save(travelInvite);
+    return "https://yourdomain.com/invite?token=" + token;
+  }
+
+  @Transactional
+  public InviteVerificationResponse acceptInvite(AuthenticatedUser authenticatedUser, String token) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    TravelInvite invite = findUsableInvite(token);
+    Travel travel = invite.getTravel();
+
+    if (travelMemberRepository.existsByTravel_IdAndUser_Id(travel.getId(), user.getId())) {
+      throw new IllegalArgumentException("User already joined this travel.");
     }
 
-    public String createInviteLink(UUID teamId) {
-        // 해당 팀이 존재하는지 확인
-        Travel team = travelTeampRepository.findById(teamId)  // 임시로 설정해놓은거임
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팀입니다."));
+    travelMemberRepository.save(
+        TravelMember.builder().travel(travel).user(user).role(TravelTeamRole.MEMBER).build());
+    invite.markUsed();
 
-        // 무작위 UUID 토큰 생성 및 만료 시간(24시간 뒤) 설정
-        String token = UUID.randomUUID().toString();
-        OffsetDateTime expiredAt = OffsetDateTime.now().plusHours(24); // 24시간 유효
+    return InviteVerificationResponse.from(travel, true);
+  }
 
-        // 엔티티 생성 및 DB 저장
-        TravelInvite teamInvite = TravelInvite.builder()
-                .travel(team)
-                .token(token)
-                .expiredAt(expiredAt)
-                .build();
+  private TravelInvite findUsableInvite(String token) {
+    TravelInvite invite =
+        travelInviteRepository
+            .findByToken(token)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid invite link."));
 
-        travelInviteRepository.save(teamInvite);
-
-        // 프론트엔드가 접근할 완성된 초대 링크 주소 반환
-        // (배포 환경에 따라 도메인 주소는 달라질 수 있음)
-        return "https://yourdomain.com/invite?token=" + token;
+    if (invite.isExpired()) {
+      throw new IllegalArgumentException("Invite link has expired.");
     }
+
+    if (Boolean.TRUE.equals(invite.getUsed())) {
+      throw new IllegalArgumentException("Invite link has already been used.");
+    }
+
+    return invite;
+  }
+
+  private void validateLeader(AuthenticatedUser authenticatedUser, UUID travelId) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    boolean leader =
+        travelMemberRepository.existsByTravel_IdAndUser_IdAndRole(
+            travelId, user.getId(), TravelTeamRole.LEADER);
+
+    if (!leader) {
+      throw new IllegalArgumentException("Only travel leaders can create invite links.");
+    }
+  }
+
+  private User findAuthenticatedUser(AuthenticatedUser authenticatedUser) {
+    if (authenticatedUser == null || authenticatedUser.id() == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return userRepository
+        .findById(authenticatedUser.id())
+        .orElseThrow(UnauthenticatedException::new);
+  }
 }

@@ -6,6 +6,11 @@ import com.butingbe.domain.travel.dto.response.TravelResDto;
 import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.TravelRepository;
+import com.butingbe.domain.travelteam.entity.TravelMember;
+import com.butingbe.domain.travelteam.entity.TravelTeamRole;
+import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
+import com.butingbe.domain.user.entity.User;
+import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,11 +22,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class TravelServiceImpl implements TravelService {
 
   private final TravelRepository travelRepository;
+  private final TravelMemberRepository travelMemberRepository;
+  private final UserRepository userRepository;
 
   @Override
   @Transactional
   public TravelResDto createTravel(AuthenticatedUser authenticatedUser, TravelCreateReqDto request) {
-    validateAuthenticatedUser(authenticatedUser);
+    User user = findAuthenticatedUser(authenticatedUser);
     validateTravelDate(request);
 
     Travel travel =
@@ -41,22 +48,26 @@ public class TravelServiceImpl implements TravelService {
             .accommodationArea(request.accommodationArea())
             .build();
 
-    return TravelResDto.from(travelRepository.save(travel));
+    Travel savedTravel = travelRepository.save(travel);
+    travelMemberRepository.save(
+        TravelMember.builder().travel(savedTravel).user(user).role(TravelTeamRole.LEADER).build());
+
+    return TravelResDto.from(savedTravel);
   }
 
-  private void validateAuthenticatedUser(AuthenticatedUser authenticatedUser) {
-    if (authenticatedUser == null) {
+  private User findAuthenticatedUser(AuthenticatedUser authenticatedUser) {
+    if (authenticatedUser == null || authenticatedUser.id() == null) {
       throw new UnauthenticatedException();
     }
 
-    if (authenticatedUser.id() == null && !authenticatedUser.isDevelopmentAdmin()) {
-      throw new UnauthenticatedException();
-    }
+    return userRepository
+        .findById(authenticatedUser.id())
+        .orElseThrow(UnauthenticatedException::new);
   }
 
   private void validateTravelDate(TravelCreateReqDto request) {
     if (request.endDate().isBefore(request.startDate())) {
-      throw new IllegalArgumentException("여행 종료 날짜는 시작 날짜보다 빠를 수 없습니다.");
+      throw new IllegalArgumentException("Travel end date cannot be before start date.");
     }
   }
 }

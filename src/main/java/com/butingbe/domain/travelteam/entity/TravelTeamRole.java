@@ -6,10 +6,8 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum TravelTeamRole {
+  LEADER("leader"),
+  MEMBER("member");
 
-    LEADER("방장"),
-    MEMBER("팀원");
-
-    private final String description;
-
+  private final String description;
 }

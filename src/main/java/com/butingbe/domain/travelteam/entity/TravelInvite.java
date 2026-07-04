@@ -1,48 +1,58 @@
 package com.butingbe.domain.travelteam.entity;
 
 import com.butingbe.domain.travel.entity.Travel;
-import com.butingbe.domain.travel.entity.Travel;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-
-import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Entity
+@Table(name = "travel_invite")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TravelInvite {
-    @Id
-    @GeneratedValue(generator = "UUID")
-    private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "travel_id", nullable = false)
-    private Travel travel;  // 임시 Travel 연결
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  @Column(nullable = false, updatable = false)
+  private UUID id;
 
-    @Column(nullable = false, unique = true)
-    private String token;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "travel_id", nullable = false)
+  private Travel travel;
 
-    @Column(nullable = false)
-    private Boolean used = false;
+  @Column(nullable = false, unique = true, length = 100)
+  private String token;
 
-    @Column(nullable = false)
-    private OffsetDateTime expiredAt;
+  @Column(nullable = false)
+  private Boolean used = false;
 
-    public boolean isExpired() {
-        return OffsetDateTime.now().isAfter(this.expiredAt);
-    }
+  @Column(name = "expired_at", nullable = false)
+  private OffsetDateTime expiredAt;
 
-    @Builder
-    public TravelInvite(Travel travel, String token, OffsetDateTime expiredAt) {
-        this.travel = travel;
-        this.token = token;
-        this.expiredAt = expiredAt;
-    }
+  @Builder
+  public TravelInvite(Travel travel, String token, OffsetDateTime expiredAt) {
+    this.travel = travel;
+    this.token = token;
+    this.expiredAt = expiredAt;
+  }
 
+  public boolean isExpired() {
+    return OffsetDateTime.now().isAfter(this.expiredAt);
+  }
 
+  public void markUsed() {
+    this.used = true;
+  }
 }
