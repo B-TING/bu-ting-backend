@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelteam.service;
 
 import com.butingbe.domain.temp.entity.TravelTemp;
+import com.butingbe.domain.temp.repository.TravelTempRepository;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
 import com.butingbe.domain.travelteam.entity.TravelInvite;
 import com.butingbe.domain.travelteam.repository.TravelInviteRepository;
@@ -15,6 +16,7 @@ import java.util.UUID;
 public class TravelTeamService {
 
     private final TravelInviteRepository travelInviteRepository;
+    private final TravelTempRepository travelTeampRepository; // 임시로 설정해놓은거임
 
     public InviteVerificationResponse verifyToken(String token) {
 
@@ -34,9 +36,9 @@ public class TravelTeamService {
         return new InviteVerificationResponse(invite.getTravel().getId(), invite.getTravel().getTitle(), true);
     }
 
-    public String createInviteLink(Long teamId) {
+    public String createInviteLink(UUID teamId) {
         // 해당 팀이 존재하는지 확인
-        TravelTemp team = travelTeampRepository.findById(teamId)
+        TravelTemp team = travelTeampRepository.findById(teamId)  // 임시로 설정해놓은거임
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팀입니다."));
 
         // 무작위 UUID 토큰 생성 및 만료 시간(24시간 뒤) 설정

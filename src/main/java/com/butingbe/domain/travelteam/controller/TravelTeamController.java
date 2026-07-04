@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -23,7 +24,7 @@ public class TravelTeamController {
     }
 
     @PostMapping("/{teamId}/invite")
-    public ResponseEntity<Map<String, String>> createInviteLink(@PathVariable("teamId") Long teamId) {
+    public ResponseEntity<Map<String, String>> createInviteLink(@PathVariable("teamId") UUID teamId) {
         String inviteLink = travelTeamService.createInviteLink(teamId);
 
         Map<String, String> response = new HashMap<>();
