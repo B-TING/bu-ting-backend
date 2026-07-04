@@ -123,11 +123,19 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testAnnotationProcessor("org.projectlombok:lombok")
 
-    testImplementation("org.testcontainers:testcontainers:1.20.1")
-    testImplementation("org.testcontainers:junit-jupiter:1.20.1")
-    testImplementation("org.testcontainers:postgresql:1.20.1")
+//    testImplementation("org.testcontainers:testcontainers:1.20.1")
+//    testImplementation("org.testcontainers:junit-jupiter:1.20.1")
+//    testImplementation("org.testcontainers:postgresql:1.20.1")
+    testImplementation("org.testcontainers:testcontainers:1.21.4")
+    testImplementation("org.testcontainers:junit-jupiter:1.21.4")
+
+    // 다른 testcontainers 모듈(mysql, postgresql 등)이 있다면 그것도 버전을 맞춰줍니다.
+    testImplementation("org.testcontainers:postgresql:1.21.4")
 
     testImplementation("org.springframework.security:spring-security-test")
+
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
 tasks.withType<Test> {
