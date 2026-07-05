@@ -1,6 +1,7 @@
 package com.butingbe.global.error;
 
 import com.butingbe.global.common.ApiResponse;
+import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,6 +45,13 @@ public class GlobalExceptionHandler {
   }
 
   /** ❌ 2. 잘못된 비즈니스 요청 예외 (400 Bad Request) IllegalArgumentException 등이 터졌을 때 처리합니다. */
+  @ExceptionHandler(ConflictException.class)
+  public ResponseEntity<ApiResponse<Void>> handleConflictException(ConflictException e) {
+    log.warn("Conflict Exception: {}", e.getMessage());
+
+    return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.fail(e.getMessage()));
+  }
+
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(
       IllegalArgumentException e) {

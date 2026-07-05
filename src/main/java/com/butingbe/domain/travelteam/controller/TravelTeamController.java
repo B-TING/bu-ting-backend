@@ -11,6 +11,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -55,5 +56,16 @@ public class TravelTeamController {
 
     InviteVerificationResponse response = travelTeamService.acceptInvite(user, token);
     return ResponseEntity.ok(ApiResponse.success("Invite accepted.", response));
+  }
+
+  @DeleteMapping("/{travelId}/members/me")
+  public ResponseEntity<ApiResponse<Void>> exitTravel(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID travelId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    travelTeamService.exitTravel(user, travelId);
+    return ResponseEntity.ok(ApiResponse.success("Travel exit completed.", null));
   }
 }

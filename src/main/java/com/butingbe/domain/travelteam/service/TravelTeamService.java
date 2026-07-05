@@ -11,6 +11,7 @@ import com.butingbe.domain.travelteam.repository.TravelInviteRepository;
 import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -67,6 +68,29 @@ public class TravelTeamService {
     invite.markUsed();
 
     return InviteVerificationResponse.from(travel, true);
+  }
+
+  @Transactional
+  public void exitTravel(AuthenticatedUser authenticatedUser, UUID travelId) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    TravelMember member =
+        travelMemberRepository
+            .findByTravel_IdAndUser_Id(travelId, user.getId())
+            .orElseThrow(() -> new IllegalArgumentException("User is not a travel member."));
+
+    long memberCount = travelMemberRepository.countByTravel_Id(travelId);
+
+    if (member.getRole() == TravelTeamRole.MEMBER) {
+      travelMemberRepository.delete(member);
+      return;
+    }
+
+    if (memberCount == 1) {
+      travelRepository.delete(member.getTravel());
+      return;
+    }
+
+    throw new ConflictException("LEADER_TRANSFER_REQUIRED");
   }
 
   private TravelInvite findUsableInvite(String token) {
