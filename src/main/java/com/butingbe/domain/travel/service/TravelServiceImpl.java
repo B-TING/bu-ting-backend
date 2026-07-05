@@ -147,6 +147,27 @@ public class TravelServiceImpl implements TravelService {
     return PlanPlaceResDto.from(planPlaceRepository.save(planPlace));
   }
 
+  @Override
+  @Transactional
+  public void deletePlanPlace(
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID planId, UUID planPlaceId) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    validateTravelMember(travelId, user.getId());
+    Plan plan = findPlanInTravel(travelId, planId);
+    PlanPlace planPlace =
+        planPlaceRepository
+            .findById(planPlaceId)
+            .filter(foundPlace -> foundPlace.getPlan().getId().equals(plan.getId()))
+            .orElseThrow(() -> new IllegalArgumentException("Plan place not found."));
+
+    Integer deletedSequence = planPlace.getSequence();
+
+    planRouteRepository.deleteByPlan_Id(planId);
+    planPlaceRepository.delete(planPlace);
+    planPlaceRepository.flush();
+    decreaseSequencesAfterDeletedPlace(planId, deletedSequence);
+  }
+
   private PlanDayResDto toPlanDayResponse(Plan plan) {
     Map<UUID, PlanRoute> routeByFromPlaceId =
         planRouteRepository.findByPlan_Id(plan.getId()).stream()
@@ -170,6 +191,13 @@ public class TravelServiceImpl implements TravelService {
     return travelRepository
         .findById(travelId)
         .orElseThrow(() -> new IllegalArgumentException("Travel not found."));
+  }
+
+  private Plan findPlanInTravel(UUID travelId, UUID planId) {
+    return planRepository
+        .findById(planId)
+        .filter(foundPlan -> foundPlan.getTravel().getId().equals(travelId))
+        .orElseThrow(() -> new IllegalArgumentException("Plan not found."));
   }
 
   private void validateTravelMember(UUID travelId, UUID userId) {
@@ -211,5 +239,11 @@ public class TravelServiceImpl implements TravelService {
     }
 
     return sequence;
+  }
+
+  private void decreaseSequencesAfterDeletedPlace(UUID planId, Integer deletedSequence) {
+    planPlaceRepository
+        .findByPlan_IdAndSequenceGreaterThanOrderBySequenceAsc(planId, deletedSequence)
+        .forEach(place -> place.changeSequence(place.getSequence() - 1));
   }
 }

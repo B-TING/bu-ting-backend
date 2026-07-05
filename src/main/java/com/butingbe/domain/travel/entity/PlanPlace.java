@@ -88,4 +88,8 @@ public class PlanPlace {
     this.durationMinutes = durationMinutes;
     this.visited = visited != null ? visited : false;
   }
+
+  public void changeSequence(Integer sequence) {
+    this.sequence = sequence;
+  }
 }

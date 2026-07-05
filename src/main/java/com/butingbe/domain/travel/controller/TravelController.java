@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -76,5 +77,19 @@ public class TravelController {
 
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(travelService.createPlanPlace(user, travelId, planId, request));
+  }
+
+  @DeleteMapping("/{travelId}/plans/{planId}/places/{planPlaceId}")
+  public ResponseEntity<Void> deletePlanPlace(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelId,
+      @PathVariable UUID planId,
+      @PathVariable UUID planPlaceId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    travelService.deletePlanPlace(user, travelId, planId, planPlaceId);
+    return ResponseEntity.noContent().build();
   }
 }

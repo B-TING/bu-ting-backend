@@ -24,4 +24,7 @@ public interface TravelService {
       UUID travelId,
       UUID planId,
       PlanPlaceCreateReqDto request);
+
+  void deletePlanPlace(
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID planId, UUID planPlaceId);
 }

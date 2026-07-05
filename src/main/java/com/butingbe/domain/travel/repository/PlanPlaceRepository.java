@@ -10,6 +10,9 @@ public interface PlanPlaceRepository extends JpaRepository<PlanPlace, UUID> {
 
   List<PlanPlace> findByPlan_IdOrderBySequenceAsc(UUID planId);
 
+  List<PlanPlace> findByPlan_IdAndSequenceGreaterThanOrderBySequenceAsc(
+      UUID planId, Integer sequence);
+
   boolean existsByPlan_IdAndSequence(UUID planId, Integer sequence);
 
   Optional<PlanPlace> findTopByPlan_IdOrderBySequenceDesc(UUID planId);
