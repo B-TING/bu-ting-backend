@@ -116,6 +116,16 @@ public class TravelServiceImpl implements TravelService {
 
   @Override
   @Transactional
+  public void deletePlan(AuthenticatedUser authenticatedUser, UUID travelId, UUID planId) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    validateTravelMember(travelId, user.getId());
+
+    Plan plan = findPlanInTravel(travelId, planId);
+    planRepository.delete(plan);
+  }
+
+  @Override
+  @Transactional
   public PlanPlaceResDto createPlanPlace(
       AuthenticatedUser authenticatedUser, UUID planId, PlanPlaceCreateReqDto request) {
     User user = findAuthenticatedUser(authenticatedUser);

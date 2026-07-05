@@ -21,6 +21,8 @@ public interface TravelService {
   PlanResDto createPlan(
       AuthenticatedUser authenticatedUser, UUID travelId, PlanCreateReqDto request);
 
+  void deletePlan(AuthenticatedUser authenticatedUser, UUID travelId, UUID planId);
+
   PlanPlaceResDto createPlanPlace(
       AuthenticatedUser authenticatedUser, UUID planId, PlanPlaceCreateReqDto request);
 
