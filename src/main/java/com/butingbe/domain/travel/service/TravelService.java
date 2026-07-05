@@ -8,6 +8,7 @@ import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
 import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
 import com.butingbe.domain.travel.dto.response.TravelResDto;
+import java.util.List;
 import java.util.UUID;
 
 public interface TravelService {
@@ -24,6 +25,8 @@ public interface TravelService {
       UUID travelId,
       UUID planId,
       PlanPlaceCreateReqDto request);
+
+  List<PlanPlaceResDto> getPlanPlaces(AuthenticatedUser authenticatedUser, UUID planId);
 
   void deletePlanPlace(
       AuthenticatedUser authenticatedUser, UUID travelId, UUID planId, UUID planPlaceId);

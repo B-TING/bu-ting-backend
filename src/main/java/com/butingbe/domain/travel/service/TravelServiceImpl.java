@@ -148,6 +148,20 @@ public class TravelServiceImpl implements TravelService {
   }
 
   @Override
+  public List<PlanPlaceResDto> getPlanPlaces(AuthenticatedUser authenticatedUser, UUID planId) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    Plan plan =
+        planRepository
+            .findById(planId)
+            .orElseThrow(() -> new IllegalArgumentException("Plan not found."));
+    validateTravelMember(plan.getTravel().getId(), user.getId());
+
+    return planPlaceRepository.findByPlan_IdOrderBySequenceAsc(planId).stream()
+        .map(PlanPlaceResDto::from)
+        .toList();
+  }
+
+  @Override
   @Transactional
   public void deletePlanPlace(
       AuthenticatedUser authenticatedUser, UUID travelId, UUID planId, UUID planPlaceId) {
