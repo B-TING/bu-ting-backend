@@ -3,6 +3,7 @@ package com.butingbe.domain.travel.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.dto.request.PlanCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
@@ -29,6 +30,7 @@ import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -185,6 +187,33 @@ public class TravelServiceImpl implements TravelService {
 
   @Override
   @Transactional
+  public List<PlanPlaceResDto> updatePlanPlaceSequence(
+      AuthenticatedUser authenticatedUser, UUID planId, PlanPlaceSequenceUpdateReqDto request) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    Plan plan =
+        planRepository
+            .findById(planId)
+            .orElseThrow(() -> new ResourceNotFoundException("Plan not found."));
+    validateTravelMember(plan.getTravel().getId(), user.getId());
+
+    List<PlanPlace> places = planPlaceRepository.findByPlan_IdOrderBySequenceAsc(planId);
+    validateReorderRequest(places, request.planPlaceIds());
+
+    Map<UUID, PlanPlace> placeById =
+        places.stream().collect(Collectors.toMap(PlanPlace::getId, Function.identity()));
+
+    movePlacesToTemporarySequences(places);
+    assignRequestedSequences(request.planPlaceIds(), placeById);
+    planRouteRepository.deleteByPlan_Id(planId);
+
+    return request.planPlaceIds().stream()
+        .map(placeById::get)
+        .map(PlanPlaceResDto::from)
+        .toList();
+  }
+
+  @Override
+  @Transactional
   public void deletePlanPlace(AuthenticatedUser authenticatedUser, UUID planPlaceId) {
     User user = findAuthenticatedUser(authenticatedUser);
     PlanPlace planPlace =
@@ -280,5 +309,36 @@ public class TravelServiceImpl implements TravelService {
     planPlaceRepository
         .findByPlan_IdAndSequenceGreaterThanOrderBySequenceAsc(planId, deletedSequence)
         .forEach(place -> place.changeSequence(place.getSequence() - 1));
+  }
+
+  private void validateReorderRequest(List<PlanPlace> places, List<UUID> requestedIds) {
+    if (places.size() != requestedIds.size()) {
+      throw new IllegalArgumentException("All plan place ids must be included.");
+    }
+
+    Set<UUID> existingIds = places.stream().map(PlanPlace::getId).collect(Collectors.toSet());
+    Set<UUID> uniqueRequestedIds = requestedIds.stream().collect(Collectors.toSet());
+
+    if (uniqueRequestedIds.size() != requestedIds.size()) {
+      throw new IllegalArgumentException("Duplicated plan place id exists.");
+    }
+
+    if (!existingIds.equals(uniqueRequestedIds)) {
+      throw new IllegalArgumentException("Plan place ids do not match this plan.");
+    }
+  }
+
+  private void movePlacesToTemporarySequences(List<PlanPlace> places) {
+    int temporarySequence = places.size() + 1;
+    for (PlanPlace place : places) {
+      place.changeSequence(temporarySequence++);
+    }
+    planPlaceRepository.flush();
+  }
+
+  private void assignRequestedSequences(List<UUID> requestedIds, Map<UUID, PlanPlace> placeById) {
+    for (int index = 0; index < requestedIds.size(); index++) {
+      placeById.get(requestedIds.get(index)).changeSequence(index + 1);
+    }
   }
 }
