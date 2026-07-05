@@ -12,7 +12,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.LocalTime;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -23,7 +22,7 @@ import lombok.NoArgsConstructor;
 @Table(
     name = "plan_place",
     uniqueConstraints = {
-      @UniqueConstraint(name = "uk_plan_place_google_place_id", columnNames = "google_place_id")
+      @UniqueConstraint(name = "uk_plan_place_sequence", columnNames = {"plan_id", "sequence"})
     })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -38,27 +37,14 @@ public class PlanPlace {
   @JoinColumn(name = "plan_id", nullable = false)
   private Plan plan;
 
-  @Column(name = "google_place_id", nullable = false)
-  private String googlePlaceId;
-
-  @Column(name = "place_name")
-  private String placeName;
-
-  @Column
+  @Column(nullable = false)
   private Integer sequence;
 
-  @Column(name = "duration_time")
-  private LocalTime durationTime;
+  @Column(name = "place_name", nullable = false)
+  private String placeName;
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "transport_type", length = 30)
-  private TransportType transportType;
-
-  @Column(name = "transport_duration")
-  private LocalTime transportDuration;
-
-  @Column(name = "is_visited")
-  private Boolean visited = false;
+  @Column(nullable = false)
+  private String address;
 
   @Column
   private Double latitude;
@@ -66,32 +52,40 @@ public class PlanPlace {
   @Column
   private Double longitude;
 
-  @Column
-  private String addr;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private PlaceProvider provider;
+
+  @Column(name = "provider_place_id", nullable = false)
+  private String providerPlaceId;
+
+  @Column(name = "duration_minutes")
+  private Integer durationMinutes;
+
+  @Column(name = "is_visited", nullable = false)
+  private Boolean visited = false;
 
   @Builder
   public PlanPlace(
       Plan plan,
-      String googlePlaceId,
-      String placeName,
       Integer sequence,
-      LocalTime durationTime,
-      TransportType transportType,
-      LocalTime transportDuration,
-      Boolean visited,
+      String placeName,
+      String address,
       Double latitude,
       Double longitude,
-      String addr) {
+      PlaceProvider provider,
+      String providerPlaceId,
+      Integer durationMinutes,
+      Boolean visited) {
     this.plan = plan;
-    this.googlePlaceId = googlePlaceId;
-    this.placeName = placeName;
     this.sequence = sequence;
-    this.durationTime = durationTime;
-    this.transportType = transportType;
-    this.transportDuration = transportDuration;
-    this.visited = visited != null ? visited : false;
+    this.placeName = placeName;
+    this.address = address;
     this.latitude = latitude;
     this.longitude = longitude;
-    this.addr = addr;
+    this.provider = provider;
+    this.providerPlaceId = providerPlaceId;
+    this.durationMinutes = durationMinutes;
+    this.visited = visited != null ? visited : false;
   }
 }

@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -17,7 +18,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "plan")
+@Table(
+    name = "plan",
+    uniqueConstraints = {
+      @UniqueConstraint(name = "uk_plan_travel_day", columnNames = {"travel_id", "day_number"}),
+      @UniqueConstraint(name = "uk_plan_travel_visit_date", columnNames = {"travel_id", "visit_date"})
+    })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Plan {
@@ -34,7 +40,7 @@ public class Plan {
   @Column(name = "day_number", nullable = false)
   private Integer dayNumber;
 
-  @Column(name = "visit_date")
+  @Column(name = "visit_date", nullable = false)
   private LocalDate visitDate;
 
   @Builder
