@@ -24,6 +24,8 @@ import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.List;
 import java.util.Map;
@@ -79,12 +81,9 @@ public class TravelServiceImpl implements TravelService {
   @Override
   public TravelPlansResDto getTravelPlans(AuthenticatedUser authenticatedUser, UUID travelId) {
     User user = findAuthenticatedUser(authenticatedUser);
+    Travel travel = findTravel(travelId);
     validateTravelMember(travelId, user.getId());
 
-    Travel travel =
-        travelRepository
-            .findById(travelId)
-            .orElseThrow(() -> new IllegalArgumentException("Travel not found."));
     List<PlanDayResDto> days =
         planRepository.findByTravel_IdOrderByDayNumberAsc(travelId).stream()
             .map(this::toPlanDayResponse)
@@ -98,9 +97,8 @@ public class TravelServiceImpl implements TravelService {
   public PlanResDto createPlan(
       AuthenticatedUser authenticatedUser, UUID travelId, PlanCreateReqDto request) {
     User user = findAuthenticatedUser(authenticatedUser);
-    validateTravelMember(travelId, user.getId());
-
     Travel travel = findTravel(travelId);
+    validateTravelMember(travelId, user.getId());
     validatePlanDate(travel, request);
     validatePlanDayNumber(travelId, request.dayNumber());
 
@@ -118,6 +116,7 @@ public class TravelServiceImpl implements TravelService {
   @Transactional
   public void deletePlan(AuthenticatedUser authenticatedUser, UUID travelId, UUID planId) {
     User user = findAuthenticatedUser(authenticatedUser);
+    findTravel(travelId);
     validateTravelMember(travelId, user.getId());
 
     Plan plan = findPlanInTravel(travelId, planId);
@@ -132,7 +131,7 @@ public class TravelServiceImpl implements TravelService {
     Plan plan =
         planRepository
             .findById(planId)
-            .orElseThrow(() -> new IllegalArgumentException("Plan not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("Plan not found."));
     validateTravelMember(plan.getTravel().getId(), user.getId());
     Integer sequence = resolveSequence(planId, request.sequence());
 
@@ -161,7 +160,7 @@ public class TravelServiceImpl implements TravelService {
     Plan plan =
         planRepository
             .findById(planId)
-            .orElseThrow(() -> new IllegalArgumentException("Plan not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("Plan not found."));
     validateTravelMember(plan.getTravel().getId(), user.getId());
 
     return planPlaceRepository.findByPlan_IdOrderBySequenceAsc(planId).stream()
@@ -177,7 +176,7 @@ public class TravelServiceImpl implements TravelService {
     PlanPlace planPlace =
         planPlaceRepository
             .findById(planPlaceId)
-            .orElseThrow(() -> new IllegalArgumentException("Plan place not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("Plan place not found."));
     validateTravelMember(planPlace.getPlan().getTravel().getId(), user.getId());
 
     planPlace.updateSchedule(request.memo(), request.scheduledTime());
@@ -191,7 +190,7 @@ public class TravelServiceImpl implements TravelService {
     PlanPlace planPlace =
         planPlaceRepository
             .findById(planPlaceId)
-            .orElseThrow(() -> new IllegalArgumentException("Plan place not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("Plan place not found."));
     Plan plan = planPlace.getPlan();
     UUID planId = plan.getId();
     validateTravelMember(plan.getTravel().getId(), user.getId());
@@ -226,19 +225,19 @@ public class TravelServiceImpl implements TravelService {
   private Travel findTravel(UUID travelId) {
     return travelRepository
         .findById(travelId)
-        .orElseThrow(() -> new IllegalArgumentException("Travel not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
   }
 
   private Plan findPlanInTravel(UUID travelId, UUID planId) {
     return planRepository
         .findById(planId)
         .filter(foundPlan -> foundPlan.getTravel().getId().equals(travelId))
-        .orElseThrow(() -> new IllegalArgumentException("Plan not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("Plan not found."));
   }
 
   private void validateTravelMember(UUID travelId, UUID userId) {
     if (!travelMemberRepository.existsByTravel_IdAndUser_Id(travelId, userId)) {
-      throw new IllegalArgumentException("User is not a travel member.");
+      throw new ForbiddenException("User is not a travel member.");
     }
   }
 

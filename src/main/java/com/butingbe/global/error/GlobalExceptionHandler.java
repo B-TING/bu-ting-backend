@@ -3,6 +3,8 @@ package com.butingbe.global.error;
 import com.butingbe.global.common.ApiResponse;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
+import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Locale;
@@ -65,6 +67,21 @@ public class GlobalExceptionHandler {
    * 📝 3. DTO 유효성 검증 실패 예외 (400 Bad Request) 컨트롤러에서 @Valid 선언한 DTO 제약조건(예: @NotBlank)을 위반했을 때
    * 작동합니다.
    */
+  @ExceptionHandler(ForbiddenException.class)
+  public ResponseEntity<ApiResponse<Void>> handleForbiddenException(ForbiddenException e) {
+    log.warn("Forbidden Exception: {}", e.getMessage());
+
+    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail(e.getMessage()));
+  }
+
+  @ExceptionHandler(ResourceNotFoundException.class)
+  public ResponseEntity<ApiResponse<Void>> handleResourceNotFoundException(
+      ResourceNotFoundException e) {
+    log.warn("Resource Not Found Exception: {}", e.getMessage());
+
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+  }
+
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ApiResponse<Void>> handleValidationException(
       MethodArgumentNotValidException e) {
