@@ -23,12 +23,11 @@ public class WebSocketEventListener {
     StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
     String destination = accessor.getDestination();
 
-    if (destination != null && destination.startsWith("/sub/chat/room/")
-            && !destination.endsWith("/status")) {
+    if (destination != null
+        && destination.startsWith("/sub/chat/room/")
+        && !destination.endsWith("/status")) {
       // 주소에서 roomId 추출 (/sub/chat/room/{roomId})
-      String roomIdStr = destination
-              .substring("/sub/chat/room/".length())
-              .split("/")[0];
+      String roomIdStr = destination.substring("/sub/chat/room/".length()).split("/")[0];
 
       UUID roomId = UUID.fromString(roomIdStr);
 
