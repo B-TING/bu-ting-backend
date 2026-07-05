@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.LocalTime;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -62,6 +63,12 @@ public class PlanPlace {
   @Column(name = "duration_minutes")
   private Integer durationMinutes;
 
+  @Column(columnDefinition = "text")
+  private String memo;
+
+  @Column(name = "scheduled_time")
+  private LocalTime scheduledTime;
+
   @Column(name = "is_visited", nullable = false)
   private Boolean visited = false;
 
@@ -76,6 +83,8 @@ public class PlanPlace {
       PlaceProvider provider,
       String providerPlaceId,
       Integer durationMinutes,
+      String memo,
+      LocalTime scheduledTime,
       Boolean visited) {
     this.plan = plan;
     this.sequence = sequence;
@@ -86,10 +95,21 @@ public class PlanPlace {
     this.provider = provider;
     this.providerPlaceId = providerPlaceId;
     this.durationMinutes = durationMinutes;
+    this.memo = memo;
+    this.scheduledTime = scheduledTime;
     this.visited = visited != null ? visited : false;
   }
 
   public void changeSequence(Integer sequence) {
     this.sequence = sequence;
+  }
+
+  public void updateSchedule(String memo, LocalTime scheduledTime) {
+    if (memo != null) {
+      this.memo = memo;
+    }
+    if (scheduledTime != null) {
+      this.scheduledTime = scheduledTime;
+    }
   }
 }

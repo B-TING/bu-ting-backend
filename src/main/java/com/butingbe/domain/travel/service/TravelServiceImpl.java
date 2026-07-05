@@ -3,6 +3,7 @@ package com.butingbe.domain.travel.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.dto.request.PlanCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
@@ -116,18 +117,13 @@ public class TravelServiceImpl implements TravelService {
   @Override
   @Transactional
   public PlanPlaceResDto createPlanPlace(
-      AuthenticatedUser authenticatedUser,
-      UUID travelId,
-      UUID planId,
-      PlanPlaceCreateReqDto request) {
+      AuthenticatedUser authenticatedUser, UUID planId, PlanPlaceCreateReqDto request) {
     User user = findAuthenticatedUser(authenticatedUser);
-    validateTravelMember(travelId, user.getId());
-
     Plan plan =
         planRepository
             .findById(planId)
-            .filter(foundPlan -> foundPlan.getTravel().getId().equals(travelId))
             .orElseThrow(() -> new IllegalArgumentException("Plan not found."));
+    validateTravelMember(plan.getTravel().getId(), user.getId());
     Integer sequence = resolveSequence(planId, request.sequence());
 
     PlanPlace planPlace =
@@ -141,6 +137,8 @@ public class TravelServiceImpl implements TravelService {
             .provider(request.provider())
             .providerPlaceId(request.providerPlaceId())
             .durationMinutes(request.durationMinutes())
+            .memo(request.memo())
+            .scheduledTime(request.scheduledTime())
             .visited(request.visited())
             .build();
 
@@ -163,16 +161,30 @@ public class TravelServiceImpl implements TravelService {
 
   @Override
   @Transactional
-  public void deletePlanPlace(
-      AuthenticatedUser authenticatedUser, UUID travelId, UUID planId, UUID planPlaceId) {
+  public PlanPlaceResDto updatePlanPlace(
+      AuthenticatedUser authenticatedUser, UUID planPlaceId, PlanPlaceUpdateReqDto request) {
     User user = findAuthenticatedUser(authenticatedUser);
-    validateTravelMember(travelId, user.getId());
-    Plan plan = findPlanInTravel(travelId, planId);
     PlanPlace planPlace =
         planPlaceRepository
             .findById(planPlaceId)
-            .filter(foundPlace -> foundPlace.getPlan().getId().equals(plan.getId()))
             .orElseThrow(() -> new IllegalArgumentException("Plan place not found."));
+    validateTravelMember(planPlace.getPlan().getTravel().getId(), user.getId());
+
+    planPlace.updateSchedule(request.memo(), request.scheduledTime());
+    return PlanPlaceResDto.from(planPlace);
+  }
+
+  @Override
+  @Transactional
+  public void deletePlanPlace(AuthenticatedUser authenticatedUser, UUID planPlaceId) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    PlanPlace planPlace =
+        planPlaceRepository
+            .findById(planPlaceId)
+            .orElseThrow(() -> new IllegalArgumentException("Plan place not found."));
+    Plan plan = planPlace.getPlan();
+    UUID planId = plan.getId();
+    validateTravelMember(plan.getTravel().getId(), user.getId());
 
     Integer deletedSequence = planPlace.getSequence();
 

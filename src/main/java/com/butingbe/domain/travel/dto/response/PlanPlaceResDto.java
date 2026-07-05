@@ -2,6 +2,7 @@ package com.butingbe.domain.travel.dto.response;
 
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.PlanPlace;
+import java.time.LocalTime;
 import java.util.UUID;
 
 public record PlanPlaceResDto(
@@ -15,6 +16,8 @@ public record PlanPlaceResDto(
     PlaceProvider provider,
     String providerPlaceId,
     Integer durationMinutes,
+    String memo,
+    LocalTime scheduledTime,
     Boolean visited) {
 
   public static PlanPlaceResDto from(PlanPlace place) {
@@ -29,6 +32,8 @@ public record PlanPlaceResDto(
         place.getProvider(),
         place.getProviderPlaceId(),
         place.getDurationMinutes(),
+        place.getMemo(),
+        place.getScheduledTime(),
         place.getVisited());
   }
 }
