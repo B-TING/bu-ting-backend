@@ -55,7 +55,8 @@ class TravelTeamControllerTest {
     mockMvc
         .perform(post("/travel/team/{travelId}/invite", FakeTravelTeamService.TRAVEL_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.inviteLink").value("https://yourdomain.com/invite?token=invite-token"));
+        .andExpect(
+            jsonPath("$.inviteLink").value("https://yourdomain.com/invite?token=invite-token"));
 
     assertThat(travelTeamService.createdInviteTravelId).isEqualTo(FakeTravelTeamService.TRAVEL_ID);
   }
@@ -121,7 +122,8 @@ class TravelTeamControllerTest {
     }
 
     @Override
-    public InviteVerificationResponse acceptInvite(AuthenticatedUser authenticatedUser, String token) {
+    public InviteVerificationResponse acceptInvite(
+        AuthenticatedUser authenticatedUser, String token) {
       return new InviteVerificationResponse(TRAVEL_ID, "Busan", true);
     }
 

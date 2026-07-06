@@ -3,7 +3,6 @@ package com.butingbe.domain.travel.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,7 +26,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -109,10 +107,11 @@ class TravelControllerTest {
   @DisplayName("여행 일자 삭제 요청을 service에 위임한다")
   void deletePlan() throws Exception {
     mockMvc
-        .perform(delete(
-            "/travels/{travelId}/plans/{planId}",
-            FakeTravelService.TRAVEL_ID,
-            FakeTravelService.PLAN_ID))
+        .perform(
+            delete(
+                "/travels/{travelId}/plans/{planId}",
+                FakeTravelService.TRAVEL_ID,
+                FakeTravelService.PLAN_ID))
         .andExpect(status().isNoContent());
 
     assertThat(travelService.deletedPlanId).isEqualTo(FakeTravelService.PLAN_ID);

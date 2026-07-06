@@ -28,18 +28,10 @@ class TravelRepositoryTest extends AbstractContainerTest {
     Travel travel = travelRepository.save(createTravel());
     Plan day2 =
         planRepository.save(
-            Plan.builder()
-                .travel(travel)
-                .dayNumber(2)
-                .visitDate(LocalDate.of(2026, 8, 2))
-                .build());
+            Plan.builder().travel(travel).dayNumber(2).visitDate(LocalDate.of(2026, 8, 2)).build());
     Plan day1 =
         planRepository.save(
-            Plan.builder()
-                .travel(travel)
-                .dayNumber(1)
-                .visitDate(LocalDate.of(2026, 8, 1))
-                .build());
+            Plan.builder().travel(travel).dayNumber(1).visitDate(LocalDate.of(2026, 8, 1)).build());
 
     List<Plan> plans = planRepository.findByTravel_IdOrderByDayNumberAsc(travel.getId());
 
@@ -52,11 +44,7 @@ class TravelRepositoryTest extends AbstractContainerTest {
     Travel travel = travelRepository.save(createTravel());
     Plan plan =
         planRepository.save(
-            Plan.builder()
-                .travel(travel)
-                .dayNumber(1)
-                .visitDate(LocalDate.of(2026, 8, 1))
-                .build());
+            Plan.builder().travel(travel).dayNumber(1).visitDate(LocalDate.of(2026, 8, 1)).build());
     PlanPlace second = planPlaceRepository.save(createPlace(plan, 2, "Haeundae"));
     PlanPlace first = planPlaceRepository.save(createPlace(plan, 1, "Busan Station"));
 

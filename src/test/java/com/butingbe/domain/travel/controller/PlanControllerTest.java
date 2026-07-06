@@ -102,7 +102,8 @@ class PlanControllerTest {
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody().planPlaceId()).isEqualTo(FakeTravelService.PLACE_ID);
     assertThat(travelService.updatedPlanPlaceRequest.durationMinutes()).isEqualTo(45);
-    assertThat(travelService.updatedPlanPlaceRequest.scheduledTime()).isEqualTo(LocalTime.of(13, 30));
+    assertThat(travelService.updatedPlanPlaceRequest.scheduledTime())
+        .isEqualTo(LocalTime.of(13, 30));
     assertThat(travelService.updatedPlanPlaceRequest.memo()).isEqualTo("Lunch");
   }
 

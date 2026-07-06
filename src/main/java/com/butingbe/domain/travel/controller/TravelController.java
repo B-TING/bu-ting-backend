@@ -37,7 +37,8 @@ public class TravelController {
       throw new UnauthenticatedException();
     }
 
-    return ResponseEntity.status(HttpStatus.CREATED).body(travelService.createTravel(user, request));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(travelService.createTravel(user, request));
   }
 
   @GetMapping("/{travelId}/plans")
