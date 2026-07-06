@@ -86,6 +86,8 @@ public class TravelTeamService {
     }
 
     if (memberCount == 1) {
+      travelMemberRepository.delete(member);
+      travelMemberRepository.flush();
       travelRepository.delete(member.getTravel());
       return;
     }

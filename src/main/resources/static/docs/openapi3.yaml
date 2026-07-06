@@ -19,6 +19,8 @@ tags:
     description: Travel survey profile APIs
   - name: Travel
     description: Travel planning and itinerary APIs
+  - name: TravelTeam
+    description: Travel team invite and member APIs
   - name: Chat
     description: Chat APIs
   - name: WebSocket STOMP
@@ -1193,6 +1195,127 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/travel/team/invites/verify:
+    get:
+      tags:
+        - TravelTeam
+      summary: Verify travel invite token
+      description: Verifies a travel invite token and returns the target travel information.
+      parameters:
+        - $ref: "#/components/parameters/InviteToken"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteVerificationEnvelope"
+        "400":
+          description: Invalid, expired, or already used invite token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel/team/{travelId}/invite:
+    post:
+      tags:
+        - TravelTeam
+      summary: Create travel invite link
+      description: Creates an invite link for a travel. Only the travel leader can create an invite link.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelInviteLinkResponse"
+        "400":
+          description: Travel not found or the user is not a travel leader
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel/team/invites/accept:
+    post:
+      tags:
+        - TravelTeam
+      summary: Accept travel invite
+      description: Accepts a travel invite token and joins the authenticated user to the travel as a member.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/InviteToken"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteVerificationEnvelope"
+        "400":
+          description: Invalid invite token or user already joined this travel
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel/team/{travelId}/members/me:
+    delete:
+      tags:
+        - TravelTeam
+      summary: Exit travel
+      description: |
+        Exits the authenticated user from a travel.
+        MEMBER exits by deleting only their TravelMember row.
+        LEADER can exit only when they are alone; if other members remain, the API returns conflict.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelExitEnvelope"
+        "400":
+          description: User is not a travel member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: Leader transfer is required before exit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /websocket-guide/connect:
     get:
       tags:
@@ -1307,6 +1430,14 @@ components:
         type: string
         format: uuid
       example: 30000000-0000-0000-0000-000000000001
+    InviteToken:
+      name: token
+      in: query
+      required: true
+      description: Travel invite token
+      schema:
+        type: string
+      example: invite-token
   securitySchemes:
     opaqueToken:
       type: http
@@ -2122,6 +2253,48 @@ components:
         - PUBLIC_TRANSPORT
         - WALK
       example: CAR
+    TravelInviteLinkResponse:
+      type: object
+      properties:
+        inviteLink:
+          type: string
+          example: https://yourdomain.com/invite?token=invite-token
+    InviteVerificationEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Invite token verified.
+        data:
+          $ref: "#/components/schemas/InviteVerificationResponse"
+    InviteVerificationResponse:
+      type: object
+      properties:
+        travelId:
+          type: string
+          format: uuid
+          example: 10000000-0000-0000-0000-000000000001
+        travelName:
+          type: string
+          example: Busan
+        valid:
+          type: boolean
+          example: true
+    TravelExitEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Travel exit completed.
+        data:
+          nullable: true
+          example: null
     LocalChatroomResponse:
       type: object
       properties:
