@@ -57,7 +57,7 @@ public class PlanController {
   public ResponseEntity<PlanPlaceResDto> updatePlanPlace(
       @AuthenticationPrincipal AuthenticatedUser user,
       @PathVariable UUID planPlaceId,
-      @RequestBody PlanPlaceUpdateReqDto request) {
+      @RequestBody @Valid PlanPlaceUpdateReqDto request) {
     if (user == null) {
       throw new UnauthenticatedException();
     }

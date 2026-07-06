@@ -104,12 +104,15 @@ public class PlanPlace {
     this.sequence = sequence;
   }
 
-  public void updateSchedule(String memo, LocalTime scheduledTime) {
-    if (memo != null) {
-      this.memo = memo;
+  public void updateSchedule(Integer durationMinutes, LocalTime scheduledTime, String memo) {
+    if (durationMinutes != null) {
+      this.durationMinutes = durationMinutes;
     }
     if (scheduledTime != null) {
       this.scheduledTime = scheduledTime;
+    }
+    if (memo != null) {
+      this.memo = memo;
     }
   }
 }

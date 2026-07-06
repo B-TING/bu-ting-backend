@@ -97,10 +97,13 @@ class PlanControllerTest {
         planController.updatePlanPlace(
             authenticatedUser(),
             FakeTravelService.PLACE_ID,
-            new PlanPlaceUpdateReqDto("Lunch", LocalTime.of(13, 30)));
+            new PlanPlaceUpdateReqDto(45, LocalTime.of(13, 30), "Lunch"));
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody().planPlaceId()).isEqualTo(FakeTravelService.PLACE_ID);
+    assertThat(travelService.updatedPlanPlaceRequest.durationMinutes()).isEqualTo(45);
+    assertThat(travelService.updatedPlanPlaceRequest.scheduledTime()).isEqualTo(LocalTime.of(13, 30));
+    assertThat(travelService.updatedPlanPlaceRequest.memo()).isEqualTo("Lunch");
   }
 
   @Test
@@ -161,6 +164,7 @@ class PlanControllerTest {
     static final UUID PLACE_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
 
     UUID deletedPlanPlaceId;
+    PlanPlaceUpdateReqDto updatedPlanPlaceRequest;
 
     @Override
     public TravelResDto createTravel(
@@ -198,6 +202,7 @@ class PlanControllerTest {
     @Override
     public PlanPlaceResDto updatePlanPlace(
         AuthenticatedUser authenticatedUser, UUID planPlaceId, PlanPlaceUpdateReqDto request) {
+      updatedPlanPlaceRequest = request;
       return placeResponse(planPlaceId, 1);
     }
 

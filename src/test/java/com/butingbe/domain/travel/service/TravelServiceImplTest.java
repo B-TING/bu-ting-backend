@@ -7,6 +7,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.dto.request.PlanCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
@@ -23,6 +24,7 @@ import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -116,6 +118,30 @@ class TravelServiceImplTest extends AbstractContainerTest {
         .extracting(place -> place.getId())
         .containsExactly(third.planPlaceId(), first.planPlaceId(), second.planPlaceId());
     assertThat(planRouteRepository.findByPlan_Id(plan.planId())).isEmpty();
+  }
+
+  @Test
+  @DisplayName("plan place update changes duration, scheduled time, and memo")
+  void updatePlanPlaceChangesScheduleFields() {
+    User user = userRepository.save(createUser("update-place@example.com", "update-place"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser,
+            travel.id(),
+            new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto place = createPlace(authenticatedUser, plan.planId(), 1, "Busan Station");
+
+    PlanPlaceResDto result =
+        travelService.updatePlanPlace(
+            authenticatedUser,
+            place.planPlaceId(),
+            new PlanPlaceUpdateReqDto(90, LocalTime.of(11, 30), "Lunch before beach"));
+
+    assertThat(result.durationMinutes()).isEqualTo(90);
+    assertThat(result.scheduledTime()).isEqualTo(LocalTime.of(11, 30));
+    assertThat(result.memo()).isEqualTo("Lunch before beach");
   }
 
   private TravelResDto createTravel(User user) {

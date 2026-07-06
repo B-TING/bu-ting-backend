@@ -181,7 +181,7 @@ public class TravelServiceImpl implements TravelService {
             .orElseThrow(() -> new ResourceNotFoundException("Plan place not found."));
     validateTravelMember(planPlace.getPlan().getTravel().getId(), user.getId());
 
-    planPlace.updateSchedule(request.memo(), request.scheduledTime());
+    planPlace.updateSchedule(request.durationMinutes(), request.scheduledTime(), request.memo());
     return PlanPlaceResDto.from(planPlace);
   }
 

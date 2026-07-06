@@ -1122,7 +1122,7 @@ paths:
       tags:
         - Travel
       summary: Update plan place
-      description: Updates memo and scheduled visit time of a place schedule.
+      description: Updates stay duration, schedule start time, and memo of a place schedule.
       security:
         - opaqueToken: []
       parameters:
@@ -1134,8 +1134,9 @@ paths:
             schema:
               $ref: "#/components/schemas/PlanPlaceUpdateRequest"
             example:
-              memo: Lunch reservation
+              durationMinutes: 90
               scheduledTime: "13:30:00"
+              memo: Lunch reservation
       responses:
         "200":
           description: OK
@@ -1897,15 +1898,22 @@ components:
     PlanPlaceUpdateRequest:
       type: object
       properties:
-        memo:
-          type: string
+        durationMinutes:
+          type: integer
+          minimum: 0
           nullable: true
-          example: Lunch reservation
+          description: Stay duration at this place in minutes.
+          example: 90
         scheduledTime:
           type: string
           format: time
           nullable: true
+          description: Schedule start time.
           example: "13:30:00"
+        memo:
+          type: string
+          nullable: true
+          example: Lunch reservation
     PlanPlaceSequenceUpdateRequest:
       type: object
       required:
