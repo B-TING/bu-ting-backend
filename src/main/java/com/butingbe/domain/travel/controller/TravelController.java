@@ -3,6 +3,7 @@ package com.butingbe.domain.travel.controller;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.dto.request.PlanCreateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
+import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
 import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
 import com.butingbe.domain.travel.dto.response.TravelResDto;
@@ -17,6 +18,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -74,5 +76,17 @@ public class TravelController {
 
     travelService.deletePlan(user, travelId, planId);
     return ResponseEntity.noContent().build();
+  }
+
+  @PatchMapping("/{travelId}/status")
+  public ResponseEntity<TravelResDto> updateTravelStatus(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelId,
+      @RequestBody @Valid TravelStatusUpdateReqDto request) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(travelService.updateTravelStatus(user, travelId, request));
   }
 }

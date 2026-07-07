@@ -15,6 +15,7 @@ import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
+import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
 import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
@@ -210,6 +211,12 @@ class PlanControllerTest {
     @Override
     public PlanResDto createPlan(
         AuthenticatedUser authenticatedUser, UUID travelId, PlanCreateReqDto request) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public TravelResDto updateTravelStatus(
+        AuthenticatedUser authenticatedUser, UUID travelId, TravelStatusUpdateReqDto request) {
       throw new UnsupportedOperationException();
     }
 

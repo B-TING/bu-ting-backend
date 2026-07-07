@@ -936,6 +936,62 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/travels/{travelId}/status:
+    patch:
+      tags:
+        - Travel
+      summary: Update travel status
+      description: |
+        Changes the travel status.
+        Allowed transitions:
+        PLANNED -> IN_PROGRESS, PLANNED -> COMPLETED,
+        IN_PROGRESS -> COMPLETED,
+        COMPLETED -> IN_PROGRESS.
+        Changing back to PLANNED is not allowed.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelStatusUpdateRequest"
+            example:
+              status: IN_PROGRESS
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelResponse"
+        "400":
+          description: Validation failed or invalid travel status transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: User is not a travel member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Travel not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/travels/{travelId}/plans/{planId}:
     delete:
       tags:
@@ -1995,6 +2051,13 @@ components:
               format: date-time
               nullable: true
               example: "2026-07-05T14:30:00"
+    TravelStatusUpdateRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: "#/components/schemas/TravelStatus"
     PlanCreateRequest:
       type: object
       required:

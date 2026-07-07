@@ -7,6 +7,7 @@ import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
+import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
 import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
@@ -113,6 +114,19 @@ public class TravelServiceImpl implements TravelService {
             .build();
 
     return PlanResDto.from(planRepository.save(plan));
+  }
+
+  @Override
+  @Transactional
+  public TravelResDto updateTravelStatus(
+      AuthenticatedUser authenticatedUser, UUID travelId, TravelStatusUpdateReqDto request) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    Travel travel = findTravel(travelId);
+    validateTravelMember(travelId, user.getId());
+    validateStatusTransition(travel.getStatus(), request.status());
+
+    travel.changeStatus(request.status());
+    return TravelResDto.from(travel);
   }
 
   @Override
@@ -312,6 +326,31 @@ public class TravelServiceImpl implements TravelService {
     if (planRepository.existsByTravel_IdAndDayNumber(travelId, dayNumber)) {
       throw new IllegalArgumentException("Plan day number already exists.");
     }
+  }
+
+  private void validateStatusTransition(TravelStatus currentStatus, TravelStatus nextStatus) {
+    if (currentStatus == nextStatus) {
+      return;
+    }
+
+    if (nextStatus == TravelStatus.PLANNED) {
+      throw new IllegalArgumentException("Travel status cannot be changed back to PLANNED.");
+    }
+
+    if (currentStatus == TravelStatus.PLANNED
+        && (nextStatus == TravelStatus.IN_PROGRESS || nextStatus == TravelStatus.COMPLETED)) {
+      return;
+    }
+
+    if (currentStatus == TravelStatus.IN_PROGRESS && nextStatus == TravelStatus.COMPLETED) {
+      return;
+    }
+
+    if (currentStatus == TravelStatus.COMPLETED && nextStatus == TravelStatus.IN_PROGRESS) {
+      return;
+    }
+
+    throw new IllegalArgumentException("Invalid travel status transition.");
   }
 
   private Integer resolveSequence(UUID planId, Integer requestedSequence) {

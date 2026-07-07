@@ -10,12 +10,14 @@ import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
+import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
 import com.butingbe.domain.travel.dto.response.TravelResDto;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.PlanRoute;
 import com.butingbe.domain.travel.entity.TransportType;
+import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
@@ -145,6 +147,75 @@ class TravelServiceImplTest extends AbstractContainerTest {
     assertThat(result.durationMinutes()).isEqualTo(90);
     assertThat(result.scheduledTime()).isEqualTo(LocalTime.of(11, 30));
     assertThat(result.memo()).isEqualTo("Lunch before beach");
+  }
+
+  @Test
+  @DisplayName("travel member can update travel status")
+  void updateTravelStatusChangesStatus() {
+    User user = userRepository.save(createUser("complete@example.com", "complete"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+
+    TravelResDto result =
+        travelService.updateTravelStatus(
+            authenticatedUser, travel.id(), new TravelStatusUpdateReqDto(TravelStatus.IN_PROGRESS));
+
+    assertThat(result.status()).isEqualTo(TravelStatus.IN_PROGRESS);
+    assertThat(travelRepository.findById(travel.id()).orElseThrow().getStatus())
+        .isEqualTo(TravelStatus.IN_PROGRESS);
+  }
+
+  @Test
+  @DisplayName("travel status update rejects users who are not travel members")
+  void updateTravelStatusForbiddenWhenUserIsNotMember() {
+    User owner = userRepository.save(createUser("complete-owner@example.com", "complete-owner"));
+    User outsider =
+        userRepository.save(createUser("complete-outsider@example.com", "complete-outsider"));
+    TravelResDto travel = createTravel(owner);
+
+    assertThatThrownBy(
+            () ->
+                travelService.updateTravelStatus(
+                    AuthenticatedUser.from(outsider),
+                    travel.id(),
+                    new TravelStatusUpdateReqDto(TravelStatus.COMPLETED)))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not a travel member.");
+  }
+
+  @Test
+  @DisplayName("travel status cannot be changed back to planned")
+  void updateTravelStatusRejectsBackToPlanned() {
+    User user = userRepository.save(createUser("planned-back@example.com", "planned-back"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    travelService.updateTravelStatus(
+        authenticatedUser, travel.id(), new TravelStatusUpdateReqDto(TravelStatus.COMPLETED));
+
+    assertThatThrownBy(
+            () ->
+                travelService.updateTravelStatus(
+                    authenticatedUser,
+                    travel.id(),
+                    new TravelStatusUpdateReqDto(TravelStatus.PLANNED)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel status cannot be changed back to PLANNED.");
+  }
+
+  @Test
+  @DisplayName("completed travel can be restored to in progress")
+  void updateTravelStatusAllowsCompletedToInProgress() {
+    User user = userRepository.save(createUser("restore-progress@example.com", "restore-progress"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    travelService.updateTravelStatus(
+        authenticatedUser, travel.id(), new TravelStatusUpdateReqDto(TravelStatus.COMPLETED));
+
+    TravelResDto result =
+        travelService.updateTravelStatus(
+            authenticatedUser, travel.id(), new TravelStatusUpdateReqDto(TravelStatus.IN_PROGRESS));
+
+    assertThat(result.status()).isEqualTo(TravelStatus.IN_PROGRESS);
   }
 
   @Test

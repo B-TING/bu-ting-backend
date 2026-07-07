@@ -104,4 +104,8 @@ public class Travel {
     this.companionTypes = companionTypes;
     this.accommodationArea = accommodationArea;
   }
+
+  public void changeStatus(TravelStatus status) {
+    this.status = status;
+  }
 }

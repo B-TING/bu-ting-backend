@@ -14,6 +14,7 @@ import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
+import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
 import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
@@ -119,6 +120,22 @@ class TravelControllerTest {
     assertThat(travelService.deletedPlanId).isEqualTo(FakeTravelService.PLAN_ID);
   }
 
+  @Test
+  @DisplayName("travel status update delegates to service")
+  void updateTravelStatus() {
+    var response =
+        travelController.updateTravelStatus(
+            authenticatedUser(),
+            FakeTravelService.TRAVEL_ID,
+            new TravelStatusUpdateReqDto(TravelStatus.IN_PROGRESS));
+
+    assertThat(response.getStatusCode().value()).isEqualTo(200);
+    assertThat(response.getBody().id()).isEqualTo(FakeTravelService.TRAVEL_ID);
+    assertThat(response.getBody().status()).isEqualTo(TravelStatus.IN_PROGRESS);
+    assertThat(travelService.updatedStatusTravelId).isEqualTo(FakeTravelService.TRAVEL_ID);
+    assertThat(travelService.updatedStatusRequest.status()).isEqualTo(TravelStatus.IN_PROGRESS);
+  }
+
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
     return new HandlerMethodArgumentResolver() {
       @Override
@@ -147,6 +164,8 @@ class TravelControllerTest {
 
     boolean createTravelCalled;
     UUID deletedPlanId;
+    UUID updatedStatusTravelId;
+    TravelStatusUpdateReqDto updatedStatusRequest;
 
     @Override
     public TravelResDto createTravel(
@@ -179,6 +198,29 @@ class TravelControllerTest {
     public PlanResDto createPlan(
         AuthenticatedUser authenticatedUser, UUID travelId, PlanCreateReqDto request) {
       return new PlanResDto(PLAN_ID, travelId, request.dayNumber(), request.visitDate());
+    }
+
+    @Override
+    public TravelResDto updateTravelStatus(
+        AuthenticatedUser authenticatedUser, UUID travelId, TravelStatusUpdateReqDto request) {
+      updatedStatusTravelId = travelId;
+      updatedStatusRequest = request;
+      return new TravelResDto(
+          travelId,
+          "Busan",
+          LocalDate.of(2026, 8, 1),
+          LocalDate.of(2026, 8, 3),
+          request.status(),
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null);
     }
 
     @Override
