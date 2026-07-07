@@ -7,12 +7,15 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.dto.request.PlanCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
 import com.butingbe.domain.travel.dto.response.TravelResDto;
 import com.butingbe.domain.travel.entity.PlaceProvider;
+import com.butingbe.domain.travel.entity.PlanRoute;
+import com.butingbe.domain.travel.entity.TransportType;
 import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
@@ -142,6 +145,53 @@ class TravelServiceImplTest extends AbstractContainerTest {
     assertThat(result.durationMinutes()).isEqualTo(90);
     assertThat(result.scheduledTime()).isEqualTo(LocalTime.of(11, 30));
     assertThat(result.memo()).isEqualTo("Lunch before beach");
+  }
+
+  @Test
+  @DisplayName("plan place update place changes location fields and clears routes")
+  void updatePlanPlacePlaceChangesLocationFields() {
+    User user = userRepository.save(createUser("replace-place@example.com", "replace-place"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser,
+            travel.id(),
+            new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto first = createPlace(authenticatedUser, plan.planId(), 1, "Busan Station");
+    PlanPlaceResDto second = createPlace(authenticatedUser, plan.planId(), 2, "Haeundae");
+    var firstPlace = planPlaceRepository.findById(first.planPlaceId()).orElseThrow();
+    var secondPlace = planPlaceRepository.findById(second.planPlaceId()).orElseThrow();
+    planRouteRepository.save(
+        PlanRoute.builder()
+            .plan(firstPlace.getPlan())
+            .fromPlace(firstPlace)
+            .toPlace(secondPlace)
+            .transportType(TransportType.CAR)
+            .durationMinutes(35)
+            .distanceMeters(12000)
+            .provider(PlaceProvider.GOOGLE)
+            .build());
+
+    PlanPlaceResDto result =
+        travelService.updatePlanPlacePlace(
+            authenticatedUser,
+            first.planPlaceId(),
+            new PlanPlaceUpdatePlaceReqDto(
+                "Gwangalli",
+                "Busan Suyeong-gu",
+                35.153,
+                129.118,
+                PlaceProvider.KAKAO,
+                "kakao-gwangalli-id"));
+
+    assertThat(result.placeName()).isEqualTo("Gwangalli");
+    assertThat(result.address()).isEqualTo("Busan Suyeong-gu");
+    assertThat(result.latitude()).isEqualTo(35.153);
+    assertThat(result.longitude()).isEqualTo(129.118);
+    assertThat(result.provider()).isEqualTo(PlaceProvider.KAKAO);
+    assertThat(result.providerPlaceId()).isEqualTo("kakao-gwangalli-id");
+    assertThat(planRouteRepository.findByPlan_Id(plan.planId())).isEmpty();
   }
 
   private TravelResDto createTravel(User user) {

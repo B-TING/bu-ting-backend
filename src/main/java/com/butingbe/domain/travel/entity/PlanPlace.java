@@ -115,4 +115,19 @@ public class PlanPlace {
       this.memo = memo;
     }
   }
+
+  public void updatePlace(
+      String placeName,
+      String address,
+      Double latitude,
+      Double longitude,
+      PlaceProvider provider,
+      String providerPlaceId) {
+    this.placeName = placeName;
+    this.address = address;
+    this.latitude = latitude;
+    this.longitude = longitude;
+    this.provider = provider;
+    this.providerPlaceId = providerPlaceId;
+  }
 }

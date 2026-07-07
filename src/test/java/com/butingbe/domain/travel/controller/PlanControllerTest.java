@@ -12,6 +12,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.dto.request.PlanCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
@@ -107,6 +108,34 @@ class PlanControllerTest {
   }
 
   @Test
+  @DisplayName("plan place location can be replaced")
+  void updatePlanPlacePlace() throws Exception {
+    mockMvc
+        .perform(
+            patch("/plans/places/{planPlaceId}/place", FakeTravelService.PLACE_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "placeName": "Haeundae",
+                      "address": "Busan Haeundae-gu",
+                      "latitude": 35.158,
+                      "longitude": 129.16,
+                      "provider": "GOOGLE",
+                      "providerPlaceId": "google-haeundae-id"
+                    }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.placeName").value("Haeundae"))
+        .andExpect(jsonPath("$.providerPlaceId").value("google-haeundae-id"));
+
+    assertThat(travelService.updatedPlaceRequest.placeName()).isEqualTo("Haeundae");
+    assertThat(travelService.updatedPlaceRequest.address()).isEqualTo("Busan Haeundae-gu");
+    assertThat(travelService.updatedPlaceRequest.provider()).isEqualTo(PlaceProvider.GOOGLE);
+    assertThat(travelService.updatedPlaceRequest.providerPlaceId()).isEqualTo("google-haeundae-id");
+  }
+
+  @Test
   @DisplayName("드래그 앤 드롭 결과 순서 배열을 service에 전달한다")
   void updatePlanPlaceSequence() throws Exception {
     UUID anotherPlaceId = UUID.fromString("30000000-0000-0000-0000-000000000002");
@@ -165,6 +194,7 @@ class PlanControllerTest {
 
     UUID deletedPlanPlaceId;
     PlanPlaceUpdateReqDto updatedPlanPlaceRequest;
+    PlanPlaceUpdatePlaceReqDto updatedPlaceRequest;
 
     @Override
     public TravelResDto createTravel(
@@ -204,6 +234,26 @@ class PlanControllerTest {
         AuthenticatedUser authenticatedUser, UUID planPlaceId, PlanPlaceUpdateReqDto request) {
       updatedPlanPlaceRequest = request;
       return placeResponse(planPlaceId, 1);
+    }
+
+    @Override
+    public PlanPlaceResDto updatePlanPlacePlace(
+        AuthenticatedUser authenticatedUser, UUID planPlaceId, PlanPlaceUpdatePlaceReqDto request) {
+      updatedPlaceRequest = request;
+      return new PlanPlaceResDto(
+          planPlaceId,
+          PLAN_ID,
+          1,
+          request.placeName(),
+          request.address(),
+          request.latitude(),
+          request.longitude(),
+          request.provider(),
+          request.providerPlaceId(),
+          30,
+          null,
+          null,
+          false);
     }
 
     @Override

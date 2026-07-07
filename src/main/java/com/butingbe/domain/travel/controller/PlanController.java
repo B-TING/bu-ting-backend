@@ -3,6 +3,7 @@ package com.butingbe.domain.travel.controller;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.service.TravelService;
@@ -63,6 +64,18 @@ public class PlanController {
     }
 
     return ResponseEntity.ok(travelService.updatePlanPlace(user, planPlaceId, request));
+  }
+
+  @PatchMapping("/places/{planPlaceId}/place")
+  public ResponseEntity<PlanPlaceResDto> updatePlanPlacePlace(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID planPlaceId,
+      @RequestBody @Valid PlanPlaceUpdatePlaceReqDto request) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(travelService.updatePlanPlacePlace(user, planPlaceId, request));
   }
 
   @PatchMapping("/{planId}/places/sequence")
