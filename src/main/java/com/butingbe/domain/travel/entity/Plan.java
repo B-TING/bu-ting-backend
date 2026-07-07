@@ -21,8 +21,12 @@ import lombok.NoArgsConstructor;
 @Table(
     name = "plan",
     uniqueConstraints = {
-      @UniqueConstraint(name = "uk_plan_travel_day", columnNames = {"travel_id", "day_number"}),
-      @UniqueConstraint(name = "uk_plan_travel_visit_date", columnNames = {"travel_id", "visit_date"})
+      @UniqueConstraint(
+          name = "uk_plan_travel_day",
+          columnNames = {"travel_id", "day_number"}),
+      @UniqueConstraint(
+          name = "uk_plan_travel_visit_date",
+          columnNames = {"travel_id", "visit_date"})
     })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

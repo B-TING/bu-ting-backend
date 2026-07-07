@@ -42,7 +42,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     Travel travel = travelRepository.save(createTravel("Busan"));
     saveMember(travel, leader, TravelTeamRole.LEADER);
 
-    String inviteLink = travelTeamService.createInviteLink(AuthenticatedUser.from(leader), travel.getId());
+    String inviteLink =
+        travelTeamService.createInviteLink(AuthenticatedUser.from(leader), travel.getId());
     String token = tokenFrom(inviteLink);
 
     assertThat(inviteLink).startsWith("https://yourdomain.com/invite?token=");
@@ -57,7 +58,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     saveMember(travel, member, TravelTeamRole.MEMBER);
 
     assertThatThrownBy(
-            () -> travelTeamService.createInviteLink(AuthenticatedUser.from(member), travel.getId()))
+            () ->
+                travelTeamService.createInviteLink(AuthenticatedUser.from(member), travel.getId()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Only travel leaders can create invite links.");
   }
@@ -88,7 +90,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     assertThat(response.travelId()).isEqualTo(travel.getId());
     assertThat(travelMemberRepository.existsByTravel_IdAndUser_Id(travel.getId(), user.getId()))
         .isTrue();
-    assertThat(travelInviteRepository.findByToken(invite.getToken()).orElseThrow().getUsed()).isTrue();
+    assertThat(travelInviteRepository.findByToken(invite.getToken()).orElseThrow().getUsed())
+        .isTrue();
   }
 
   @Test
@@ -142,7 +145,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     saveMember(travel, leader, TravelTeamRole.LEADER);
     saveMember(travel, member, TravelTeamRole.MEMBER);
 
-    assertThatThrownBy(() -> travelTeamService.exitTravel(AuthenticatedUser.from(leader), travel.getId()))
+    assertThatThrownBy(
+            () -> travelTeamService.exitTravel(AuthenticatedUser.from(leader), travel.getId()))
         .isInstanceOf(ConflictException.class)
         .hasMessage("LEADER_TRANSFER_REQUIRED");
   }

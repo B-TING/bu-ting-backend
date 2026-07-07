@@ -54,7 +54,8 @@ public class TravelServiceImpl implements TravelService {
 
   @Override
   @Transactional
-  public TravelResDto createTravel(AuthenticatedUser authenticatedUser, TravelCreateReqDto request) {
+  public TravelResDto createTravel(
+      AuthenticatedUser authenticatedUser, TravelCreateReqDto request) {
     User user = findAuthenticatedUser(authenticatedUser);
     validateTravelDate(request);
 
@@ -245,10 +246,7 @@ public class TravelServiceImpl implements TravelService {
     assignRequestedSequences(request.planPlaceIds(), placeById);
     planRouteRepository.deleteByPlan_Id(planId);
 
-    return request.planPlaceIds().stream()
-        .map(placeById::get)
-        .map(PlanPlaceResDto::from)
-        .toList();
+    return request.planPlaceIds().stream().map(placeById::get).map(PlanPlaceResDto::from).toList();
   }
 
   @Override
@@ -277,7 +275,9 @@ public class TravelServiceImpl implements TravelService {
             .collect(Collectors.toMap(route -> route.getFromPlace().getId(), Function.identity()));
 
     return PlanDayResDto.of(
-        plan, planPlaceRepository.findByPlan_IdOrderBySequenceAsc(plan.getId()), routeByFromPlaceId);
+        plan,
+        planPlaceRepository.findByPlan_IdOrderBySequenceAsc(plan.getId()),
+        routeByFromPlaceId);
   }
 
   private User findAuthenticatedUser(AuthenticatedUser authenticatedUser) {

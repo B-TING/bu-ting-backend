@@ -23,7 +23,9 @@ import lombok.NoArgsConstructor;
 @Table(
     name = "plan_place",
     uniqueConstraints = {
-      @UniqueConstraint(name = "uk_plan_place_sequence", columnNames = {"plan_id", "sequence"})
+      @UniqueConstraint(
+          name = "uk_plan_place_sequence",
+          columnNames = {"plan_id", "sequence"})
     })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -47,11 +49,9 @@ public class PlanPlace {
   @Column(nullable = false)
   private String address;
 
-  @Column
-  private Double latitude;
+  @Column private Double latitude;
 
-  @Column
-  private Double longitude;
+  @Column private Double longitude;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)

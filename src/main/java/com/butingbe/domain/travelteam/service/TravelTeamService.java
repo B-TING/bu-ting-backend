@@ -54,7 +54,8 @@ public class TravelTeamService {
   }
 
   @Transactional
-  public InviteVerificationResponse acceptInvite(AuthenticatedUser authenticatedUser, String token) {
+  public InviteVerificationResponse acceptInvite(
+      AuthenticatedUser authenticatedUser, String token) {
     User user = findAuthenticatedUser(authenticatedUser);
     TravelInvite invite = findUsableInvite(token);
     Travel travel = invite.getTravel();

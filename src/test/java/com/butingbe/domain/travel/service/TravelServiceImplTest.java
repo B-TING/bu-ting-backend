@@ -78,7 +78,8 @@ class TravelServiceImplTest extends AbstractContainerTest {
     User outsider = userRepository.save(createUser("outsider@example.com", "outsider"));
     TravelResDto travel = createTravel(owner);
 
-    assertThatThrownBy(() -> travelService.getTravelPlans(AuthenticatedUser.from(outsider), travel.id()))
+    assertThatThrownBy(
+            () -> travelService.getTravelPlans(AuthenticatedUser.from(outsider), travel.id()))
         .isInstanceOf(ForbiddenException.class)
         .hasMessage("User is not a travel member.");
   }
@@ -89,7 +90,9 @@ class TravelServiceImplTest extends AbstractContainerTest {
     User user = userRepository.save(createUser("not-found@example.com", "not-found"));
 
     assertThatThrownBy(
-            () -> travelService.getPlanPlaces(AuthenticatedUser.from(user), java.util.UUID.randomUUID()))
+            () ->
+                travelService.getPlanPlaces(
+                    AuthenticatedUser.from(user), java.util.UUID.randomUUID()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Plan not found.");
   }
@@ -102,9 +105,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
     TravelResDto travel = createTravel(user);
     PlanResDto plan =
         travelService.createPlan(
-            authenticatedUser,
-            travel.id(),
-            new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
     PlanPlaceResDto first = createPlace(authenticatedUser, plan.planId(), 1, "A");
     PlanPlaceResDto second = createPlace(authenticatedUser, plan.planId(), 2, "B");
     PlanPlaceResDto third = createPlace(authenticatedUser, plan.planId(), 3, "C");
@@ -133,9 +134,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
     TravelResDto travel = createTravel(user);
     PlanResDto plan =
         travelService.createPlan(
-            authenticatedUser,
-            travel.id(),
-            new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
     PlanPlaceResDto place = createPlace(authenticatedUser, plan.planId(), 1, "Busan Station");
 
     PlanPlaceResDto result =
