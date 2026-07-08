@@ -8,6 +8,7 @@ import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
+import com.butingbe.domain.travelteam.dto.TravelInviteLinkInfoResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
 import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.entity.TravelInvite;
@@ -200,6 +201,37 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                     new TravelLeaderTransferRequest(outsider.getId())))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("New leader is not a travel member.");
+  }
+
+  @Test
+  @DisplayName("leader can get active invite link")
+  void getInviteLinkByLeader() {
+    User leader = userRepository.save(createUser("leader-get-invite@example.com", "leader"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveInvite(travel, "expired-get-token", OffsetDateTime.now().minusMinutes(1));
+    TravelInvite activeInvite =
+        saveInvite(travel, "active-get-token", OffsetDateTime.now().plusHours(1));
+
+    TravelInviteLinkInfoResponse response =
+        travelTeamService.getInviteLink(AuthenticatedUser.from(leader), travel.getId());
+
+    assertThat(response.inviteLink())
+        .isEqualTo("https://yourdomain.com/invite?token=" + activeInvite.getToken());
+    assertThat(response.expiredAt()).isEqualTo(activeInvite.getExpiredAt());
+  }
+
+  @Test
+  @DisplayName("member cannot get invite link")
+  void getInviteLinkByMemberThrowsException() {
+    User member = userRepository.save(createUser("member-get-invite@example.com", "member"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+
+    assertThatThrownBy(
+            () -> travelTeamService.getInviteLink(AuthenticatedUser.from(member), travel.getId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Only travel leaders can get invite links.");
   }
 
   @Test

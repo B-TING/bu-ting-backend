@@ -4,6 +4,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
+import com.butingbe.domain.travelteam.dto.TravelInviteLinkInfoResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
 import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.entity.TravelInvite;
@@ -108,6 +109,20 @@ public class TravelTeamService {
   }
 
   @Transactional
+  public TravelInviteLinkInfoResponse getInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
+    validateLeader(authenticatedUser, travelId, "Only travel leaders can get invite links.");
+    validateTravelExists(travelId);
+
+    TravelInvite invite =
+        travelInviteRepository
+            .findFirstByTravel_IdAndUsedFalseAndExpiredAtAfterOrderByExpiredAtDesc(
+                travelId, OffsetDateTime.now())
+            .orElseThrow(() -> new IllegalArgumentException("Active invite link not found."));
+
+    return new TravelInviteLinkInfoResponse(toInviteLink(invite.getToken()), invite.getExpiredAt());
+  }
+
+  @Transactional
   public void deleteInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
     validateLeader(authenticatedUser, travelId, "Only travel leaders can delete invite links.");
     validateTravelExists(travelId);
@@ -131,7 +146,7 @@ public class TravelTeamService {
         TravelInvite.builder().travel(travel).token(token).expiredAt(expiredAt).build();
 
     travelInviteRepository.save(travelInvite);
-    return "https://yourdomain.com/invite?token=" + token;
+    return toInviteLink(token);
   }
 
   @Transactional
@@ -203,6 +218,10 @@ public class TravelTeamService {
     if (!leader) {
       throw new IllegalArgumentException(message);
     }
+  }
+
+  private String toInviteLink(String token) {
+    return "https://yourdomain.com/invite?token=" + token;
   }
 
   private void validateTravelExists(UUID travelId) {

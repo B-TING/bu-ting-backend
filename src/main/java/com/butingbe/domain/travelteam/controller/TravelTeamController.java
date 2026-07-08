@@ -2,6 +2,7 @@ package com.butingbe.domain.travelteam.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
+import com.butingbe.domain.travelteam.dto.TravelInviteLinkInfoResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
 import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.service.TravelTeamService;
@@ -88,6 +89,17 @@ public class TravelTeamController {
     response.put("inviteLink", inviteLink);
 
     return ResponseEntity.ok(response);
+  }
+
+  @GetMapping("/{travelId}/invite")
+  public ResponseEntity<ApiResponse<TravelInviteLinkInfoResponse>> getInviteLink(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID travelId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    TravelInviteLinkInfoResponse response = travelTeamService.getInviteLink(user, travelId);
+    return ResponseEntity.ok(ApiResponse.success("Travel invite link retrieved.", response));
   }
 
   @DeleteMapping("/{travelId}/invite")

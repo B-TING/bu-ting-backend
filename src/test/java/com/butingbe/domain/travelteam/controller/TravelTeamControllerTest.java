@@ -10,17 +10,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
+import com.butingbe.domain.travelteam.dto.TravelInviteLinkInfoResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
 import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.service.TravelTeamService;
-import org.springframework.http.MediaType;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -116,6 +118,20 @@ class TravelTeamControllerTest {
   }
 
   @Test
+  @DisplayName("get invite link returns response envelope")
+  void getInviteLink() throws Exception {
+    mockMvc
+        .perform(get("/travel/team/{travelId}/invite", FakeTravelTeamService.TRAVEL_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(
+            jsonPath("$.data.inviteLink")
+                .value("https://yourdomain.com/invite?token=invite-token"));
+
+    assertThat(travelTeamService.inviteLinkTravelId).isEqualTo(FakeTravelTeamService.TRAVEL_ID);
+  }
+
+  @Test
   @DisplayName("delete invite link delegates to service")
   void deleteInviteLink() throws Exception {
     mockMvc
@@ -177,6 +193,7 @@ class TravelTeamControllerTest {
     UUID transferredNewLeaderUserId;
     UUID removedTravelId;
     UUID removedUserId;
+    UUID inviteLinkTravelId;
     UUID deletedInviteTravelId;
 
     FakeTravelTeamService() {
@@ -214,6 +231,14 @@ class TravelTeamControllerTest {
     public String createInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
       createdInviteTravelId = travelId;
       return "https://yourdomain.com/invite?token=invite-token";
+    }
+
+    @Override
+    public TravelInviteLinkInfoResponse getInviteLink(
+        AuthenticatedUser authenticatedUser, UUID travelId) {
+      inviteLinkTravelId = travelId;
+      return new TravelInviteLinkInfoResponse(
+          "https://yourdomain.com/invite?token=invite-token", OffsetDateTime.now().plusHours(1));
     }
 
     @Override
