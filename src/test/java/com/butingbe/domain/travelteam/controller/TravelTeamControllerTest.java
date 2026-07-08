@@ -197,7 +197,7 @@ class TravelTeamControllerTest {
     UUID deletedInviteTravelId;
 
     FakeTravelTeamService() {
-      super(null, null, null, null);
+      super(null, null, null, null, "https://yourdomain.com/invite");
     }
 
     @Override

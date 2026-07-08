@@ -20,12 +20,11 @@ import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TravelTeamService {
 
@@ -33,6 +32,22 @@ public class TravelTeamService {
   private final TravelMemberRepository travelMemberRepository;
   private final TravelRepository travelRepository;
   private final UserRepository userRepository;
+  private final String inviteBaseUrl;
+
+  public TravelTeamService(
+      TravelInviteRepository travelInviteRepository,
+      TravelMemberRepository travelMemberRepository,
+      TravelRepository travelRepository,
+      UserRepository userRepository,
+      @Value(
+              "${travel-team.invite.base-url:${TRAVEL_INVITE_BASE_URL:https://yourdomain.com/invite}}")
+          String inviteBaseUrl) {
+    this.travelInviteRepository = travelInviteRepository;
+    this.travelMemberRepository = travelMemberRepository;
+    this.travelRepository = travelRepository;
+    this.userRepository = userRepository;
+    this.inviteBaseUrl = normalizeInviteBaseUrl(inviteBaseUrl);
+  }
 
   public InviteVerificationResponse verifyToken(String token) {
     TravelInvite invite = findUsableInvite(token);
@@ -221,7 +236,17 @@ public class TravelTeamService {
   }
 
   private String toInviteLink(String token) {
-    return "https://yourdomain.com/invite?token=" + token;
+    return inviteBaseUrl + "?token=" + token;
+  }
+
+  private String normalizeInviteBaseUrl(String inviteBaseUrl) {
+    if (inviteBaseUrl == null || inviteBaseUrl.isBlank()) {
+      return "https://yourdomain.com/invite";
+    }
+
+    return inviteBaseUrl.endsWith("?")
+        ? inviteBaseUrl.substring(0, inviteBaseUrl.length() - 1)
+        : inviteBaseUrl;
   }
 
   private void validateTravelExists(UUID travelId) {
