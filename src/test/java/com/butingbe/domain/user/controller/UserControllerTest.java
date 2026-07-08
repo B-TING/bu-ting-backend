@@ -136,15 +136,15 @@ class UserControllerTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer opaque-token")
                 .content(
                     """
-                                                {
-                                                  "email": "test@example.com",
-                                                  "nickname": "테스터",
-                                                  "provider": "google",
-                                                  "providerId": "google-123",
-                                                  "firstName": "길동",
-                                                  "lastName": "홍"
-                                                }
-                                                """))
+                                                                {
+                                                                  "email": "test@example.com",
+                                                                  "nickname": "테스터",
+                                                                  "provider": "google",
+                                                                  "providerId": "google-123",
+                                                                  "firstName": "길동",
+                                                                  "lastName": "홍"
+                                                                }
+                                                                """))
         .andDo(print())
         .andExpect(status().isCreated())
         .andDo(
@@ -264,13 +264,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                {
-                                  "nickname": "수정닉",
-                                  "profileImageUrl": "https://example.com/updated.png",
-                                  "firstName": "길동",
-                                  "lastName": "홍"
-                                }
-                                """))
+                                                {
+                                                  "nickname": "수정닉",
+                                                  "profileImageUrl": "https://example.com/updated.png",
+                                                  "firstName": "길동",
+                                                  "lastName": "홍"
+                                                }
+                                                """))
         .andDo(print())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.nickname").value("수정닉"))
@@ -330,15 +330,15 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                {
-                                                  "email": "test@example.com",
-                                                  "nickname": "테스터",
-                                                  "provider": "google",
-                                                  "providerId": "google-123",
-                                                  "firstName": "길동",
-                                                  "lastName": "홍"
-                                                }
-                                                """))
+                                                                {
+                                                                  "email": "test@example.com",
+                                                                  "nickname": "테스터",
+                                                                  "provider": "google",
+                                                                  "providerId": "google-123",
+                                                                  "firstName": "길동",
+                                                                  "lastName": "홍"
+                                                                }
+                                                                """))
         .andDo(print())
         .andExpect(status().isUnauthorized());
 
@@ -355,13 +355,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                {
-                                                  "email": "not-email-format",
-                                                  "nickname": "",
-                                                  "firstName": "",
-                                                  "lastName": ""
-                                                }
-                                                """))
+                                                                {
+                                                                  "email": "not-email-format",
+                                                                  "nickname": "",
+                                                                  "firstName": "",
+                                                                  "lastName": ""
+                                                                }
+                                                                """))
         .andDo(print())
         .andExpect(status().isBadRequest());
 
@@ -378,13 +378,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                {
-                                                  "email": "",
-                                                  "nickname": "tester",
-                                                  "firstName": "",
-                                                  "lastName": ""
-                                                }
-                                                """))
+                                                                {
+                                                                  "email": "",
+                                                                  "nickname": "tester",
+                                                                  "firstName": "",
+                                                                  "lastName": ""
+                                                                }
+                                                                """))
         .andDo(print())
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("Email is required."));
@@ -402,13 +402,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                {
-                                                  "email": "",
-                                                  "nickname": "tester",
-                                                  "firstName": "",
-                                                  "lastName": ""
-                                                }
-                                                """))
+                                                                {
+                                                                  "email": "",
+                                                                  "nickname": "tester",
+                                                                  "firstName": "",
+                                                                  "lastName": ""
+                                                                }
+                                                                """))
         .andDo(print())
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("メールアドレスは必須入力項目です。"));
@@ -426,13 +426,13 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                                                {
-                                                  "email": "",
-                                                  "nickname": "tester",
-                                                  "firstName": "",
-                                                  "lastName": ""
-                                                }
-                                                """))
+                                                                {
+                                                                  "email": "",
+                                                                  "nickname": "tester",
+                                                                  "firstName": "",
+                                                                  "lastName": ""
+                                                                }
+                                                                """))
         .andDo(print())
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("邮箱为必填项。"));

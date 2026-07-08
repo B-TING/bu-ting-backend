@@ -56,6 +56,7 @@ public class SecurityConfig {
     CorsConfiguration configuration = new CorsConfiguration();
 
     configuration.addAllowedOrigin("http://localhost:3000");
+    configuration.addAllowedOrigin("https://dev.buting.store");
     configuration.addAllowedMethod("*"); // 모든 HTTP Method 일단 허용 (GET, POST 등)
     configuration.addAllowedHeader("*"); // 모든 헤더 허용
 

@@ -1,0 +1,1 @@
+ALTER TABLE local_chatroom DROP COLUMN IF EXISTS creater_id;
