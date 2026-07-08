@@ -9,12 +9,7 @@ import com.butingbe.domain.place.dto.googleplaces.GooglePlaceSearchResponse;
 import com.butingbe.domain.place.dto.request.FestivalSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceLocationSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceSearchReqDto;
-import com.butingbe.domain.place.dto.response.FestivalResDto;
-import com.butingbe.domain.place.dto.response.FestivalSearchResDto;
-import com.butingbe.domain.place.dto.response.GooglePlaceInfoResDto;
-import com.butingbe.domain.place.dto.response.PlaceDetailResDto;
-import com.butingbe.domain.place.dto.response.PlaceResDto;
-import com.butingbe.domain.place.dto.response.PlaceSearchResDto;
+import com.butingbe.domain.place.dto.response.*;
 import com.butingbe.domain.place.dto.tourapi.TourApiCommonResponse;
 import com.butingbe.domain.place.dto.tourapi.TourApiCommonResponse.TourCommonItem;
 import com.butingbe.domain.place.dto.tourapi.TourApiDetailResponse;
@@ -201,7 +196,8 @@ public class TourApiPlaceService implements PlaceService {
                       .queryParam("mapX", request.mapX())
                       .queryParam("mapY", request.mapY())
                       .queryParam("radius", request.radius())
-                      .queryParam("serviceKey", serviceKey);
+                      .queryParam("serviceKey", serviceKey)
+                      .queryParam("lDongRegnCd", BUSAN_REGION_CODE);
 
                   if (StringUtils.hasText(request.contentTypeIdOrNull())) {
                     uriBuilder.queryParam("contentTypeId", request.contentTypeIdOrNull());

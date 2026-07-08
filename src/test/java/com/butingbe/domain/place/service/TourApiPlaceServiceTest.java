@@ -1,10 +1,7 @@
 package com.butingbe.domain.place.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.butingbe.domain.place.dto.request.FestivalSearchReqDto;
@@ -47,39 +44,39 @@ class TourApiPlaceServiceTest {
         .andRespond(
             withSuccess(
                 """
-                {
-                  "response": {
-                    "header": {
-                      "resultCode": "0000",
-                      "resultMsg": "OK"
-                    },
-                    "body": {
-                      "numOfRows": 10,
-                      "pageNo": 2,
-                      "totalCount": 1,
-                      "items": {
-                        "item": [
-                          {
-                            "addr1": "부산광역시 강서구 가락대로 1206 (봉림동)",
-                            "addr2": "",
-                            "contentid": "2869277",
-                            "contenttypeid": "39",
-                            "firstimage": "https://tong.visitkorea.or.kr/cms/resource/70/2869270_image2_1.jpg",
-                            "firstimage2": "https://tong.visitkorea.or.kr/cms/resource/70/2869270_image3_1.jpg",
-                            "mapx": "128.9010323937",
-                            "mapy": "35.1724954738",
-                            "tel": "",
-                            "title": "오플로우",
-                            "zipcode": "46709",
-                            "lDongRegnCd": "26",
-                            "lDongSignguCd": "440"
-                          }
-                        ]
-                      }
-                    }
-                  }
-                }
-                """,
+                                        {
+                                          "response": {
+                                            "header": {
+                                              "resultCode": "0000",
+                                              "resultMsg": "OK"
+                                            },
+                                            "body": {
+                                              "numOfRows": 10,
+                                              "pageNo": 2,
+                                              "totalCount": 1,
+                                              "items": {
+                                                "item": [
+                                                  {
+                                                    "addr1": "부산광역시 강서구 가락대로 1206 (봉림동)",
+                                                    "addr2": "",
+                                                    "contentid": "2869277",
+                                                    "contenttypeid": "39",
+                                                    "firstimage": "https://tong.visitkorea.or.kr/cms/resource/70/2869270_image2_1.jpg",
+                                                    "firstimage2": "https://tong.visitkorea.or.kr/cms/resource/70/2869270_image3_1.jpg",
+                                                    "mapx": "128.9010323937",
+                                                    "mapy": "35.1724954738",
+                                                    "tel": "",
+                                                    "title": "오플로우",
+                                                    "zipcode": "46709",
+                                                    "lDongRegnCd": "26",
+                                                    "lDongSignguCd": "440"
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                          }
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     PlaceSearchResDto response =
@@ -121,41 +118,42 @@ class TourApiPlaceServiceTest {
                     + "&mapY=35.163"
                     + "&radius=1000"
                     + "&serviceKey=SERVICE_KEY"
+                    + "&lDongRegnCd=26"
                     + "&contentTypeId=32"))
         .andExpect(method(HttpMethod.GET))
         .andRespond(
             withSuccess(
                 """
-                {
-                  "response": {
-                    "header": {
-                      "resultCode": "0000",
-                      "resultMsg": "OK"
-                    },
-                    "body": {
-                      "numOfRows": 5,
-                      "pageNo": 1,
-                      "totalCount": 1,
-                      "items": {
-                        "item": [
-                          {
-                            "addr1": "부산광역시 해운대구",
-                            "contentid": "2651318",
-                            "contenttypeid": "32",
-                            "firstimage": "https://example.com/image.jpg",
-                            "firstimage2": "https://example.com/thumb.jpg",
-                            "mapx": "129.160",
-                            "mapy": "35.163",
-                            "title": "부산 호텔",
-                            "lDongRegnCd": "26",
-                            "lDongSignguCd": "350"
-                          }
-                        ]
-                      }
-                    }
-                  }
-                }
-                """,
+                                        {
+                                          "response": {
+                                            "header": {
+                                              "resultCode": "0000",
+                                              "resultMsg": "OK"
+                                            },
+                                            "body": {
+                                              "numOfRows": 5,
+                                              "pageNo": 1,
+                                              "totalCount": 1,
+                                              "items": {
+                                                "item": [
+                                                  {
+                                                    "addr1": "부산광역시 해운대구",
+                                                    "contentid": "2651318",
+                                                    "contenttypeid": "32",
+                                                    "firstimage": "https://example.com/image.jpg",
+                                                    "firstimage2": "https://example.com/thumb.jpg",
+                                                    "mapx": "129.160",
+                                                    "mapy": "35.163",
+                                                    "title": "부산 호텔",
+                                                    "lDongRegnCd": "26",
+                                                    "lDongSignguCd": "350"
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                          }
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     PlaceSearchResDto response =
@@ -199,38 +197,38 @@ class TourApiPlaceServiceTest {
         .andRespond(
             withSuccess(
                 """
-                {
-                  "response": {
-                    "header": {
-                      "resultCode": "0000",
-                      "resultMsg": "OK"
-                    },
-                    "body": {
-                      "numOfRows": 10,
-                      "pageNo": 1,
-                      "totalCount": 1,
-                      "items": {
-                        "item": [
-                          {
-                            "addr1": "부산광역시 해운대구",
-                            "contentid": "3000001",
-                            "contenttypeid": "15",
-                            "firstimage": "https://example.com/festival.jpg",
-                            "firstimage2": "https://example.com/festival-thumb.jpg",
-                            "mapx": "129.160",
-                            "mapy": "35.163",
-                            "title": "진행중 행사",
-                            "lDongRegnCd": "26",
-                            "lDongSignguCd": "350",
-                            "eventstartdate": "20260601",
-                            "eventenddate": "20260710"
-                          }
-                        ]
-                      }
-                    }
-                  }
-                }
-                """,
+                                        {
+                                          "response": {
+                                            "header": {
+                                              "resultCode": "0000",
+                                              "resultMsg": "OK"
+                                            },
+                                            "body": {
+                                              "numOfRows": 10,
+                                              "pageNo": 1,
+                                              "totalCount": 1,
+                                              "items": {
+                                                "item": [
+                                                  {
+                                                    "addr1": "부산광역시 해운대구",
+                                                    "contentid": "3000001",
+                                                    "contenttypeid": "15",
+                                                    "firstimage": "https://example.com/festival.jpg",
+                                                    "firstimage2": "https://example.com/festival-thumb.jpg",
+                                                    "mapx": "129.160",
+                                                    "mapy": "35.163",
+                                                    "title": "진행중 행사",
+                                                    "lDongRegnCd": "26",
+                                                    "lDongSignguCd": "350",
+                                                    "eventstartdate": "20260601",
+                                                    "eventenddate": "20260710"
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                          }
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     FestivalSearchResDto response =
@@ -271,28 +269,28 @@ class TourApiPlaceServiceTest {
         .andRespond(
             withSuccess(
                 """
-                {
-                  "response": {
-                    "header": {
-                      "resultCode": "0000",
-                      "resultMsg": "OK"
-                    },
-                    "body": {
-                      "items": {
-                        "item": {
-                          "contentid": "2651318",
-                          "contenttypeid": "32",
-                          "checkintime": "15:00",
-                          "checkouttime": "11:00",
-                          "parkinglodging": "주차 가능",
-                          "reservationurl": "https://example.com",
-                          "emptyfield": ""
-                        }
-                      }
-                    }
-                  }
-                }
-                """,
+                                        {
+                                          "response": {
+                                            "header": {
+                                              "resultCode": "0000",
+                                              "resultMsg": "OK"
+                                            },
+                                            "body": {
+                                              "items": {
+                                                "item": {
+                                                  "contentid": "2651318",
+                                                  "contenttypeid": "32",
+                                                  "checkintime": "15:00",
+                                                  "checkouttime": "11:00",
+                                                  "parkinglodging": "주차 가능",
+                                                  "reservationurl": "https://example.com",
+                                                  "emptyfield": ""
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", null);
@@ -336,20 +334,20 @@ class TourApiPlaceServiceTest {
         .andRespond(
             withSuccess(
                 """
-                {
-                  "response": {
-                    "body": {
-                      "items": {
-                        "item": {
-                          "contentid": "2651318",
-                          "contenttypeid": "32",
-                          "checkintime": "15:00"
-                        }
-                      }
-                    }
-                  }
-                }
-                """,
+                                        {
+                                          "response": {
+                                            "body": {
+                                              "items": {
+                                                "item": {
+                                                  "contentid": "2651318",
+                                                  "contenttypeid": "32",
+                                                  "checkintime": "15:00"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     server
@@ -368,22 +366,22 @@ class TourApiPlaceServiceTest {
         .andRespond(
             withSuccess(
                 """
-                {
-                  "response": {
-                    "body": {
-                      "items": {
-                        "item": {
-                          "contentid": "2651318",
-                          "title": "부산 호텔",
-                          "addr1": "부산광역시 해운대구",
-                          "mapx": "129.160",
-                          "mapy": "35.163"
-                        }
-                      }
-                    }
-                  }
-                }
-                """,
+                                        {
+                                          "response": {
+                                            "body": {
+                                              "items": {
+                                                "item": {
+                                                  "contentid": "2651318",
+                                                  "title": "부산 호텔",
+                                                  "addr1": "부산광역시 해운대구",
+                                                  "mapx": "129.160",
+                                                  "mapy": "35.163"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     server
@@ -395,33 +393,33 @@ class TourApiPlaceServiceTest {
             content()
                 .json(
                     """
-                    {
-                      "textQuery": "부산 호텔 부산광역시 해운대구",
-                      "languageCode": "ko",
-                      "regionCode": "KR",
-                      "maxResultCount": 1,
-                      "locationBias": {
-                        "circle": {
-                          "center": {
-                            "latitude": 35.163,
-                            "longitude": 129.160
-                          },
-                          "radius": 500.0
-                        }
-                      }
-                    }
-                    """))
+                                                {
+                                                  "textQuery": "부산 호텔 부산광역시 해운대구",
+                                                  "languageCode": "ko",
+                                                  "regionCode": "KR",
+                                                  "maxResultCount": 1,
+                                                  "locationBias": {
+                                                    "circle": {
+                                                      "center": {
+                                                        "latitude": 35.163,
+                                                        "longitude": 129.160
+                                                      },
+                                                      "radius": 500.0
+                                                    }
+                                                  }
+                                                }
+                                                """))
         .andRespond(
             withSuccess(
                 """
-                {
-                  "places": [
-                    {
-                      "id": "google-place-id"
-                    }
-                  ]
-                }
-                """,
+                                        {
+                                          "places": [
+                                            {
+                                              "id": "google-place-id"
+                                            }
+                                          ]
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     server
@@ -435,33 +433,33 @@ class TourApiPlaceServiceTest {
         .andRespond(
             withSuccess(
                 """
-                {
-                  "id": "google-place-id",
-                  "rating": 4.4,
-                  "userRatingCount": 128,
-                  "priceLevel": "PRICE_LEVEL_MODERATE",
-                  "regularOpeningHours": {
-                    "weekdayDescriptions": [
-                      "월요일: 오전 9:00 ~ 오후 6:00",
-                      "화요일: 오전 9:00 ~ 오후 6:00"
-                    ]
-                  },
-                  "reviews": [
-                    {
-                      "rating": 5,
-                      "text": {
-                        "text": "좋았어요",
-                        "languageCode": "ko"
-                      },
-                      "authorAttribution": {
-                        "displayName": "리뷰어"
-                      },
-                      "relativePublishTimeDescription": "1개월 전",
-                      "publishTime": "2026-06-01T00:00:00Z"
-                    }
-                  ]
-                }
-                """,
+                                        {
+                                          "id": "google-place-id",
+                                          "rating": 4.4,
+                                          "userRatingCount": 128,
+                                          "priceLevel": "PRICE_LEVEL_MODERATE",
+                                          "regularOpeningHours": {
+                                            "weekdayDescriptions": [
+                                              "월요일: 오전 9:00 ~ 오후 6:00",
+                                              "화요일: 오전 9:00 ~ 오후 6:00"
+                                            ]
+                                          },
+                                          "reviews": [
+                                            {
+                                              "rating": 5,
+                                              "text": {
+                                                "text": "좋았어요",
+                                                "languageCode": "ko"
+                                              },
+                                              "authorAttribution": {
+                                                "displayName": "리뷰어"
+                                              },
+                                              "relativePublishTimeDescription": "1개월 전",
+                                              "publishTime": "2026-06-01T00:00:00Z"
+                                            }
+                                          ]
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", null);
@@ -505,19 +503,19 @@ class TourApiPlaceServiceTest {
         .andRespond(
             withSuccess(
                 """
-                {
-                  "response": {
-                    "body": {
-                      "items": {
-                        "item": {
-                          "contentid": "2651318",
-                          "contenttypeid": "32"
-                        }
-                      }
-                    }
-                  }
-                }
-                """,
+                                        {
+                                          "response": {
+                                            "body": {
+                                              "items": {
+                                                "item": {
+                                                  "contentid": "2651318",
+                                                  "contenttypeid": "32"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     server
@@ -528,24 +526,24 @@ class TourApiPlaceServiceTest {
             content()
                 .json(
                     """
-                    {
-                      "textQuery": "파라다이스 호텔 부산",
-                      "languageCode": "ko",
-                      "regionCode": "KR",
-                      "maxResultCount": 1
-                    }
-                    """))
+                                                {
+                                                  "textQuery": "파라다이스 호텔 부산",
+                                                  "languageCode": "ko",
+                                                  "regionCode": "KR",
+                                                  "maxResultCount": 1
+                                                }
+                                                """))
         .andRespond(
             withSuccess(
                 """
-                {
-                  "places": [
-                    {
-                      "id": "google-place-id"
-                    }
-                  ]
-                }
-                """,
+                                        {
+                                          "places": [
+                                            {
+                                              "id": "google-place-id"
+                                            }
+                                          ]
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     server
@@ -558,12 +556,12 @@ class TourApiPlaceServiceTest {
         .andRespond(
             withSuccess(
                 """
-                {
-                  "id": "google-place-id",
-                  "rating": 4.7,
-                  "userRatingCount": 300
-                }
-                """,
+                                        {
+                                          "id": "google-place-id",
+                                          "rating": 4.7,
+                                          "userRatingCount": 300
+                                        }
+                                        """,
                 MediaType.APPLICATION_JSON));
 
     PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", "파라다이스 호텔 부산");
