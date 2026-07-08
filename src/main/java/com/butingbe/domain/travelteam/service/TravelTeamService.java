@@ -5,6 +5,7 @@ import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
+import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.entity.TravelInvite;
 import com.butingbe.domain.travelteam.entity.TravelMember;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
@@ -46,6 +47,34 @@ public class TravelTeamService {
     return travelMemberRepository.findMembersByTravelId(travelId).stream()
         .map(TravelMemberResponse::from)
         .toList();
+  }
+
+  @Transactional
+  public void transferLeader(
+      AuthenticatedUser authenticatedUser, UUID travelId, TravelLeaderTransferRequest request) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    validateTravelExists(travelId);
+
+    TravelMember currentLeader =
+        travelMemberRepository
+            .findByTravel_IdAndUser_Id(travelId, user.getId())
+            .orElseThrow(() -> new ForbiddenException("User is not a travel member."));
+
+    if (currentLeader.getRole() != TravelTeamRole.LEADER) {
+      throw new ForbiddenException("Only travel leaders can transfer leader role.");
+    }
+
+    if (user.getId().equals(request.newLeaderUserId())) {
+      throw new IllegalArgumentException("New leader must be another travel member.");
+    }
+
+    TravelMember newLeader =
+        travelMemberRepository
+            .findByTravel_IdAndUser_Id(travelId, request.newLeaderUserId())
+            .orElseThrow(() -> new IllegalArgumentException("New leader is not a travel member."));
+
+    currentLeader.changeRole(TravelTeamRole.MEMBER);
+    newLeader.changeRole(TravelTeamRole.LEADER);
   }
 
   @Transactional

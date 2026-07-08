@@ -9,6 +9,7 @@ import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
+import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.entity.TravelInvite;
 import com.butingbe.domain.travelteam.entity.TravelMember;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
@@ -74,6 +75,76 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                     AuthenticatedUser.from(outsider), travel.getId()))
         .isInstanceOf(ForbiddenException.class)
         .hasMessage("User is not a travel member.");
+  }
+
+  @Test
+  @DisplayName("leader can transfer leader role to another member")
+  void transferLeader() {
+    User leader = userRepository.save(createUser("leader-transfer@example.com", "leader-transfer"));
+    User member = userRepository.save(createUser("member-transfer@example.com", "member-transfer"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+
+    travelTeamService.transferLeader(
+        AuthenticatedUser.from(leader),
+        travel.getId(),
+        new TravelLeaderTransferRequest(member.getId()));
+
+    assertThat(
+            travelMemberRepository
+                .findByTravel_IdAndUser_Id(travel.getId(), leader.getId())
+                .orElseThrow()
+                .getRole())
+        .isEqualTo(TravelTeamRole.MEMBER);
+    assertThat(
+            travelMemberRepository
+                .findByTravel_IdAndUser_Id(travel.getId(), member.getId())
+                .orElseThrow()
+                .getRole())
+        .isEqualTo(TravelTeamRole.LEADER);
+  }
+
+  @Test
+  @DisplayName("member cannot transfer leader role")
+  void transferLeaderByMemberThrowsForbiddenException() {
+    User leader =
+        userRepository.save(createUser("leader-transfer-forbidden@example.com", "leader-transfer"));
+    User member =
+        userRepository.save(createUser("member-transfer-forbidden@example.com", "member-transfer"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+
+    assertThatThrownBy(
+            () ->
+                travelTeamService.transferLeader(
+                    AuthenticatedUser.from(member),
+                    travel.getId(),
+                    new TravelLeaderTransferRequest(leader.getId())))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("Only travel leaders can transfer leader role.");
+  }
+
+  @Test
+  @DisplayName("leader cannot transfer leader role to non travel member")
+  void transferLeaderToNonMemberThrowsException() {
+    User leader =
+        userRepository.save(createUser("leader-transfer-outsider@example.com", "leader-transfer"));
+    User outsider =
+        userRepository.save(
+            createUser("outsider-transfer-outsider@example.com", "outsider-transfer"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+
+    assertThatThrownBy(
+            () ->
+                travelTeamService.transferLeader(
+                    AuthenticatedUser.from(leader),
+                    travel.getId(),
+                    new TravelLeaderTransferRequest(outsider.getId())))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("New leader is not a travel member.");
   }
 
   @Test

@@ -3,6 +3,7 @@ package com.butingbe.domain.travelteam.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -10,8 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
+import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.service.TravelTeamService;
+import org.springframework.http.MediaType;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +55,25 @@ class TravelTeamControllerTest {
         .andExpect(jsonPath("$.data[0].role").value("LEADER"));
 
     assertThat(travelTeamService.membersTravelId).isEqualTo(FakeTravelTeamService.TRAVEL_ID);
+  }
+
+  @Test
+  @DisplayName("transfer leader delegates to service")
+  void transferLeader() throws Exception {
+    mockMvc
+        .perform(
+            patch("/travel/team/{travelId}/leader", FakeTravelTeamService.TRAVEL_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"newLeaderUserId":"50000000-0000-0000-0000-000000000001"}
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
+
+    assertThat(travelTeamService.transferredTravelId).isEqualTo(FakeTravelTeamService.TRAVEL_ID);
+    assertThat(travelTeamService.transferredNewLeaderUserId)
+        .isEqualTo(FakeTravelTeamService.USER_ID);
   }
 
   @Test
@@ -124,6 +146,8 @@ class TravelTeamControllerTest {
     UUID createdInviteTravelId;
     UUID exitedTravelId;
     UUID membersTravelId;
+    UUID transferredTravelId;
+    UUID transferredNewLeaderUserId;
 
     FakeTravelTeamService() {
       super(null, null, null, null);
@@ -141,6 +165,13 @@ class TravelTeamControllerTest {
       return List.of(
           new TravelMemberResponse(
               MEMBER_ID, USER_ID, "tester@example.com", "tester", null, TravelTeamRole.LEADER));
+    }
+
+    @Override
+    public void transferLeader(
+        AuthenticatedUser authenticatedUser, UUID travelId, TravelLeaderTransferRequest request) {
+      transferredTravelId = travelId;
+      transferredNewLeaderUserId = request.newLeaderUserId();
     }
 
     @Override

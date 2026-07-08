@@ -55,4 +55,8 @@ public class TravelMember {
     this.user = user;
     this.role = role != null ? role : TravelTeamRole.MEMBER;
   }
+
+  public void changeRole(TravelTeamRole role) {
+    this.role = role;
+  }
 }
