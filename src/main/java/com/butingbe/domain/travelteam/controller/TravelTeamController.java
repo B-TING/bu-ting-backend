@@ -1,9 +1,11 @@
 package com.butingbe.domain.travelteam.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
 import com.butingbe.domain.travelteam.dto.TravelInviteLinkInfoResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
+import com.butingbe.domain.travelteam.dto.TravelTeamTravelResponse;
 import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.service.TravelTeamService;
 import com.butingbe.global.common.ApiResponse;
@@ -32,6 +34,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class TravelTeamController {
 
   private final TravelTeamService travelTeamService;
+
+  @GetMapping("/my-travels")
+  public ResponseEntity<ApiResponse<List<TravelTeamTravelResponse>>> getMyTravels(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestParam(value = "status", required = false) TravelStatus status) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    List<TravelTeamTravelResponse> response = travelTeamService.getMyTravels(user, status);
+    return ResponseEntity.ok(ApiResponse.success("My travels retrieved.", response));
+  }
 
   @GetMapping("/{travelId}/members")
   public ResponseEntity<ApiResponse<List<TravelMemberResponse>>> getTravelMembers(

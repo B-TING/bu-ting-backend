@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelteam.repository;
 
 import com.butingbe.domain.travel.entity.Travel;
+import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travelteam.entity.TravelMember;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import java.util.List;
@@ -13,6 +14,18 @@ import org.springframework.data.repository.query.Param;
 public interface TravelMemberRepository extends JpaRepository<TravelMember, UUID> {
 
   List<TravelMember> findByUser_Id(UUID userId);
+
+  @Query(
+      """
+      select tm
+      from TravelMember tm
+      join fetch tm.travel
+      where tm.user.id = :userId
+        and (:status is null or tm.travel.status = :status)
+      order by tm.travel.startDate desc, tm.travel.createdAt desc
+      """)
+  List<TravelMember> findMyTravelsByStatus(
+      @Param("userId") UUID userId, @Param("status") TravelStatus status);
 
   Optional<TravelMember> findByTravel_IdAndUser_Id(UUID travelId, UUID userId);
 

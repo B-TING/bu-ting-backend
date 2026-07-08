@@ -26,6 +26,29 @@ class TravelTeamRepositoryTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
 
   @Test
+  @DisplayName("find my travels by status returns filtered travels")
+  void findMyTravelsByStatus() {
+    User user = userRepository.save(createUser("status-member@example.com", "status-member"));
+    Travel planned = travelRepository.save(createTravel("Planned", TravelStatus.PLANNED));
+    Travel inProgress =
+        travelRepository.save(createTravel("In Progress", TravelStatus.IN_PROGRESS));
+    Travel completed = travelRepository.save(createTravel("Completed", TravelStatus.COMPLETED));
+    travelMemberRepository.save(
+        TravelMember.builder().travel(planned).user(user).role(TravelTeamRole.MEMBER).build());
+    travelMemberRepository.save(
+        TravelMember.builder().travel(inProgress).user(user).role(TravelTeamRole.LEADER).build());
+    travelMemberRepository.save(
+        TravelMember.builder().travel(completed).user(user).role(TravelTeamRole.MEMBER).build());
+
+    assertThat(travelMemberRepository.findMyTravelsByStatus(user.getId(), TravelStatus.IN_PROGRESS))
+        .extracting(travelMember -> travelMember.getTravel().getId())
+        .containsExactly(inProgress.getId());
+    assertThat(travelMemberRepository.findMyTravelsByStatus(user.getId(), TravelStatus.COMPLETED))
+        .extracting(travelMember -> travelMember.getTravel().getId())
+        .containsExactly(completed.getId());
+  }
+
+  @Test
   @DisplayName("find members by travel id returns leader first")
   void findMembersByTravelId() {
     User member = userRepository.save(createUser("member-list-repo@example.com", "member-list"));
@@ -73,11 +96,15 @@ class TravelTeamRepositoryTest extends AbstractContainerTest {
   }
 
   private Travel createTravel(String title) {
+    return createTravel(title, TravelStatus.PLANNED);
+  }
+
+  private Travel createTravel(String title, TravelStatus status) {
     return Travel.builder()
         .title(title)
         .startDate(LocalDate.of(2026, 8, 1))
         .endDate(LocalDate.of(2026, 8, 3))
-        .status(TravelStatus.PLANNED)
+        .status(status)
         .build();
   }
 

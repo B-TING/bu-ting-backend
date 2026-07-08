@@ -2,10 +2,12 @@ package com.butingbe.domain.travelteam.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.entity.Travel;
+import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
 import com.butingbe.domain.travelteam.dto.TravelInviteLinkInfoResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
+import com.butingbe.domain.travelteam.dto.TravelTeamTravelResponse;
 import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.entity.TravelInvite;
 import com.butingbe.domain.travelteam.entity.TravelMember;
@@ -62,6 +64,15 @@ public class TravelTeamService {
 
     return travelMemberRepository.findMembersByTravelId(travelId).stream()
         .map(TravelMemberResponse::from)
+        .toList();
+  }
+
+  public List<TravelTeamTravelResponse> getMyTravels(
+      AuthenticatedUser authenticatedUser, TravelStatus status) {
+    User user = findAuthenticatedUser(authenticatedUser);
+
+    return travelMemberRepository.findMyTravelsByStatus(user.getId(), status).stream()
+        .map(TravelTeamTravelResponse::from)
         .toList();
   }
 

@@ -9,12 +9,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
 import com.butingbe.domain.travelteam.dto.TravelInviteLinkInfoResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
+import com.butingbe.domain.travelteam.dto.TravelTeamTravelResponse;
 import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.service.TravelTeamService;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -43,6 +46,19 @@ class TravelTeamControllerTest {
         MockMvcBuilders.standaloneSetup(new TravelTeamController(travelTeamService))
             .setCustomArgumentResolvers(authenticatedUserResolver())
             .build();
+  }
+
+  @Test
+  @DisplayName("get my travels returns filtered response envelope")
+  void getMyTravels() throws Exception {
+    mockMvc
+        .perform(get("/travel/team/my-travels").param("status", "IN_PROGRESS"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data[0].travelId").value(FakeTravelTeamService.TRAVEL_ID.toString()))
+        .andExpect(jsonPath("$.data[0].status").value("IN_PROGRESS"));
+
+    assertThat(travelTeamService.myTravelsStatus).isEqualTo(TravelStatus.IN_PROGRESS);
   }
 
   @Test
@@ -195,6 +211,7 @@ class TravelTeamControllerTest {
     UUID removedUserId;
     UUID inviteLinkTravelId;
     UUID deletedInviteTravelId;
+    TravelStatus myTravelsStatus;
 
     FakeTravelTeamService() {
       super(null, null, null, null, "https://yourdomain.com/invite");
@@ -203,6 +220,21 @@ class TravelTeamControllerTest {
     @Override
     public InviteVerificationResponse verifyToken(String token) {
       return new InviteVerificationResponse(TRAVEL_ID, "Busan", true);
+    }
+
+    @Override
+    public List<TravelTeamTravelResponse> getMyTravels(
+        AuthenticatedUser authenticatedUser, TravelStatus status) {
+      myTravelsStatus = status;
+      return List.of(
+          new TravelTeamTravelResponse(
+              TRAVEL_ID,
+              "Busan",
+              LocalDate.of(2026, 8, 1),
+              LocalDate.of(2026, 8, 3),
+              TravelStatus.IN_PROGRESS,
+              TravelTeamRole.MEMBER,
+              null));
     }
 
     @Override

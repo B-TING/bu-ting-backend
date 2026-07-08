@@ -10,6 +10,7 @@ import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
 import com.butingbe.domain.travelteam.dto.TravelInviteLinkInfoResponse;
 import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
+import com.butingbe.domain.travelteam.dto.TravelTeamTravelResponse;
 import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.entity.TravelInvite;
 import com.butingbe.domain.travelteam.entity.TravelMember;
@@ -39,6 +40,51 @@ class TravelTeamServiceTest extends AbstractContainerTest {
   @Autowired private TravelMemberRepository travelMemberRepository;
   @Autowired private TravelInviteRepository travelInviteRepository;
   @Autowired private UserRepository userRepository;
+
+  @Test
+  @DisplayName("user can get my travels filtered by status")
+  void getMyTravelsByStatus() {
+    User user = userRepository.save(createUser("my-travels@example.com", "my-travels"));
+    Travel planned = travelRepository.save(createTravel("Planned", TravelStatus.PLANNED));
+    Travel inProgress =
+        travelRepository.save(createTravel("In Progress", TravelStatus.IN_PROGRESS));
+    Travel completed = travelRepository.save(createTravel("Completed", TravelStatus.COMPLETED));
+    saveMember(planned, user, TravelTeamRole.MEMBER);
+    saveMember(inProgress, user, TravelTeamRole.LEADER);
+    saveMember(completed, user, TravelTeamRole.MEMBER);
+
+    List<TravelTeamTravelResponse> inProgressResponses =
+        travelTeamService.getMyTravels(AuthenticatedUser.from(user), TravelStatus.IN_PROGRESS);
+    List<TravelTeamTravelResponse> completedResponses =
+        travelTeamService.getMyTravels(AuthenticatedUser.from(user), TravelStatus.COMPLETED);
+
+    assertThat(inProgressResponses)
+        .extracting(TravelTeamTravelResponse::travelId)
+        .containsExactly(inProgress.getId());
+    assertThat(inProgressResponses)
+        .extracting(TravelTeamTravelResponse::role)
+        .containsExactly(TravelTeamRole.LEADER);
+    assertThat(completedResponses)
+        .extracting(TravelTeamTravelResponse::travelId)
+        .containsExactly(completed.getId());
+  }
+
+  @Test
+  @DisplayName("user can get all my travels when status is omitted")
+  void getMyTravelsWithoutStatus() {
+    User user = userRepository.save(createUser("all-my-travels@example.com", "my-travels"));
+    Travel planned = travelRepository.save(createTravel("Planned", TravelStatus.PLANNED));
+    Travel completed = travelRepository.save(createTravel("Completed", TravelStatus.COMPLETED));
+    saveMember(planned, user, TravelTeamRole.MEMBER);
+    saveMember(completed, user, TravelTeamRole.MEMBER);
+
+    List<TravelTeamTravelResponse> responses =
+        travelTeamService.getMyTravels(AuthenticatedUser.from(user), null);
+
+    assertThat(responses)
+        .extracting(TravelTeamTravelResponse::travelId)
+        .containsExactly(completed.getId(), planned.getId());
+  }
 
   @Test
   @DisplayName("travel member can get travel members")
@@ -382,11 +428,15 @@ class TravelTeamServiceTest extends AbstractContainerTest {
   }
 
   private Travel createTravel(String title) {
+    return createTravel(title, TravelStatus.PLANNED);
+  }
+
+  private Travel createTravel(String title, TravelStatus status) {
     return Travel.builder()
         .title(title)
         .startDate(LocalDate.of(2026, 8, 1))
         .endDate(LocalDate.of(2026, 8, 3))
-        .status(TravelStatus.PLANNED)
+        .status(status)
         .build();
   }
 
