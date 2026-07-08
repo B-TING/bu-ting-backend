@@ -78,6 +78,61 @@ class TravelTeamServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("leader can remove member")
+  void removeMember() {
+    User leader = userRepository.save(createUser("leader-remove@example.com", "leader-remove"));
+    User member = userRepository.save(createUser("member-remove@example.com", "member-remove"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+
+    travelTeamService.removeMember(AuthenticatedUser.from(leader), travel.getId(), member.getId());
+
+    assertThat(travelMemberRepository.existsByTravel_IdAndUser_Id(travel.getId(), member.getId()))
+        .isFalse();
+    assertThat(travelMemberRepository.existsByTravel_IdAndUser_Id(travel.getId(), leader.getId()))
+        .isTrue();
+  }
+
+  @Test
+  @DisplayName("member cannot remove member")
+  void removeMemberByMemberThrowsForbiddenException() {
+    User leader =
+        userRepository.save(createUser("leader-remove-forbidden@example.com", "leader-remove"));
+    User member =
+        userRepository.save(createUser("member-remove-forbidden@example.com", "member-remove"));
+    User target =
+        userRepository.save(createUser("target-remove-forbidden@example.com", "target-remove"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+    saveMember(travel, target, TravelTeamRole.MEMBER);
+
+    assertThatThrownBy(
+            () ->
+                travelTeamService.removeMember(
+                    AuthenticatedUser.from(member), travel.getId(), target.getId()))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("Only travel leaders can remove members.");
+  }
+
+  @Test
+  @DisplayName("leader cannot remove themselves")
+  void removeSelfThrowsException() {
+    User leader =
+        userRepository.save(createUser("leader-remove-self@example.com", "leader-remove"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+
+    assertThatThrownBy(
+            () ->
+                travelTeamService.removeMember(
+                    AuthenticatedUser.from(leader), travel.getId(), leader.getId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Leader cannot remove themselves.");
+  }
+
+  @Test
   @DisplayName("leader can transfer leader role to another member")
   void transferLeader() {
     User leader = userRepository.save(createUser("leader-transfer@example.com", "leader-transfer"));

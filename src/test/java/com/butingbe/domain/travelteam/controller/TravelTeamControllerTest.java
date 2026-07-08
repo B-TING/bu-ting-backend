@@ -77,6 +77,22 @@ class TravelTeamControllerTest {
   }
 
   @Test
+  @DisplayName("remove member delegates to service")
+  void removeMember() throws Exception {
+    mockMvc
+        .perform(
+            delete(
+                "/travel/team/{travelId}/members/{userId}",
+                FakeTravelTeamService.TRAVEL_ID,
+                FakeTravelTeamService.USER_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
+
+    assertThat(travelTeamService.removedTravelId).isEqualTo(FakeTravelTeamService.TRAVEL_ID);
+    assertThat(travelTeamService.removedUserId).isEqualTo(FakeTravelTeamService.USER_ID);
+  }
+
+  @Test
   @DisplayName("verify invite token returns response envelope")
   void verifyInvite() throws Exception {
     mockMvc
@@ -148,6 +164,8 @@ class TravelTeamControllerTest {
     UUID membersTravelId;
     UUID transferredTravelId;
     UUID transferredNewLeaderUserId;
+    UUID removedTravelId;
+    UUID removedUserId;
 
     FakeTravelTeamService() {
       super(null, null, null, null);
@@ -172,6 +190,12 @@ class TravelTeamControllerTest {
         AuthenticatedUser authenticatedUser, UUID travelId, TravelLeaderTransferRequest request) {
       transferredTravelId = travelId;
       transferredNewLeaderUserId = request.newLeaderUserId();
+    }
+
+    @Override
+    public void removeMember(AuthenticatedUser authenticatedUser, UUID travelId, UUID targetUserId) {
+      removedTravelId = travelId;
+      removedUserId = targetUserId;
     }
 
     @Override

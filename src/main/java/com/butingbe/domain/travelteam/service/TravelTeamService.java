@@ -50,6 +50,36 @@ public class TravelTeamService {
   }
 
   @Transactional
+  public void removeMember(AuthenticatedUser authenticatedUser, UUID travelId, UUID targetUserId) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    validateTravelExists(travelId);
+
+    TravelMember leader =
+        travelMemberRepository
+            .findByTravel_IdAndUser_Id(travelId, user.getId())
+            .orElseThrow(() -> new ForbiddenException("User is not a travel member."));
+
+    if (leader.getRole() != TravelTeamRole.LEADER) {
+      throw new ForbiddenException("Only travel leaders can remove members.");
+    }
+
+    if (user.getId().equals(targetUserId)) {
+      throw new IllegalArgumentException("Leader cannot remove themselves.");
+    }
+
+    TravelMember targetMember =
+        travelMemberRepository
+            .findByTravel_IdAndUser_Id(travelId, targetUserId)
+            .orElseThrow(() -> new IllegalArgumentException("Target user is not a travel member."));
+
+    if (targetMember.getRole() == TravelTeamRole.LEADER) {
+      throw new IllegalArgumentException("Leader cannot be removed.");
+    }
+
+    travelMemberRepository.delete(targetMember);
+  }
+
+  @Transactional
   public void transferLeader(
       AuthenticatedUser authenticatedUser, UUID travelId, TravelLeaderTransferRequest request) {
     User user = findAuthenticatedUser(authenticatedUser);

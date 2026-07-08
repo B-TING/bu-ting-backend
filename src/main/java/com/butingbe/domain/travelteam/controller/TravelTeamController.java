@@ -56,6 +56,19 @@ public class TravelTeamController {
     return ResponseEntity.ok(ApiResponse.success("Travel leader transferred.", null));
   }
 
+  @DeleteMapping("/{travelId}/members/{userId}")
+  public ResponseEntity<ApiResponse<Void>> removeMember(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelId,
+      @PathVariable UUID userId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    travelTeamService.removeMember(user, travelId, userId);
+    return ResponseEntity.ok(ApiResponse.success("Travel member removed.", null));
+  }
+
   @GetMapping("/invites/verify")
   public ResponseEntity<ApiResponse<InviteVerificationResponse>> verifyInvite(
       @RequestParam("token") String token) {

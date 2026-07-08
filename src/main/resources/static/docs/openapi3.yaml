@@ -1386,6 +1386,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/travel/team/{travelId}/members/{userId}:
+    delete:
+      tags:
+        - TravelTeam
+      summary: 여행 멤버 강퇴
+      description: 여행 방장이 특정 멤버를 여행에서 내보냅니다. 방장 본인이나 다른 방장은 강퇴할 수 없습니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - name: userId
+          in: path
+          required: true
+          description: 강퇴할 사용자 ID
+          schema:
+            type: string
+            format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+      responses:
+        "200":
+          description: 강퇴 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelMemberRemoveEnvelope"
+        "400":
+          description: 여행을 찾을 수 없거나 강퇴 대상이 여행 멤버가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 여행 멤버가 아니거나 방장이 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/travel/team/invites/verify:
     get:
       tags:
@@ -2543,6 +2587,18 @@ components:
         message:
           type: string
           example: 여행 방장 위임 완료
+        data:
+          nullable: true
+          example: null
+    TravelMemberRemoveEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 여행 멤버 강퇴 완료
         data:
           nullable: true
           example: null
