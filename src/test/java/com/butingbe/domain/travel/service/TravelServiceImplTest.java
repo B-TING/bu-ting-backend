@@ -225,9 +225,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
     TravelResDto travel = createTravel(user);
     PlanResDto plan =
         travelService.createPlan(
-            authenticatedUser,
-            travel.id(),
-            new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
     PlanPlaceResDto first = createPlace(authenticatedUser, plan.planId(), 1, "Busan Station");
     PlanPlaceResDto second = createPlace(authenticatedUser, plan.planId(), 2, "Haeundae");
     var firstPlace = planPlaceRepository.findById(first.planPlaceId()).orElseThrow();
