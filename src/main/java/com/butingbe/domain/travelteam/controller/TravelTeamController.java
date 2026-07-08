@@ -2,10 +2,12 @@ package com.butingbe.domain.travelteam.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
+import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
 import com.butingbe.domain.travelteam.service.TravelTeamService;
 import com.butingbe.global.common.ApiResponse;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class TravelTeamController {
 
   private final TravelTeamService travelTeamService;
+
+  @GetMapping("/{travelId}/members")
+  public ResponseEntity<ApiResponse<List<TravelMemberResponse>>> getTravelMembers(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID travelId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    List<TravelMemberResponse> response = travelTeamService.getTravelMembers(user, travelId);
+    return ResponseEntity.ok(ApiResponse.success("Travel members retrieved.", response));
+  }
 
   @GetMapping("/invites/verify")
   public ResponseEntity<ApiResponse<InviteVerificationResponse>> verifyInvite(

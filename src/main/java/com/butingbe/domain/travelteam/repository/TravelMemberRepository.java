@@ -8,12 +8,23 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface TravelMemberRepository extends JpaRepository<TravelMember, UUID> {
 
   List<TravelMember> findByUser_Id(UUID userId);
 
   Optional<TravelMember> findByTravel_IdAndUser_Id(UUID travelId, UUID userId);
+
+  @Query(
+      """
+      select tm
+      from TravelMember tm
+      join fetch tm.user
+      where tm.travel.id = :travelId
+      order by tm.role asc, tm.user.nickname asc
+      """)
+  List<TravelMember> findMembersByTravelId(@Param("travelId") UUID travelId);
 
   long countByTravel_Id(UUID travelId);
 

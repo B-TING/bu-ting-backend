@@ -8,6 +8,7 @@ import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
+import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
 import com.butingbe.domain.travelteam.entity.TravelInvite;
 import com.butingbe.domain.travelteam.entity.TravelMember;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
@@ -18,9 +19,11 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +37,44 @@ class TravelTeamServiceTest extends AbstractContainerTest {
   @Autowired private TravelMemberRepository travelMemberRepository;
   @Autowired private TravelInviteRepository travelInviteRepository;
   @Autowired private UserRepository userRepository;
+
+  @Test
+  @DisplayName("travel member can get travel members")
+  void getTravelMembers() {
+    User leader = userRepository.save(createUser("leader-list@example.com", "leader-list"));
+    User member = userRepository.save(createUser("member-list@example.com", "member-list"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+
+    List<TravelMemberResponse> responses =
+        travelTeamService.getTravelMembers(AuthenticatedUser.from(member), travel.getId());
+
+    assertThat(responses).hasSize(2);
+    assertThat(responses)
+        .extracting(TravelMemberResponse::role)
+        .containsExactly(TravelTeamRole.LEADER, TravelTeamRole.MEMBER);
+    assertThat(responses)
+        .extracting(TravelMemberResponse::nickname)
+        .containsExactly("leader-list", "member-list");
+  }
+
+  @Test
+  @DisplayName("non travel member cannot get travel members")
+  void getTravelMembersByNonMemberThrowsForbiddenException() {
+    User leader = userRepository.save(createUser("leader-private@example.com", "leader-private"));
+    User outsider =
+        userRepository.save(createUser("outsider-private@example.com", "outsider-private"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+
+    assertThatThrownBy(
+            () ->
+                travelTeamService.getTravelMembers(
+                    AuthenticatedUser.from(outsider), travel.getId()))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not a travel member.");
+  }
 
   @Test
   @DisplayName("leader can create invite link")

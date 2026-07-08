@@ -26,6 +26,22 @@ class TravelTeamRepositoryTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
 
   @Test
+  @DisplayName("find members by travel id returns leader first")
+  void findMembersByTravelId() {
+    User member = userRepository.save(createUser("member-list-repo@example.com", "member-list"));
+    User leader = userRepository.save(createUser("leader-list-repo@example.com", "leader-list"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    travelMemberRepository.save(
+        TravelMember.builder().travel(travel).user(member).role(TravelTeamRole.MEMBER).build());
+    travelMemberRepository.save(
+        TravelMember.builder().travel(travel).user(leader).role(TravelTeamRole.LEADER).build());
+
+    assertThat(travelMemberRepository.findMembersByTravelId(travel.getId()))
+        .extracting(travelMember -> travelMember.getUser().getNickname())
+        .containsExactly("leader-list", "member-list");
+  }
+
+  @Test
   @DisplayName("find travels by user id returns joined travels")
   void findTravelByUserId() {
     User user = userRepository.save(createUser("member@example.com", "member"));

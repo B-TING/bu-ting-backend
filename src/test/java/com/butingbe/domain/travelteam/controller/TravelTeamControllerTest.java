@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
+import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
+import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.service.TravelTeamService;
 import java.util.List;
 import java.util.UUID;
@@ -36,6 +38,20 @@ class TravelTeamControllerTest {
         MockMvcBuilders.standaloneSetup(new TravelTeamController(travelTeamService))
             .setCustomArgumentResolvers(authenticatedUserResolver())
             .build();
+  }
+
+  @Test
+  @DisplayName("get travel members returns response envelope")
+  void getTravelMembers() throws Exception {
+    mockMvc
+        .perform(get("/travel/team/{travelId}/members", FakeTravelTeamService.TRAVEL_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data[0].userId").value(FakeTravelTeamService.USER_ID.toString()))
+        .andExpect(jsonPath("$.data[0].nickname").value("tester"))
+        .andExpect(jsonPath("$.data[0].role").value("LEADER"));
+
+    assertThat(travelTeamService.membersTravelId).isEqualTo(FakeTravelTeamService.TRAVEL_ID);
   }
 
   @Test
@@ -102,9 +118,12 @@ class TravelTeamControllerTest {
 
   static class FakeTravelTeamService extends TravelTeamService {
     static final UUID TRAVEL_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
+    static final UUID MEMBER_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
+    static final UUID USER_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
 
     UUID createdInviteTravelId;
     UUID exitedTravelId;
+    UUID membersTravelId;
 
     FakeTravelTeamService() {
       super(null, null, null, null);
@@ -113,6 +132,15 @@ class TravelTeamControllerTest {
     @Override
     public InviteVerificationResponse verifyToken(String token) {
       return new InviteVerificationResponse(TRAVEL_ID, "Busan", true);
+    }
+
+    @Override
+    public List<TravelMemberResponse> getTravelMembers(
+        AuthenticatedUser authenticatedUser, UUID travelId) {
+      membersTravelId = travelId;
+      return List.of(
+          new TravelMemberResponse(
+              MEMBER_ID, USER_ID, "tester@example.com", "tester", null, TravelTeamRole.LEADER));
     }
 
     @Override

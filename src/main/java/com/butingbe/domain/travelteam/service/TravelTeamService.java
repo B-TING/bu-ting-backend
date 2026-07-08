@@ -4,6 +4,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.dto.InviteVerificationResponse;
+import com.butingbe.domain.travelteam.dto.TravelMemberResponse;
 import com.butingbe.domain.travelteam.entity.TravelInvite;
 import com.butingbe.domain.travelteam.entity.TravelMember;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
@@ -12,8 +13,10 @@ import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,17 @@ public class TravelTeamService {
   public InviteVerificationResponse verifyToken(String token) {
     TravelInvite invite = findUsableInvite(token);
     return InviteVerificationResponse.from(invite.getTravel(), true);
+  }
+
+  public List<TravelMemberResponse> getTravelMembers(
+      AuthenticatedUser authenticatedUser, UUID travelId) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    validateTravelExists(travelId);
+    validateTravelMember(travelId, user.getId());
+
+    return travelMemberRepository.findMembersByTravelId(travelId).stream()
+        .map(TravelMemberResponse::from)
+        .toList();
   }
 
   @Transactional
@@ -121,6 +135,18 @@ public class TravelTeamService {
 
     if (!leader) {
       throw new IllegalArgumentException("Only travel leaders can create invite links.");
+    }
+  }
+
+  private void validateTravelExists(UUID travelId) {
+    if (!travelRepository.existsById(travelId)) {
+      throw new IllegalArgumentException("Travel not found.");
+    }
+  }
+
+  private void validateTravelMember(UUID travelId, UUID userId) {
+    if (!travelMemberRepository.existsByTravel_IdAndUser_Id(travelId, userId)) {
+      throw new ForbiddenException("User is not a travel member.");
     }
   }
 
