@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TravelInviteRepository extends JpaRepository<TravelInvite, UUID> {
   Optional<TravelInvite> findByToken(String token);
+
+  long deleteByTravel_IdAndUsedFalse(UUID travelId);
 }

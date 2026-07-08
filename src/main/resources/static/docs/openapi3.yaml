@@ -1481,6 +1481,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - TravelTeam
+      summary: 여행 초대 링크 폐기
+      description: 여행 방장이 해당 여행의 아직 사용되지 않은 초대 링크를 폐기합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+      responses:
+        "200":
+          description: 폐기 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelInviteDeleteEnvelope"
+        "400":
+          description: 여행을 찾을 수 없거나 방장이 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/travel/team/invites/accept:
     post:
@@ -2530,6 +2558,18 @@ components:
         inviteLink:
           type: string
           example: https://yourdomain.com/invite?token=invite-token
+    TravelInviteDeleteEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 여행 초대 링크 폐기 완료
+        data:
+          nullable: true
+          example: null
     TravelMemberListEnvelope:
       type: object
       properties:

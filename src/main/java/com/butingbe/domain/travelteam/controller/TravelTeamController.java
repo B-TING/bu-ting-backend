@@ -90,6 +90,17 @@ public class TravelTeamController {
     return ResponseEntity.ok(response);
   }
 
+  @DeleteMapping("/{travelId}/invite")
+  public ResponseEntity<ApiResponse<Void>> deleteInviteLink(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID travelId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    travelTeamService.deleteInviteLink(user, travelId);
+    return ResponseEntity.ok(ApiResponse.success("Travel invite link deleted.", null));
+  }
+
   @PostMapping("/invites/accept")
   public ResponseEntity<ApiResponse<InviteVerificationResponse>> acceptInvite(
       @AuthenticationPrincipal AuthenticatedUser user, @RequestParam("token") String token) {

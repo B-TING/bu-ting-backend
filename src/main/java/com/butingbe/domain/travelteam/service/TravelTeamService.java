@@ -108,8 +108,16 @@ public class TravelTeamService {
   }
 
   @Transactional
+  public void deleteInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
+    validateLeader(authenticatedUser, travelId, "Only travel leaders can delete invite links.");
+    validateTravelExists(travelId);
+
+    travelInviteRepository.deleteByTravel_IdAndUsedFalse(travelId);
+  }
+
+  @Transactional
   public String createInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
-    validateLeader(authenticatedUser, travelId);
+    validateLeader(authenticatedUser, travelId, "Only travel leaders can create invite links.");
 
     Travel travel =
         travelRepository
@@ -186,14 +194,14 @@ public class TravelTeamService {
     return invite;
   }
 
-  private void validateLeader(AuthenticatedUser authenticatedUser, UUID travelId) {
+  private void validateLeader(AuthenticatedUser authenticatedUser, UUID travelId, String message) {
     User user = findAuthenticatedUser(authenticatedUser);
     boolean leader =
         travelMemberRepository.existsByTravel_IdAndUser_IdAndRole(
             travelId, user.getId(), TravelTeamRole.LEADER);
 
     if (!leader) {
-      throw new IllegalArgumentException("Only travel leaders can create invite links.");
+      throw new IllegalArgumentException(message);
     }
   }
 

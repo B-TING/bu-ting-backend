@@ -116,6 +116,17 @@ class TravelTeamControllerTest {
   }
 
   @Test
+  @DisplayName("delete invite link delegates to service")
+  void deleteInviteLink() throws Exception {
+    mockMvc
+        .perform(delete("/travel/team/{travelId}/invite", FakeTravelTeamService.TRAVEL_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
+
+    assertThat(travelTeamService.deletedInviteTravelId).isEqualTo(FakeTravelTeamService.TRAVEL_ID);
+  }
+
+  @Test
   @DisplayName("accept invite returns response envelope")
   void acceptInvite() throws Exception {
     mockMvc
@@ -166,6 +177,7 @@ class TravelTeamControllerTest {
     UUID transferredNewLeaderUserId;
     UUID removedTravelId;
     UUID removedUserId;
+    UUID deletedInviteTravelId;
 
     FakeTravelTeamService() {
       super(null, null, null, null);
@@ -202,6 +214,11 @@ class TravelTeamControllerTest {
     public String createInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
       createdInviteTravelId = travelId;
       return "https://yourdomain.com/invite?token=invite-token";
+    }
+
+    @Override
+    public void deleteInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
+      deletedInviteTravelId = travelId;
     }
 
     @Override

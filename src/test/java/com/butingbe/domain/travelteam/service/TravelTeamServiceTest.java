@@ -218,6 +218,37 @@ class TravelTeamServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("leader can delete unused invite links")
+  void deleteInviteLinkByLeader() {
+    User leader = userRepository.save(createUser("leader-delete-invite@example.com", "leader"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    TravelInvite unusedInvite =
+        saveInvite(travel, "unused-delete-token", OffsetDateTime.now().plusHours(1));
+    TravelInvite usedInvite =
+        saveInvite(travel, "used-delete-token", OffsetDateTime.now().plusHours(1));
+    usedInvite.markUsed();
+
+    travelTeamService.deleteInviteLink(AuthenticatedUser.from(leader), travel.getId());
+
+    assertThat(travelInviteRepository.findById(unusedInvite.getId())).isEmpty();
+    assertThat(travelInviteRepository.findById(usedInvite.getId())).isPresent();
+  }
+
+  @Test
+  @DisplayName("member cannot delete invite links")
+  void deleteInviteLinkByMemberThrowsException() {
+    User member = userRepository.save(createUser("member-delete-invite@example.com", "member"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+
+    assertThatThrownBy(
+            () -> travelTeamService.deleteInviteLink(AuthenticatedUser.from(member), travel.getId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Only travel leaders can delete invite links.");
+  }
+
+  @Test
   @DisplayName("member cannot create invite link")
   void createInviteLinkByMemberThrowsException() {
     User member = userRepository.save(createUser("member-invite@example.com", "member-invite"));
