@@ -28,9 +28,7 @@ public class TravelStatusScheduler {
   @Transactional
   public void updateTravelStatuses(LocalDate today) {
     travelRepository.completeEndedTravels(
-        today,
-        List.of(TravelStatus.PLANNED, TravelStatus.IN_PROGRESS),
-        TravelStatus.COMPLETED);
+        today, List.of(TravelStatus.PLANNED, TravelStatus.IN_PROGRESS), TravelStatus.COMPLETED);
     travelRepository.startPlannedTravels(today, TravelStatus.PLANNED, TravelStatus.IN_PROGRESS);
   }
 }

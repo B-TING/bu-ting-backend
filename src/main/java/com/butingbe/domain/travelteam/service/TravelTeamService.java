@@ -135,7 +135,8 @@ public class TravelTeamService {
   }
 
   @Transactional
-  public TravelInviteLinkInfoResponse getInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
+  public TravelInviteLinkInfoResponse getInviteLink(
+      AuthenticatedUser authenticatedUser, UUID travelId) {
     validateLeader(authenticatedUser, travelId, "Only travel leaders can get invite links.");
     validateTravelExists(travelId);
 

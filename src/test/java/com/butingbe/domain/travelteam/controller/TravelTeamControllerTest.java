@@ -254,7 +254,8 @@ class TravelTeamControllerTest {
     }
 
     @Override
-    public void removeMember(AuthenticatedUser authenticatedUser, UUID travelId, UUID targetUserId) {
+    public void removeMember(
+        AuthenticatedUser authenticatedUser, UUID travelId, UUID targetUserId) {
       removedTravelId = travelId;
       removedUserId = targetUserId;
     }

@@ -29,8 +29,7 @@ class TravelRepositoryTest extends AbstractContainerTest {
   void updateTravelStatusesChangesPlannedToInProgress() {
     Travel travel =
         travelRepository.save(
-            createTravel(
-                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), TravelStatus.PLANNED));
+            createTravel(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), TravelStatus.PLANNED));
 
     travelStatusScheduler.updateTravelStatuses(LocalDate.of(2026, 8, 1));
 
@@ -43,8 +42,7 @@ class TravelRepositoryTest extends AbstractContainerTest {
   void updateTravelStatusesChangesEndedTravelsToCompleted() {
     Travel planned =
         travelRepository.save(
-            createTravel(
-                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), TravelStatus.PLANNED));
+            createTravel(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), TravelStatus.PLANNED));
     Travel inProgress =
         travelRepository.save(
             createTravel(

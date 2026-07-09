@@ -321,7 +321,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     saveMember(travel, member, TravelTeamRole.MEMBER);
 
     assertThatThrownBy(
-            () -> travelTeamService.deleteInviteLink(AuthenticatedUser.from(member), travel.getId()))
+            () ->
+                travelTeamService.deleteInviteLink(AuthenticatedUser.from(member), travel.getId()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Only travel leaders can delete invite links.");
   }
