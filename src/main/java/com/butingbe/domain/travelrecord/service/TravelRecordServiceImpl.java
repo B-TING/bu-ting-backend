@@ -10,15 +10,19 @@ import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRepository;
 import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
+import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto.TravelRecordDayResDto;
+import com.butingbe.domain.travelrecord.entity.PlaceReview;
 import com.butingbe.domain.travelrecord.entity.TravelRecord;
 import com.butingbe.domain.travelrecord.entity.TravelRecordDay;
 import com.butingbe.domain.travelrecord.entity.TravelRecordPlace;
 import com.butingbe.domain.travelrecord.entity.TravelRecordRoute;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
+import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRepository;
@@ -57,6 +61,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private final TravelRecordDayRepository travelRecordDayRepository;
   private final TravelRecordPlaceRepository travelRecordPlaceRepository;
   private final TravelRecordRouteRepository travelRecordRouteRepository;
+  private final PlaceReviewRepository placeReviewRepository;
 
   @Override
   @Transactional
@@ -119,6 +124,36 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     travelRecord.updateContent(request.title(), request.content(), request.coverImageUrl());
 
     return toResponse(travelRecord);
+  }
+
+  @Override
+  @Transactional
+  public PlaceReviewResDto createPlaceReview(
+      AuthenticatedUser authenticatedUser,
+      UUID travelId,
+      UUID travelRecordId,
+      UUID travelRecordPlaceId,
+      PlaceReviewCreateReqDto request) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validateDraftBelongsToTravel(travelRecord, travelId);
+    validateAuthor(travelRecord, author.getId());
+    validateDraft(travelRecord);
+    validatePlaceReviewCreateRequest(request);
+
+    TravelRecordPlace travelRecordPlace =
+        findTravelRecordPlaceInRecord(travelRecordPlaceId, travelRecordId);
+    validatePlaceReviewNotDuplicated(travelRecordPlaceId);
+
+    PlaceReview placeReview =
+        placeReviewRepository.save(
+            PlaceReview.builder()
+                .travelRecordPlace(travelRecordPlace)
+                .rating(request.rating())
+                .content(request.content())
+                .build());
+
+    return PlaceReviewResDto.from(placeReview);
   }
 
   private void copyItinerarySnapshot(UUID travelId, TravelRecord travelRecord) {
@@ -234,6 +269,20 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .orElseThrow(() -> new ResourceNotFoundException("Travel record not found."));
   }
 
+  private TravelRecordPlace findTravelRecordPlaceInRecord(
+      UUID travelRecordPlaceId, UUID travelRecordId) {
+    TravelRecordPlace travelRecordPlace =
+        travelRecordPlaceRepository
+            .findById(travelRecordPlaceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Travel record place not found."));
+
+    if (!travelRecordPlace.getTravelRecordDay().getTravelRecord().getId().equals(travelRecordId)) {
+      throw new ResourceNotFoundException("Travel record place not found.");
+    }
+
+    return travelRecordPlace;
+  }
+
   private void validateTravelMember(UUID travelId, UUID userId) {
     if (!travelMemberRepository.existsByTravel_IdAndUser_Id(travelId, userId)) {
       throw new ForbiddenException("User is not a travel member.");
@@ -266,6 +315,22 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
     if (request.title() != null && request.title().isBlank()) {
       throw new IllegalArgumentException("Travel record title cannot be blank.");
+    }
+  }
+
+  private void validatePlaceReviewCreateRequest(PlaceReviewCreateReqDto request) {
+    if (request == null || request.rating() == null) {
+      throw new IllegalArgumentException("Place review rating is required.");
+    }
+
+    if (request.rating() < 1 || request.rating() > 5) {
+      throw new IllegalArgumentException("Place review rating must be between 1 and 5.");
+    }
+  }
+
+  private void validatePlaceReviewNotDuplicated(UUID travelRecordPlaceId) {
+    if (placeReviewRepository.findByTravelRecordPlace_Id(travelRecordPlaceId).isPresent()) {
+      throw new DuplicateResourceException("Place review already exists.");
     }
   }
 

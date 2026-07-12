@@ -18,10 +18,13 @@ import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.service.TravelService;
+import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
+import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRouteRepository;
@@ -50,6 +53,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @Autowired private TravelRecordDayRepository travelRecordDayRepository;
   @Autowired private TravelRecordPlaceRepository travelRecordPlaceRepository;
   @Autowired private TravelRecordRouteRepository travelRecordRouteRepository;
+  @Autowired private PlaceReviewRepository placeReviewRepository;
 
   @Test
   @DisplayName("completed travel can be copied to a draft travel record snapshot")
@@ -213,6 +217,75 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         .hasMessage("Travel record title cannot be blank.");
   }
 
+  @Test
+  @DisplayName("author can create place review for a draft travel record place")
+  void createPlaceReviewSuccess() {
+    User user = userRepository.save(createUser("review-owner@example.com", "review-owner"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+
+    PlaceReviewResDto result =
+        travelRecordService.createPlaceReview(
+            authenticatedUser,
+            draft.originalTravelId(),
+            draft.travelRecordId(),
+            place.travelRecordPlaceId(),
+            new PlaceReviewCreateReqDto(5, "Best place in this route"));
+
+    assertThat(result.travelRecordPlaceId()).isEqualTo(place.travelRecordPlaceId());
+    assertThat(result.rating()).isEqualTo(5);
+    assertThat(result.content()).isEqualTo("Best place in this route");
+    assertThat(placeReviewRepository.findByTravelRecordPlace_Id(place.travelRecordPlaceId()))
+        .isPresent();
+  }
+
+  @Test
+  @DisplayName("place review cannot be created twice for the same travel record place")
+  void createPlaceReviewRejectsDuplicate() {
+    User user = userRepository.save(createUser("review-duplicate@example.com", "review-duplicate"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+    travelRecordService.createPlaceReview(
+        authenticatedUser,
+        draft.originalTravelId(),
+        draft.travelRecordId(),
+        place.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(4, "Good"));
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    draft.originalTravelId(),
+                    draft.travelRecordId(),
+                    place.travelRecordPlaceId(),
+                    new PlaceReviewCreateReqDto(5, "Again")))
+        .isInstanceOf(DuplicateResourceException.class)
+        .hasMessage("Place review already exists.");
+  }
+
+  @Test
+  @DisplayName("place review rating must be between 1 and 5")
+  void createPlaceReviewRejectsInvalidRating() {
+    User user = userRepository.save(createUser("review-rating@example.com", "review-rating"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    draft.originalTravelId(),
+                    draft.travelRecordId(),
+                    place.travelRecordPlaceId(),
+                    new PlaceReviewCreateReqDto(6, "Too high")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Place review rating must be between 1 and 5.");
+  }
+
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {
     TravelResDto travel =
         travelService.createTravel(
@@ -233,6 +306,16 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     return travelService.updateTravelStatus(
         authenticatedUser, travel.id(), new TravelStatusUpdateReqDto(TravelStatus.COMPLETED));
+  }
+
+  private TravelRecordResDto createDraftWithOnePlace(AuthenticatedUser authenticatedUser) {
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station");
+
+    return travelRecordService.createDraft(authenticatedUser, travel.id(), null);
   }
 
   private PlanPlaceResDto createPlace(

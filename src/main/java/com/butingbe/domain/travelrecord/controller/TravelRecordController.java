@@ -1,8 +1,10 @@
 package com.butingbe.domain.travelrecord.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.service.TravelRecordService;
 import com.butingbe.global.error.exception.UnauthenticatedException;
@@ -64,5 +66,22 @@ public class TravelRecordController {
 
     return ResponseEntity.ok(
         travelRecordService.updateDraft(user, travelId, travelRecordId, request));
+  }
+
+  @PostMapping("/{travelRecordId}/places/{travelRecordPlaceId}/review")
+  public ResponseEntity<PlaceReviewResDto> createPlaceReview(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelId,
+      @PathVariable UUID travelRecordId,
+      @PathVariable UUID travelRecordPlaceId,
+      @RequestBody @Valid PlaceReviewCreateReqDto request) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            travelRecordService.createPlaceReview(
+                user, travelId, travelRecordId, travelRecordPlaceId, request));
   }
 }
