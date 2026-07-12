@@ -23,11 +23,13 @@ import com.butingbe.domain.travelexpense.repository.TravelExpenseRepository.Memb
 import com.butingbe.domain.travelexpense.repository.TravelExpenseShareRepository;
 import com.butingbe.domain.travelexpense.repository.TravelExpenseShareRepository.ExpenseParticipantCount;
 import com.butingbe.domain.travelexpense.repository.TravelExpenseShareRepository.MemberShareAmount;
+import com.butingbe.domain.travelexpense.repository.TravelSettlementRepository;
 import com.butingbe.domain.travelteam.entity.TravelMember;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
 import com.butingbe.domain.user.entity.User;
+import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
@@ -60,6 +62,7 @@ public class TravelExpenseService {
   private final TravelExpenseRepository travelExpenseRepository;
   private final TravelExpenseShareRepository travelExpenseShareRepository;
   private final TravelMemberAuthorization travelMemberAuthorization;
+  private final TravelSettlementRepository travelSettlementRepository;
 
   public TravelExpenseSummaryResponse getExpenseSummary(
       AuthenticatedUser authenticatedUser,
@@ -69,9 +72,7 @@ public class TravelExpenseService {
     if (authenticatedUser == null || authenticatedUser.id() == null) {
       throw new UnauthenticatedException();
     }
-    if (!travelRepository.existsById(travelId)) {
-      throw new ResourceNotFoundException("Travel not found.");
-    }
+    lockTravel(travelId);
     travelMemberAuthorization.validateMember(travelId, authenticatedUser.id());
     validateExpensePeriod(from, to);
 
@@ -103,9 +104,7 @@ public class TravelExpenseService {
     if (authenticatedUser == null || authenticatedUser.id() == null) {
       throw new UnauthenticatedException();
     }
-    if (!travelRepository.existsById(travelId)) {
-      throw new ResourceNotFoundException("Travel not found.");
-    }
+    lockTravel(travelId);
     TravelMember requester =
         travelMemberAuthorization.requireMember(travelId, authenticatedUser.id());
     TravelExpense expense =
@@ -117,6 +116,7 @@ public class TravelExpenseService {
         expense,
         authenticatedUser.id(),
         "Only the expense creator or travel leader can delete this expense.");
+    validateSettlementOpen(travelId);
 
     travelExpenseShareRepository.deleteByExpense_Id(expenseId);
     travelExpenseShareRepository.flush();
@@ -147,6 +147,7 @@ public class TravelExpenseService {
         expense,
         authenticatedUser.id(),
         "Only the expense creator or travel leader can modify this expense.");
+    validateSettlementOpen(travelId);
 
     validateDistinctParticipants(request.participantUserIds());
     Map<UUID, User> membersById = findMembersById(travelId);
@@ -238,12 +239,10 @@ public class TravelExpenseService {
       throw new UnauthenticatedException();
     }
 
-    Travel travel =
-        travelRepository
-            .findById(travelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
+    Travel travel = lockTravel(travelId);
     TravelMember creator =
         travelMemberAuthorization.requireMember(travelId, authenticatedUser.id());
+    validateSettlementOpen(travelId);
 
     validateDistinctParticipants(request.participantUserIds());
     Map<UUID, User> membersById = findMembersById(travelId);
@@ -335,6 +334,18 @@ public class TravelExpenseService {
     if (from != null && to != null && from.isAfter(to)) {
       throw new IllegalArgumentException("Expense search start time must not be after end time.");
     }
+  }
+
+  private void validateSettlementOpen(UUID travelId) {
+    if (travelSettlementRepository.existsByTravel_Id(travelId)) {
+      throw new ConflictException("SETTLEMENT_CONFIRMED");
+    }
+  }
+
+  private Travel lockTravel(UUID travelId) {
+    return travelRepository
+        .findByIdForUpdate(travelId)
+        .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
   }
 
   private Map<UUID, Long> findParticipantCounts(List<TravelExpense> expenses) {
