@@ -2,6 +2,7 @@ package com.butingbe.domain.travelrecord.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
@@ -97,5 +98,21 @@ public class TravelRecordController {
 
     return ResponseEntity.ok(
         travelRecordService.getPlaceReview(user, travelId, travelRecordId, travelRecordPlaceId));
+  }
+
+  @PatchMapping("/{travelRecordId}/places/{travelRecordPlaceId}/review")
+  public ResponseEntity<PlaceReviewResDto> updatePlaceReview(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelId,
+      @PathVariable UUID travelRecordId,
+      @PathVariable UUID travelRecordPlaceId,
+      @RequestBody(required = false) @Valid PlaceReviewUpdateReqDto request) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(
+        travelRecordService.updatePlaceReview(
+            user, travelId, travelRecordId, travelRecordPlaceId, request));
   }
 }

@@ -2,6 +2,7 @@ package com.butingbe.domain.travelrecord.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
@@ -34,4 +35,11 @@ public interface TravelRecordService {
       UUID travelId,
       UUID travelRecordId,
       UUID travelRecordPlaceId);
+
+  PlaceReviewResDto updatePlaceReview(
+      AuthenticatedUser authenticatedUser,
+      UUID travelId,
+      UUID travelRecordId,
+      UUID travelRecordPlaceId,
+      PlaceReviewUpdateReqDto request);
 }

@@ -19,6 +19,7 @@ import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.service.TravelService;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
@@ -332,6 +333,106 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     place.travelRecordPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Place review not found.");
+  }
+
+  @Test
+  @DisplayName("author can update place review for a draft travel record place")
+  void updatePlaceReviewSuccess() {
+    User user = userRepository.save(createUser("review-update@example.com", "review-update"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+    travelRecordService.createPlaceReview(
+        authenticatedUser,
+        draft.originalTravelId(),
+        draft.travelRecordId(),
+        place.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(3, "Before"));
+
+    PlaceReviewResDto result =
+        travelRecordService.updatePlaceReview(
+            authenticatedUser,
+            draft.originalTravelId(),
+            draft.travelRecordId(),
+            place.travelRecordPlaceId(),
+            new PlaceReviewUpdateReqDto(5, "After"));
+
+    assertThat(result.rating()).isEqualTo(5);
+    assertThat(result.content()).isEqualTo("After");
+  }
+
+  @Test
+  @DisplayName("place review update keeps existing values when fields are null")
+  void updatePlaceReviewKeepsExistingValuesForNullFields() {
+    User user = userRepository.save(createUser("review-patch@example.com", "review-patch"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+    travelRecordService.createPlaceReview(
+        authenticatedUser,
+        draft.originalTravelId(),
+        draft.travelRecordId(),
+        place.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(4, "Before"));
+
+    PlaceReviewResDto result =
+        travelRecordService.updatePlaceReview(
+            authenticatedUser,
+            draft.originalTravelId(),
+            draft.travelRecordId(),
+            place.travelRecordPlaceId(),
+            new PlaceReviewUpdateReqDto(null, "Only content changed"));
+
+    assertThat(result.rating()).isEqualTo(4);
+    assertThat(result.content()).isEqualTo("Only content changed");
+  }
+
+  @Test
+  @DisplayName("place review update returns not found when review does not exist")
+  void updatePlaceReviewNotFound() {
+    User user =
+        userRepository.save(createUser("review-update-missing@example.com", "review-update-missing"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updatePlaceReview(
+                    authenticatedUser,
+                    draft.originalTravelId(),
+                    draft.travelRecordId(),
+                    place.travelRecordPlaceId(),
+                    new PlaceReviewUpdateReqDto(5, "Missing")))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Place review not found.");
+  }
+
+  @Test
+  @DisplayName("place review update rating must be between 1 and 5")
+  void updatePlaceReviewRejectsInvalidRating() {
+    User user =
+        userRepository.save(createUser("review-update-rating@example.com", "review-update-rating"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+    travelRecordService.createPlaceReview(
+        authenticatedUser,
+        draft.originalTravelId(),
+        draft.travelRecordId(),
+        place.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(4, "Before"));
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updatePlaceReview(
+                    authenticatedUser,
+                    draft.originalTravelId(),
+                    draft.travelRecordId(),
+                    place.travelRecordPlaceId(),
+                    new PlaceReviewUpdateReqDto(0, "Invalid")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Place review rating must be between 1 and 5.");
   }
 
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {
