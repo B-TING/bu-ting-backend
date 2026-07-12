@@ -3,18 +3,27 @@ package com.butingbe.domain.travelexpense.controller;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelexpense.dto.request.TravelExpenseCreateRequest;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseCreateResponse;
+import com.butingbe.domain.travelexpense.dto.response.TravelExpenseListResponse;
+import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
 import com.butingbe.domain.travelexpense.service.TravelExpenseService;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -23,6 +32,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class TravelExpenseController {
 
   private final TravelExpenseService travelExpenseService;
+
+  @GetMapping
+  public ResponseEntity<TravelExpenseListResponse> getExpenses(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelId,
+      @RequestParam(required = false) ExpenseCategory category,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          LocalDateTime from,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          LocalDateTime to,
+      @RequestParam(required = false) UUID payerUserId,
+      @PageableDefault(size = 20, sort = "spentAt", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(
+        travelExpenseService.getExpenses(
+            user, travelId, category, from, to, payerUserId, pageable));
+  }
 
   @PostMapping
   public ResponseEntity<TravelExpenseCreateResponse> createEqualExpense(

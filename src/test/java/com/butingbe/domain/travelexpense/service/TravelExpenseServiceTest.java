@@ -9,6 +9,7 @@ import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelexpense.dto.request.TravelExpenseCreateRequest;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseCreateResponse;
+import com.butingbe.domain.travelexpense.dto.response.TravelExpenseListResponse;
 import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
 import com.butingbe.domain.travelexpense.entity.ExpenseSplitType;
 import com.butingbe.domain.travelexpense.repository.TravelExpenseRepository;
@@ -21,11 +22,14 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.support.AbstractContainerTest;
+import com.butingbe.global.error.exception.ForbiddenException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
@@ -112,6 +116,102 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
         .containsExactly(1L, 1L, 0L);
   }
 
+  @Test
+  void getsLatestExpensePageWithParticipantCount() {
+    User creator = saveUser("list-creator");
+    User member = saveUser("list-member");
+    Travel travel = saveTravel();
+    saveMember(travel, creator, TravelTeamRole.LEADER);
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+    createExpense(
+        creator,
+        travel,
+        "Lunch",
+        ExpenseCategory.FOOD,
+        LocalDateTime.of(2026, 7, 12, 12, 0),
+        List.of(creator.getId(), member.getId()));
+    createExpense(
+        creator,
+        travel,
+        "Taxi",
+        ExpenseCategory.TRANSPORT,
+        LocalDateTime.of(2026, 7, 12, 20, 0),
+        List.of(creator.getId()));
+
+    TravelExpenseListResponse response =
+        travelExpenseService.getExpenses(
+            AuthenticatedUser.from(member),
+            travel.getId(),
+            null,
+            null,
+            null,
+            null,
+            PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "spentAt")));
+
+    assertThat(response.totalElements()).isEqualTo(2);
+    assertThat(response.totalPages()).isEqualTo(2);
+    assertThat(response.content()).hasSize(1);
+    assertThat(response.content().getFirst().title()).isEqualTo("Taxi");
+    assertThat(response.content().getFirst().participantCount()).isEqualTo(1);
+  }
+
+  @Test
+  void filtersExpensesByCategoryPeriodAndPayer() {
+    User creator = saveUser("filter-creator");
+    User member = saveUser("filter-member");
+    Travel travel = saveTravel();
+    saveMember(travel, creator, TravelTeamRole.LEADER);
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+    createExpense(
+        creator,
+        travel,
+        "Breakfast",
+        ExpenseCategory.FOOD,
+        LocalDateTime.of(2026, 7, 12, 8, 0),
+        List.of(creator.getId(), member.getId()));
+    createExpense(
+        member,
+        travel,
+        "Dinner",
+        ExpenseCategory.FOOD,
+        LocalDateTime.of(2026, 7, 12, 19, 0),
+        List.of(creator.getId(), member.getId()));
+
+    TravelExpenseListResponse response =
+        travelExpenseService.getExpenses(
+            AuthenticatedUser.from(creator),
+            travel.getId(),
+            ExpenseCategory.FOOD,
+            LocalDateTime.of(2026, 7, 12, 12, 0),
+            LocalDateTime.of(2026, 7, 12, 23, 59),
+            member.getId(),
+            PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "spentAt")));
+
+    assertThat(response.content()).extracting(item -> item.title()).containsExactly("Dinner");
+    assertThat(response.content().getFirst().payer().userId()).isEqualTo(member.getId());
+  }
+
+  @Test
+  void rejectsExpenseListRequestFromNonMember() {
+    User member = saveUser("list-member-only");
+    User outsider = saveUser("list-outsider");
+    Travel travel = saveTravel();
+    saveMember(travel, member, TravelTeamRole.LEADER);
+
+    assertThatThrownBy(
+            () ->
+                travelExpenseService.getExpenses(
+                    AuthenticatedUser.from(outsider),
+                    travel.getId(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    PageRequest.of(0, 20)))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not a travel member.");
+  }
+
   private TravelExpenseCreateRequest request(
       long amount, User payer, List<java.util.UUID> participants) {
     return new TravelExpenseCreateRequest(
@@ -123,6 +223,27 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
         participants,
         LocalDateTime.of(2026, 7, 12, 18, 30),
         "Team dinner");
+  }
+
+  private void createExpense(
+      User payer,
+      Travel travel,
+      String title,
+      ExpenseCategory category,
+      LocalDateTime spentAt,
+      List<java.util.UUID> participants) {
+    travelExpenseService.createEqualExpense(
+        AuthenticatedUser.from(payer),
+        travel.getId(),
+        new TravelExpenseCreateRequest(
+            title,
+            10_000L,
+            "KRW",
+            category,
+            payer.getId(),
+            participants,
+            spentAt,
+            null));
   }
 
   private User saveUser(String nickname) {

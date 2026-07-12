@@ -5,25 +5,33 @@ import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelexpense.dto.request.TravelExpenseCreateRequest;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseCreateResponse;
+import com.butingbe.domain.travelexpense.dto.response.TravelExpenseListResponse;
+import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
 import com.butingbe.domain.travelexpense.entity.ExpenseSplitType;
 import com.butingbe.domain.travelexpense.entity.TravelExpense;
 import com.butingbe.domain.travelexpense.entity.TravelExpenseShare;
 import com.butingbe.domain.travelexpense.repository.TravelExpenseRepository;
 import com.butingbe.domain.travelexpense.repository.TravelExpenseShareRepository;
+import com.butingbe.domain.travelexpense.repository.TravelExpenseShareRepository.ExpenseParticipantCount;
 import com.butingbe.domain.travelteam.entity.TravelMember;
 import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +45,30 @@ public class TravelExpenseService {
   private final TravelExpenseRepository travelExpenseRepository;
   private final TravelExpenseShareRepository travelExpenseShareRepository;
   private final TravelMemberAuthorization travelMemberAuthorization;
+
+  public TravelExpenseListResponse getExpenses(
+      AuthenticatedUser authenticatedUser,
+      UUID travelId,
+      ExpenseCategory category,
+      LocalDateTime from,
+      LocalDateTime to,
+      UUID payerUserId,
+      Pageable pageable) {
+    if (authenticatedUser == null || authenticatedUser.id() == null) {
+      throw new UnauthenticatedException();
+    }
+    if (!travelRepository.existsById(travelId)) {
+      throw new ResourceNotFoundException("Travel not found.");
+    }
+    travelMemberAuthorization.validateMember(travelId, authenticatedUser.id());
+    validateExpensePeriod(from, to);
+
+    Page<TravelExpense> expensePage =
+        travelExpenseRepository.findAll(
+            expenseSpecification(travelId, category, from, to, payerUserId), pageable);
+    Map<UUID, Long> participantCounts = findParticipantCounts(expensePage.getContent());
+    return TravelExpenseListResponse.of(expensePage, participantCounts);
+  }
 
   @Transactional
   public TravelExpenseCreateResponse createEqualExpense(
@@ -127,5 +159,56 @@ public class TravelExpenseService {
       throw new IllegalArgumentException(subject + " is not a travel member.");
     }
     return member;
+  }
+
+  private void validateExpensePeriod(LocalDateTime from, LocalDateTime to) {
+    if (from != null && to != null && from.isAfter(to)) {
+      throw new IllegalArgumentException("Expense search start time must not be after end time.");
+    }
+  }
+
+  private Map<UUID, Long> findParticipantCounts(List<TravelExpense> expenses) {
+    if (expenses.isEmpty()) {
+      return Map.of();
+    }
+    List<UUID> expenseIds = expenses.stream().map(TravelExpense::getId).toList();
+    return travelExpenseShareRepository.countParticipantsByExpenseIds(expenseIds).stream()
+        .collect(
+            Collectors.toMap(
+                ExpenseParticipantCount::getExpenseId,
+                ExpenseParticipantCount::getParticipantCount));
+  }
+
+  private Specification<TravelExpense> expenseSpecification(
+      UUID travelId,
+      ExpenseCategory category,
+      LocalDateTime from,
+      LocalDateTime to,
+      UUID payerUserId) {
+    Specification<TravelExpense> specification =
+        (root, query, builder) -> builder.equal(root.get("travel").get("id"), travelId);
+    if (category != null) {
+      specification =
+          specification.and(
+              (root, query, builder) -> builder.equal(root.get("category"), category));
+    }
+    if (from != null) {
+      specification =
+          specification.and(
+              (root, query, builder) ->
+                  builder.greaterThanOrEqualTo(root.get("spentAt"), from));
+    }
+    if (to != null) {
+      specification =
+          specification.and(
+              (root, query, builder) -> builder.lessThanOrEqualTo(root.get("spentAt"), to));
+    }
+    if (payerUserId != null) {
+      specification =
+          specification.and(
+              (root, query, builder) ->
+                  builder.equal(root.get("payer").get("id"), payerUserId));
+    }
+    return specification;
   }
 }
