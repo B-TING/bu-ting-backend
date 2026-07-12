@@ -276,7 +276,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
 
     assertThatThrownBy(
             () -> travelTeamService.getInviteLink(AuthenticatedUser.from(member), travel.getId()))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(ForbiddenException.class)
         .hasMessage("Only travel leaders can get invite links.");
   }
 
@@ -323,7 +323,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     assertThatThrownBy(
             () ->
                 travelTeamService.deleteInviteLink(AuthenticatedUser.from(member), travel.getId()))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(ForbiddenException.class)
         .hasMessage("Only travel leaders can delete invite links.");
   }
 
@@ -337,7 +337,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     assertThatThrownBy(
             () ->
                 travelTeamService.createInviteLink(AuthenticatedUser.from(member), travel.getId()))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(ForbiddenException.class)
         .hasMessage("Only travel leaders can create invite links.");
   }
 
