@@ -51,6 +51,33 @@ public class TravelExpenseService {
   private final TravelMemberAuthorization travelMemberAuthorization;
 
   @Transactional
+  public void deleteExpense(
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID expenseId) {
+    if (authenticatedUser == null || authenticatedUser.id() == null) {
+      throw new UnauthenticatedException();
+    }
+    if (!travelRepository.existsById(travelId)) {
+      throw new ResourceNotFoundException("Travel not found.");
+    }
+    TravelMember requester =
+        travelMemberAuthorization.requireMember(travelId, authenticatedUser.id());
+    TravelExpense expense =
+        travelExpenseRepository
+            .findByIdAndTravel_Id(expenseId, travelId)
+            .orElseThrow(() -> new ResourceNotFoundException("Expense not found."));
+    validateExpenseManager(
+        requester,
+        expense,
+        authenticatedUser.id(),
+        "Only the expense creator or travel leader can delete this expense.");
+
+    travelExpenseShareRepository.deleteByExpense_Id(expenseId);
+    travelExpenseShareRepository.flush();
+    travelExpenseRepository.delete(expense);
+    travelExpenseRepository.flush();
+  }
+
+  @Transactional
   public TravelExpenseDetailResponse updateExpense(
       AuthenticatedUser authenticatedUser,
       UUID travelId,
@@ -68,7 +95,11 @@ public class TravelExpenseService {
         travelExpenseRepository
             .findByIdAndTravel_Id(expenseId, travelId)
             .orElseThrow(() -> new ResourceNotFoundException("Expense not found."));
-    validateExpenseEditor(requester, expense, authenticatedUser.id());
+    validateExpenseManager(
+        requester,
+        expense,
+        authenticatedUser.id(),
+        "Only the expense creator or travel leader can modify this expense.");
 
     validateDistinctParticipants(request.participantUserIds());
     Map<UUID, User> membersById = findMembersById(travelId);
@@ -244,13 +275,12 @@ public class TravelExpenseService {
     return member;
   }
 
-  private void validateExpenseEditor(
-      TravelMember requester, TravelExpense expense, UUID requesterId) {
+  private void validateExpenseManager(
+      TravelMember requester, TravelExpense expense, UUID requesterId, String message) {
     boolean creator = expense.getCreatedBy().getId().equals(requesterId);
     boolean leader = requester.getRole() == TravelTeamRole.LEADER;
     if (!creator && !leader) {
-      throw new ForbiddenException(
-          "Only the expense creator or travel leader can modify this expense.");
+      throw new ForbiddenException(message);
     }
   }
 

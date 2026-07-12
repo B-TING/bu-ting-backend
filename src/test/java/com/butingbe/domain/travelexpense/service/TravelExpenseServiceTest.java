@@ -396,6 +396,102 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
     assertThat(unchanged.amount()).isEqualTo(10_000L);
   }
 
+  @Test
+  void creatorDeletesExpenseAndItsShares() {
+    User creator = saveUser("delete-creator");
+    User member = saveUser("delete-participant");
+    Travel travel = saveTravel();
+    saveMember(travel, creator, TravelTeamRole.MEMBER);
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+    TravelExpenseCreateResponse created =
+        createExpense(
+            creator,
+            travel,
+            "Delete expense",
+            ExpenseCategory.ETC,
+            LocalDateTime.of(2026, 7, 12, 12, 0),
+            List.of(creator.getId(), member.getId()));
+
+    travelExpenseService.deleteExpense(
+        AuthenticatedUser.from(creator), travel.getId(), created.expenseId());
+
+    assertThat(travelExpenseRepository.existsById(created.expenseId())).isFalse();
+    assertThat(travelExpenseShareRepository.count()).isZero();
+  }
+
+  @Test
+  void leaderDeletesExpenseCreatedByMember() {
+    User leader = saveUser("delete-leader");
+    User creator = saveUser("delete-member-creator");
+    Travel travel = saveTravel();
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveMember(travel, creator, TravelTeamRole.MEMBER);
+    TravelExpenseCreateResponse created =
+        createExpense(
+            creator,
+            travel,
+            "Member delete expense",
+            ExpenseCategory.FOOD,
+            LocalDateTime.of(2026, 7, 12, 13, 0),
+            List.of(creator.getId()));
+
+    travelExpenseService.deleteExpense(
+        AuthenticatedUser.from(leader), travel.getId(), created.expenseId());
+
+    assertThat(travelExpenseRepository.existsById(created.expenseId())).isFalse();
+  }
+
+  @Test
+  void ordinaryMemberCannotDeleteAnotherMembersExpense() {
+    User creator = saveUser("delete-owner");
+    User other = saveUser("delete-other");
+    Travel travel = saveTravel();
+    saveMember(travel, creator, TravelTeamRole.MEMBER);
+    saveMember(travel, other, TravelTeamRole.MEMBER);
+    TravelExpenseCreateResponse created =
+        createExpense(
+            creator,
+            travel,
+            "Protected delete expense",
+            ExpenseCategory.FOOD,
+            LocalDateTime.of(2026, 7, 12, 14, 0),
+            List.of(creator.getId()));
+
+    assertThatThrownBy(
+            () ->
+                travelExpenseService.deleteExpense(
+                    AuthenticatedUser.from(other), travel.getId(), created.expenseId()))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("Only the expense creator or travel leader can delete this expense.");
+    assertThat(travelExpenseRepository.existsById(created.expenseId())).isTrue();
+    assertThat(travelExpenseShareRepository.count()).isEqualTo(1);
+  }
+
+  @Test
+  void doesNotDeleteExpenseThroughAnotherTravelId() {
+    User user = saveUser("delete-travel-scope");
+    Travel expenseTravel = saveTravel();
+    Travel otherTravel = saveTravel();
+    saveMember(expenseTravel, user, TravelTeamRole.LEADER);
+    saveMember(otherTravel, user, TravelTeamRole.LEADER);
+    TravelExpenseCreateResponse created =
+        createExpense(
+            user,
+            expenseTravel,
+            "Scoped delete expense",
+            ExpenseCategory.ETC,
+            LocalDateTime.of(2026, 7, 12, 15, 0),
+            List.of(user.getId()));
+
+    assertThatThrownBy(
+            () ->
+                travelExpenseService.deleteExpense(
+                    AuthenticatedUser.from(user), otherTravel.getId(), created.expenseId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Expense not found.");
+    assertThat(travelExpenseRepository.existsById(created.expenseId())).isTrue();
+  }
+
   private TravelExpenseCreateRequest request(
       long amount, User payer, List<java.util.UUID> participants) {
     return new TravelExpenseCreateRequest(
