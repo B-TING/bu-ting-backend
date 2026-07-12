@@ -19,6 +19,7 @@ import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.service.TravelService;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
@@ -142,6 +143,74 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     AuthenticatedUser.from(outsider), travel.id(), draft.travelRecordId()))
         .isInstanceOf(ForbiddenException.class)
         .hasMessage("User is not the travel record author.");
+  }
+
+  @Test
+  @DisplayName("author can update draft travel record content")
+  void updateDraftChangesDraftContent() {
+    User user = userRepository.save(createUser("record-update@example.com", "record-update"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto("Before", "Before content", "https://image.test/before"));
+
+    TravelRecordResDto result =
+        travelRecordService.updateDraft(
+            authenticatedUser,
+            travel.id(),
+            draft.travelRecordId(),
+            new TravelRecordUpdateReqDto("After", "After content", "https://image.test/after"));
+
+    assertThat(result.title()).isEqualTo("After");
+    assertThat(result.content()).isEqualTo("After content");
+    assertThat(result.coverImageUrl()).isEqualTo("https://image.test/after");
+    assertThat(result.status()).isEqualTo(TravelRecordStatus.DRAFT);
+  }
+
+  @Test
+  @DisplayName("draft update keeps existing values when fields are null")
+  void updateDraftKeepsExistingValuesForNullFields() {
+    User user = userRepository.save(createUser("record-patch@example.com", "record-patch"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto("Before", "Before content", "https://image.test/before"));
+
+    TravelRecordResDto result =
+        travelRecordService.updateDraft(
+            authenticatedUser,
+            travel.id(),
+            draft.travelRecordId(),
+            new TravelRecordUpdateReqDto(null, "Only content changed", null));
+
+    assertThat(result.title()).isEqualTo("Before");
+    assertThat(result.content()).isEqualTo("Only content changed");
+    assertThat(result.coverImageUrl()).isEqualTo("https://image.test/before");
+  }
+
+  @Test
+  @DisplayName("draft update rejects blank title")
+  void updateDraftRejectsBlankTitle() {
+    User user = userRepository.save(createUser("record-blank@example.com", "record-blank"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    TravelRecordResDto draft = travelRecordService.createDraft(authenticatedUser, travel.id(), null);
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateDraft(
+                    authenticatedUser,
+                    travel.id(),
+                    draft.travelRecordId(),
+                    new TravelRecordUpdateReqDto(" ", null, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record title cannot be blank.");
   }
 
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {

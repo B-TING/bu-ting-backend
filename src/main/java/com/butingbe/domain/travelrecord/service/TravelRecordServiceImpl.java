@@ -11,6 +11,7 @@ import com.butingbe.domain.travel.repository.PlanRepository;
 import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto.TravelRecordDayResDto;
 import com.butingbe.domain.travelrecord.entity.TravelRecord;
@@ -93,6 +94,29 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     validateDraftBelongsToTravel(travelRecord, travelId);
     validateAuthor(travelRecord, author.getId());
     validateDraft(travelRecord);
+
+    return toResponse(travelRecord);
+  }
+
+  @Override
+  @Transactional
+  public TravelRecordResDto updateDraft(
+      AuthenticatedUser authenticatedUser,
+      UUID travelId,
+      UUID travelRecordId,
+      TravelRecordUpdateReqDto request) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validateDraftBelongsToTravel(travelRecord, travelId);
+    validateAuthor(travelRecord, author.getId());
+    validateDraft(travelRecord);
+    validateUpdateRequest(request);
+
+    if (request == null) {
+      return toResponse(travelRecord);
+    }
+
+    travelRecord.updateContent(request.title(), request.content(), request.coverImageUrl());
 
     return toResponse(travelRecord);
   }
@@ -231,7 +255,17 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   private void validateDraft(TravelRecord travelRecord) {
     if (travelRecord.getStatus() != TravelRecordStatus.DRAFT) {
-      throw new IllegalArgumentException("Only draft travel records can be viewed here.");
+      throw new IllegalArgumentException("Only draft travel records can be accessed here.");
+    }
+  }
+
+  private void validateUpdateRequest(TravelRecordUpdateReqDto request) {
+    if (request == null) {
+      return;
+    }
+
+    if (request.title() != null && request.title().isBlank()) {
+      throw new IllegalArgumentException("Travel record title cannot be blank.");
     }
   }
 
