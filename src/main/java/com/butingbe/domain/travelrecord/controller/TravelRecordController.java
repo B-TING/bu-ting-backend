@@ -84,4 +84,18 @@ public class TravelRecordController {
             travelRecordService.createPlaceReview(
                 user, travelId, travelRecordId, travelRecordPlaceId, request));
   }
+
+  @GetMapping("/{travelRecordId}/places/{travelRecordPlaceId}/review")
+  public ResponseEntity<PlaceReviewResDto> getPlaceReview(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelId,
+      @PathVariable UUID travelRecordId,
+      @PathVariable UUID travelRecordPlaceId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(
+        travelRecordService.getPlaceReview(user, travelId, travelRecordId, travelRecordPlaceId));
+  }
 }

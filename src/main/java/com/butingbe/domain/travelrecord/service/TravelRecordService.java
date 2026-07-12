@@ -28,4 +28,10 @@ public interface TravelRecordService {
       UUID travelRecordId,
       UUID travelRecordPlaceId,
       PlaceReviewCreateReqDto request);
+
+  PlaceReviewResDto getPlaceReview(
+      AuthenticatedUser authenticatedUser,
+      UUID travelId,
+      UUID travelRecordId,
+      UUID travelRecordPlaceId);
 }

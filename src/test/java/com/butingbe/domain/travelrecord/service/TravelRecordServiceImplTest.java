@@ -34,6 +34,7 @@ import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -284,6 +285,53 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     new PlaceReviewCreateReqDto(6, "Too high")))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Place review rating must be between 1 and 5.");
+  }
+
+  @Test
+  @DisplayName("author can get place review for a draft travel record place")
+  void getPlaceReviewSuccess() {
+    User user = userRepository.save(createUser("review-get@example.com", "review-get"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+    PlaceReviewResDto created =
+        travelRecordService.createPlaceReview(
+            authenticatedUser,
+            draft.originalTravelId(),
+            draft.travelRecordId(),
+            place.travelRecordPlaceId(),
+            new PlaceReviewCreateReqDto(5, "Worth visiting"));
+
+    PlaceReviewResDto result =
+        travelRecordService.getPlaceReview(
+            authenticatedUser,
+            draft.originalTravelId(),
+            draft.travelRecordId(),
+            place.travelRecordPlaceId());
+
+    assertThat(result.placeReviewId()).isEqualTo(created.placeReviewId());
+    assertThat(result.travelRecordPlaceId()).isEqualTo(place.travelRecordPlaceId());
+    assertThat(result.rating()).isEqualTo(5);
+    assertThat(result.content()).isEqualTo("Worth visiting");
+  }
+
+  @Test
+  @DisplayName("place review get returns not found when review does not exist")
+  void getPlaceReviewNotFound() {
+    User user = userRepository.save(createUser("review-missing@example.com", "review-missing"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.getPlaceReview(
+                    authenticatedUser,
+                    draft.originalTravelId(),
+                    draft.travelRecordId(),
+                    place.travelRecordPlaceId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Place review not found.");
   }
 
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {
