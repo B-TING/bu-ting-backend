@@ -29,6 +29,7 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.DuplicateResourceException;
+import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -101,6 +102,46 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThatThrownBy(() -> travelRecordService.createDraft(authenticatedUser, travel.id(), null))
         .isInstanceOf(DuplicateResourceException.class)
         .hasMessage("Travel record already exists.");
+  }
+
+  @Test
+  @DisplayName("author can get draft travel record snapshot")
+  void getDraftReturnsDraftSnapshot() {
+    User user = userRepository.save(createUser("record-get@example.com", "record-get"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station");
+    TravelRecordResDto draft = travelRecordService.createDraft(authenticatedUser, travel.id(), null);
+
+    TravelRecordResDto result =
+        travelRecordService.getDraft(authenticatedUser, travel.id(), draft.travelRecordId());
+
+    assertThat(result.travelRecordId()).isEqualTo(draft.travelRecordId());
+    assertThat(result.status()).isEqualTo(TravelRecordStatus.DRAFT);
+    assertThat(result.days()).hasSize(1);
+    assertThat(result.days().getFirst().places().getFirst().placeName())
+        .isEqualTo("Busan Station");
+  }
+
+  @Test
+  @DisplayName("non-author cannot get draft travel record")
+  void getDraftRejectsNonAuthor() {
+    User owner = userRepository.save(createUser("record-owner-get@example.com", "record-owner-get"));
+    User outsider =
+        userRepository.save(createUser("record-outsider-get@example.com", "record-outsider-get"));
+    AuthenticatedUser ownerUser = AuthenticatedUser.from(owner);
+    TravelResDto travel = createCompletedTravel(ownerUser);
+    TravelRecordResDto draft = travelRecordService.createDraft(ownerUser, travel.id(), null);
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.getDraft(
+                    AuthenticatedUser.from(outsider), travel.id(), draft.travelRecordId()))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not the travel record author.");
   }
 
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {

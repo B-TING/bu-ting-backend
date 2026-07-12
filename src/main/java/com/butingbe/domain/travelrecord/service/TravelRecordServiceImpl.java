@@ -85,6 +85,18 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     return toResponse(travelRecord);
   }
 
+  @Override
+  public TravelRecordResDto getDraft(
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID travelRecordId) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validateDraftBelongsToTravel(travelRecord, travelId);
+    validateAuthor(travelRecord, author.getId());
+    validateDraft(travelRecord);
+
+    return toResponse(travelRecord);
+  }
+
   private void copyItinerarySnapshot(UUID travelId, TravelRecord travelRecord) {
     List<Plan> plans = planRepository.findByTravel_IdOrderByDayNumberAsc(travelId);
 
@@ -192,9 +204,34 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
   }
 
+  private TravelRecord findTravelRecord(UUID travelRecordId) {
+    return travelRecordRepository
+        .findById(travelRecordId)
+        .orElseThrow(() -> new ResourceNotFoundException("Travel record not found."));
+  }
+
   private void validateTravelMember(UUID travelId, UUID userId) {
     if (!travelMemberRepository.existsByTravel_IdAndUser_Id(travelId, userId)) {
       throw new ForbiddenException("User is not a travel member.");
+    }
+  }
+
+  private void validateDraftBelongsToTravel(TravelRecord travelRecord, UUID travelId) {
+    if (travelRecord.getOriginalTravel() == null
+        || !travelRecord.getOriginalTravel().getId().equals(travelId)) {
+      throw new ResourceNotFoundException("Travel record not found.");
+    }
+  }
+
+  private void validateAuthor(TravelRecord travelRecord, UUID userId) {
+    if (!travelRecord.getAuthor().getId().equals(userId)) {
+      throw new ForbiddenException("User is not the travel record author.");
+    }
+  }
+
+  private void validateDraft(TravelRecord travelRecord) {
+    if (travelRecord.getStatus() != TravelRecordStatus.DRAFT) {
+      throw new IllegalArgumentException("Only draft travel records can be viewed here.");
     }
   }
 

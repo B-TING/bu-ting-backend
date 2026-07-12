@@ -9,4 +9,7 @@ public interface TravelRecordService {
 
   TravelRecordResDto createDraft(
       AuthenticatedUser authenticatedUser, UUID travelId, TravelRecordCreateReqDto request);
+
+  TravelRecordResDto getDraft(
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID travelRecordId);
 }
