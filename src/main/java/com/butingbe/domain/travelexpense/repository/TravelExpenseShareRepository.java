@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelexpense.repository;
 
 import com.butingbe.domain.travelexpense.entity.TravelExpenseShare;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -25,10 +26,39 @@ public interface TravelExpenseShareRepository extends JpaRepository<TravelExpens
   List<ExpenseParticipantCount> countParticipantsByExpenseIds(
       @Param("expenseIds") List<UUID> expenseIds);
 
+  @Query(
+      """
+      select s.expense.currency as currency,
+             s.user.id as userId,
+             s.user.nickname as nickname,
+             sum(s.shareAmount) as amount
+      from TravelExpenseShare s
+      where s.expense.travel.id = :travelId
+        and s.expense.spentAt >= coalesce(:from, s.expense.spentAt)
+        and s.expense.spentAt <= coalesce(:to, s.expense.spentAt)
+      group by s.expense.currency, s.user.id, s.user.nickname
+      order by s.expense.currency, s.user.nickname
+      """)
+  List<MemberShareAmount> summarizeShareAmounts(
+      @Param("travelId") UUID travelId,
+      @Param("from") LocalDateTime from,
+      @Param("to") LocalDateTime to);
+
   interface ExpenseParticipantCount {
 
     UUID getExpenseId();
 
     long getParticipantCount();
+  }
+
+  interface MemberShareAmount {
+
+    String getCurrency();
+
+    UUID getUserId();
+
+    String getNickname();
+
+    long getAmount();
   }
 }

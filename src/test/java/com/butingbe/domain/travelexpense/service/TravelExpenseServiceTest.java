@@ -12,6 +12,7 @@ import com.butingbe.domain.travelexpense.dto.request.TravelExpenseUpdateRequest;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseCreateResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseDetailResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseListResponse;
+import com.butingbe.domain.travelexpense.dto.response.TravelExpenseSummaryResponse;
 import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
 import com.butingbe.domain.travelexpense.entity.ExpenseSplitType;
 import com.butingbe.domain.travelexpense.repository.TravelExpenseRepository;
@@ -492,6 +493,136 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
     assertThat(travelExpenseRepository.existsById(created.expenseId())).isTrue();
   }
 
+  @Test
+  void summarizesExpensesByCurrencyCategoryAndMember() {
+    User first = saveUser("summary-first");
+    User second = saveUser("summary-second");
+    User third = saveUser("summary-third");
+    Travel travel = saveTravel();
+    saveMember(travel, first, TravelTeamRole.LEADER);
+    saveMember(travel, second, TravelTeamRole.MEMBER);
+    saveMember(travel, third, TravelTeamRole.MEMBER);
+    createExpense(
+        first,
+        travel,
+        "Food",
+        10_000L,
+        "KRW",
+        ExpenseCategory.FOOD,
+        LocalDateTime.of(2026, 7, 12, 12, 0),
+        List.of(first.getId(), second.getId()));
+    createExpense(
+        second,
+        travel,
+        "Taxi",
+        6_000L,
+        "KRW",
+        ExpenseCategory.TRANSPORT,
+        LocalDateTime.of(2026, 7, 12, 14, 0),
+        List.of(first.getId(), second.getId(), third.getId()));
+    createExpense(
+        third,
+        travel,
+        "Tickets",
+        9L,
+        "USD",
+        ExpenseCategory.ACTIVITY,
+        LocalDateTime.of(2026, 7, 12, 16, 0),
+        List.of(first.getId(), third.getId()));
+
+    TravelExpenseSummaryResponse response =
+        travelExpenseService.getExpenseSummary(
+            AuthenticatedUser.from(second), travel.getId(), null, null);
+
+    assertThat(response.expenseCount()).isEqualTo(3);
+    assertThat(response.currencySummaries())
+        .extracting(summary -> summary.currency())
+        .containsExactly("KRW", "USD");
+    TravelExpenseSummaryResponse.CurrencySummary krw = response.currencySummaries().get(0);
+    assertThat(krw.totalAmount()).isEqualTo(16_000L);
+    assertThat(krw.categorySummaries())
+        .extracting(summary -> summary.ratio().toPlainString())
+        .containsExactly("62.50", "37.50");
+    assertThat(krw.memberSummaries().stream().mapToLong(member -> member.balance()).sum()).isZero();
+    assertThat(krw.memberSummaries())
+        .filteredOn(member -> member.userId().equals(first.getId()))
+        .singleElement()
+        .satisfies(
+            member -> {
+              assertThat(member.paidAmount()).isEqualTo(10_000L);
+              assertThat(member.shareAmount()).isEqualTo(7_000L);
+              assertThat(member.balance()).isEqualTo(3_000L);
+            });
+  }
+
+  @Test
+  void appliesPeriodToAllExpenseSummaryAggregates() {
+    User user = saveUser("summary-period");
+    Travel travel = saveTravel();
+    saveMember(travel, user, TravelTeamRole.LEADER);
+    createExpense(
+        user,
+        travel,
+        "Before period",
+        ExpenseCategory.FOOD,
+        LocalDateTime.of(2026, 7, 12, 8, 0),
+        List.of(user.getId()));
+    createExpense(
+        user,
+        travel,
+        "Inside period",
+        ExpenseCategory.TRANSPORT,
+        LocalDateTime.of(2026, 7, 13, 8, 0),
+        List.of(user.getId()));
+
+    TravelExpenseSummaryResponse response =
+        travelExpenseService.getExpenseSummary(
+            AuthenticatedUser.from(user),
+            travel.getId(),
+            LocalDateTime.of(2026, 7, 13, 0, 0),
+            LocalDateTime.of(2026, 7, 13, 23, 59));
+
+    assertThat(response.expenseCount()).isEqualTo(1);
+    assertThat(response.currencySummaries()).singleElement()
+        .satisfies(
+            summary -> {
+              assertThat(summary.totalAmount()).isEqualTo(10_000L);
+              assertThat(summary.categorySummaries()).singleElement()
+                  .satisfies(
+                      category ->
+                          assertThat(category.category()).isEqualTo(ExpenseCategory.TRANSPORT));
+            });
+  }
+
+  @Test
+  void returnsEmptySummaryWhenTravelHasNoExpenses() {
+    User user = saveUser("summary-empty");
+    Travel travel = saveTravel();
+    saveMember(travel, user, TravelTeamRole.LEADER);
+
+    TravelExpenseSummaryResponse response =
+        travelExpenseService.getExpenseSummary(
+            AuthenticatedUser.from(user), travel.getId(), null, null);
+
+    assertThat(response.expenseCount()).isZero();
+    assertThat(response.currencySummaries()).isEmpty();
+  }
+
+  @Test
+  void rejectsExpenseSummaryRequestFromNonMember() {
+    User member = saveUser("summary-member");
+    User outsider = saveUser("summary-outsider");
+    Travel travel = saveTravel();
+    saveMember(travel, member, TravelTeamRole.LEADER);
+
+    assertThatThrownBy(
+            () ->
+                travelExpenseService.getExpenseSummary(
+                    AuthenticatedUser.from(outsider), travel.getId(), null, null))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not a travel member.");
+  }
+
   private TravelExpenseCreateRequest request(
       long amount, User payer, List<java.util.UUID> participants) {
     return new TravelExpenseCreateRequest(
@@ -525,13 +656,26 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
       ExpenseCategory category,
       LocalDateTime spentAt,
       List<java.util.UUID> participants) {
+    return createExpense(
+        payer, travel, title, 10_000L, "KRW", category, spentAt, participants);
+  }
+
+  private TravelExpenseCreateResponse createExpense(
+      User payer,
+      Travel travel,
+      String title,
+      long amount,
+      String currency,
+      ExpenseCategory category,
+      LocalDateTime spentAt,
+      List<java.util.UUID> participants) {
     return travelExpenseService.createEqualExpense(
         AuthenticatedUser.from(payer),
         travel.getId(),
         new TravelExpenseCreateRequest(
             title,
-            10_000L,
-            "KRW",
+            amount,
+            currency,
             category,
             payer.getId(),
             participants,

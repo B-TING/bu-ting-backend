@@ -6,6 +6,7 @@ import com.butingbe.domain.travelexpense.dto.request.TravelExpenseUpdateRequest;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseCreateResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseDetailResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseListResponse;
+import com.butingbe.domain.travelexpense.dto.response.TravelExpenseSummaryResponse;
 import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
 import com.butingbe.domain.travelexpense.service.TravelExpenseService;
 import com.butingbe.global.error.exception.UnauthenticatedException;
@@ -36,6 +37,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class TravelExpenseController {
 
   private final TravelExpenseService travelExpenseService;
+
+  @GetMapping("/summary")
+  public ResponseEntity<TravelExpenseSummaryResponse> getExpenseSummary(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelId,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          LocalDateTime from,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          LocalDateTime to) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(
+        travelExpenseService.getExpenseSummary(user, travelId, from, to));
+  }
 
   @DeleteMapping("/{expenseId}")
   public ResponseEntity<Void> deleteExpense(
