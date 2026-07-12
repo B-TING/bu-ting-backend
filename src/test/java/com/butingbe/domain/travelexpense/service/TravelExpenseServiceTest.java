@@ -9,6 +9,7 @@ import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelexpense.dto.request.TravelExpenseCreateRequest;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseCreateResponse;
+import com.butingbe.domain.travelexpense.dto.response.TravelExpenseDetailResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseListResponse;
 import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
 import com.butingbe.domain.travelexpense.entity.ExpenseSplitType;
@@ -23,6 +24,7 @@ import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.support.AbstractContainerTest;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -212,6 +214,83 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
         .hasMessage("User is not a travel member.");
   }
 
+  @Test
+  void getsExpenseDetailWithUsersAndShares() {
+    User creator = saveUser("detail-creator");
+    User member = saveUser("detail-member");
+    Travel travel = saveTravel();
+    saveMember(travel, creator, TravelTeamRole.LEADER);
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+    TravelExpenseCreateResponse created =
+        createExpense(
+            creator,
+            travel,
+            "Hotel",
+            ExpenseCategory.ACCOMMODATION,
+            LocalDateTime.of(2026, 7, 12, 15, 0),
+            List.of(creator.getId(), member.getId()));
+
+    TravelExpenseDetailResponse response =
+        travelExpenseService.getExpense(
+            AuthenticatedUser.from(member), travel.getId(), created.expenseId());
+
+    assertThat(response.title()).isEqualTo("Hotel");
+    assertThat(response.payer().userId()).isEqualTo(creator.getId());
+    assertThat(response.createdBy().userId()).isEqualTo(creator.getId());
+    assertThat(response.shares()).hasSize(2);
+    assertThat(response.shares())
+        .extracting(TravelExpenseDetailResponse.ShareDetail::nickname)
+        .containsExactlyInAnyOrder(creator.getNickname(), member.getNickname());
+    assertThat(response.editable()).isFalse();
+  }
+
+  @Test
+  void allowsLeaderToEditExpenseCreatedByAnotherMember() {
+    User leader = saveUser("detail-leader");
+    User member = saveUser("detail-writer");
+    Travel travel = saveTravel();
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveMember(travel, member, TravelTeamRole.MEMBER);
+    TravelExpenseCreateResponse created =
+        createExpense(
+            member,
+            travel,
+            "Tickets",
+            ExpenseCategory.ACTIVITY,
+            LocalDateTime.of(2026, 7, 13, 10, 0),
+            List.of(leader.getId(), member.getId()));
+
+    TravelExpenseDetailResponse response =
+        travelExpenseService.getExpense(
+            AuthenticatedUser.from(leader), travel.getId(), created.expenseId());
+
+    assertThat(response.editable()).isTrue();
+  }
+
+  @Test
+  void doesNotExposeExpenseThroughAnotherTravelId() {
+    User user = saveUser("detail-travel-scope");
+    Travel expenseTravel = saveTravel();
+    Travel otherTravel = saveTravel();
+    saveMember(expenseTravel, user, TravelTeamRole.LEADER);
+    saveMember(otherTravel, user, TravelTeamRole.LEADER);
+    TravelExpenseCreateResponse created =
+        createExpense(
+            user,
+            expenseTravel,
+            "Scoped expense",
+            ExpenseCategory.ETC,
+            LocalDateTime.of(2026, 7, 12, 16, 0),
+            List.of(user.getId()));
+
+    assertThatThrownBy(
+            () ->
+                travelExpenseService.getExpense(
+                    AuthenticatedUser.from(user), otherTravel.getId(), created.expenseId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Expense not found.");
+  }
+
   private TravelExpenseCreateRequest request(
       long amount, User payer, List<java.util.UUID> participants) {
     return new TravelExpenseCreateRequest(
@@ -225,14 +304,14 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
         "Team dinner");
   }
 
-  private void createExpense(
+  private TravelExpenseCreateResponse createExpense(
       User payer,
       Travel travel,
       String title,
       ExpenseCategory category,
       LocalDateTime spentAt,
       List<java.util.UUID> participants) {
-    travelExpenseService.createEqualExpense(
+    return travelExpenseService.createEqualExpense(
         AuthenticatedUser.from(payer),
         travel.getId(),
         new TravelExpenseCreateRequest(

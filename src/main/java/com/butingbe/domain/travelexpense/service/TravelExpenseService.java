@@ -5,6 +5,7 @@ import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelexpense.dto.request.TravelExpenseCreateRequest;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseCreateResponse;
+import com.butingbe.domain.travelexpense.dto.response.TravelExpenseDetailResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseListResponse;
 import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
 import com.butingbe.domain.travelexpense.entity.ExpenseSplitType;
@@ -14,6 +15,7 @@ import com.butingbe.domain.travelexpense.repository.TravelExpenseRepository;
 import com.butingbe.domain.travelexpense.repository.TravelExpenseShareRepository;
 import com.butingbe.domain.travelexpense.repository.TravelExpenseShareRepository.ExpenseParticipantCount;
 import com.butingbe.domain.travelteam.entity.TravelMember;
+import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
 import com.butingbe.domain.user.entity.User;
@@ -45,6 +47,29 @@ public class TravelExpenseService {
   private final TravelExpenseRepository travelExpenseRepository;
   private final TravelExpenseShareRepository travelExpenseShareRepository;
   private final TravelMemberAuthorization travelMemberAuthorization;
+
+  public TravelExpenseDetailResponse getExpense(
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID expenseId) {
+    if (authenticatedUser == null || authenticatedUser.id() == null) {
+      throw new UnauthenticatedException();
+    }
+    if (!travelRepository.existsById(travelId)) {
+      throw new ResourceNotFoundException("Travel not found.");
+    }
+    TravelMember requester =
+        travelMemberAuthorization.requireMember(travelId, authenticatedUser.id());
+    TravelExpense expense =
+        travelExpenseRepository
+            .findByIdAndTravel_Id(expenseId, travelId)
+            .orElseThrow(() -> new ResourceNotFoundException("Expense not found."));
+    List<TravelExpenseShare> shares =
+        travelExpenseShareRepository.findByExpense_IdOrderByIdAsc(expenseId);
+    boolean editable =
+        expense.getCreatedBy().getId().equals(authenticatedUser.id())
+            || requester.getRole() == TravelTeamRole.LEADER;
+
+    return TravelExpenseDetailResponse.of(expense, shares, editable);
+  }
 
   public TravelExpenseListResponse getExpenses(
       AuthenticatedUser authenticatedUser,

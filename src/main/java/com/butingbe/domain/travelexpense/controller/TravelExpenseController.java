@@ -3,6 +3,7 @@ package com.butingbe.domain.travelexpense.controller;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelexpense.dto.request.TravelExpenseCreateRequest;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseCreateResponse;
+import com.butingbe.domain.travelexpense.dto.response.TravelExpenseDetailResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseListResponse;
 import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
 import com.butingbe.domain.travelexpense.service.TravelExpenseService;
@@ -32,6 +33,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class TravelExpenseController {
 
   private final TravelExpenseService travelExpenseService;
+
+  @GetMapping("/{expenseId}")
+  public ResponseEntity<TravelExpenseDetailResponse> getExpense(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelId,
+      @PathVariable UUID expenseId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(travelExpenseService.getExpense(user, travelId, expenseId));
+  }
 
   @GetMapping
   public ResponseEntity<TravelExpenseListResponse> getExpenses(

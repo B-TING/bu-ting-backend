@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelexpense.repository;
 
 import com.butingbe.domain.travelexpense.entity.TravelExpense;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,4 +16,7 @@ public interface TravelExpenseRepository
   @Override
   @EntityGraph(attributePaths = "payer")
   Page<TravelExpense> findAll(Specification<TravelExpense> specification, Pageable pageable);
+
+  @EntityGraph(attributePaths = {"payer", "createdBy"})
+  Optional<TravelExpense> findByIdAndTravel_Id(UUID expenseId, UUID travelId);
 }

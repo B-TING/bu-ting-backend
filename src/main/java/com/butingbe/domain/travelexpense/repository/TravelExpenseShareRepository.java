@@ -3,12 +3,14 @@ package com.butingbe.domain.travelexpense.repository;
 import com.butingbe.domain.travelexpense.entity.TravelExpenseShare;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TravelExpenseShareRepository extends JpaRepository<TravelExpenseShare, UUID> {
 
+  @EntityGraph(attributePaths = "user")
   List<TravelExpenseShare> findByExpense_IdOrderByIdAsc(UUID expenseId);
 
   @Query(
