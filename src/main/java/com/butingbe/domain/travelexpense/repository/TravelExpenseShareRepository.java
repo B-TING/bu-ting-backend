@@ -13,6 +13,8 @@ public interface TravelExpenseShareRepository extends JpaRepository<TravelExpens
   @EntityGraph(attributePaths = "user")
   List<TravelExpenseShare> findByExpense_IdOrderByIdAsc(UUID expenseId);
 
+  void deleteByExpense_Id(UUID expenseId);
+
   @Query(
       """
       select s.expense.id as expenseId, count(s) as participantCount

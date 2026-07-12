@@ -101,6 +101,23 @@ public class TravelExpense {
     this.splitType = Objects.requireNonNull(splitType, "Split type is required.");
   }
 
+  public void update(
+      String title,
+      Long amount,
+      String currency,
+      ExpenseCategory category,
+      User payer,
+      LocalDateTime spentAt,
+      String memo) {
+    this.title = requireTitle(title);
+    this.amount = requirePositiveAmount(amount);
+    this.currency = normalizeCurrency(currency);
+    this.category = Objects.requireNonNull(category, "Expense category is required.");
+    this.payer = Objects.requireNonNull(payer, "Payer is required.");
+    this.spentAt = Objects.requireNonNull(spentAt, "Spent time is required.");
+    this.memo = memo;
+  }
+
   private static String requireTitle(String title) {
     if (title == null || title.isBlank()) {
       throw new IllegalArgumentException("Expense title is required.");

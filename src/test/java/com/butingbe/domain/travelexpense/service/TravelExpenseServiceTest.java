@@ -8,6 +8,7 @@ import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelexpense.dto.request.TravelExpenseCreateRequest;
+import com.butingbe.domain.travelexpense.dto.request.TravelExpenseUpdateRequest;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseCreateResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseDetailResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseListResponse;
@@ -291,6 +292,110 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
         .hasMessage("Expense not found.");
   }
 
+  @Test
+  void creatorUpdatesExpenseAndReplacesEqualShares() {
+    User creator = saveUser("update-creator");
+    User second = saveUser("update-second");
+    User third = saveUser("update-third");
+    Travel travel = saveTravel();
+    saveMember(travel, creator, TravelTeamRole.MEMBER);
+    saveMember(travel, second, TravelTeamRole.MEMBER);
+    saveMember(travel, third, TravelTeamRole.MEMBER);
+    TravelExpenseCreateResponse created =
+        createExpense(
+            creator,
+            travel,
+            "Old expense",
+            ExpenseCategory.ETC,
+            LocalDateTime.of(2026, 7, 12, 10, 0),
+            List.of(creator.getId(), second.getId()));
+
+    TravelExpenseDetailResponse updated =
+        travelExpenseService.updateExpense(
+            AuthenticatedUser.from(creator),
+            travel.getId(),
+            created.expenseId(),
+            updateRequest(
+                "Updated dinner",
+                10_000L,
+                second,
+                List.of(second.getId(), creator.getId(), third.getId())));
+
+    assertThat(updated.title()).isEqualTo("Updated dinner");
+    assertThat(updated.payer().userId()).isEqualTo(second.getId());
+    assertThat(updated.shares())
+        .extracting(TravelExpenseDetailResponse.ShareDetail::shareAmount)
+        .containsExactly(3_334L, 3_333L, 3_333L);
+    assertThat(updated.shares().stream().mapToLong(share -> share.shareAmount()).sum())
+        .isEqualTo(10_000L);
+    assertThat(travelExpenseShareRepository.count()).isEqualTo(3);
+  }
+
+  @Test
+  void leaderUpdatesExpenseCreatedByMember() {
+    User leader = saveUser("update-leader");
+    User creator = saveUser("update-member-creator");
+    Travel travel = saveTravel();
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveMember(travel, creator, TravelTeamRole.MEMBER);
+    TravelExpenseCreateResponse created =
+        createExpense(
+            creator,
+            travel,
+            "Member expense",
+            ExpenseCategory.FOOD,
+            LocalDateTime.of(2026, 7, 12, 12, 0),
+            List.of(leader.getId(), creator.getId()));
+
+    TravelExpenseDetailResponse updated =
+        travelExpenseService.updateExpense(
+            AuthenticatedUser.from(leader),
+            travel.getId(),
+            created.expenseId(),
+            updateRequest("Leader corrected", 8_000L, leader, List.of(leader.getId())));
+
+    assertThat(updated.title()).isEqualTo("Leader corrected");
+    assertThat(updated.createdBy().userId()).isEqualTo(creator.getId());
+    assertThat(updated.shares())
+        .extracting(TravelExpenseDetailResponse.ShareDetail::shareAmount)
+        .containsExactly(8_000L);
+  }
+
+  @Test
+  void ordinaryMemberCannotUpdateAnotherMembersExpense() {
+    User leader = saveUser("update-owner-leader");
+    User creator = saveUser("update-owner");
+    User other = saveUser("update-other");
+    Travel travel = saveTravel();
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveMember(travel, creator, TravelTeamRole.MEMBER);
+    saveMember(travel, other, TravelTeamRole.MEMBER);
+    TravelExpenseCreateResponse created =
+        createExpense(
+            creator,
+            travel,
+            "Protected expense",
+            ExpenseCategory.FOOD,
+            LocalDateTime.of(2026, 7, 12, 12, 0),
+            List.of(creator.getId()));
+
+    assertThatThrownBy(
+            () ->
+                travelExpenseService.updateExpense(
+                    AuthenticatedUser.from(other),
+                    travel.getId(),
+                    created.expenseId(),
+                    updateRequest("Unauthorized", 1_000L, other, List.of(other.getId()))))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("Only the expense creator or travel leader can modify this expense.");
+
+    TravelExpenseDetailResponse unchanged =
+        travelExpenseService.getExpense(
+            AuthenticatedUser.from(creator), travel.getId(), created.expenseId());
+    assertThat(unchanged.title()).isEqualTo("Protected expense");
+    assertThat(unchanged.amount()).isEqualTo(10_000L);
+  }
+
   private TravelExpenseCreateRequest request(
       long amount, User payer, List<java.util.UUID> participants) {
     return new TravelExpenseCreateRequest(
@@ -302,6 +407,19 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
         participants,
         LocalDateTime.of(2026, 7, 12, 18, 30),
         "Team dinner");
+  }
+
+  private TravelExpenseUpdateRequest updateRequest(
+      String title, long amount, User payer, List<java.util.UUID> participants) {
+    return new TravelExpenseUpdateRequest(
+        title,
+        amount,
+        "KRW",
+        ExpenseCategory.FOOD,
+        payer.getId(),
+        participants,
+        LocalDateTime.of(2026, 7, 13, 18, 0),
+        "Updated memo");
   }
 
   private TravelExpenseCreateResponse createExpense(

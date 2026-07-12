@@ -4,6 +4,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelexpense.dto.request.TravelExpenseCreateRequest;
+import com.butingbe.domain.travelexpense.dto.request.TravelExpenseUpdateRequest;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseCreateResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseDetailResponse;
 import com.butingbe.domain.travelexpense.dto.response.TravelExpenseListResponse;
@@ -19,6 +20,7 @@ import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
 import com.butingbe.domain.user.entity.User;
+import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.LocalDateTime;
@@ -47,6 +49,62 @@ public class TravelExpenseService {
   private final TravelExpenseRepository travelExpenseRepository;
   private final TravelExpenseShareRepository travelExpenseShareRepository;
   private final TravelMemberAuthorization travelMemberAuthorization;
+
+  @Transactional
+  public TravelExpenseDetailResponse updateExpense(
+      AuthenticatedUser authenticatedUser,
+      UUID travelId,
+      UUID expenseId,
+      TravelExpenseUpdateRequest request) {
+    if (authenticatedUser == null || authenticatedUser.id() == null) {
+      throw new UnauthenticatedException();
+    }
+    if (!travelRepository.existsById(travelId)) {
+      throw new ResourceNotFoundException("Travel not found.");
+    }
+    TravelMember requester =
+        travelMemberAuthorization.requireMember(travelId, authenticatedUser.id());
+    TravelExpense expense =
+        travelExpenseRepository
+            .findByIdAndTravel_Id(expenseId, travelId)
+            .orElseThrow(() -> new ResourceNotFoundException("Expense not found."));
+    validateExpenseEditor(requester, expense, authenticatedUser.id());
+
+    validateDistinctParticipants(request.participantUserIds());
+    Map<UUID, User> membersById = findMembersById(travelId);
+    User payer = requireTravelMember(membersById, request.payerUserId(), "Payer");
+    List<User> participants =
+        request.participantUserIds().stream()
+            .map(userId -> requireTravelMember(membersById, userId, "Participant"))
+            .toList();
+    List<Long> amounts = calculateEqualShares(request.amount(), participants.size());
+
+    expense.update(
+        request.title(),
+        request.amount(),
+        request.currency(),
+        request.category(),
+        payer,
+        request.spentAt(),
+        request.memo());
+    travelExpenseShareRepository.deleteByExpense_Id(expenseId);
+    travelExpenseShareRepository.flush();
+
+    List<TravelExpenseShare> shares =
+        IntStream.range(0, participants.size())
+            .mapToObj(
+                index ->
+                    TravelExpenseShare.builder()
+                        .expense(expense)
+                        .user(participants.get(index))
+                        .shareAmount(amounts.get(index))
+                        .build())
+            .toList();
+    travelExpenseShareRepository.saveAll(shares);
+    travelExpenseRepository.flush();
+
+    return TravelExpenseDetailResponse.of(expense, shares, true);
+  }
 
   public TravelExpenseDetailResponse getExpense(
       AuthenticatedUser authenticatedUser, UUID travelId, UUID expenseId) {
@@ -184,6 +242,16 @@ public class TravelExpenseService {
       throw new IllegalArgumentException(subject + " is not a travel member.");
     }
     return member;
+  }
+
+  private void validateExpenseEditor(
+      TravelMember requester, TravelExpense expense, UUID requesterId) {
+    boolean creator = expense.getCreatedBy().getId().equals(requesterId);
+    boolean leader = requester.getRole() == TravelTeamRole.LEADER;
+    if (!creator && !leader) {
+      throw new ForbiddenException(
+          "Only the expense creator or travel leader can modify this expense.");
+    }
   }
 
   private void validateExpensePeriod(LocalDateTime from, LocalDateTime to) {
