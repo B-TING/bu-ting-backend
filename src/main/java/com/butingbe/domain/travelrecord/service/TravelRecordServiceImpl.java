@@ -203,6 +203,24 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     return PlaceReviewResDto.from(placeReview);
   }
 
+  @Override
+  @Transactional
+  public void deletePlaceReview(
+      AuthenticatedUser authenticatedUser,
+      UUID travelId,
+      UUID travelRecordId,
+      UUID travelRecordPlaceId) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validateDraftBelongsToTravel(travelRecord, travelId);
+    validateAuthor(travelRecord, author.getId());
+    validateDraft(travelRecord);
+    findTravelRecordPlaceInRecord(travelRecordPlaceId, travelRecordId);
+
+    PlaceReview placeReview = findPlaceReviewByTravelRecordPlaceId(travelRecordPlaceId);
+    placeReviewRepository.delete(placeReview);
+  }
+
   private void copyItinerarySnapshot(UUID travelId, TravelRecord travelRecord) {
     List<Plan> plans = planRepository.findByTravel_IdOrderByDayNumberAsc(travelId);
 

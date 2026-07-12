@@ -435,6 +435,59 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         .hasMessage("Place review rating must be between 1 and 5.");
   }
 
+  @Test
+  @DisplayName("author can delete place review for a draft travel record place")
+  void deletePlaceReviewSuccess() {
+    User user = userRepository.save(createUser("review-delete@example.com", "review-delete"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+    travelRecordService.createPlaceReview(
+        authenticatedUser,
+        draft.originalTravelId(),
+        draft.travelRecordId(),
+        place.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(5, "Delete me"));
+
+    travelRecordService.deletePlaceReview(
+        authenticatedUser,
+        draft.originalTravelId(),
+        draft.travelRecordId(),
+        place.travelRecordPlaceId());
+
+    assertThat(placeReviewRepository.findByTravelRecordPlace_Id(place.travelRecordPlaceId()))
+        .isEmpty();
+    assertThatThrownBy(
+            () ->
+                travelRecordService.getPlaceReview(
+                    authenticatedUser,
+                    draft.originalTravelId(),
+                    draft.travelRecordId(),
+                    place.travelRecordPlaceId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Place review not found.");
+  }
+
+  @Test
+  @DisplayName("place review delete returns not found when review does not exist")
+  void deletePlaceReviewNotFound() {
+    User user =
+        userRepository.save(createUser("review-delete-missing@example.com", "review-delete-missing"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.deletePlaceReview(
+                    authenticatedUser,
+                    draft.originalTravelId(),
+                    draft.travelRecordId(),
+                    place.travelRecordPlaceId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Place review not found.");
+  }
+
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {
     TravelResDto travel =
         travelService.createTravel(

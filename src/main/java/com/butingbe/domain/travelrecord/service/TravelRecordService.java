@@ -42,4 +42,10 @@ public interface TravelRecordService {
       UUID travelRecordId,
       UUID travelRecordPlaceId,
       PlaceReviewUpdateReqDto request);
+
+  void deletePlaceReview(
+      AuthenticatedUser authenticatedUser,
+      UUID travelId,
+      UUID travelRecordId,
+      UUID travelRecordPlaceId);
 }
