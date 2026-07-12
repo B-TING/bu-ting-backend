@@ -49,3 +49,7 @@ place:
   google-places:
     base-url: ${GOOGLE_PLACES_BASE_URL:https://places.googleapis.com/v1/places}
     api-key: ${GOOGLE_PLACES_API_KEY:}
+
+travel-team:
+  invite:
+    base-url: ${TRAVEL_INVITE_BASE_URL:https://yourdomain.com/invite}
