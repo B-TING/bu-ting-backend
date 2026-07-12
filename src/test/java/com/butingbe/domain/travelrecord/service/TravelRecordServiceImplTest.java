@@ -220,6 +220,84 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("author can publish a draft travel record")
+  void publishDraftSuccess() {
+    User user = userRepository.save(createUser("record-publish@example.com", "record-publish"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+
+    TravelRecordResDto result =
+        travelRecordService.publish(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    assertThat(result.travelRecordId()).isEqualTo(draft.travelRecordId());
+    assertThat(result.status()).isEqualTo(TravelRecordStatus.PUBLISHED);
+    assertThat(result.publishedAt()).isNotNull();
+    assertThat(result.days()).hasSize(1);
+    assertThatThrownBy(
+            () ->
+                travelRecordService.getDraft(
+                    authenticatedUser, draft.originalTravelId(), draft.travelRecordId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Only draft travel records can be accessed here.");
+  }
+
+  @Test
+  @DisplayName("non-author cannot publish a travel record")
+  void publishRejectsNonAuthor() {
+    User owner =
+        userRepository.save(createUser("record-publish-owner@example.com", "record-publish-owner"));
+    User outsider =
+        userRepository.save(
+            createUser("record-publish-outsider@example.com", "record-publish-outsider"));
+    AuthenticatedUser ownerUser = AuthenticatedUser.from(owner);
+    TravelRecordResDto draft = createDraftWithOnePlace(ownerUser);
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.publish(
+                    AuthenticatedUser.from(outsider),
+                    draft.originalTravelId(),
+                    draft.travelRecordId()))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not the travel record author.");
+  }
+
+  @Test
+  @DisplayName("published travel record cannot be published again")
+  void publishRejectsAlreadyPublishedRecord() {
+    User user =
+        userRepository.save(createUser("record-publish-again@example.com", "record-publish-again"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    travelRecordService.publish(authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.publish(
+                    authenticatedUser, draft.originalTravelId(), draft.travelRecordId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Only draft travel records can be accessed here.");
+  }
+
+  @Test
+  @DisplayName("travel record without itinerary snapshot cannot be published")
+  void publishRejectsEmptyItinerary() {
+    User user =
+        userRepository.save(createUser("record-publish-empty@example.com", "record-publish-empty"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    TravelRecordResDto draft = travelRecordService.createDraft(authenticatedUser, travel.id(), null);
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.publish(
+                    authenticatedUser, draft.originalTravelId(), draft.travelRecordId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record itinerary is required.");
+  }
+
+  @Test
   @DisplayName("author can create place review for a draft travel record place")
   void createPlaceReviewSuccess() {
     User user = userRepository.save(createUser("review-owner@example.com", "review-owner"));

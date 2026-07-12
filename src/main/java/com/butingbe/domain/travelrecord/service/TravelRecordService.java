@@ -23,6 +23,9 @@ public interface TravelRecordService {
       UUID travelRecordId,
       TravelRecordUpdateReqDto request);
 
+  TravelRecordResDto publish(
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID travelRecordId);
+
   PlaceReviewResDto createPlaceReview(
       AuthenticatedUser authenticatedUser,
       UUID travelId,

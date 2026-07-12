@@ -35,6 +35,7 @@ import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -123,6 +124,22 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     travelRecord.updateContent(request.title(), request.content(), request.coverImageUrl());
+
+    return toResponse(travelRecord);
+  }
+
+  @Override
+  @Transactional
+  public TravelRecordResDto publish(
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID travelRecordId) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validateDraftBelongsToTravel(travelRecord, travelId);
+    validateAuthor(travelRecord, author.getId());
+    validateDraft(travelRecord);
+    validatePublishable(travelRecord);
+
+    travelRecord.publish(LocalDateTime.now());
 
     return toResponse(travelRecord);
   }
@@ -376,6 +393,18 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private void validateDraft(TravelRecord travelRecord) {
     if (travelRecord.getStatus() != TravelRecordStatus.DRAFT) {
       throw new IllegalArgumentException("Only draft travel records can be accessed here.");
+    }
+  }
+
+  private void validatePublishable(TravelRecord travelRecord) {
+    if (travelRecord.getTitle() == null || travelRecord.getTitle().isBlank()) {
+      throw new IllegalArgumentException("Travel record title is required.");
+    }
+
+    if (travelRecordDayRepository
+        .findByTravelRecord_IdOrderByDayNumberAsc(travelRecord.getId())
+        .isEmpty()) {
+      throw new IllegalArgumentException("Travel record itinerary is required.");
     }
   }
 

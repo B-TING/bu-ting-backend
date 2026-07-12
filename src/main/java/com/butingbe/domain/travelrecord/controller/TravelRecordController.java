@@ -70,6 +70,18 @@ public class TravelRecordController {
         travelRecordService.updateDraft(user, travelId, travelRecordId, request));
   }
 
+  @PostMapping("/{travelRecordId}/publish")
+  public ResponseEntity<TravelRecordResDto> publish(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelId,
+      @PathVariable UUID travelRecordId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(travelRecordService.publish(user, travelId, travelRecordId));
+  }
+
   @PostMapping("/{travelRecordId}/places/{travelRecordPlaceId}/review")
   public ResponseEntity<PlaceReviewResDto> createPlaceReview(
       @AuthenticationPrincipal AuthenticatedUser user,
