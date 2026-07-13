@@ -24,10 +24,13 @@ import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
 import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
+import com.butingbe.domain.travelrecord.repository.TravelRecordRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRouteRepository;
@@ -55,6 +58,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
   @Autowired private PlanPlaceRepository planPlaceRepository;
   @Autowired private PlanRouteRepository planRouteRepository;
+  @Autowired private TravelRecordRepository travelRecordRepository;
   @Autowired private TravelRecordDayRepository travelRecordDayRepository;
   @Autowired private TravelRecordPlaceRepository travelRecordPlaceRepository;
   @Autowired private TravelRecordRouteRepository travelRecordRouteRepository;
@@ -357,17 +361,309 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         travelRecordService.publish(
             newerAuthenticatedUser, newerDraft.originalTravelId(), newerDraft.travelRecordId());
 
-    List<TravelRecordFeedResDto> result = travelRecordService.getLatestFeed();
+    TravelRecordFeedPageResDto result = travelRecordService.getLatestFeed(null, null);
 
-    assertThat(result)
+    assertThat(result.items())
         .extracting(TravelRecordFeedResDto::travelRecordId)
         .containsExactly(newerPublished.travelRecordId(), olderPublished.travelRecordId());
-    assertThat(result)
+    assertThat(result.items())
         .extracting(TravelRecordFeedResDto::travelRecordId)
         .doesNotContain(hiddenDraft.travelRecordId());
-    assertThat(result.getFirst().title()).isEqualTo("Newer Feed");
-    assertThat(result.getFirst().authorNickname()).isEqualTo("record-feed-newer");
-    assertThat(result.getFirst().publishedAt()).isNotNull();
+    assertThat(result.hasNext()).isFalse();
+    assertThat(result.nextCursor()).isNull();
+    assertThat(result.items().getFirst().title()).isEqualTo("Newer Feed");
+    assertThat(result.items().getFirst().authorNickname()).isEqualTo("record-feed-newer");
+    assertThat(result.items().getFirst().publishedAt()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("latest feed supports cursor pagination")
+  void getLatestFeedSupportsCursorPagination() {
+    User firstUser =
+        userRepository.save(createUser("record-feed-page-first@example.com", "record-feed-page-first"));
+    User secondUser =
+        userRepository.save(
+            createUser("record-feed-page-second@example.com", "record-feed-page-second"));
+    AuthenticatedUser firstAuthenticatedUser = AuthenticatedUser.from(firstUser);
+    AuthenticatedUser secondAuthenticatedUser = AuthenticatedUser.from(secondUser);
+    TravelRecordResDto firstDraft =
+        createDraftWithOnePlace(firstAuthenticatedUser, "First Page Feed");
+    TravelRecordResDto secondDraft =
+        createDraftWithOnePlace(secondAuthenticatedUser, "Second Page Feed");
+    TravelRecordResDto firstPublished =
+        travelRecordService.publish(
+            firstAuthenticatedUser, firstDraft.originalTravelId(), firstDraft.travelRecordId());
+    TravelRecordResDto secondPublished =
+        travelRecordService.publish(
+            secondAuthenticatedUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
+
+    TravelRecordFeedPageResDto firstPage = travelRecordService.getLatestFeed(null, 1);
+    TravelRecordFeedPageResDto secondPage =
+        travelRecordService.getLatestFeed(firstPage.nextCursor(), 1);
+
+    assertThat(firstPage.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(secondPublished.travelRecordId());
+    assertThat(firstPage.hasNext()).isTrue();
+    assertThat(firstPage.nextCursor()).isNotBlank();
+    assertThat(secondPage.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(firstPublished.travelRecordId());
+    assertThat(secondPage.hasNext()).isFalse();
+    assertThat(secondPage.nextCursor()).isNull();
+  }
+
+  @Test
+  @DisplayName("author can manage own travel records")
+  void getMyRecordsReturnsOnlyAuthenticatedAuthorsRecords() {
+    User owner = userRepository.save(createUser("record-my-owner@example.com", "record-my-owner"));
+    User outsider =
+        userRepository.save(createUser("record-my-outsider@example.com", "record-my-outsider"));
+    AuthenticatedUser ownerUser = AuthenticatedUser.from(owner);
+    AuthenticatedUser outsiderUser = AuthenticatedUser.from(outsider);
+    TravelRecordResDto publishedDraft = createDraftWithOnePlace(ownerUser, "Published Mine");
+    TravelRecordResDto draft = createDraftWithOnePlace(ownerUser, "Draft Mine");
+    TravelRecordResDto outsiderDraft = createDraftWithOnePlace(outsiderUser, "Outsider Record");
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            ownerUser, publishedDraft.originalTravelId(), publishedDraft.travelRecordId());
+
+    List<TravelRecordManageResDto> result = travelRecordService.getMyRecords(ownerUser);
+
+    assertThat(result)
+        .extracting(TravelRecordManageResDto::travelRecordId)
+        .containsExactly(draft.travelRecordId(), published.travelRecordId());
+    assertThat(result)
+        .extracting(TravelRecordManageResDto::travelRecordId)
+        .doesNotContain(outsiderDraft.travelRecordId());
+    assertThat(result)
+        .extracting(TravelRecordManageResDto::status)
+        .containsExactly(TravelRecordStatus.DRAFT, TravelRecordStatus.PUBLISHED);
+    assertThat(result.getFirst().title()).isEqualTo("Draft Mine");
+    assertThat(result.getLast().publishedAt()).isNotNull();
+    assertThat(result.getLast().createdAt()).isNotNull();
+    assertThat(result.getLast().updatedAt()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("author can get own travel record detail regardless of status")
+  void getMyRecordReturnsOwnRecordDetailRegardlessOfStatus() {
+    User user = userRepository.save(createUser("record-my-detail@example.com", "record-my-detail"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Draft Detail");
+    TravelRecordResDto publishedDraft = createDraftWithOnePlace(authenticatedUser, "Published Detail");
+    TravelRecordResDto hiddenDraft = createDraftWithOnePlace(authenticatedUser, "Hidden Detail");
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, publishedDraft.originalTravelId(), publishedDraft.travelRecordId());
+    travelRecordRepository.findById(hiddenDraft.travelRecordId()).orElseThrow().hide();
+
+    TravelRecordResDto draftResult =
+        travelRecordService.getMyRecord(authenticatedUser, draft.travelRecordId());
+    TravelRecordResDto publishedResult =
+        travelRecordService.getMyRecord(authenticatedUser, published.travelRecordId());
+    TravelRecordResDto hiddenResult =
+        travelRecordService.getMyRecord(authenticatedUser, hiddenDraft.travelRecordId());
+
+    assertThat(draftResult.status()).isEqualTo(TravelRecordStatus.DRAFT);
+    assertThat(draftResult.days()).hasSize(1);
+    assertThat(publishedResult.status()).isEqualTo(TravelRecordStatus.PUBLISHED);
+    assertThat(publishedResult.publishedAt()).isNotNull();
+    assertThat(hiddenResult.status()).isEqualTo(TravelRecordStatus.HIDDEN);
+    assertThat(hiddenResult.title()).isEqualTo("Hidden Detail");
+  }
+
+  @Test
+  @DisplayName("non-author cannot get my travel record detail")
+  void getMyRecordRejectsNonAuthor() {
+    User owner =
+        userRepository.save(createUser("record-my-detail-owner@example.com", "record-my-detail-owner"));
+    User outsider =
+        userRepository.save(
+            createUser("record-my-detail-outsider@example.com", "record-my-detail-outsider"));
+    AuthenticatedUser ownerUser = AuthenticatedUser.from(owner);
+    TravelRecordResDto draft = createDraftWithOnePlace(ownerUser, "Owner Detail");
+
+    assertThatThrownBy(
+            () -> travelRecordService.getMyRecord(AuthenticatedUser.from(outsider), draft.travelRecordId()))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not the travel record author.");
+  }
+
+  @Test
+  @DisplayName("author can update own draft, published, and hidden travel records")
+  void updateMyRecordUpdatesOwnRecordRegardlessOfStatus() {
+    User user = userRepository.save(createUser("record-my-update@example.com", "record-my-update"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Draft Before");
+    TravelRecordResDto publishedDraft =
+        createDraftWithOnePlace(authenticatedUser, "Published Before");
+    TravelRecordResDto hiddenDraft = createDraftWithOnePlace(authenticatedUser, "Hidden Before");
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, publishedDraft.originalTravelId(), publishedDraft.travelRecordId());
+    travelRecordRepository.findById(hiddenDraft.travelRecordId()).orElseThrow().hide();
+
+    TravelRecordResDto draftResult =
+        travelRecordService.updateMyRecord(
+            authenticatedUser,
+            draft.travelRecordId(),
+            new TravelRecordUpdateReqDto("Draft After", "Draft content", "https://image.test/draft"));
+    TravelRecordResDto publishedResult =
+        travelRecordService.updateMyRecord(
+            authenticatedUser,
+            published.travelRecordId(),
+            new TravelRecordUpdateReqDto(
+                "Published After", "Published content", "https://image.test/published"));
+    TravelRecordResDto hiddenResult =
+        travelRecordService.updateMyRecord(
+            authenticatedUser,
+            hiddenDraft.travelRecordId(),
+            new TravelRecordUpdateReqDto("Hidden After", "Hidden content", "https://image.test/hidden"));
+
+    assertThat(draftResult.status()).isEqualTo(TravelRecordStatus.DRAFT);
+    assertThat(draftResult.title()).isEqualTo("Draft After");
+    assertThat(draftResult.content()).isEqualTo("Draft content");
+    assertThat(draftResult.coverImageUrl()).isEqualTo("https://image.test/draft");
+    assertThat(publishedResult.status()).isEqualTo(TravelRecordStatus.PUBLISHED);
+    assertThat(publishedResult.title()).isEqualTo("Published After");
+    assertThat(publishedResult.publishedAt()).isNotNull();
+    assertThat(hiddenResult.status()).isEqualTo(TravelRecordStatus.HIDDEN);
+    assertThat(hiddenResult.title()).isEqualTo("Hidden After");
+  }
+
+  @Test
+  @DisplayName("my record update keeps existing values when fields are null")
+  void updateMyRecordKeepsExistingValuesForNullFields() {
+    User user =
+        userRepository.save(createUser("record-my-update-null@example.com", "record-my-update-null"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Keep Before");
+    TravelRecordResDto updated =
+        travelRecordService.updateMyRecord(
+            authenticatedUser,
+            draft.travelRecordId(),
+            new TravelRecordUpdateReqDto("Keep Title", "Keep content", "https://image.test/keep"));
+
+    TravelRecordResDto result =
+        travelRecordService.updateMyRecord(
+            authenticatedUser,
+            updated.travelRecordId(),
+            new TravelRecordUpdateReqDto(null, "Only content changed", null));
+
+    assertThat(result.title()).isEqualTo("Keep Title");
+    assertThat(result.content()).isEqualTo("Only content changed");
+    assertThat(result.coverImageUrl()).isEqualTo("https://image.test/keep");
+  }
+
+  @Test
+  @DisplayName("non-author cannot update my travel record")
+  void updateMyRecordRejectsNonAuthor() {
+    User owner =
+        userRepository.save(
+            createUser("record-my-update-owner@example.com", "record-my-update-owner"));
+    User outsider =
+        userRepository.save(
+            createUser("record-my-update-outsider@example.com", "record-my-update-outsider"));
+    AuthenticatedUser ownerUser = AuthenticatedUser.from(owner);
+    TravelRecordResDto draft = createDraftWithOnePlace(ownerUser, "Owner Update");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateMyRecord(
+                    AuthenticatedUser.from(outsider),
+                    draft.travelRecordId(),
+                    new TravelRecordUpdateReqDto("Hacked", null, null)))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not the travel record author.");
+  }
+
+  @Test
+  @DisplayName("my record update rejects blank title")
+  void updateMyRecordRejectsBlankTitle() {
+    User user =
+        userRepository.save(
+            createUser("record-my-update-blank@example.com", "record-my-update-blank"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Blank Title");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateMyRecord(
+                    authenticatedUser,
+                    draft.travelRecordId(),
+                    new TravelRecordUpdateReqDto(" ", null, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record title cannot be blank.");
+  }
+
+  @Test
+  @DisplayName("author can hide own published travel record")
+  void hideMyRecordHidesPublishedRecord() {
+    User user = userRepository.save(createUser("record-hide@example.com", "record-hide"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Hide Me");
+    var place = draft.days().getFirst().places().getFirst();
+    travelRecordService.createPlaceReview(
+        authenticatedUser,
+        draft.originalTravelId(),
+        draft.travelRecordId(),
+        place.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(5, "Before hidden"));
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelRecordResDto result =
+        travelRecordService.hideMyRecord(authenticatedUser, published.travelRecordId());
+
+    assertThat(result.status()).isEqualTo(TravelRecordStatus.HIDDEN);
+    assertThat(travelRecordService.getMyRecord(authenticatedUser, published.travelRecordId()).status())
+        .isEqualTo(TravelRecordStatus.HIDDEN);
+    assertThatThrownBy(() -> travelRecordService.getPublished(published.travelRecordId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel record not found.");
+    assertThat(travelRecordService.getLatestFeed(null, null).items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .doesNotContain(published.travelRecordId());
+    assertThat(travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "Busan Station")
+            .reviews())
+        .extracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::travelRecordId)
+        .doesNotContain(published.travelRecordId());
+  }
+
+  @Test
+  @DisplayName("hide my record is idempotent for already hidden record")
+  void hideMyRecordIsIdempotent() {
+    User user =
+        userRepository.save(createUser("record-hide-again@example.com", "record-hide-again"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Hide Again");
+
+    TravelRecordResDto firstResult =
+        travelRecordService.hideMyRecord(authenticatedUser, draft.travelRecordId());
+    TravelRecordResDto secondResult =
+        travelRecordService.hideMyRecord(authenticatedUser, draft.travelRecordId());
+
+    assertThat(firstResult.status()).isEqualTo(TravelRecordStatus.HIDDEN);
+    assertThat(secondResult.status()).isEqualTo(TravelRecordStatus.HIDDEN);
+    assertThat(secondResult.travelRecordId()).isEqualTo(draft.travelRecordId());
+  }
+
+  @Test
+  @DisplayName("non-author cannot hide my travel record")
+  void hideMyRecordRejectsNonAuthor() {
+    User owner =
+        userRepository.save(createUser("record-hide-owner@example.com", "record-hide-owner"));
+    User outsider =
+        userRepository.save(createUser("record-hide-outsider@example.com", "record-hide-outsider"));
+    AuthenticatedUser ownerUser = AuthenticatedUser.from(owner);
+    TravelRecordResDto draft = createDraftWithOnePlace(ownerUser, "Owner Hide");
+
+    assertThatThrownBy(
+            () -> travelRecordService.hideMyRecord(AuthenticatedUser.from(outsider), draft.travelRecordId()))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not the travel record author.");
   }
 
   @Test

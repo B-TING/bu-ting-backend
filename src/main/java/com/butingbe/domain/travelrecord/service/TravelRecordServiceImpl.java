@@ -17,7 +17,9 @@ import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto.TravelRecordDayResDto;
 import com.butingbe.domain.travelrecord.entity.PlaceReview;
@@ -38,7 +40,9 @@ import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,6 +51,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +61,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class TravelRecordServiceImpl implements TravelRecordService {
 
   private static final String DEFAULT_TITLE = "여행 기록";
+  private static final int DEFAULT_FEED_SIZE = 20;
+  private static final int MAX_FEED_SIZE = 50;
 
   private final TravelRepository travelRepository;
   private final PlanRepository planRepository;
@@ -157,12 +164,79 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   @Override
-  public List<TravelRecordFeedResDto> getLatestFeed() {
-    return travelRecordRepository
-        .findByStatusOrderByPublishedAtDescCreatedAtDesc(TravelRecordStatus.PUBLISHED)
-        .stream()
-        .map(TravelRecordFeedResDto::from)
+  public TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size) {
+    int pageSize = resolveFeedSize(size);
+    FeedCursor feedCursor = decodeFeedCursor(cursor);
+    PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+    List<TravelRecord> fetchedRecords =
+        feedCursor == null
+            ? travelRecordRepository.findByStatusOrderByPublishedAtDescCreatedAtDesc(
+                TravelRecordStatus.PUBLISHED, pageRequest)
+            : travelRecordRepository.findFeedPageAfterCursor(
+                TravelRecordStatus.PUBLISHED,
+                feedCursor.publishedAt(),
+                feedCursor.createdAt(),
+                pageRequest);
+    boolean hasNext = fetchedRecords.size() > pageSize;
+    List<TravelRecord> pageRecords =
+        hasNext ? fetchedRecords.subList(0, pageSize) : fetchedRecords;
+    List<TravelRecordFeedResDto> items =
+        pageRecords.stream().map(TravelRecordFeedResDto::from).toList();
+
+    return new TravelRecordFeedPageResDto(
+        items,
+        hasNext ? encodeFeedCursor(pageRecords.getLast()) : null,
+        hasNext);
+  }
+
+  @Override
+  public List<TravelRecordManageResDto> getMyRecords(AuthenticatedUser authenticatedUser) {
+    User author = findAuthenticatedUser(authenticatedUser);
+
+    return travelRecordRepository.findByAuthor_IdOrderByCreatedAtDesc(author.getId()).stream()
+        .map(TravelRecordManageResDto::from)
         .toList();
+  }
+
+  @Override
+  public TravelRecordResDto getMyRecord(
+      AuthenticatedUser authenticatedUser, UUID travelRecordId) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validateAuthor(travelRecord, author.getId());
+
+    return toResponse(travelRecord);
+  }
+
+  @Override
+  @Transactional
+  public TravelRecordResDto updateMyRecord(
+      AuthenticatedUser authenticatedUser, UUID travelRecordId, TravelRecordUpdateReqDto request) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validateAuthor(travelRecord, author.getId());
+    validateUpdateRequest(request);
+
+    if (request == null) {
+      return toResponse(travelRecord);
+    }
+
+    travelRecord.updateContent(request.title(), request.content(), request.coverImageUrl());
+
+    return toResponse(travelRecord);
+  }
+
+  @Override
+  @Transactional
+  public TravelRecordResDto hideMyRecord(
+      AuthenticatedUser authenticatedUser, UUID travelRecordId) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validateAuthor(travelRecord, author.getId());
+
+    travelRecord.hide();
+
+    return toResponse(travelRecord);
   }
 
   @Override
@@ -545,4 +619,44 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
     return ratingCounts;
   }
+
+  private int resolveFeedSize(Integer size) {
+    if (size == null) {
+      return DEFAULT_FEED_SIZE;
+    }
+
+    if (size < 1 || size > MAX_FEED_SIZE) {
+      throw new IllegalArgumentException("Feed size must be between 1 and 50.");
+    }
+
+    return size;
+  }
+
+  private String encodeFeedCursor(TravelRecord travelRecord) {
+    String rawCursor = travelRecord.getPublishedAt() + "|" + travelRecord.getCreatedAt();
+    return Base64.getUrlEncoder()
+        .withoutPadding()
+        .encodeToString(rawCursor.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private FeedCursor decodeFeedCursor(String cursor) {
+    if (cursor == null || cursor.isBlank()) {
+      return null;
+    }
+
+    try {
+      String rawCursor =
+          new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+      String[] values = rawCursor.split("\\|");
+      if (values.length != 2) {
+        throw new IllegalArgumentException("Invalid feed cursor.");
+      }
+
+      return new FeedCursor(LocalDateTime.parse(values[0]), LocalDateTime.parse(values[1]));
+    } catch (IllegalArgumentException exception) {
+      throw new IllegalArgumentException("Invalid feed cursor.");
+    }
+  }
+
+  private record FeedCursor(LocalDateTime publishedAt, LocalDateTime createdAt) {}
 }

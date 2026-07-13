@@ -8,7 +8,8 @@ import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
-import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import java.util.List;
 import java.util.UUID;
@@ -32,7 +33,16 @@ public interface TravelRecordService {
 
   TravelRecordResDto getPublished(UUID travelRecordId);
 
-  List<TravelRecordFeedResDto> getLatestFeed();
+  TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size);
+
+  List<TravelRecordManageResDto> getMyRecords(AuthenticatedUser authenticatedUser);
+
+  TravelRecordResDto getMyRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
+
+  TravelRecordResDto updateMyRecord(
+      AuthenticatedUser authenticatedUser, UUID travelRecordId, TravelRecordUpdateReqDto request);
+
+  TravelRecordResDto hideMyRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
 
   PlaceReviewSummaryResDto getPlaceReviewSummary(PlaceProvider provider, String providerPlaceId);
 
