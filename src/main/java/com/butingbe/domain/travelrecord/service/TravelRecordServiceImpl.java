@@ -47,6 +47,7 @@ import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HashMap;
@@ -175,17 +176,50 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   @Override
   public TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size) {
+    return getLatestFeed(cursor, size, null, null, null, null, null);
+  }
+
+  @Override
+  public TravelRecordFeedPageResDto getLatestFeed(
+      String cursor,
+      Integer size,
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
+      LocalDate travelEndDate) {
     int pageSize = resolveFeedSize(size);
     FeedCursor feedCursor = decodeFeedCursor(cursor);
+    FeedSearchCondition searchCondition =
+        resolveFeedSearchCondition(keyword, provider, providerPlaceId, travelStartDate, travelEndDate);
     PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
     List<TravelRecord> fetchedRecords =
         feedCursor == null
-            ? travelRecordRepository.findByStatusOrderByPublishedAtDescCreatedAtDesc(
-                TravelRecordStatus.PUBLISHED, pageRequest)
+            ? travelRecordRepository.findFeedPage(
+                TravelRecordStatus.PUBLISHED,
+                searchCondition.hasKeyword(),
+                searchCondition.keywordPattern(),
+                searchCondition.hasPlace(),
+                searchCondition.provider(),
+                searchCondition.providerPlaceId(),
+                searchCondition.hasTravelStartDate(),
+                searchCondition.travelStartDate(),
+                searchCondition.hasTravelEndDate(),
+                searchCondition.travelEndDate(),
+                pageRequest)
             : travelRecordRepository.findFeedPageAfterCursor(
                 TravelRecordStatus.PUBLISHED,
                 feedCursor.publishedAt(),
                 feedCursor.createdAt(),
+                searchCondition.hasKeyword(),
+                searchCondition.keywordPattern(),
+                searchCondition.hasPlace(),
+                searchCondition.provider(),
+                searchCondition.providerPlaceId(),
+                searchCondition.hasTravelStartDate(),
+                searchCondition.travelStartDate(),
+                searchCondition.hasTravelEndDate(),
+                searchCondition.travelEndDate(),
                 pageRequest);
     boolean hasNext = fetchedRecords.size() > pageSize;
     List<TravelRecord> pageRecords =
@@ -761,6 +795,39 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     return size;
   }
 
+  private FeedSearchCondition resolveFeedSearchCondition(
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
+      LocalDate travelEndDate) {
+    String normalizedKeyword =
+        keyword == null || keyword.isBlank() ? null : keyword.trim().toLowerCase();
+    boolean hasKeyword = normalizedKeyword != null;
+    boolean hasProviderPlaceId = providerPlaceId != null && !providerPlaceId.isBlank();
+
+    if ((provider == null && hasProviderPlaceId) || (provider != null && !hasProviderPlaceId)) {
+      throw new IllegalArgumentException("Place provider and provider place id must be provided together.");
+    }
+
+    if (travelStartDate != null
+        && travelEndDate != null
+        && travelEndDate.isBefore(travelStartDate)) {
+      throw new IllegalArgumentException("Travel end date cannot be before travel start date.");
+    }
+
+    return new FeedSearchCondition(
+        hasKeyword,
+        hasKeyword ? "%" + normalizedKeyword + "%" : "",
+        provider != null,
+        provider,
+        hasProviderPlaceId ? providerPlaceId.trim() : "",
+        travelStartDate != null,
+        travelStartDate,
+        travelEndDate != null,
+        travelEndDate);
+  }
+
   private String encodeFeedCursor(TravelRecord travelRecord) {
     String rawCursor = travelRecord.getPublishedAt() + "|" + travelRecord.getCreatedAt();
     return Base64.getUrlEncoder()
@@ -788,4 +855,15 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   private record FeedCursor(LocalDateTime publishedAt, LocalDateTime createdAt) {}
+
+  private record FeedSearchCondition(
+      boolean hasKeyword,
+      String keywordPattern,
+      boolean hasPlace,
+      PlaceProvider provider,
+      String providerPlaceId,
+      boolean hasTravelStartDate,
+      LocalDate travelStartDate,
+      boolean hasTravelEndDate,
+      LocalDate travelEndDate) {}
 }

@@ -416,6 +416,99 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("latest feed searches by title and place name")
+  void getLatestFeedSearchesByKeyword() {
+    User titleUser =
+        userRepository.save(createUser("record-search-title@example.com", "record-search-title"));
+    User placeUser =
+        userRepository.save(createUser("record-search-place@example.com", "record-search-place"));
+    AuthenticatedUser titleAuthenticatedUser = AuthenticatedUser.from(titleUser);
+    AuthenticatedUser placeAuthenticatedUser = AuthenticatedUser.from(placeUser);
+    TravelRecordResDto cafeDraft =
+        createDraftWithOnePlace(titleAuthenticatedUser, "Hidden Cafe Route");
+    TravelRecordResDto beachDraft =
+        createDraftWithOnePlace(placeAuthenticatedUser, "Summer Route", "Haeundae Beach");
+    TravelRecordResDto cafePublished =
+        travelRecordService.publish(
+            titleAuthenticatedUser, cafeDraft.originalTravelId(), cafeDraft.travelRecordId());
+    TravelRecordResDto beachPublished =
+        travelRecordService.publish(
+            placeAuthenticatedUser, beachDraft.originalTravelId(), beachDraft.travelRecordId());
+
+    TravelRecordFeedPageResDto titleResult =
+        travelRecordService.getLatestFeed(null, null, "cafe", null, null, null, null);
+    TravelRecordFeedPageResDto placeResult =
+        travelRecordService.getLatestFeed(null, null, "haeundae", null, null, null, null);
+
+    assertThat(titleResult.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .contains(cafePublished.travelRecordId())
+        .doesNotContain(beachPublished.travelRecordId());
+    assertThat(placeResult.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .contains(beachPublished.travelRecordId())
+        .doesNotContain(cafePublished.travelRecordId());
+  }
+
+  @Test
+  @DisplayName("latest feed filters by place and travel date range")
+  void getLatestFeedFiltersByPlaceAndTravelDateRange() {
+    User stationUser =
+        userRepository.save(
+            createUser("record-filter-station@example.com", "record-filter-station"));
+    User beachUser =
+        userRepository.save(createUser("record-filter-beach@example.com", "record-filter-beach"));
+    AuthenticatedUser stationAuthenticatedUser = AuthenticatedUser.from(stationUser);
+    AuthenticatedUser beachAuthenticatedUser = AuthenticatedUser.from(beachUser);
+    TravelRecordResDto stationDraft =
+        createDraftWithOnePlace(stationAuthenticatedUser, "Station Route", "Busan Station");
+    TravelRecordResDto beachDraft =
+        createDraftWithOnePlace(beachAuthenticatedUser, "Beach Route", "Haeundae");
+    TravelRecordResDto stationPublished =
+        travelRecordService.publish(
+            stationAuthenticatedUser, stationDraft.originalTravelId(), stationDraft.travelRecordId());
+    TravelRecordResDto beachPublished =
+        travelRecordService.publish(
+            beachAuthenticatedUser, beachDraft.originalTravelId(), beachDraft.travelRecordId());
+
+    TravelRecordFeedPageResDto placeResult =
+        travelRecordService.getLatestFeed(
+            null, null, null, PlaceProvider.GOOGLE, "Busan Station", null, null);
+    TravelRecordFeedPageResDto overlappingDateResult =
+        travelRecordService.getLatestFeed(
+            null, null, null, null, null, LocalDate.of(2026, 8, 2), LocalDate.of(2026, 8, 2));
+    TravelRecordFeedPageResDto outOfRangeDateResult =
+        travelRecordService.getLatestFeed(
+            null, null, null, null, null, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 3));
+
+    assertThat(placeResult.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(stationPublished.travelRecordId());
+    assertThat(overlappingDateResult.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .contains(beachPublished.travelRecordId(), stationPublished.travelRecordId());
+    assertThat(outOfRangeDateResult.items()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("latest feed search rejects invalid filters")
+  void getLatestFeedRejectsInvalidFilters() {
+    assertThatThrownBy(
+            () ->
+                travelRecordService.getLatestFeed(
+                    null, null, null, PlaceProvider.GOOGLE, null, null, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Place provider and provider place id must be provided together.");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.getLatestFeed(
+                    null, null, null, null, null, LocalDate.of(2026, 9, 3), LocalDate.of(2026, 9, 1)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel end date cannot be before travel start date.");
+  }
+
+  @Test
   @DisplayName("author can manage own travel records")
   void getMyRecordsReturnsOnlyAuthenticatedAuthorsRecords() {
     User owner = userRepository.save(createUser("record-my-owner@example.com", "record-my-owner"));

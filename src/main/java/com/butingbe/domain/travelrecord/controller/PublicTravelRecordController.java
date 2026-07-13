@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelrecord.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
@@ -10,12 +11,14 @@ import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.service.TravelRecordService;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -36,8 +39,17 @@ public class PublicTravelRecordController {
   @GetMapping
   public ResponseEntity<TravelRecordFeedPageResDto> getLatestFeed(
       @RequestParam(required = false) String cursor,
-      @RequestParam(required = false) Integer size) {
-    return ResponseEntity.ok(travelRecordService.getLatestFeed(cursor, size));
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) PlaceProvider provider,
+      @RequestParam(required = false) String providerPlaceId,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate travelStartDate,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate travelEndDate) {
+    return ResponseEntity.ok(
+        travelRecordService.getLatestFeed(
+            cursor, size, keyword, provider, providerPlaceId, travelStartDate, travelEndDate));
   }
 
   @GetMapping("/me")

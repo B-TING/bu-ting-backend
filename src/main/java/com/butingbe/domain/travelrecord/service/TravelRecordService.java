@@ -14,6 +14,7 @@ import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,6 +38,15 @@ public interface TravelRecordService {
   TravelRecordResDto getPublished(UUID travelRecordId);
 
   TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size);
+
+  TravelRecordFeedPageResDto getLatestFeed(
+      String cursor,
+      Integer size,
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
+      LocalDate travelEndDate);
 
   List<TravelRecordManageResDto> getMyRecords(AuthenticatedUser authenticatedUser);
 
