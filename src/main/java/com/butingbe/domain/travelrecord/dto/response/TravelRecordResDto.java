@@ -25,6 +25,8 @@ public record TravelRecordResDto(
     LocalDate travelEndDate,
     TravelRecordStatus status,
     LocalDateTime publishedAt,
+    long likeCount,
+    long viewCount,
     List<TravelRecordDayResDto> days) {
 
   public static TravelRecordResDto of(TravelRecord travelRecord, List<TravelRecordDayResDto> days) {
@@ -39,6 +41,8 @@ public record TravelRecordResDto(
         travelRecord.getTravelEndDate(),
         travelRecord.getStatus(),
         travelRecord.getPublishedAt(),
+        travelRecord.getLikeCount(),
+        travelRecord.getViewCount(),
         days);
   }
 

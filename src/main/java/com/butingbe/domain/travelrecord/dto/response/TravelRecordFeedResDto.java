@@ -15,7 +15,9 @@ public record TravelRecordFeedResDto(
     String coverImageUrl,
     LocalDate travelStartDate,
     LocalDate travelEndDate,
-    LocalDateTime publishedAt) {
+    LocalDateTime publishedAt,
+    long likeCount,
+    long viewCount) {
 
   public static TravelRecordFeedResDto from(TravelRecord travelRecord) {
     return new TravelRecordFeedResDto(
@@ -28,6 +30,8 @@ public record TravelRecordFeedResDto(
         travelRecord.getCoverImageUrl(),
         travelRecord.getTravelStartDate(),
         travelRecord.getTravelEndDate(),
-        travelRecord.getPublishedAt());
+        travelRecord.getPublishedAt(),
+        travelRecord.getLikeCount(),
+        travelRecord.getViewCount());
   }
 }

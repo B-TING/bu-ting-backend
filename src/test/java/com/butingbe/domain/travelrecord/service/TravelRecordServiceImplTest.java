@@ -27,6 +27,7 @@ import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
@@ -849,6 +850,93 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         .extracting(bookmark -> bookmark.travelRecord().travelRecordId())
         .containsExactly(secondPublished.travelRecordId());
     assertThat(result.getFirst().travelRecord().title()).isEqualTo("Second Bookmark");
+  }
+
+  @Test
+  @DisplayName("published travel record detail increases view count")
+  void getPublishedIncreasesViewCount() {
+    User author =
+        userRepository.save(createUser("record-view-author@example.com", "record-view-author"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "View Target");
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelRecordResDto firstResult = travelRecordService.getPublished(published.travelRecordId());
+    TravelRecordResDto secondResult = travelRecordService.getPublished(published.travelRecordId());
+
+    assertThat(firstResult.viewCount()).isEqualTo(1);
+    assertThat(secondResult.viewCount()).isEqualTo(2);
+    assertThat(secondResult.likeCount()).isZero();
+    assertThat(travelRecordService.getLatestFeed(null, null).items())
+        .filteredOn(item -> item.travelRecordId().equals(published.travelRecordId()))
+        .extracting(TravelRecordFeedResDto::viewCount)
+        .containsExactly(2L);
+  }
+
+  @Test
+  @DisplayName("user can like and unlike a published travel record")
+  void likeAndUnlikeTravelRecordSuccess() {
+    User author =
+        userRepository.save(createUser("record-like-author@example.com", "record-like-author"));
+    User user = userRepository.save(createUser("record-like-user@example.com", "record-like-user"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Like Target");
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelRecordLikeResDto like =
+        travelRecordService.likeTravelRecord(authenticatedUser, published.travelRecordId());
+
+    assertThat(like.likeId()).isNotNull();
+    assertThat(like.likedAt()).isNotNull();
+    assertThat(like.travelRecordId()).isEqualTo(published.travelRecordId());
+    assertThat(like.likeCount()).isEqualTo(1);
+    assertThat(travelRecordService.getMyRecord(authorUser, published.travelRecordId()).likeCount())
+        .isEqualTo(1);
+
+    travelRecordService.unlikeTravelRecord(authenticatedUser, published.travelRecordId());
+    travelRecordService.unlikeTravelRecord(authenticatedUser, published.travelRecordId());
+
+    assertThat(travelRecordService.getMyRecord(authorUser, published.travelRecordId()).likeCount())
+        .isZero();
+  }
+
+  @Test
+  @DisplayName("like rejects duplicated travel record like")
+  void likeTravelRecordRejectsDuplicate() {
+    User author =
+        userRepository.save(
+            createUser("record-like-duplicate-author@example.com", "record-like-duplicate-author"));
+    User user =
+        userRepository.save(
+            createUser("record-like-duplicate-user@example.com", "record-like-duplicate-user"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Duplicate Like");
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, draft.originalTravelId(), draft.travelRecordId());
+    travelRecordService.likeTravelRecord(authenticatedUser, published.travelRecordId());
+
+    assertThatThrownBy(
+            () -> travelRecordService.likeTravelRecord(authenticatedUser, published.travelRecordId()))
+        .isInstanceOf(DuplicateResourceException.class)
+        .hasMessage("Travel record like already exists.");
+  }
+
+  @Test
+  @DisplayName("like rejects non-published travel record")
+  void likeTravelRecordRejectsNonPublishedRecord() {
+    User user =
+        userRepository.save(createUser("record-like-draft-user@example.com", "record-like-draft-user"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Draft Like");
+
+    assertThatThrownBy(
+            () -> travelRecordService.likeTravelRecord(authenticatedUser, draft.travelRecordId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel record not found.");
   }
 
   @Test

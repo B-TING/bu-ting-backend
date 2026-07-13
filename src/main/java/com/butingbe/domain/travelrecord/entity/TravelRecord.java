@@ -71,6 +71,12 @@ public class TravelRecord {
   @Column(name = "published_at")
   private LocalDateTime publishedAt;
 
+  @Column(name = "like_count", nullable = false)
+  private long likeCount;
+
+  @Column(name = "view_count", nullable = false)
+  private long viewCount;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
@@ -89,7 +95,9 @@ public class TravelRecord {
       LocalDate travelStartDate,
       LocalDate travelEndDate,
       TravelRecordStatus status,
-      LocalDateTime publishedAt) {
+      LocalDateTime publishedAt,
+      Long likeCount,
+      Long viewCount) {
     this.originalTravel = originalTravel;
     this.author = author;
     this.title = title;
@@ -99,6 +107,8 @@ public class TravelRecord {
     this.travelEndDate = travelEndDate;
     this.status = status != null ? status : TravelRecordStatus.DRAFT;
     this.publishedAt = publishedAt;
+    this.likeCount = likeCount != null ? likeCount : 0L;
+    this.viewCount = viewCount != null ? viewCount : 0L;
   }
 
   public void updateContent(String title, String content, String coverImageUrl) {
@@ -124,5 +134,19 @@ public class TravelRecord {
 
   public void republish() {
     this.status = TravelRecordStatus.PUBLISHED;
+  }
+
+  public void increaseLikeCount() {
+    this.likeCount++;
+  }
+
+  public void decreaseLikeCount() {
+    if (this.likeCount > 0) {
+      this.likeCount--;
+    }
+  }
+
+  public void increaseViewCount() {
+    this.viewCount++;
   }
 }

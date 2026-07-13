@@ -4,6 +4,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.service.TravelRecordService;
@@ -120,6 +121,29 @@ public class PublicTravelRecordController {
     }
 
     travelRecordService.unbookmarkTravelRecord(user, travelRecordId);
+
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/{travelRecordId}/likes")
+  public ResponseEntity<TravelRecordLikeResDto> likeTravelRecord(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID travelRecordId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(travelRecordService.likeTravelRecord(user, travelRecordId));
+  }
+
+  @DeleteMapping("/{travelRecordId}/likes")
+  public ResponseEntity<Void> unlikeTravelRecord(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID travelRecordId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    travelRecordService.unlikeTravelRecord(user, travelRecordId);
 
     return ResponseEntity.noContent().build();
   }

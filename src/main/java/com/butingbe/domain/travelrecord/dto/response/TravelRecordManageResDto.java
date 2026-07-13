@@ -17,6 +17,8 @@ public record TravelRecordManageResDto(
     LocalDate travelEndDate,
     TravelRecordStatus status,
     LocalDateTime publishedAt,
+    long likeCount,
+    long viewCount,
     LocalDateTime createdAt,
     LocalDateTime updatedAt) {
 
@@ -32,6 +34,8 @@ public record TravelRecordManageResDto(
         travelRecord.getTravelEndDate(),
         travelRecord.getStatus(),
         travelRecord.getPublishedAt(),
+        travelRecord.getLikeCount(),
+        travelRecord.getViewCount(),
         travelRecord.getCreatedAt(),
         travelRecord.getUpdatedAt());
   }

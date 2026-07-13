@@ -20,6 +20,7 @@ import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto.TravelRecordDayResDto;
@@ -27,12 +28,14 @@ import com.butingbe.domain.travelrecord.entity.PlaceReview;
 import com.butingbe.domain.travelrecord.entity.TravelRecord;
 import com.butingbe.domain.travelrecord.entity.TravelRecordBookmark;
 import com.butingbe.domain.travelrecord.entity.TravelRecordDay;
+import com.butingbe.domain.travelrecord.entity.TravelRecordLike;
 import com.butingbe.domain.travelrecord.entity.TravelRecordPlace;
 import com.butingbe.domain.travelrecord.entity.TravelRecordRoute;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
 import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordBookmarkRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
+import com.butingbe.domain.travelrecord.repository.TravelRecordLikeRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRouteRepository;
@@ -79,6 +82,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private final TravelRecordRouteRepository travelRecordRouteRepository;
   private final PlaceReviewRepository placeReviewRepository;
   private final TravelRecordBookmarkRepository travelRecordBookmarkRepository;
+  private final TravelRecordLikeRepository travelRecordLikeRepository;
 
   @Override
   @Transactional
@@ -160,9 +164,11 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   @Override
+  @Transactional
   public TravelRecordResDto getPublished(UUID travelRecordId) {
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validatePublished(travelRecord);
+    travelRecord.increaseViewCount();
 
     return toResponse(travelRecord);
   }
@@ -295,6 +301,37 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .stream()
         .map(TravelRecordBookmarkResDto::from)
         .toList();
+  }
+
+  @Override
+  @Transactional
+  public TravelRecordLikeResDto likeTravelRecord(
+      AuthenticatedUser authenticatedUser, UUID travelRecordId) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validatePublished(travelRecord);
+    validateLikeNotDuplicated(user.getId(), travelRecordId);
+
+    travelRecord.increaseLikeCount();
+    TravelRecordLike like =
+        travelRecordLikeRepository.saveAndFlush(
+            TravelRecordLike.builder().user(user).travelRecord(travelRecord).build());
+
+    return TravelRecordLikeResDto.from(like);
+  }
+
+  @Override
+  @Transactional
+  public void unlikeTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId) {
+    User user = findAuthenticatedUser(authenticatedUser);
+
+    travelRecordLikeRepository
+        .findByUser_IdAndTravelRecord_Id(user.getId(), travelRecordId)
+        .ifPresent(
+            like -> {
+              like.getTravelRecord().decreaseLikeCount();
+              travelRecordLikeRepository.delete(like);
+            });
   }
 
   @Override
@@ -643,6 +680,12 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private void validateBookmarkNotDuplicated(UUID userId, UUID travelRecordId) {
     if (travelRecordBookmarkRepository.existsByUser_IdAndTravelRecord_Id(userId, travelRecordId)) {
       throw new DuplicateResourceException("Travel record bookmark already exists.");
+    }
+  }
+
+  private void validateLikeNotDuplicated(UUID userId, UUID travelRecordId) {
+    if (travelRecordLikeRepository.existsByUser_IdAndTravelRecord_Id(userId, travelRecordId)) {
+      throw new DuplicateResourceException("Travel record like already exists.");
     }
   }
 

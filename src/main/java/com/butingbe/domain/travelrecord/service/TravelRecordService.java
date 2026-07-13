@@ -10,6 +10,7 @@ import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import java.util.List;
@@ -53,6 +54,10 @@ public interface TravelRecordService {
   void unbookmarkTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
 
   List<TravelRecordBookmarkResDto> getMyBookmarkedRecords(AuthenticatedUser authenticatedUser);
+
+  TravelRecordLikeResDto likeTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
+
+  void unlikeTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
 
   PlaceReviewSummaryResDto getPlaceReviewSummary(PlaceProvider provider, String providerPlaceId);
 
