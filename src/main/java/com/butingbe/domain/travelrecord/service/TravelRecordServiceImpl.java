@@ -15,6 +15,7 @@ import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto.TravelRecordDayResDto;
 import com.butingbe.domain.travelrecord.entity.PlaceReview;
@@ -142,6 +143,23 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     travelRecord.publish(LocalDateTime.now());
 
     return toResponse(travelRecord);
+  }
+
+  @Override
+  public TravelRecordResDto getPublished(UUID travelRecordId) {
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validatePublished(travelRecord);
+
+    return toResponse(travelRecord);
+  }
+
+  @Override
+  public List<TravelRecordFeedResDto> getLatestFeed() {
+    return travelRecordRepository
+        .findByStatusOrderByPublishedAtDescCreatedAtDesc(TravelRecordStatus.PUBLISHED)
+        .stream()
+        .map(TravelRecordFeedResDto::from)
+        .toList();
   }
 
   @Override
@@ -405,6 +423,12 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .findByTravelRecord_IdOrderByDayNumberAsc(travelRecord.getId())
         .isEmpty()) {
       throw new IllegalArgumentException("Travel record itinerary is required.");
+    }
+  }
+
+  private void validatePublished(TravelRecord travelRecord) {
+    if (travelRecord.getStatus() != TravelRecordStatus.PUBLISHED) {
+      throw new ResourceNotFoundException("Travel record not found.");
     }
   }
 

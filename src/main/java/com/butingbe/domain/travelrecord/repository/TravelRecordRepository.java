@@ -15,5 +15,5 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
 
   List<TravelRecord> findByAuthor_IdOrderByCreatedAtDesc(UUID authorId);
 
-  List<TravelRecord> findByStatusOrderByPublishedAtDesc(TravelRecordStatus status);
+  List<TravelRecord> findByStatusOrderByPublishedAtDescCreatedAtDesc(TravelRecordStatus status);
 }

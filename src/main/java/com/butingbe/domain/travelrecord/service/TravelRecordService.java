@@ -6,7 +6,9 @@ import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
+import java.util.List;
 import java.util.UUID;
 
 public interface TravelRecordService {
@@ -25,6 +27,10 @@ public interface TravelRecordService {
 
   TravelRecordResDto publish(
       AuthenticatedUser authenticatedUser, UUID travelId, UUID travelRecordId);
+
+  TravelRecordResDto getPublished(UUID travelRecordId);
+
+  List<TravelRecordFeedResDto> getLatestFeed();
 
   PlaceReviewResDto createPlaceReview(
       AuthenticatedUser authenticatedUser,

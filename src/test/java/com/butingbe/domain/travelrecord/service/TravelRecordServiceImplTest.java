@@ -23,6 +23,7 @@ import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
 import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
@@ -39,6 +40,7 @@ import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -295,6 +297,76 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     authenticatedUser, draft.originalTravelId(), draft.travelRecordId()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Travel record itinerary is required.");
+  }
+
+  @Test
+  @DisplayName("published travel record can be viewed publicly")
+  void getPublishedSuccess() {
+    User user =
+        userRepository.save(createUser("record-public-detail@example.com", "record-public-detail"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelRecordResDto result = travelRecordService.getPublished(published.travelRecordId());
+
+    assertThat(result.travelRecordId()).isEqualTo(published.travelRecordId());
+    assertThat(result.authorId()).isEqualTo(user.getId());
+    assertThat(result.status()).isEqualTo(TravelRecordStatus.PUBLISHED);
+    assertThat(result.publishedAt()).isNotNull();
+    assertThat(result.days()).hasSize(1);
+    assertThat(result.days().getFirst().places().getFirst().placeName())
+        .isEqualTo("Busan Station");
+  }
+
+  @Test
+  @DisplayName("draft travel record cannot be viewed publicly")
+  void getPublishedRejectsDraft() {
+    User user =
+        userRepository.save(createUser("record-public-draft@example.com", "record-public-draft"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+
+    assertThatThrownBy(() -> travelRecordService.getPublished(draft.travelRecordId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel record not found.");
+  }
+
+  @Test
+  @DisplayName("latest feed returns only published travel records in newest order")
+  void getLatestFeedReturnsPublishedRecordsInNewestOrder() {
+    User olderUser =
+        userRepository.save(createUser("record-feed-older@example.com", "record-feed-older"));
+    User newerUser =
+        userRepository.save(createUser("record-feed-newer@example.com", "record-feed-newer"));
+    User draftUser =
+        userRepository.save(createUser("record-feed-draft@example.com", "record-feed-draft"));
+    AuthenticatedUser olderAuthenticatedUser = AuthenticatedUser.from(olderUser);
+    AuthenticatedUser newerAuthenticatedUser = AuthenticatedUser.from(newerUser);
+    AuthenticatedUser draftAuthenticatedUser = AuthenticatedUser.from(draftUser);
+    TravelRecordResDto olderDraft = createDraftWithOnePlace(olderAuthenticatedUser, "Older Feed");
+    TravelRecordResDto newerDraft = createDraftWithOnePlace(newerAuthenticatedUser, "Newer Feed");
+    TravelRecordResDto hiddenDraft = createDraftWithOnePlace(draftAuthenticatedUser, "Draft Feed");
+    TravelRecordResDto olderPublished =
+        travelRecordService.publish(
+            olderAuthenticatedUser, olderDraft.originalTravelId(), olderDraft.travelRecordId());
+    TravelRecordResDto newerPublished =
+        travelRecordService.publish(
+            newerAuthenticatedUser, newerDraft.originalTravelId(), newerDraft.travelRecordId());
+
+    List<TravelRecordFeedResDto> result = travelRecordService.getLatestFeed();
+
+    assertThat(result)
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(newerPublished.travelRecordId(), olderPublished.travelRecordId());
+    assertThat(result)
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .doesNotContain(hiddenDraft.travelRecordId());
+    assertThat(result.getFirst().title()).isEqualTo("Newer Feed");
+    assertThat(result.getFirst().authorNickname()).isEqualTo("record-feed-newer");
+    assertThat(result.getFirst().publishedAt()).isNotNull();
   }
 
   @Test
@@ -589,13 +661,21 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   private TravelRecordResDto createDraftWithOnePlace(AuthenticatedUser authenticatedUser) {
+    return createDraftWithOnePlace(authenticatedUser, null);
+  }
+
+  private TravelRecordResDto createDraftWithOnePlace(
+      AuthenticatedUser authenticatedUser, String title) {
     TravelResDto travel = createCompletedTravel(authenticatedUser);
     PlanResDto firstDay =
         travelService.createPlan(
             authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
     createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station");
 
-    return travelRecordService.createDraft(authenticatedUser, travel.id(), null);
+    return travelRecordService.createDraft(
+        authenticatedUser,
+        travel.id(),
+        title == null ? null : new TravelRecordCreateReqDto(title, null, null));
   }
 
   private PlanPlaceResDto createPlace(
