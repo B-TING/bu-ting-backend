@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelrecord.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.Plan;
 import com.butingbe.domain.travel.entity.PlanPlace;
 import com.butingbe.domain.travel.entity.PlanRoute;
@@ -15,6 +16,7 @@ import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
+import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto.TravelRecordDayResDto;
@@ -38,6 +40,7 @@ import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -160,6 +163,23 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .stream()
         .map(TravelRecordFeedResDto::from)
         .toList();
+  }
+
+  @Override
+  public PlaceReviewSummaryResDto getPlaceReviewSummary(
+      PlaceProvider provider, String providerPlaceId) {
+    validatePlaceReviewSummaryRequest(provider, providerPlaceId);
+
+    List<PlaceReview> reviews =
+        placeReviewRepository.findByPlaceAndRecordStatus(
+            provider, providerPlaceId, TravelRecordStatus.PUBLISHED);
+
+    return PlaceReviewSummaryResDto.of(
+        provider,
+        providerPlaceId,
+        calculateAverageRating(reviews),
+        calculateRatingCounts(reviews),
+        reviews);
   }
 
   @Override
@@ -462,6 +482,16 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
   }
 
+  private void validatePlaceReviewSummaryRequest(PlaceProvider provider, String providerPlaceId) {
+    if (provider == null) {
+      throw new IllegalArgumentException("Place provider is required.");
+    }
+
+    if (providerPlaceId == null || providerPlaceId.isBlank()) {
+      throw new IllegalArgumentException("Provider place id is required.");
+    }
+  }
+
   private void validatePlaceReviewNotDuplicated(UUID travelRecordPlaceId) {
     if (placeReviewRepository.findByTravelRecordPlace_Id(travelRecordPlaceId).isPresent()) {
       throw new DuplicateResourceException("Place review already exists.");
@@ -490,5 +520,29 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     return DEFAULT_TITLE;
+  }
+
+  private double calculateAverageRating(List<PlaceReview> reviews) {
+    if (reviews.isEmpty()) {
+      return 0.0;
+    }
+
+    double average =
+        reviews.stream().mapToInt(PlaceReview::getRating).average().orElse(0.0);
+
+    return Math.round(average * 10.0) / 10.0;
+  }
+
+  private Map<Integer, Long> calculateRatingCounts(List<PlaceReview> reviews) {
+    Map<Integer, Long> ratingCounts = new LinkedHashMap<>();
+    for (int rating = 1; rating <= 5; rating++) {
+      ratingCounts.put(rating, 0L);
+    }
+
+    for (PlaceReview review : reviews) {
+      ratingCounts.computeIfPresent(review.getRating(), (rating, count) -> count + 1);
+    }
+
+    return ratingCounts;
   }
 }

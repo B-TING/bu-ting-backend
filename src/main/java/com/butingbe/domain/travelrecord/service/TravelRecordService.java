@@ -1,11 +1,13 @@
 package com.butingbe.domain.travelrecord.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
+import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import java.util.List;
@@ -31,6 +33,8 @@ public interface TravelRecordService {
   TravelRecordResDto getPublished(UUID travelRecordId);
 
   List<TravelRecordFeedResDto> getLatestFeed();
+
+  PlaceReviewSummaryResDto getPlaceReviewSummary(PlaceProvider provider, String providerPlaceId);
 
   PlaceReviewResDto createPlaceReview(
       AuthenticatedUser authenticatedUser,

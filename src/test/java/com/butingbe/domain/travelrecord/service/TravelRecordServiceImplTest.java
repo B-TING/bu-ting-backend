@@ -23,6 +23,7 @@ import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
+import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
@@ -483,6 +484,80 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     place.travelRecordPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Place review not found.");
+  }
+
+  @Test
+  @DisplayName("place review summary aggregates only published travel record reviews")
+  void getPlaceReviewSummaryAggregatesPublishedReviews() {
+    User firstUser =
+        userRepository.save(createUser("review-summary-first@example.com", "review-summary-first"));
+    User secondUser =
+        userRepository.save(
+            createUser("review-summary-second@example.com", "review-summary-second"));
+    User draftUser =
+        userRepository.save(createUser("review-summary-draft@example.com", "review-summary-draft"));
+    AuthenticatedUser firstAuthenticatedUser = AuthenticatedUser.from(firstUser);
+    AuthenticatedUser secondAuthenticatedUser = AuthenticatedUser.from(secondUser);
+    AuthenticatedUser draftAuthenticatedUser = AuthenticatedUser.from(draftUser);
+    TravelRecordResDto firstDraft = createDraftWithOnePlace(firstAuthenticatedUser, "First Record");
+    TravelRecordResDto secondDraft =
+        createDraftWithOnePlace(secondAuthenticatedUser, "Second Record");
+    TravelRecordResDto hiddenDraft = createDraftWithOnePlace(draftAuthenticatedUser, "Draft Record");
+    var firstPlace = firstDraft.days().getFirst().places().getFirst();
+    var secondPlace = secondDraft.days().getFirst().places().getFirst();
+    var hiddenPlace = hiddenDraft.days().getFirst().places().getFirst();
+    travelRecordService.createPlaceReview(
+        firstAuthenticatedUser,
+        firstDraft.originalTravelId(),
+        firstDraft.travelRecordId(),
+        firstPlace.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(4, "Good route"));
+    travelRecordService.createPlaceReview(
+        secondAuthenticatedUser,
+        secondDraft.originalTravelId(),
+        secondDraft.travelRecordId(),
+        secondPlace.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(5, "Perfect stop"));
+    travelRecordService.createPlaceReview(
+        draftAuthenticatedUser,
+        hiddenDraft.originalTravelId(),
+        hiddenDraft.travelRecordId(),
+        hiddenPlace.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(1, "Still draft"));
+    travelRecordService.publish(
+        firstAuthenticatedUser, firstDraft.originalTravelId(), firstDraft.travelRecordId());
+    travelRecordService.publish(
+        secondAuthenticatedUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
+
+    PlaceReviewSummaryResDto result =
+        travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "Busan Station");
+
+    assertThat(result.provider()).isEqualTo(PlaceProvider.GOOGLE);
+    assertThat(result.providerPlaceId()).isEqualTo("Busan Station");
+    assertThat(result.reviewCount()).isEqualTo(2);
+    assertThat(result.averageRating()).isEqualTo(4.5);
+    assertThat(result.ratingCounts()).containsEntry(1, 0L);
+    assertThat(result.ratingCounts()).containsEntry(4, 1L);
+    assertThat(result.ratingCounts()).containsEntry(5, 1L);
+    assertThat(result.reviews())
+        .extracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::content)
+        .containsExactlyInAnyOrder("Perfect stop", "Good route");
+    assertThat(result.reviews())
+        .extracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::travelRecordId)
+        .doesNotContain(hiddenDraft.travelRecordId());
+  }
+
+  @Test
+  @DisplayName("place review summary returns empty aggregate when there are no public reviews")
+  void getPlaceReviewSummaryReturnsEmptyAggregate() {
+    PlaceReviewSummaryResDto result =
+        travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "missing-place");
+
+    assertThat(result.reviewCount()).isZero();
+    assertThat(result.averageRating()).isEqualTo(0.0);
+    assertThat(result.ratingCounts()).containsEntry(1, 0L);
+    assertThat(result.ratingCounts()).containsEntry(5, 0L);
+    assertThat(result.reviews()).isEmpty();
   }
 
   @Test

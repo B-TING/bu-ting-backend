@@ -24,6 +24,7 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, UUID> 
       where trp.provider = :provider
         and trp.providerPlaceId = :providerPlaceId
         and tr.status = :status
+      order by pr.createdAt desc
       """)
   List<PlaceReview> findByPlaceAndRecordStatus(
       @Param("provider") PlaceProvider provider,
