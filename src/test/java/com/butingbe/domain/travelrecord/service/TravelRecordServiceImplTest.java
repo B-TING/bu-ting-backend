@@ -667,6 +667,81 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("author can republish own hidden travel record")
+  void republishMyRecordRepublishesHiddenPublishedRecord() {
+    User user =
+        userRepository.save(createUser("record-republish@example.com", "record-republish"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Republish Me");
+    var place = draft.days().getFirst().places().getFirst();
+    travelRecordService.createPlaceReview(
+        authenticatedUser,
+        draft.originalTravelId(),
+        draft.travelRecordId(),
+        place.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(5, "Back again"));
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+    TravelRecordResDto hidden =
+        travelRecordService.hideMyRecord(authenticatedUser, published.travelRecordId());
+
+    TravelRecordResDto result =
+        travelRecordService.republishMyRecord(authenticatedUser, hidden.travelRecordId());
+
+    assertThat(result.status()).isEqualTo(TravelRecordStatus.PUBLISHED);
+    assertThat(result.publishedAt()).isEqualTo(published.publishedAt());
+    assertThat(travelRecordService.getPublished(published.travelRecordId()).status())
+        .isEqualTo(TravelRecordStatus.PUBLISHED);
+    assertThat(travelRecordService.getLatestFeed(null, null).items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .contains(published.travelRecordId());
+    assertThat(travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "Busan Station")
+            .reviews())
+        .extracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::travelRecordId)
+        .contains(published.travelRecordId());
+  }
+
+  @Test
+  @DisplayName("draft hidden record cannot be republished")
+  void republishMyRecordRejectsNeverPublishedHiddenRecord() {
+    User user =
+        userRepository.save(
+            createUser("record-republish-draft@example.com", "record-republish-draft"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Draft Hidden");
+    travelRecordService.hideMyRecord(authenticatedUser, draft.travelRecordId());
+
+    assertThatThrownBy(
+            () -> travelRecordService.republishMyRecord(authenticatedUser, draft.travelRecordId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Only previously published travel records can be republished.");
+  }
+
+  @Test
+  @DisplayName("non-author cannot republish my travel record")
+  void republishMyRecordRejectsNonAuthor() {
+    User owner =
+        userRepository.save(
+            createUser("record-republish-owner@example.com", "record-republish-owner"));
+    User outsider =
+        userRepository.save(
+            createUser("record-republish-outsider@example.com", "record-republish-outsider"));
+    AuthenticatedUser ownerUser = AuthenticatedUser.from(owner);
+    TravelRecordResDto draft = createDraftWithOnePlace(ownerUser, "Owner Republish");
+    TravelRecordResDto published =
+        travelRecordService.publish(ownerUser, draft.originalTravelId(), draft.travelRecordId());
+    travelRecordService.hideMyRecord(ownerUser, published.travelRecordId());
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.republishMyRecord(
+                    AuthenticatedUser.from(outsider), published.travelRecordId()))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not the travel record author.");
+  }
+
+  @Test
   @DisplayName("author can create place review for a draft travel record place")
   void createPlaceReviewSuccess() {
     User user = userRepository.save(createUser("review-owner@example.com", "review-owner"));

@@ -78,6 +78,16 @@ public class PublicTravelRecordController {
     return ResponseEntity.ok(travelRecordService.hideMyRecord(user, travelRecordId));
   }
 
+  @PostMapping("/me/{travelRecordId}/republish")
+  public ResponseEntity<TravelRecordResDto> republishMyRecord(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID travelRecordId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(travelRecordService.republishMyRecord(user, travelRecordId));
+  }
+
   @GetMapping("/{travelRecordId}")
   public ResponseEntity<TravelRecordResDto> getPublished(@PathVariable UUID travelRecordId) {
     return ResponseEntity.ok(travelRecordService.getPublished(travelRecordId));

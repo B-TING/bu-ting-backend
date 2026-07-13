@@ -44,6 +44,8 @@ public interface TravelRecordService {
 
   TravelRecordResDto hideMyRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
 
+  TravelRecordResDto republishMyRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
+
   PlaceReviewSummaryResDto getPlaceReviewSummary(PlaceProvider provider, String providerPlaceId);
 
   PlaceReviewResDto createPlaceReview(

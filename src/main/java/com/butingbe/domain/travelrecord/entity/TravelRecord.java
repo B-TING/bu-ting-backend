@@ -121,4 +121,8 @@ public class TravelRecord {
   public void hide() {
     this.status = TravelRecordStatus.HIDDEN;
   }
+
+  public void republish() {
+    this.status = TravelRecordStatus.PUBLISHED;
+  }
 }

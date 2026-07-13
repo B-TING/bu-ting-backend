@@ -240,6 +240,20 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   @Override
+  @Transactional
+  public TravelRecordResDto republishMyRecord(
+      AuthenticatedUser authenticatedUser, UUID travelRecordId) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validateAuthor(travelRecord, author.getId());
+    validateRepublishable(travelRecord);
+
+    travelRecord.republish();
+
+    return toResponse(travelRecord);
+  }
+
+  @Override
   public PlaceReviewSummaryResDto getPlaceReviewSummary(
       PlaceProvider provider, String providerPlaceId) {
     validatePlaceReviewSummaryRequest(provider, providerPlaceId);
@@ -523,6 +537,16 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private void validatePublished(TravelRecord travelRecord) {
     if (travelRecord.getStatus() != TravelRecordStatus.PUBLISHED) {
       throw new ResourceNotFoundException("Travel record not found.");
+    }
+  }
+
+  private void validateRepublishable(TravelRecord travelRecord) {
+    if (travelRecord.getStatus() != TravelRecordStatus.HIDDEN) {
+      throw new IllegalArgumentException("Only hidden travel records can be republished.");
+    }
+
+    if (travelRecord.getPublishedAt() == null) {
+      throw new IllegalArgumentException("Only previously published travel records can be republished.");
     }
   }
 
