@@ -24,6 +24,7 @@ import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
@@ -739,6 +740,115 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     AuthenticatedUser.from(outsider), published.travelRecordId()))
         .isInstanceOf(ForbiddenException.class)
         .hasMessage("User is not the travel record author.");
+  }
+
+  @Test
+  @DisplayName("user can bookmark a published travel record")
+  void bookmarkTravelRecordSuccess() {
+    User author =
+        userRepository.save(createUser("record-bookmark-author@example.com", "record-bookmark-author"));
+    User user =
+        userRepository.save(createUser("record-bookmark-user@example.com", "record-bookmark-user"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Bookmark Target");
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelRecordBookmarkResDto result =
+        travelRecordService.bookmarkTravelRecord(
+            AuthenticatedUser.from(user), published.travelRecordId());
+
+    assertThat(result.bookmarkId()).isNotNull();
+    assertThat(result.bookmarkedAt()).isNotNull();
+    assertThat(result.travelRecord().travelRecordId()).isEqualTo(published.travelRecordId());
+    assertThat(result.travelRecord().title()).isEqualTo("Bookmark Target");
+  }
+
+  @Test
+  @DisplayName("bookmark rejects duplicated travel record bookmark")
+  void bookmarkTravelRecordRejectsDuplicate() {
+    User author =
+        userRepository.save(
+            createUser("record-bookmark-duplicate-author@example.com", "record-bookmark-duplicate-author"));
+    User user =
+        userRepository.save(
+            createUser("record-bookmark-duplicate-user@example.com", "record-bookmark-duplicate-user"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Duplicate Bookmark");
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, draft.originalTravelId(), draft.travelRecordId());
+    travelRecordService.bookmarkTravelRecord(authenticatedUser, published.travelRecordId());
+
+    assertThatThrownBy(
+            () -> travelRecordService.bookmarkTravelRecord(authenticatedUser, published.travelRecordId()))
+        .isInstanceOf(DuplicateResourceException.class)
+        .hasMessage("Travel record bookmark already exists.");
+  }
+
+  @Test
+  @DisplayName("bookmark rejects non-published travel record")
+  void bookmarkTravelRecordRejectsNonPublishedRecord() {
+    User user =
+        userRepository.save(
+            createUser("record-bookmark-draft-user@example.com", "record-bookmark-draft-user"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Draft Bookmark");
+
+    assertThatThrownBy(
+            () -> travelRecordService.bookmarkTravelRecord(authenticatedUser, draft.travelRecordId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel record not found.");
+  }
+
+  @Test
+  @DisplayName("user can unbookmark a travel record idempotently")
+  void unbookmarkTravelRecordSuccess() {
+    User author =
+        userRepository.save(
+            createUser("record-unbookmark-author@example.com", "record-unbookmark-author"));
+    User user =
+        userRepository.save(createUser("record-unbookmark-user@example.com", "record-unbookmark-user"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Unbookmark Target");
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, draft.originalTravelId(), draft.travelRecordId());
+    travelRecordService.bookmarkTravelRecord(authenticatedUser, published.travelRecordId());
+
+    travelRecordService.unbookmarkTravelRecord(authenticatedUser, published.travelRecordId());
+    travelRecordService.unbookmarkTravelRecord(authenticatedUser, published.travelRecordId());
+
+    assertThat(travelRecordService.getMyBookmarkedRecords(authenticatedUser)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("my bookmarked records returns only published records")
+  void getMyBookmarkedRecordsReturnsOnlyPublishedRecords() {
+    User author =
+        userRepository.save(
+            createUser("record-bookmark-list-author@example.com", "record-bookmark-list-author"));
+    User user =
+        userRepository.save(createUser("record-bookmark-list-user@example.com", "record-bookmark-list-user"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto firstDraft = createDraftWithOnePlace(authorUser, "First Bookmark");
+    TravelRecordResDto secondDraft = createDraftWithOnePlace(authorUser, "Second Bookmark");
+    TravelRecordResDto firstPublished =
+        travelRecordService.publish(authorUser, firstDraft.originalTravelId(), firstDraft.travelRecordId());
+    TravelRecordResDto secondPublished =
+        travelRecordService.publish(authorUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
+    travelRecordService.bookmarkTravelRecord(authenticatedUser, firstPublished.travelRecordId());
+    travelRecordService.bookmarkTravelRecord(authenticatedUser, secondPublished.travelRecordId());
+    travelRecordService.hideMyRecord(authorUser, firstPublished.travelRecordId());
+
+    List<TravelRecordBookmarkResDto> result =
+        travelRecordService.getMyBookmarkedRecords(authenticatedUser);
+
+    assertThat(result)
+        .extracting(bookmark -> bookmark.travelRecord().travelRecordId())
+        .containsExactly(secondPublished.travelRecordId());
+    assertThat(result.getFirst().travelRecord().title()).isEqualTo("Second Bookmark");
   }
 
   @Test

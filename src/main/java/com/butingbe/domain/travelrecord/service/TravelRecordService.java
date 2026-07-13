@@ -8,6 +8,7 @@ import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
@@ -45,6 +46,13 @@ public interface TravelRecordService {
   TravelRecordResDto hideMyRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
 
   TravelRecordResDto republishMyRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
+
+  TravelRecordBookmarkResDto bookmarkTravelRecord(
+      AuthenticatedUser authenticatedUser, UUID travelRecordId);
+
+  void unbookmarkTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
+
+  List<TravelRecordBookmarkResDto> getMyBookmarkedRecords(AuthenticatedUser authenticatedUser);
 
   PlaceReviewSummaryResDto getPlaceReviewSummary(PlaceProvider provider, String providerPlaceId);
 
