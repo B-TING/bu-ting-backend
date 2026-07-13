@@ -10,6 +10,7 @@ import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
@@ -58,6 +59,9 @@ public interface TravelRecordService {
   TravelRecordLikeResDto likeTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
 
   void unlikeTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
+
+  List<TravelRecordFeedResDto> getTravelRecordsByPlace(
+      PlaceProvider provider, String providerPlaceId);
 
   PlaceReviewSummaryResDto getPlaceReviewSummary(PlaceProvider provider, String providerPlaceId);
 

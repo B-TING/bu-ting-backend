@@ -1130,6 +1130,69 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("place travel records returns published records containing the place")
+  void getTravelRecordsByPlaceReturnsPublishedRecordsContainingPlace() {
+    User firstUser =
+        userRepository.save(
+            createUser("record-place-first@example.com", "record-place-first"));
+    User secondUser =
+        userRepository.save(
+            createUser("record-place-second@example.com", "record-place-second"));
+    User hiddenUser =
+        userRepository.save(
+            createUser("record-place-hidden@example.com", "record-place-hidden"));
+    User otherUser =
+        userRepository.save(
+            createUser("record-place-other@example.com", "record-place-other"));
+    AuthenticatedUser firstAuthenticatedUser = AuthenticatedUser.from(firstUser);
+    AuthenticatedUser secondAuthenticatedUser = AuthenticatedUser.from(secondUser);
+    AuthenticatedUser hiddenAuthenticatedUser = AuthenticatedUser.from(hiddenUser);
+    AuthenticatedUser otherAuthenticatedUser = AuthenticatedUser.from(otherUser);
+    TravelRecordResDto firstDraft =
+        createDraftWithOnePlace(firstAuthenticatedUser, "First Place Record");
+    TravelRecordResDto secondDraft =
+        createDraftWithOnePlace(secondAuthenticatedUser, "Second Place Record");
+    TravelRecordResDto hiddenDraft =
+        createDraftWithOnePlace(hiddenAuthenticatedUser, "Hidden Place Record");
+    TravelRecordResDto otherDraft =
+        createDraftWithOnePlace(otherAuthenticatedUser, "Other Place Record", "Haeundae");
+    TravelRecordResDto firstPublished =
+        travelRecordService.publish(
+            firstAuthenticatedUser, firstDraft.originalTravelId(), firstDraft.travelRecordId());
+    TravelRecordResDto secondPublished =
+        travelRecordService.publish(
+            secondAuthenticatedUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
+    TravelRecordResDto hiddenPublished =
+        travelRecordService.publish(
+            hiddenAuthenticatedUser, hiddenDraft.originalTravelId(), hiddenDraft.travelRecordId());
+    travelRecordService.publish(
+        otherAuthenticatedUser, otherDraft.originalTravelId(), otherDraft.travelRecordId());
+    travelRecordService.hideMyRecord(hiddenAuthenticatedUser, hiddenPublished.travelRecordId());
+
+    List<TravelRecordFeedResDto> result =
+        travelRecordService.getTravelRecordsByPlace(PlaceProvider.GOOGLE, "Busan Station");
+
+    assertThat(result)
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(secondPublished.travelRecordId(), firstPublished.travelRecordId());
+    assertThat(result)
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .doesNotContain(hiddenPublished.travelRecordId(), otherDraft.travelRecordId());
+    assertThat(result.getFirst().title()).isEqualTo("Second Place Record");
+    assertThat(result.getFirst().likeCount()).isZero();
+    assertThat(result.getFirst().viewCount()).isZero();
+  }
+
+  @Test
+  @DisplayName("place travel records returns empty list when there are no public records")
+  void getTravelRecordsByPlaceReturnsEmptyList() {
+    List<TravelRecordFeedResDto> result =
+        travelRecordService.getTravelRecordsByPlace(PlaceProvider.GOOGLE, "missing-place");
+
+    assertThat(result).isEmpty();
+  }
+
+  @Test
   @DisplayName("author can update place review for a draft travel record place")
   void updatePlaceReviewSuccess() {
     User user = userRepository.save(createUser("review-update@example.com", "review-update"));
@@ -1310,11 +1373,16 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
   private TravelRecordResDto createDraftWithOnePlace(
       AuthenticatedUser authenticatedUser, String title) {
+    return createDraftWithOnePlace(authenticatedUser, title, "Busan Station");
+  }
+
+  private TravelRecordResDto createDraftWithOnePlace(
+      AuthenticatedUser authenticatedUser, String title, String placeName) {
     TravelResDto travel = createCompletedTravel(authenticatedUser);
     PlanResDto firstDay =
         travelService.createPlan(
             authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
-    createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station");
+    createPlace(authenticatedUser, firstDay.planId(), 1, placeName);
 
     return travelRecordService.createDraft(
         authenticatedUser,

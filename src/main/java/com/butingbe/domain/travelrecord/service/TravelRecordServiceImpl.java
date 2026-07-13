@@ -335,6 +335,18 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   @Override
+  public List<TravelRecordFeedResDto> getTravelRecordsByPlace(
+      PlaceProvider provider, String providerPlaceId) {
+    validatePlaceReviewSummaryRequest(provider, providerPlaceId);
+
+    return travelRecordRepository
+        .findPublishedRecordsByPlace(provider, providerPlaceId, TravelRecordStatus.PUBLISHED)
+        .stream()
+        .map(TravelRecordFeedResDto::from)
+        .toList();
+  }
+
+  @Override
   public PlaceReviewSummaryResDto getPlaceReviewSummary(
       PlaceProvider provider, String providerPlaceId) {
     validatePlaceReviewSummaryRequest(provider, providerPlaceId);
