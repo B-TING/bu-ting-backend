@@ -2,6 +2,7 @@ package com.butingbe.domain.travelrecord.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.entity.PlaceProvider;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
@@ -46,10 +47,11 @@ public class PublicTravelRecordController {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
           LocalDate travelStartDate,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate travelEndDate) {
+          LocalDate travelEndDate,
+      @RequestParam(required = false) TravelRecordFeedSort sort) {
     return ResponseEntity.ok(
         travelRecordService.getLatestFeed(
-            cursor, size, keyword, provider, providerPlaceId, travelStartDate, travelEndDate));
+            cursor, size, keyword, provider, providerPlaceId, travelStartDate, travelEndDate, sort));
   }
 
   @GetMapping("/me")

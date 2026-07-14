@@ -14,6 +14,7 @@ import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
@@ -176,7 +177,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   @Override
   public TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size) {
-    return getLatestFeed(cursor, size, null, null, null, null, null);
+    return getLatestFeed(cursor, size, null, null, null, null, null, null);
   }
 
   @Override
@@ -188,39 +189,28 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       String providerPlaceId,
       LocalDate travelStartDate,
       LocalDate travelEndDate) {
+    return getLatestFeed(
+        cursor, size, keyword, provider, providerPlaceId, travelStartDate, travelEndDate, null);
+  }
+
+  @Override
+  public TravelRecordFeedPageResDto getLatestFeed(
+      String cursor,
+      Integer size,
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
+      LocalDate travelEndDate,
+      TravelRecordFeedSort sort) {
+    TravelRecordFeedSort feedSort = sort == null ? TravelRecordFeedSort.LATEST : sort;
     int pageSize = resolveFeedSize(size);
     FeedCursor feedCursor = decodeFeedCursor(cursor);
+    validateFeedCursorSort(feedCursor, feedSort);
     FeedSearchCondition searchCondition =
         resolveFeedSearchCondition(keyword, provider, providerPlaceId, travelStartDate, travelEndDate);
     PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
-    List<TravelRecord> fetchedRecords =
-        feedCursor == null
-            ? travelRecordRepository.findFeedPage(
-                TravelRecordStatus.PUBLISHED,
-                searchCondition.hasKeyword(),
-                searchCondition.keywordPattern(),
-                searchCondition.hasPlace(),
-                searchCondition.provider(),
-                searchCondition.providerPlaceId(),
-                searchCondition.hasTravelStartDate(),
-                searchCondition.travelStartDate(),
-                searchCondition.hasTravelEndDate(),
-                searchCondition.travelEndDate(),
-                pageRequest)
-            : travelRecordRepository.findFeedPageAfterCursor(
-                TravelRecordStatus.PUBLISHED,
-                feedCursor.publishedAt(),
-                feedCursor.createdAt(),
-                searchCondition.hasKeyword(),
-                searchCondition.keywordPattern(),
-                searchCondition.hasPlace(),
-                searchCondition.provider(),
-                searchCondition.providerPlaceId(),
-                searchCondition.hasTravelStartDate(),
-                searchCondition.travelStartDate(),
-                searchCondition.hasTravelEndDate(),
-                searchCondition.travelEndDate(),
-                pageRequest);
+    List<TravelRecord> fetchedRecords = findFeedRecords(feedCursor, searchCondition, feedSort, pageRequest);
     boolean hasNext = fetchedRecords.size() > pageSize;
     List<TravelRecord> pageRecords =
         hasNext ? fetchedRecords.subList(0, pageSize) : fetchedRecords;
@@ -229,7 +219,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
     return new TravelRecordFeedPageResDto(
         items,
-        hasNext ? encodeFeedCursor(pageRecords.getLast()) : null,
+        hasNext ? encodeFeedCursor(pageRecords.getLast(), feedSort) : null,
         hasNext);
   }
 
@@ -795,6 +785,100 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     return size;
   }
 
+  private List<TravelRecord> findFeedRecords(
+      FeedCursor feedCursor,
+      FeedSearchCondition searchCondition,
+      TravelRecordFeedSort sort,
+      PageRequest pageRequest) {
+    if (feedCursor == null) {
+      return switch (sort) {
+        case LATEST -> travelRecordRepository.findFeedPage(
+            TravelRecordStatus.PUBLISHED,
+            searchCondition.hasKeyword(),
+            searchCondition.keywordPattern(),
+            searchCondition.hasPlace(),
+            searchCondition.provider(),
+            searchCondition.providerPlaceId(),
+            searchCondition.hasTravelStartDate(),
+            searchCondition.travelStartDate(),
+            searchCondition.hasTravelEndDate(),
+            searchCondition.travelEndDate(),
+            pageRequest);
+        case MOST_LIKED -> travelRecordRepository.findFeedPageOrderByLikeCount(
+            TravelRecordStatus.PUBLISHED,
+            searchCondition.hasKeyword(),
+            searchCondition.keywordPattern(),
+            searchCondition.hasPlace(),
+            searchCondition.provider(),
+            searchCondition.providerPlaceId(),
+            searchCondition.hasTravelStartDate(),
+            searchCondition.travelStartDate(),
+            searchCondition.hasTravelEndDate(),
+            searchCondition.travelEndDate(),
+            pageRequest);
+        case MOST_VIEWED -> travelRecordRepository.findFeedPageOrderByViewCount(
+            TravelRecordStatus.PUBLISHED,
+            searchCondition.hasKeyword(),
+            searchCondition.keywordPattern(),
+            searchCondition.hasPlace(),
+            searchCondition.provider(),
+            searchCondition.providerPlaceId(),
+            searchCondition.hasTravelStartDate(),
+            searchCondition.travelStartDate(),
+            searchCondition.hasTravelEndDate(),
+            searchCondition.travelEndDate(),
+            pageRequest);
+      };
+    }
+
+    return switch (sort) {
+      case LATEST -> travelRecordRepository.findFeedPageAfterCursor(
+          TravelRecordStatus.PUBLISHED,
+          feedCursor.publishedAt(),
+          feedCursor.createdAt(),
+          searchCondition.hasKeyword(),
+          searchCondition.keywordPattern(),
+          searchCondition.hasPlace(),
+          searchCondition.provider(),
+          searchCondition.providerPlaceId(),
+          searchCondition.hasTravelStartDate(),
+          searchCondition.travelStartDate(),
+          searchCondition.hasTravelEndDate(),
+          searchCondition.travelEndDate(),
+          pageRequest);
+      case MOST_LIKED -> travelRecordRepository.findFeedPageAfterCursorOrderByLikeCount(
+          TravelRecordStatus.PUBLISHED,
+          feedCursor.sortCount(),
+          feedCursor.publishedAt(),
+          feedCursor.createdAt(),
+          searchCondition.hasKeyword(),
+          searchCondition.keywordPattern(),
+          searchCondition.hasPlace(),
+          searchCondition.provider(),
+          searchCondition.providerPlaceId(),
+          searchCondition.hasTravelStartDate(),
+          searchCondition.travelStartDate(),
+          searchCondition.hasTravelEndDate(),
+          searchCondition.travelEndDate(),
+          pageRequest);
+      case MOST_VIEWED -> travelRecordRepository.findFeedPageAfterCursorOrderByViewCount(
+          TravelRecordStatus.PUBLISHED,
+          feedCursor.sortCount(),
+          feedCursor.publishedAt(),
+          feedCursor.createdAt(),
+          searchCondition.hasKeyword(),
+          searchCondition.keywordPattern(),
+          searchCondition.hasPlace(),
+          searchCondition.provider(),
+          searchCondition.providerPlaceId(),
+          searchCondition.hasTravelStartDate(),
+          searchCondition.travelStartDate(),
+          searchCondition.hasTravelEndDate(),
+          searchCondition.travelEndDate(),
+          pageRequest);
+    };
+  }
+
   private FeedSearchCondition resolveFeedSearchCondition(
       String keyword,
       PlaceProvider provider,
@@ -828,11 +912,32 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         travelEndDate);
   }
 
-  private String encodeFeedCursor(TravelRecord travelRecord) {
-    String rawCursor = travelRecord.getPublishedAt() + "|" + travelRecord.getCreatedAt();
+  private void validateFeedCursorSort(FeedCursor feedCursor, TravelRecordFeedSort sort) {
+    if (feedCursor != null && feedCursor.sort() != sort) {
+      throw new IllegalArgumentException("Feed cursor sort does not match requested sort.");
+    }
+  }
+
+  private String encodeFeedCursor(TravelRecord travelRecord, TravelRecordFeedSort sort) {
+    String rawCursor =
+        sort
+            + "|"
+            + resolveCursorSortCount(travelRecord, sort)
+            + "|"
+            + travelRecord.getPublishedAt()
+            + "|"
+            + travelRecord.getCreatedAt();
     return Base64.getUrlEncoder()
         .withoutPadding()
         .encodeToString(rawCursor.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private long resolveCursorSortCount(TravelRecord travelRecord, TravelRecordFeedSort sort) {
+    return switch (sort) {
+      case LATEST -> 0L;
+      case MOST_LIKED -> travelRecord.getLikeCount();
+      case MOST_VIEWED -> travelRecord.getViewCount();
+    };
   }
 
   private FeedCursor decodeFeedCursor(String cursor) {
@@ -844,17 +949,33 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       String rawCursor =
           new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
       String[] values = rawCursor.split("\\|");
-      if (values.length != 2) {
+      if (values.length == 2) {
+        return new FeedCursor(
+            TravelRecordFeedSort.LATEST,
+            0L,
+            LocalDateTime.parse(values[0]),
+            LocalDateTime.parse(values[1]));
+      }
+
+      if (values.length != 4) {
         throw new IllegalArgumentException("Invalid feed cursor.");
       }
 
-      return new FeedCursor(LocalDateTime.parse(values[0]), LocalDateTime.parse(values[1]));
+      return new FeedCursor(
+          TravelRecordFeedSort.valueOf(values[0]),
+          Long.parseLong(values[1]),
+          LocalDateTime.parse(values[2]),
+          LocalDateTime.parse(values[3]));
     } catch (IllegalArgumentException exception) {
       throw new IllegalArgumentException("Invalid feed cursor.");
     }
   }
 
-  private record FeedCursor(LocalDateTime publishedAt, LocalDateTime createdAt) {}
+  private record FeedCursor(
+      TravelRecordFeedSort sort,
+      long sortCount,
+      LocalDateTime publishedAt,
+      LocalDateTime createdAt) {}
 
   private record FeedSearchCondition(
       boolean hasKeyword,

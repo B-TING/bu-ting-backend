@@ -4,6 +4,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
@@ -38,6 +39,16 @@ public interface TravelRecordService {
   TravelRecordResDto getPublished(UUID travelRecordId);
 
   TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size);
+
+  TravelRecordFeedPageResDto getLatestFeed(
+      String cursor,
+      Integer size,
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
+      LocalDate travelEndDate,
+      TravelRecordFeedSort sort);
 
   TravelRecordFeedPageResDto getLatestFeed(
       String cursor,

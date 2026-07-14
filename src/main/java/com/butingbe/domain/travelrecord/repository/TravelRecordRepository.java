@@ -122,6 +122,210 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
 
   @Query(
       """
+      select tr
+      from TravelRecord tr
+      where tr.status = :status
+        and (
+          :hasKeyword = false
+          or lower(tr.title) like :keywordPattern
+          or lower(coalesce(tr.content, '')) like :keywordPattern
+          or exists (
+            select 1
+            from TravelRecordPlace trpKeyword
+            join trpKeyword.travelRecordDay trdKeyword
+            where trdKeyword.travelRecord = tr
+              and lower(trpKeyword.placeName) like :keywordPattern
+          )
+        )
+        and (
+          :hasPlace = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpPlace
+            join trpPlace.travelRecordDay trdPlace
+            where trdPlace.travelRecord = tr
+              and trpPlace.provider = :provider
+              and trpPlace.providerPlaceId = :providerPlaceId
+          )
+        )
+        and (:hasTravelStartDate = false or tr.travelEndDate >= :travelStartDate)
+        and (:hasTravelEndDate = false or tr.travelStartDate <= :travelEndDate)
+      order by tr.likeCount desc, tr.publishedAt desc, tr.createdAt desc
+      """)
+  List<TravelRecord> findFeedPageOrderByLikeCount(
+      @Param("status") TravelRecordStatus status,
+      @Param("hasKeyword") boolean hasKeyword,
+      @Param("keywordPattern") String keywordPattern,
+      @Param("hasPlace") boolean hasPlace,
+      @Param("provider") PlaceProvider provider,
+      @Param("providerPlaceId") String providerPlaceId,
+      @Param("hasTravelStartDate") boolean hasTravelStartDate,
+      @Param("travelStartDate") LocalDate travelStartDate,
+      @Param("hasTravelEndDate") boolean hasTravelEndDate,
+      @Param("travelEndDate") LocalDate travelEndDate,
+      Pageable pageable);
+
+  @Query(
+      """
+      select tr
+      from TravelRecord tr
+      where tr.status = :status
+        and (
+          tr.likeCount < :cursorSortCount
+          or (tr.likeCount = :cursorSortCount and tr.publishedAt < :cursorPublishedAt)
+          or (
+            tr.likeCount = :cursorSortCount
+            and tr.publishedAt = :cursorPublishedAt
+            and tr.createdAt < :cursorCreatedAt
+          )
+        )
+        and (
+          :hasKeyword = false
+          or lower(tr.title) like :keywordPattern
+          or lower(coalesce(tr.content, '')) like :keywordPattern
+          or exists (
+            select 1
+            from TravelRecordPlace trpKeyword
+            join trpKeyword.travelRecordDay trdKeyword
+            where trdKeyword.travelRecord = tr
+              and lower(trpKeyword.placeName) like :keywordPattern
+          )
+        )
+        and (
+          :hasPlace = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpPlace
+            join trpPlace.travelRecordDay trdPlace
+            where trdPlace.travelRecord = tr
+              and trpPlace.provider = :provider
+              and trpPlace.providerPlaceId = :providerPlaceId
+          )
+        )
+        and (:hasTravelStartDate = false or tr.travelEndDate >= :travelStartDate)
+        and (:hasTravelEndDate = false or tr.travelStartDate <= :travelEndDate)
+      order by tr.likeCount desc, tr.publishedAt desc, tr.createdAt desc
+      """)
+  List<TravelRecord> findFeedPageAfterCursorOrderByLikeCount(
+      @Param("status") TravelRecordStatus status,
+      @Param("cursorSortCount") long cursorSortCount,
+      @Param("cursorPublishedAt") LocalDateTime cursorPublishedAt,
+      @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+      @Param("hasKeyword") boolean hasKeyword,
+      @Param("keywordPattern") String keywordPattern,
+      @Param("hasPlace") boolean hasPlace,
+      @Param("provider") PlaceProvider provider,
+      @Param("providerPlaceId") String providerPlaceId,
+      @Param("hasTravelStartDate") boolean hasTravelStartDate,
+      @Param("travelStartDate") LocalDate travelStartDate,
+      @Param("hasTravelEndDate") boolean hasTravelEndDate,
+      @Param("travelEndDate") LocalDate travelEndDate,
+      Pageable pageable);
+
+  @Query(
+      """
+      select tr
+      from TravelRecord tr
+      where tr.status = :status
+        and (
+          :hasKeyword = false
+          or lower(tr.title) like :keywordPattern
+          or lower(coalesce(tr.content, '')) like :keywordPattern
+          or exists (
+            select 1
+            from TravelRecordPlace trpKeyword
+            join trpKeyword.travelRecordDay trdKeyword
+            where trdKeyword.travelRecord = tr
+              and lower(trpKeyword.placeName) like :keywordPattern
+          )
+        )
+        and (
+          :hasPlace = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpPlace
+            join trpPlace.travelRecordDay trdPlace
+            where trdPlace.travelRecord = tr
+              and trpPlace.provider = :provider
+              and trpPlace.providerPlaceId = :providerPlaceId
+          )
+        )
+        and (:hasTravelStartDate = false or tr.travelEndDate >= :travelStartDate)
+        and (:hasTravelEndDate = false or tr.travelStartDate <= :travelEndDate)
+      order by tr.viewCount desc, tr.publishedAt desc, tr.createdAt desc
+      """)
+  List<TravelRecord> findFeedPageOrderByViewCount(
+      @Param("status") TravelRecordStatus status,
+      @Param("hasKeyword") boolean hasKeyword,
+      @Param("keywordPattern") String keywordPattern,
+      @Param("hasPlace") boolean hasPlace,
+      @Param("provider") PlaceProvider provider,
+      @Param("providerPlaceId") String providerPlaceId,
+      @Param("hasTravelStartDate") boolean hasTravelStartDate,
+      @Param("travelStartDate") LocalDate travelStartDate,
+      @Param("hasTravelEndDate") boolean hasTravelEndDate,
+      @Param("travelEndDate") LocalDate travelEndDate,
+      Pageable pageable);
+
+  @Query(
+      """
+      select tr
+      from TravelRecord tr
+      where tr.status = :status
+        and (
+          tr.viewCount < :cursorSortCount
+          or (tr.viewCount = :cursorSortCount and tr.publishedAt < :cursorPublishedAt)
+          or (
+            tr.viewCount = :cursorSortCount
+            and tr.publishedAt = :cursorPublishedAt
+            and tr.createdAt < :cursorCreatedAt
+          )
+        )
+        and (
+          :hasKeyword = false
+          or lower(tr.title) like :keywordPattern
+          or lower(coalesce(tr.content, '')) like :keywordPattern
+          or exists (
+            select 1
+            from TravelRecordPlace trpKeyword
+            join trpKeyword.travelRecordDay trdKeyword
+            where trdKeyword.travelRecord = tr
+              and lower(trpKeyword.placeName) like :keywordPattern
+          )
+        )
+        and (
+          :hasPlace = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpPlace
+            join trpPlace.travelRecordDay trdPlace
+            where trdPlace.travelRecord = tr
+              and trpPlace.provider = :provider
+              and trpPlace.providerPlaceId = :providerPlaceId
+          )
+        )
+        and (:hasTravelStartDate = false or tr.travelEndDate >= :travelStartDate)
+        and (:hasTravelEndDate = false or tr.travelStartDate <= :travelEndDate)
+      order by tr.viewCount desc, tr.publishedAt desc, tr.createdAt desc
+      """)
+  List<TravelRecord> findFeedPageAfterCursorOrderByViewCount(
+      @Param("status") TravelRecordStatus status,
+      @Param("cursorSortCount") long cursorSortCount,
+      @Param("cursorPublishedAt") LocalDateTime cursorPublishedAt,
+      @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+      @Param("hasKeyword") boolean hasKeyword,
+      @Param("keywordPattern") String keywordPattern,
+      @Param("hasPlace") boolean hasPlace,
+      @Param("provider") PlaceProvider provider,
+      @Param("providerPlaceId") String providerPlaceId,
+      @Param("hasTravelStartDate") boolean hasTravelStartDate,
+      @Param("travelStartDate") LocalDate travelStartDate,
+      @Param("hasTravelEndDate") boolean hasTravelEndDate,
+      @Param("travelEndDate") LocalDate travelEndDate,
+      Pageable pageable);
+
+  @Query(
+      """
       select distinct tr
       from TravelRecordPlace trp
       join trp.travelRecordDay trd

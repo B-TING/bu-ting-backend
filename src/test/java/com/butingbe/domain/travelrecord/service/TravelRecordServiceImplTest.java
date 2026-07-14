@@ -21,6 +21,7 @@ import com.butingbe.domain.travel.service.TravelService;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
@@ -506,6 +507,126 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     null, null, null, null, null, LocalDate.of(2026, 9, 3), LocalDate.of(2026, 9, 1)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Travel end date cannot be before travel start date.");
+  }
+
+  @Test
+  @DisplayName("latest feed can be sorted by like count")
+  void getLatestFeedSortsByLikeCount() {
+    User lowLikeAuthor =
+        userRepository.save(
+            createUser("record-sort-like-low@example.com", "record-sort-like-low"));
+    User highLikeAuthor =
+        userRepository.save(
+            createUser("record-sort-like-high@example.com", "record-sort-like-high"));
+    User likerOne =
+        userRepository.save(createUser("record-sort-like-one@example.com", "record-sort-like-one"));
+    User likerTwo =
+        userRepository.save(createUser("record-sort-like-two@example.com", "record-sort-like-two"));
+    AuthenticatedUser lowAuthorUser = AuthenticatedUser.from(lowLikeAuthor);
+    AuthenticatedUser highAuthorUser = AuthenticatedUser.from(highLikeAuthor);
+    TravelRecordResDto lowDraft = createDraftWithOnePlace(lowAuthorUser, "Low Like");
+    TravelRecordResDto highDraft = createDraftWithOnePlace(highAuthorUser, "High Like");
+    TravelRecordResDto lowPublished =
+        travelRecordService.publish(lowAuthorUser, lowDraft.originalTravelId(), lowDraft.travelRecordId());
+    TravelRecordResDto highPublished =
+        travelRecordService.publish(
+            highAuthorUser, highDraft.originalTravelId(), highDraft.travelRecordId());
+    travelRecordService.likeTravelRecord(AuthenticatedUser.from(likerOne), lowPublished.travelRecordId());
+    travelRecordService.likeTravelRecord(AuthenticatedUser.from(likerOne), highPublished.travelRecordId());
+    travelRecordService.likeTravelRecord(AuthenticatedUser.from(likerTwo), highPublished.travelRecordId());
+
+    TravelRecordFeedPageResDto firstPage =
+        travelRecordService.getLatestFeed(
+            null, 1, null, null, null, null, null, TravelRecordFeedSort.MOST_LIKED);
+    TravelRecordFeedPageResDto secondPage =
+        travelRecordService.getLatestFeed(
+            firstPage.nextCursor(),
+            1,
+            null,
+            null,
+            null,
+            null,
+            null,
+            TravelRecordFeedSort.MOST_LIKED);
+
+    assertThat(firstPage.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(highPublished.travelRecordId());
+    assertThat(firstPage.hasNext()).isTrue();
+    assertThat(firstPage.nextCursor()).isNotBlank();
+    assertThat(secondPage.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(lowPublished.travelRecordId());
+    assertThat(secondPage.hasNext()).isFalse();
+  }
+
+  @Test
+  @DisplayName("latest feed can be sorted by view count")
+  void getLatestFeedSortsByViewCount() {
+    User lowViewAuthor =
+        userRepository.save(
+            createUser("record-sort-view-low@example.com", "record-sort-view-low"));
+    User highViewAuthor =
+        userRepository.save(
+            createUser("record-sort-view-high@example.com", "record-sort-view-high"));
+    AuthenticatedUser lowAuthorUser = AuthenticatedUser.from(lowViewAuthor);
+    AuthenticatedUser highAuthorUser = AuthenticatedUser.from(highViewAuthor);
+    TravelRecordResDto lowDraft = createDraftWithOnePlace(lowAuthorUser, "Low View");
+    TravelRecordResDto highDraft = createDraftWithOnePlace(highAuthorUser, "High View");
+    TravelRecordResDto lowPublished =
+        travelRecordService.publish(lowAuthorUser, lowDraft.originalTravelId(), lowDraft.travelRecordId());
+    TravelRecordResDto highPublished =
+        travelRecordService.publish(
+            highAuthorUser, highDraft.originalTravelId(), highDraft.travelRecordId());
+    travelRecordService.getPublished(lowPublished.travelRecordId());
+    travelRecordService.getPublished(highPublished.travelRecordId());
+    travelRecordService.getPublished(highPublished.travelRecordId());
+
+    TravelRecordFeedPageResDto result =
+        travelRecordService.getLatestFeed(
+            null, null, null, null, null, null, null, TravelRecordFeedSort.MOST_VIEWED);
+
+    assertThat(result.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsSubsequence(highPublished.travelRecordId(), lowPublished.travelRecordId());
+    assertThat(result.items().getFirst().viewCount()).isGreaterThanOrEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("latest feed rejects cursor when cursor sort does not match requested sort")
+  void getLatestFeedRejectsMismatchedSortCursor() {
+    User firstUser =
+        userRepository.save(
+            createUser("record-sort-cursor-first@example.com", "record-sort-cursor-first"));
+    User secondUser =
+        userRepository.save(
+            createUser("record-sort-cursor-second@example.com", "record-sort-cursor-second"));
+    AuthenticatedUser firstAuthenticatedUser = AuthenticatedUser.from(firstUser);
+    AuthenticatedUser secondAuthenticatedUser = AuthenticatedUser.from(secondUser);
+    TravelRecordResDto firstDraft = createDraftWithOnePlace(firstAuthenticatedUser, "First Cursor Sort");
+    TravelRecordResDto secondDraft =
+        createDraftWithOnePlace(secondAuthenticatedUser, "Second Cursor Sort");
+    travelRecordService.publish(
+        firstAuthenticatedUser, firstDraft.originalTravelId(), firstDraft.travelRecordId());
+    travelRecordService.publish(
+        secondAuthenticatedUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
+    TravelRecordFeedPageResDto firstPage =
+        travelRecordService.getLatestFeed(
+            null, 1, null, null, null, null, null, TravelRecordFeedSort.MOST_LIKED);
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.getLatestFeed(
+                    firstPage.nextCursor(),
+                    1,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    TravelRecordFeedSort.LATEST))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Feed cursor sort does not match requested sort.");
   }
 
   @Test
