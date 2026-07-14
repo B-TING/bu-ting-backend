@@ -21,6 +21,8 @@ tags:
     description: 여행 생성 및 일정 관리 API
   - name: TravelTeam
     description: 여행 초대 및 멤버 관리 API
+  - name: TravelRecord
+    description: Travel record feed, draft, publish, bookmark, like, and place review APIs
   - name: Chat
     description: Chat APIs
   - name: WebSocket STOMP
@@ -1722,6 +1724,837 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/travels/{travelId}/records:
+    post:
+      tags:
+        - TravelRecord
+      summary: Create travel record draft
+      description: Completed travel itinerary is snapshotted into a private draft travel record.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordCreateRequest"
+            example:
+              title: Busan food trip
+              content: A relaxed 2-day Busan route.
+              coverImageUrl: https://example.com/cover.jpg
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "400":
+          description: Validation failed or travel cannot be snapshotted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not a travel member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Travel not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travels/{travelId}/records/{travelRecordId}:
+    get:
+      tags:
+        - TravelRecord
+      summary: Get draft travel record
+      description: Draft detail. Only the author can read the draft under the original travel.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Travel record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    patch:
+      tags:
+        - TravelRecord
+      summary: Update draft travel record
+      description: Updates draft title, content, and cover image. Request body may be omitted.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/TravelRecordId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordUpdateRequest"
+            example:
+              title: Updated Busan trip
+              content: Updated review text.
+              coverImageUrl: https://example.com/new-cover.jpg
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Travel record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travels/{travelId}/records/{travelRecordId}/publish:
+    post:
+      tags:
+        - TravelRecord
+      summary: Publish travel record
+      description: Publishes an author-owned draft. Published records appear in public feed and detail APIs.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: Published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "400":
+          description: Record cannot be published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Travel record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travels/{travelId}/records/{travelRecordId}/places/{travelRecordPlaceId}/review:
+    post:
+      tags:
+        - TravelRecord
+      summary: Create place review in travel record
+      description: Creates a rating and review for one place in an author-owned travel record.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/TravelRecordId"
+        - $ref: "#/components/parameters/TravelRecordPlaceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceReviewCreateRequest"
+            example:
+              rating: 5
+              content: Sunset was beautiful.
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceReviewResponse"
+        "400":
+          description: Validation failed or duplicated review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Travel record place not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    get:
+      tags:
+        - TravelRecord
+      summary: Get place review in travel record
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/TravelRecordId"
+        - $ref: "#/components/parameters/TravelRecordPlaceId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceReviewResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Place review not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    patch:
+      tags:
+        - TravelRecord
+      summary: Update place review in travel record
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/TravelRecordId"
+        - $ref: "#/components/parameters/TravelRecordPlaceId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceReviewUpdateRequest"
+            example:
+              rating: 4
+              content: Great, but crowded.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceReviewResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Place review not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - TravelRecord
+      summary: Delete place review in travel record
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/TravelRecordId"
+        - $ref: "#/components/parameters/TravelRecordPlaceId"
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Place review not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records:
+    get:
+      tags:
+        - TravelRecord
+      summary: Get public travel record feed
+      description: Public feed of published travel records. Supports cursor pagination, keyword/place/date/region/city filters, and sorting.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Cursor returned as nextCursor from the previous page.
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: keyword
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Searches title, content, and place name.
+        - name: provider
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/PlaceProvider"
+        - name: providerPlaceId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Must be provided together with provider.
+        - name: travelStartDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: travelEndDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: region
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filters by place name or address containing this region text.
+          example: Busan
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filters by place name or address containing this city text.
+          example: Seogwipo
+        - name: sort
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TravelRecordFeedSort"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordFeedPageResponse"
+        "400":
+          description: Invalid filter or cursor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/{travelRecordId}:
+    get:
+      tags:
+        - TravelRecord
+      summary: Get published travel record detail
+      description: Public detail of a published travel record. View count is increased when read.
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "404":
+          description: Published travel record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/me:
+    get:
+      tags:
+        - TravelRecord
+      summary: Get my travel records
+      description: Returns DRAFT, PUBLISHED, and HIDDEN records owned by the authenticated user.
+      security:
+        - opaqueToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TravelRecordManageResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/me/bookmarks:
+    get:
+      tags:
+        - TravelRecord
+      summary: Get my bookmarked travel records
+      security:
+        - opaqueToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TravelRecordBookmarkResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/me/{travelRecordId}:
+    get:
+      tags:
+        - TravelRecord
+      summary: Get my travel record detail
+      description: Owner can read DRAFT, PUBLISHED, and HIDDEN records.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Travel record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    patch:
+      tags:
+        - TravelRecord
+      summary: Update my travel record
+      description: DRAFT can be edited freely. PUBLISHED/HIDDEN support title, content, and cover image updates.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordUpdateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Travel record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/me/{travelRecordId}/hide:
+    post:
+      tags:
+        - TravelRecord
+      summary: Hide my travel record
+      description: Changes an owned published record to HIDDEN so it is excluded from public feed/detail.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: Hidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Travel record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/me/{travelRecordId}/republish:
+    post:
+      tags:
+        - TravelRecord
+      summary: Republish my hidden travel record
+      description: Changes an owned HIDDEN record back to PUBLISHED.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: Republished
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "400":
+          description: Record cannot be republished
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Not the author
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: Travel record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/{travelRecordId}/bookmarks:
+    post:
+      tags:
+        - TravelRecord
+      summary: Bookmark published travel record
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "201":
+          description: Bookmarked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordBookmarkResponse"
+        "400":
+          description: Duplicate bookmark or unpublished record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - TravelRecord
+      summary: Remove travel record bookmark
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "204":
+          description: Unbookmarked
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/{travelRecordId}/likes:
+    post:
+      tags:
+        - TravelRecord
+      summary: Like published travel record
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "201":
+          description: Liked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordLikeResponse"
+        "400":
+          description: Duplicate like or unpublished record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - TravelRecord
+      summary: Unlike travel record
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "204":
+          description: Unliked
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/places/travel-records:
+    get:
+      tags:
+        - TravelRecord
+      summary: Get public travel records by place
+      description: Returns published travel records containing the requested provider place. Cursor pagination is supported.
+      parameters:
+        - name: provider
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/PlaceProvider"
+        - name: providerPlaceId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordFeedPageResponse"
+        "400":
+          description: Invalid place or cursor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/places/reviews:
+    get:
+      tags:
+        - TravelRecord
+      summary: Get place review summary
+      description: Returns rating aggregate and review list for a provider place.
+      parameters:
+        - name: provider
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/PlaceProvider"
+        - name: providerPlaceId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceReviewSummaryResponse"
+        "400":
+          description: Invalid place query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
 components:
   parameters:
     TravelId:
@@ -1751,6 +2584,24 @@ components:
         type: string
         format: uuid
       example: 30000000-0000-0000-0000-000000000001
+    TravelRecordId:
+      name: travelRecordId
+      in: path
+      required: true
+      description: Travel record ID
+      schema:
+        type: string
+        format: uuid
+      example: 60000000-0000-0000-0000-000000000001
+    TravelRecordPlaceId:
+      name: travelRecordPlaceId
+      in: path
+      required: true
+      description: Travel record place ID
+      schema:
+        type: string
+        format: uuid
+      example: 70000000-0000-0000-0000-000000000001
     InviteToken:
       name: token
       in: query
@@ -1765,6 +2616,503 @@ components:
       scheme: bearer
       bearerFormat: opaque
   schemas:
+    TravelRecordCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: Busan food trip
+        content:
+          type: string
+          nullable: true
+          example: A relaxed 2-day Busan route.
+        coverImageUrl:
+          type: string
+          maxLength: 1000
+          nullable: true
+          example: https://example.com/cover.jpg
+    TravelRecordUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: Updated Busan trip
+        content:
+          type: string
+          nullable: true
+          example: Updated travel record body.
+        coverImageUrl:
+          type: string
+          maxLength: 1000
+          nullable: true
+          example: https://example.com/new-cover.jpg
+    TravelRecordStatus:
+      type: string
+      enum:
+        - DRAFT
+        - PUBLISHED
+        - HIDDEN
+      example: PUBLISHED
+    TravelRecordFeedSort:
+      type: string
+      enum:
+        - LATEST
+        - MOST_LIKED
+        - MOST_VIEWED
+      example: LATEST
+    TravelRecordResponse:
+      type: object
+      properties:
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        originalTravelId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 10000000-0000-0000-0000-000000000001
+        authorId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        title:
+          type: string
+          nullable: true
+          example: Busan food trip
+        content:
+          type: string
+          nullable: true
+          example: A relaxed 2-day Busan route.
+        coverImageUrl:
+          type: string
+          nullable: true
+          example: https://example.com/cover.jpg
+        travelStartDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-01"
+        travelEndDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-02"
+        status:
+          $ref: "#/components/schemas/TravelRecordStatus"
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-03T10:00:00"
+        likeCount:
+          type: integer
+          format: int64
+          example: 7
+        viewCount:
+          type: integer
+          format: int64
+          example: 120
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/TravelRecordDayResponse"
+    TravelRecordDayResponse:
+      type: object
+      properties:
+        travelRecordDayId:
+          type: string
+          format: uuid
+          example: 61000000-0000-0000-0000-000000000001
+        originalPlanId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 20000000-0000-0000-0000-000000000001
+        dayNumber:
+          type: integer
+          example: 1
+        visitDate:
+          type: string
+          format: date
+          example: "2026-08-01"
+        places:
+          type: array
+          items:
+            $ref: "#/components/schemas/TravelRecordPlaceResponse"
+    TravelRecordPlaceResponse:
+      type: object
+      properties:
+        travelRecordPlaceId:
+          type: string
+          format: uuid
+          example: 70000000-0000-0000-0000-000000000001
+        originalPlanPlaceId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 30000000-0000-0000-0000-000000000001
+        sequence:
+          type: integer
+          nullable: true
+          example: 1
+        placeName:
+          type: string
+          example: Gwangalli Beach
+        address:
+          type: string
+          nullable: true
+          example: Busan Suyeong-gu
+        latitude:
+          type: number
+          format: double
+          nullable: true
+          example: 35.153
+        longitude:
+          type: number
+          format: double
+          nullable: true
+          example: 129.118
+        provider:
+          $ref: "#/components/schemas/PlaceProvider"
+        providerPlaceId:
+          type: string
+          example: google-place-id
+        durationMinutes:
+          type: integer
+          nullable: true
+          example: 90
+        memo:
+          type: string
+          nullable: true
+          example: Sunset spot
+        scheduledTime:
+          type: string
+          format: time
+          nullable: true
+          example: "17:30:00"
+        visited:
+          type: boolean
+          nullable: true
+          example: true
+        routeToNext:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/TravelRecordRouteResponse"
+    TravelRecordRouteResponse:
+      type: object
+      properties:
+        transportType:
+          $ref: "#/components/schemas/TransportType"
+        durationMinutes:
+          type: integer
+          nullable: true
+          example: 25
+        distanceMeters:
+          type: integer
+          nullable: true
+          example: 9000
+        provider:
+          $ref: "#/components/schemas/PlaceProvider"
+    TravelRecordFeedPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TravelRecordFeedResponse"
+        nextCursor:
+          type: string
+          nullable: true
+          example: TEFURVNUfDB8MjAyNi0wOC0wM1QxMDowMDowMHwyMDI2LTA4LTAzVDA5OjAwOjAw
+        hasNext:
+          type: boolean
+          example: true
+    TravelRecordFeedResponse:
+      type: object
+      properties:
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        originalTravelId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 10000000-0000-0000-0000-000000000001
+        authorId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        authorNickname:
+          type: string
+          example: traveler
+        title:
+          type: string
+          nullable: true
+          example: Busan food trip
+        content:
+          type: string
+          nullable: true
+          example: A relaxed 2-day Busan route.
+        coverImageUrl:
+          type: string
+          nullable: true
+          example: https://example.com/cover.jpg
+        travelStartDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-01"
+        travelEndDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-02"
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-03T10:00:00"
+        likeCount:
+          type: integer
+          format: int64
+          example: 7
+        viewCount:
+          type: integer
+          format: int64
+          example: 120
+    TravelRecordManageResponse:
+      type: object
+      properties:
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        originalTravelId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 10000000-0000-0000-0000-000000000001
+        authorId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        title:
+          type: string
+          nullable: true
+          example: Busan food trip
+        content:
+          type: string
+          nullable: true
+          example: A relaxed 2-day Busan route.
+        coverImageUrl:
+          type: string
+          nullable: true
+          example: https://example.com/cover.jpg
+        travelStartDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-01"
+        travelEndDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-02"
+        status:
+          $ref: "#/components/schemas/TravelRecordStatus"
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-03T10:00:00"
+        likeCount:
+          type: integer
+          format: int64
+          example: 7
+        viewCount:
+          type: integer
+          format: int64
+          example: 120
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-03T09:00:00"
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-03T09:30:00"
+    TravelRecordBookmarkResponse:
+      type: object
+      properties:
+        bookmarkId:
+          type: string
+          format: uuid
+          example: 80000000-0000-0000-0000-000000000001
+        bookmarkedAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T11:00:00"
+        travelRecord:
+          $ref: "#/components/schemas/TravelRecordFeedResponse"
+    TravelRecordLikeResponse:
+      type: object
+      properties:
+        likeId:
+          type: string
+          format: uuid
+          example: 81000000-0000-0000-0000-000000000001
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        likedAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T11:10:00"
+        likeCount:
+          type: integer
+          format: int64
+          example: 8
+    PlaceReviewCreateRequest:
+      type: object
+      required:
+        - rating
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        content:
+          type: string
+          nullable: true
+          example: Sunset was beautiful.
+    PlaceReviewUpdateRequest:
+      type: object
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          example: 4
+        content:
+          type: string
+          nullable: true
+          example: Great, but crowded.
+    PlaceReviewResponse:
+      type: object
+      properties:
+        placeReviewId:
+          type: string
+          format: uuid
+          example: 90000000-0000-0000-0000-000000000001
+        travelRecordPlaceId:
+          type: string
+          format: uuid
+          example: 70000000-0000-0000-0000-000000000001
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        content:
+          type: string
+          nullable: true
+          example: Sunset was beautiful.
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T12:00:00"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T12:10:00"
+    PlaceReviewSummaryResponse:
+      type: object
+      properties:
+        provider:
+          $ref: "#/components/schemas/PlaceProvider"
+        providerPlaceId:
+          type: string
+          example: google-place-id
+        reviewCount:
+          type: integer
+          format: int64
+          example: 12
+        averageRating:
+          type: number
+          format: double
+          example: 4.6
+        ratingCounts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          example:
+            "1": 0
+            "2": 1
+            "3": 2
+            "4": 3
+            "5": 6
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlaceReviewSummaryItemResponse"
+    PlaceReviewSummaryItemResponse:
+      type: object
+      properties:
+        placeReviewId:
+          type: string
+          format: uuid
+          example: 90000000-0000-0000-0000-000000000001
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        travelRecordTitle:
+          type: string
+          nullable: true
+          example: Busan food trip
+        authorId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        authorNickname:
+          type: string
+          example: traveler
+        travelRecordPlaceId:
+          type: string
+          format: uuid
+          example: 70000000-0000-0000-0000-000000000001
+        placeName:
+          type: string
+          example: Gwangalli Beach
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        content:
+          type: string
+          nullable: true
+          example: Sunset was beautiful.
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T12:00:00"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T12:10:00"
     OAuthLoginRequest:
       type: object
       required:
