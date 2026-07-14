@@ -1,7 +1,6 @@
 package com.butingbe.domain.travelrecord.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
-import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
@@ -46,8 +45,7 @@ public class PublicTravelRecordController {
       @RequestParam(required = false) String cursor,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) PlaceProvider provider,
-      @RequestParam(required = false) String providerPlaceId,
+      @RequestParam(required = false) String placeId,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
           LocalDate travelStartDate,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -61,8 +59,7 @@ public class PublicTravelRecordController {
             cursor,
             size,
             keyword,
-            provider,
-            providerPlaceId,
+            placeId,
             travelStartDate,
             travelEndDate,
             region,

@@ -2109,17 +2109,13 @@ paths:
           schema:
             type: string
           description: 제목, 본문, 장소명을 검색합니다.
-        - name: provider
+        - name: placeId
           in: query
           required: false
-          schema:
-            $ref: "#/components/schemas/PlaceProvider"
-        - name: providerPlaceId
-          in: query
-          required: false
+          description: 특정 장소를 포함한 여행 기록만 조회할 때 사용하는 장소 ID입니다.
           schema:
             type: string
-          description: provider와 함께 전달해야 합니다.
+          example: google-place-id
         - name: travelStartDate
           in: query
           required: false
@@ -2651,18 +2647,15 @@ paths:
       tags:
         - TravelRecord
       summary: 장소 기반 공개 여행 기록 조회
-      description: 요청한 provider 장소를 포함하는 공개 여행 기록을 조회합니다. 커서 페이지네이션을 지원합니다.
+      description: 요청한 장소 ID를 포함하는 공개 여행 기록을 조회합니다. 커서 페이지네이션을 지원합니다.
       parameters:
-        - name: provider
+        - name: placeId
           in: query
           required: true
-          schema:
-            $ref: "#/components/schemas/PlaceProvider"
-        - name: providerPlaceId
-          in: query
-          required: true
+          description: 장소 ID입니다. 현재는 여행 일정에 저장된 장소 식별자를 사용합니다.
           schema:
             type: string
+          example: google-place-id
         - name: cursor
           in: query
           required: false
@@ -2695,18 +2688,15 @@ paths:
       tags:
         - TravelRecord
       summary: 장소 후기·별점 집계 조회
-      description: provider 장소에 대한 별점 집계와 후기 목록을 조회합니다.
+      description: 우리 플랫폼에 등록된 특정 장소의 별점 집계와 후기 목록을 조회합니다.
       parameters:
-        - name: provider
+        - name: placeId
           in: query
           required: true
-          schema:
-            $ref: "#/components/schemas/PlaceProvider"
-        - name: providerPlaceId
-          in: query
-          required: true
+          description: 장소 ID입니다. 현재는 여행 일정에 저장된 장소 식별자를 사용합니다.
           schema:
             type: string
+          example: google-place-id
       responses:
         "200":
           description: OK
@@ -3290,9 +3280,7 @@ components:
     PlaceReviewSummaryResponse:
       type: object
       properties:
-        provider:
-          $ref: "#/components/schemas/PlaceProvider"
-        providerPlaceId:
+        placeId:
           type: string
           example: google-place-id
         reviewCount:

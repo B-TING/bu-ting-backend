@@ -187,7 +187,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   @Override
   public TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size) {
-    return getLatestFeed(null, cursor, size, null, null, null, null, null, null, null, null);
+    return getLatestFeed(null, cursor, size, null, null, null, null, null, null, null);
   }
 
   @Override
@@ -204,7 +204,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         cursor,
         size,
         keyword,
-        provider,
         providerPlaceId,
         travelStartDate,
         travelEndDate,
@@ -229,7 +228,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         cursor,
         size,
         keyword,
-        provider,
         providerPlaceId,
         travelStartDate,
         travelEndDate,
@@ -253,7 +251,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         cursor,
         size,
         keyword,
-        provider,
         providerPlaceId,
         travelStartDate,
         travelEndDate,
@@ -279,7 +276,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         cursor,
         size,
         keyword,
-        provider,
         providerPlaceId,
         travelStartDate,
         travelEndDate,
@@ -294,8 +290,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       String cursor,
       Integer size,
       String keyword,
-      PlaceProvider provider,
-      String providerPlaceId,
+      String placeId,
       LocalDate travelStartDate,
       LocalDate travelEndDate,
       String region,
@@ -307,7 +302,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     validateFeedCursorSort(feedCursor, feedSort);
     FeedSearchCondition searchCondition =
         resolveFeedSearchCondition(
-            keyword, provider, providerPlaceId, travelStartDate, travelEndDate, region, city);
+            keyword, placeId, travelStartDate, travelEndDate, region, city);
     PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
     List<TravelRecord> fetchedRecords = findFeedRecords(feedCursor, searchCondition, feedSort, pageRequest);
     boolean hasNext = fetchedRecords.size() > pageSize;
@@ -526,23 +521,23 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Override
   public List<TravelRecordFeedResDto> getTravelRecordsByPlace(
       PlaceProvider provider, String providerPlaceId) {
-    return getTravelRecordsByPlace(null, provider, providerPlaceId, null, null).items();
+    return getTravelRecordsByPlace((AuthenticatedUser) null, providerPlaceId, null, null).items();
   }
 
   @Override
   public TravelRecordFeedPageResDto getTravelRecordsByPlace(
       PlaceProvider provider, String providerPlaceId, String cursor, Integer size) {
-    return getTravelRecordsByPlace(null, provider, providerPlaceId, cursor, size);
+    return getTravelRecordsByPlace((AuthenticatedUser) null, providerPlaceId, cursor, size);
   }
 
   @Override
   public TravelRecordFeedPageResDto getTravelRecordsByPlace(
       AuthenticatedUser authenticatedUser,
-      PlaceProvider provider,
-      String providerPlaceId,
+      String placeId,
       String cursor,
       Integer size) {
-    validatePlaceReviewSummaryRequest(provider, providerPlaceId);
+    validatePlaceId(placeId);
+    String normalizedPlaceId = placeId.trim();
 
     int pageSize = resolveFeedSize(size);
     FeedCursor feedCursor = decodeFeedCursor(cursor);
@@ -551,10 +546,9 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     List<TravelRecord> fetchedRecords =
         feedCursor == null
             ? travelRecordRepository.findPublishedRecordsByPlacePage(
-                provider, providerPlaceId, TravelRecordStatus.PUBLISHED, pageRequest)
+                normalizedPlaceId, TravelRecordStatus.PUBLISHED, pageRequest)
             : travelRecordRepository.findPublishedRecordsByPlacePageAfterCursor(
-                provider,
-                providerPlaceId,
+                normalizedPlaceId,
                 TravelRecordStatus.PUBLISHED,
                 feedCursor.publishedAt(),
                 feedCursor.createdAt(),
@@ -571,6 +565,22 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   @Override
+  public PlaceReviewSummaryResDto getPlaceReviewSummary(String placeId) {
+    validatePlaceId(placeId);
+
+    String normalizedPlaceId = placeId.trim();
+    List<PlaceReview> reviews =
+        placeReviewRepository.findByPlaceIdAndRecordStatus(
+            normalizedPlaceId, TravelRecordStatus.PUBLISHED);
+
+    return PlaceReviewSummaryResDto.of(
+        normalizedPlaceId,
+        calculateAverageRating(reviews),
+        calculateRatingCounts(reviews),
+        reviews);
+  }
+
+  @Override
   public PlaceReviewSummaryResDto getPlaceReviewSummary(
       PlaceProvider provider, String providerPlaceId) {
     validatePlaceReviewSummaryRequest(provider, providerPlaceId);
@@ -580,7 +590,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             provider, providerPlaceId, TravelRecordStatus.PUBLISHED);
 
     return PlaceReviewSummaryResDto.of(
-        provider,
         providerPlaceId,
         calculateAverageRating(reviews),
         calculateRatingCounts(reviews),
@@ -998,8 +1007,12 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       throw new IllegalArgumentException("Place provider is required.");
     }
 
-    if (providerPlaceId == null || providerPlaceId.isBlank()) {
-      throw new IllegalArgumentException("Provider place id is required.");
+    validatePlaceId(providerPlaceId);
+  }
+
+  private void validatePlaceId(String placeId) {
+    if (placeId == null || placeId.isBlank()) {
+      throw new IllegalArgumentException("Place id is required.");
     }
   }
 
@@ -1093,8 +1106,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             searchCondition.hasKeyword(),
             searchCondition.keywordPattern(),
             searchCondition.hasPlace(),
-            searchCondition.provider(),
-            searchCondition.providerPlaceId(),
+            searchCondition.placeId(),
             searchCondition.hasRegion(),
             searchCondition.regionPattern(),
             searchCondition.hasCity(),
@@ -1109,8 +1121,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             searchCondition.hasKeyword(),
             searchCondition.keywordPattern(),
             searchCondition.hasPlace(),
-            searchCondition.provider(),
-            searchCondition.providerPlaceId(),
+            searchCondition.placeId(),
             searchCondition.hasRegion(),
             searchCondition.regionPattern(),
             searchCondition.hasCity(),
@@ -1125,8 +1136,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             searchCondition.hasKeyword(),
             searchCondition.keywordPattern(),
             searchCondition.hasPlace(),
-            searchCondition.provider(),
-            searchCondition.providerPlaceId(),
+            searchCondition.placeId(),
             searchCondition.hasRegion(),
             searchCondition.regionPattern(),
             searchCondition.hasCity(),
@@ -1147,8 +1157,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
           searchCondition.hasKeyword(),
           searchCondition.keywordPattern(),
           searchCondition.hasPlace(),
-          searchCondition.provider(),
-          searchCondition.providerPlaceId(),
+          searchCondition.placeId(),
           searchCondition.hasRegion(),
           searchCondition.regionPattern(),
           searchCondition.hasCity(),
@@ -1166,8 +1175,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
           searchCondition.hasKeyword(),
           searchCondition.keywordPattern(),
           searchCondition.hasPlace(),
-          searchCondition.provider(),
-          searchCondition.providerPlaceId(),
+          searchCondition.placeId(),
           searchCondition.hasRegion(),
           searchCondition.regionPattern(),
           searchCondition.hasCity(),
@@ -1185,8 +1193,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
           searchCondition.hasKeyword(),
           searchCondition.keywordPattern(),
           searchCondition.hasPlace(),
-          searchCondition.provider(),
-          searchCondition.providerPlaceId(),
+          searchCondition.placeId(),
           searchCondition.hasRegion(),
           searchCondition.regionPattern(),
           searchCondition.hasCity(),
@@ -1201,8 +1208,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   private FeedSearchCondition resolveFeedSearchCondition(
       String keyword,
-      PlaceProvider provider,
-      String providerPlaceId,
+      String placeId,
       LocalDate travelStartDate,
       LocalDate travelEndDate,
       String region,
@@ -1215,11 +1221,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     boolean hasKeyword = normalizedKeyword != null;
     boolean hasRegion = normalizedRegion != null;
     boolean hasCity = normalizedCity != null;
-    boolean hasProviderPlaceId = providerPlaceId != null && !providerPlaceId.isBlank();
-
-    if ((provider == null && hasProviderPlaceId) || (provider != null && !hasProviderPlaceId)) {
-      throw new IllegalArgumentException("Place provider and provider place id must be provided together.");
-    }
+    String normalizedPlaceId = placeId == null || placeId.isBlank() ? null : placeId.trim();
+    boolean hasPlace = normalizedPlaceId != null;
 
     if (travelStartDate != null
         && travelEndDate != null
@@ -1230,9 +1233,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     return new FeedSearchCondition(
         hasKeyword,
         hasKeyword ? "%" + normalizedKeyword + "%" : "",
-        provider != null,
-        provider,
-        hasProviderPlaceId ? providerPlaceId.trim() : "",
+        hasPlace,
+        hasPlace ? normalizedPlaceId : "",
         hasRegion,
         hasRegion ? "%" + normalizedRegion + "%" : "",
         hasCity,
@@ -1312,8 +1314,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       boolean hasKeyword,
       String keywordPattern,
       boolean hasPlace,
-      PlaceProvider provider,
-      String providerPlaceId,
+      String placeId,
       boolean hasRegion,
       String regionPattern,
       boolean hasCity,

@@ -1,6 +1,5 @@
 package com.butingbe.domain.travelrecord.dto.response;
 
-import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travelrecord.entity.PlaceReview;
 import com.butingbe.domain.travelrecord.entity.TravelRecord;
 import com.butingbe.domain.travelrecord.entity.TravelRecordPlace;
@@ -10,25 +9,19 @@ import java.util.Map;
 import java.util.UUID;
 
 public record PlaceReviewSummaryResDto(
-    PlaceProvider provider,
-    String providerPlaceId,
+    String placeId,
     long reviewCount,
     double averageRating,
     Map<Integer, Long> ratingCounts,
     List<PlaceReviewItemResDto> reviews) {
 
   public static PlaceReviewSummaryResDto of(
-      PlaceProvider provider,
-      String providerPlaceId,
+      String placeId,
       double averageRating,
       Map<Integer, Long> ratingCounts,
       List<PlaceReview> reviews) {
     return new PlaceReviewSummaryResDto(
-        provider,
-        providerPlaceId,
-        reviews.size(),
-        averageRating,
-        ratingCounts,
+        placeId, reviews.size(), averageRating, ratingCounts,
         reviews.stream().map(PlaceReviewItemResDto::from).toList());
   }
 

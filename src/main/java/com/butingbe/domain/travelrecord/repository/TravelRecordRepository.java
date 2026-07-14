@@ -1,6 +1,5 @@
 package com.butingbe.domain.travelrecord.repository;
 
-import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travelrecord.entity.TravelRecord;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
 import java.time.LocalDate;
@@ -48,8 +47,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
             from TravelRecordPlace trpPlace
             join trpPlace.travelRecordDay trdPlace
             where trdPlace.travelRecord = tr
-              and trpPlace.provider = :provider
-              and trpPlace.providerPlaceId = :providerPlaceId
+              and trpPlace.providerPlaceId = :placeId
           )
         )
         and (
@@ -87,8 +85,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasKeyword") boolean hasKeyword,
       @Param("keywordPattern") String keywordPattern,
       @Param("hasPlace") boolean hasPlace,
-      @Param("provider") PlaceProvider provider,
-      @Param("providerPlaceId") String providerPlaceId,
+      @Param("placeId") String placeId,
       @Param("hasRegion") boolean hasRegion,
       @Param("regionPattern") String regionPattern,
       @Param("hasCity") boolean hasCity,
@@ -127,8 +124,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
             from TravelRecordPlace trpPlace
             join trpPlace.travelRecordDay trdPlace
             where trdPlace.travelRecord = tr
-              and trpPlace.provider = :provider
-              and trpPlace.providerPlaceId = :providerPlaceId
+              and trpPlace.providerPlaceId = :placeId
           )
         )
         and (
@@ -168,8 +164,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasKeyword") boolean hasKeyword,
       @Param("keywordPattern") String keywordPattern,
       @Param("hasPlace") boolean hasPlace,
-      @Param("provider") PlaceProvider provider,
-      @Param("providerPlaceId") String providerPlaceId,
+      @Param("placeId") String placeId,
       @Param("hasRegion") boolean hasRegion,
       @Param("regionPattern") String regionPattern,
       @Param("hasCity") boolean hasCity,
@@ -204,8 +199,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
             from TravelRecordPlace trpPlace
             join trpPlace.travelRecordDay trdPlace
             where trdPlace.travelRecord = tr
-              and trpPlace.provider = :provider
-              and trpPlace.providerPlaceId = :providerPlaceId
+              and trpPlace.providerPlaceId = :placeId
           )
         )
         and (
@@ -243,8 +237,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasKeyword") boolean hasKeyword,
       @Param("keywordPattern") String keywordPattern,
       @Param("hasPlace") boolean hasPlace,
-      @Param("provider") PlaceProvider provider,
-      @Param("providerPlaceId") String providerPlaceId,
+      @Param("placeId") String placeId,
       @Param("hasRegion") boolean hasRegion,
       @Param("regionPattern") String regionPattern,
       @Param("hasCity") boolean hasCity,
@@ -288,8 +281,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
             from TravelRecordPlace trpPlace
             join trpPlace.travelRecordDay trdPlace
             where trdPlace.travelRecord = tr
-              and trpPlace.provider = :provider
-              and trpPlace.providerPlaceId = :providerPlaceId
+              and trpPlace.providerPlaceId = :placeId
           )
         )
         and (
@@ -330,8 +322,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasKeyword") boolean hasKeyword,
       @Param("keywordPattern") String keywordPattern,
       @Param("hasPlace") boolean hasPlace,
-      @Param("provider") PlaceProvider provider,
-      @Param("providerPlaceId") String providerPlaceId,
+      @Param("placeId") String placeId,
       @Param("hasRegion") boolean hasRegion,
       @Param("regionPattern") String regionPattern,
       @Param("hasCity") boolean hasCity,
@@ -366,8 +357,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
             from TravelRecordPlace trpPlace
             join trpPlace.travelRecordDay trdPlace
             where trdPlace.travelRecord = tr
-              and trpPlace.provider = :provider
-              and trpPlace.providerPlaceId = :providerPlaceId
+              and trpPlace.providerPlaceId = :placeId
           )
         )
         and (
@@ -405,8 +395,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasKeyword") boolean hasKeyword,
       @Param("keywordPattern") String keywordPattern,
       @Param("hasPlace") boolean hasPlace,
-      @Param("provider") PlaceProvider provider,
-      @Param("providerPlaceId") String providerPlaceId,
+      @Param("placeId") String placeId,
       @Param("hasRegion") boolean hasRegion,
       @Param("regionPattern") String regionPattern,
       @Param("hasCity") boolean hasCity,
@@ -450,8 +439,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
             from TravelRecordPlace trpPlace
             join trpPlace.travelRecordDay trdPlace
             where trdPlace.travelRecord = tr
-              and trpPlace.provider = :provider
-              and trpPlace.providerPlaceId = :providerPlaceId
+              and trpPlace.providerPlaceId = :placeId
           )
         )
         and (
@@ -492,8 +480,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasKeyword") boolean hasKeyword,
       @Param("keywordPattern") String keywordPattern,
       @Param("hasPlace") boolean hasPlace,
-      @Param("provider") PlaceProvider provider,
-      @Param("providerPlaceId") String providerPlaceId,
+      @Param("placeId") String placeId,
       @Param("hasRegion") boolean hasRegion,
       @Param("regionPattern") String regionPattern,
       @Param("hasCity") boolean hasCity,
@@ -510,14 +497,12 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       from TravelRecordPlace trp
       join trp.travelRecordDay trd
       join trd.travelRecord tr
-      where trp.provider = :provider
-        and trp.providerPlaceId = :providerPlaceId
+      where trp.providerPlaceId = :placeId
         and tr.status = :status
       order by tr.publishedAt desc, tr.createdAt desc
       """)
   List<TravelRecord> findPublishedRecordsByPlace(
-      @Param("provider") PlaceProvider provider,
-      @Param("providerPlaceId") String providerPlaceId,
+      @Param("placeId") String placeId,
       @Param("status") TravelRecordStatus status);
 
   @Query(
@@ -526,14 +511,12 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       from TravelRecordPlace trp
       join trp.travelRecordDay trd
       join trd.travelRecord tr
-      where trp.provider = :provider
-        and trp.providerPlaceId = :providerPlaceId
+      where trp.providerPlaceId = :placeId
         and tr.status = :status
       order by tr.publishedAt desc, tr.createdAt desc
       """)
   List<TravelRecord> findPublishedRecordsByPlacePage(
-      @Param("provider") PlaceProvider provider,
-      @Param("providerPlaceId") String providerPlaceId,
+      @Param("placeId") String placeId,
       @Param("status") TravelRecordStatus status,
       Pageable pageable);
 
@@ -543,8 +526,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       from TravelRecordPlace trp
       join trp.travelRecordDay trd
       join trd.travelRecord tr
-      where trp.provider = :provider
-        and trp.providerPlaceId = :providerPlaceId
+      where trp.providerPlaceId = :placeId
         and tr.status = :status
         and (
           tr.publishedAt < :cursorPublishedAt
@@ -553,8 +535,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       order by tr.publishedAt desc, tr.createdAt desc
       """)
   List<TravelRecord> findPublishedRecordsByPlacePageAfterCursor(
-      @Param("provider") PlaceProvider provider,
-      @Param("providerPlaceId") String providerPlaceId,
+      @Param("placeId") String placeId,
       @Param("status") TravelRecordStatus status,
       @Param("cursorPublishedAt") LocalDateTime cursorPublishedAt,
       @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,

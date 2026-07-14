@@ -477,7 +477,16 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     TravelRecordFeedPageResDto placeResult =
         travelRecordService.getLatestFeed(
-            null, null, null, PlaceProvider.GOOGLE, "Busan Station", null, null);
+            (AuthenticatedUser) null,
+            null,
+            null,
+            null,
+            "Busan Station",
+            null,
+            null,
+            null,
+            null,
+            null);
     TravelRecordFeedPageResDto overlappingDateResult =
         travelRecordService.getLatestFeed(
             null, null, null, null, null, LocalDate.of(2026, 8, 2), LocalDate.of(2026, 8, 2));
@@ -536,13 +545,6 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @Test
   @DisplayName("latest feed search rejects invalid filters")
   void getLatestFeedRejectsInvalidFilters() {
-    assertThatThrownBy(
-            () ->
-                travelRecordService.getLatestFeed(
-                    null, null, null, PlaceProvider.GOOGLE, null, null, null))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Place provider and provider place id must be provided together.");
-
     assertThatThrownBy(
             () ->
                 travelRecordService.getLatestFeed(
@@ -884,7 +886,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(travelRecordService.getLatestFeed(null, null).items())
         .extracting(TravelRecordFeedResDto::travelRecordId)
         .doesNotContain(published.travelRecordId());
-    assertThat(travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "Busan Station")
+    assertThat(travelRecordService.getPlaceReviewSummary("Busan Station")
             .reviews())
         .extracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::travelRecordId)
         .doesNotContain(published.travelRecordId());
@@ -954,7 +956,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(travelRecordService.getLatestFeed(null, null).items())
         .extracting(TravelRecordFeedResDto::travelRecordId)
         .contains(published.travelRecordId());
-    assertThat(travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "Busan Station")
+    assertThat(travelRecordService.getPlaceReviewSummary("Busan Station")
             .reviews())
         .extracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::travelRecordId)
         .contains(published.travelRecordId());
@@ -1185,7 +1187,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     TravelRecordFeedPageResDto authenticatedFeed =
         travelRecordService.getLatestFeed(
-            viewerUser, null, null, null, null, null, null, null, null, null, null);
+            viewerUser, null, null, null, null, null, null, null, null, null);
     TravelRecordFeedPageResDto anonymousFeed = travelRecordService.getLatestFeed(null, null);
 
     assertThat(authenticatedFeed.items())
@@ -1544,10 +1546,9 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         secondAuthenticatedUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
 
     PlaceReviewSummaryResDto result =
-        travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "Busan Station");
+        travelRecordService.getPlaceReviewSummary("Busan Station");
 
-    assertThat(result.provider()).isEqualTo(PlaceProvider.GOOGLE);
-    assertThat(result.providerPlaceId()).isEqualTo("Busan Station");
+    assertThat(result.placeId()).isEqualTo("Busan Station");
     assertThat(result.reviewCount()).isEqualTo(2);
     assertThat(result.averageRating()).isEqualTo(4.5);
     assertThat(result.ratingCounts()).containsEntry(1, 0L);
@@ -1568,7 +1569,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("place review summary returns empty aggregate when there are no public reviews")
   void getPlaceReviewSummaryReturnsEmptyAggregate() {
     PlaceReviewSummaryResDto result =
-        travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "missing-place");
+        travelRecordService.getPlaceReviewSummary("missing-place");
 
     assertThat(result.reviewCount()).isZero();
     assertThat(result.averageRating()).isEqualTo(0.0);
@@ -1618,7 +1619,9 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.hideMyRecord(hiddenAuthenticatedUser, hiddenPublished.travelRecordId());
 
     List<TravelRecordFeedResDto> result =
-        travelRecordService.getTravelRecordsByPlace(PlaceProvider.GOOGLE, "Busan Station");
+        travelRecordService
+            .getTravelRecordsByPlace((AuthenticatedUser) null, "Busan Station", null, null)
+            .items();
 
     assertThat(result)
         .extracting(TravelRecordFeedResDto::travelRecordId)
@@ -1635,7 +1638,9 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("place travel records returns empty list when there are no public records")
   void getTravelRecordsByPlaceReturnsEmptyList() {
     List<TravelRecordFeedResDto> result =
-        travelRecordService.getTravelRecordsByPlace(PlaceProvider.GOOGLE, "missing-place");
+        travelRecordService
+            .getTravelRecordsByPlace((AuthenticatedUser) null, "missing-place", null, null)
+            .items();
 
     assertThat(result).isEmpty();
   }
@@ -1663,10 +1668,11 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             secondAuthenticatedUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
 
     TravelRecordFeedPageResDto firstPage =
-        travelRecordService.getTravelRecordsByPlace(PlaceProvider.GOOGLE, "Busan Station", null, 1);
+        travelRecordService.getTravelRecordsByPlace(
+            (AuthenticatedUser) null, "Busan Station", null, 1);
     TravelRecordFeedPageResDto secondPage =
         travelRecordService.getTravelRecordsByPlace(
-            PlaceProvider.GOOGLE, "Busan Station", firstPage.nextCursor(), 1);
+            (AuthenticatedUser) null, "Busan Station", firstPage.nextCursor(), 1);
 
     assertThat(firstPage.items())
         .extracting(TravelRecordFeedResDto::travelRecordId)

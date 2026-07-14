@@ -30,4 +30,18 @@ public interface PlaceReviewRepository extends JpaRepository<PlaceReview, UUID> 
       @Param("provider") PlaceProvider provider,
       @Param("providerPlaceId") String providerPlaceId,
       @Param("status") TravelRecordStatus status);
+
+  @Query(
+      """
+      select pr
+      from PlaceReview pr
+      join pr.travelRecordPlace trp
+      join trp.travelRecordDay trd
+      join trd.travelRecord tr
+      where trp.providerPlaceId = :placeId
+        and tr.status = :status
+      order by pr.createdAt desc
+      """)
+  List<PlaceReview> findByPlaceIdAndRecordStatus(
+      @Param("placeId") String placeId, @Param("status") TravelRecordStatus status);
 }

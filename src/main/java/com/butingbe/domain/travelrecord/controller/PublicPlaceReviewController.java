@@ -1,6 +1,5 @@
 package com.butingbe.domain.travelrecord.controller;
 
-import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.service.TravelRecordService;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +18,7 @@ public class PublicPlaceReviewController {
 
   @GetMapping
   public ResponseEntity<PlaceReviewSummaryResDto> getPlaceReviewSummary(
-      @RequestParam PlaceProvider provider, @RequestParam String providerPlaceId) {
-    return ResponseEntity.ok(travelRecordService.getPlaceReviewSummary(provider, providerPlaceId));
+      @RequestParam String placeId) {
+    return ResponseEntity.ok(travelRecordService.getPlaceReviewSummary(placeId));
   }
 }

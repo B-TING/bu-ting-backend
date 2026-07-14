@@ -1,7 +1,6 @@
 package com.butingbe.domain.travelrecord.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
-import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.service.TravelRecordService;
 import lombok.RequiredArgsConstructor;
@@ -22,11 +21,10 @@ public class PublicPlaceTravelRecordController {
   @GetMapping
   public ResponseEntity<TravelRecordFeedPageResDto> getTravelRecordsByPlace(
       @AuthenticationPrincipal AuthenticatedUser user,
-      @RequestParam PlaceProvider provider,
-      @RequestParam String providerPlaceId,
+      @RequestParam String placeId,
       @RequestParam(required = false) String cursor,
       @RequestParam(required = false) Integer size) {
     return ResponseEntity.ok(
-        travelRecordService.getTravelRecordsByPlace(user, provider, providerPlaceId, cursor, size));
+        travelRecordService.getTravelRecordsByPlace(user, placeId, cursor, size));
   }
 }

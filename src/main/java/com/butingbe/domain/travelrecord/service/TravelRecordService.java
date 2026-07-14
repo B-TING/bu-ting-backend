@@ -70,8 +70,7 @@ public interface TravelRecordService {
       String cursor,
       Integer size,
       String keyword,
-      PlaceProvider provider,
-      String providerPlaceId,
+      String placeId,
       LocalDate travelStartDate,
       LocalDate travelEndDate,
       String region,
@@ -143,10 +142,11 @@ public interface TravelRecordService {
 
   TravelRecordFeedPageResDto getTravelRecordsByPlace(
       AuthenticatedUser authenticatedUser,
-      PlaceProvider provider,
-      String providerPlaceId,
+      String placeId,
       String cursor,
       Integer size);
+
+  PlaceReviewSummaryResDto getPlaceReviewSummary(String placeId);
 
   PlaceReviewSummaryResDto getPlaceReviewSummary(PlaceProvider provider, String providerPlaceId);
 
