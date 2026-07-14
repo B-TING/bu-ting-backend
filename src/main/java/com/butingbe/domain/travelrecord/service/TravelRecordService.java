@@ -84,6 +84,9 @@ public interface TravelRecordService {
   List<TravelRecordFeedResDto> getTravelRecordsByPlace(
       PlaceProvider provider, String providerPlaceId);
 
+  TravelRecordFeedPageResDto getTravelRecordsByPlace(
+      PlaceProvider provider, String providerPlaceId, String cursor, Integer size);
+
   PlaceReviewSummaryResDto getPlaceReviewSummary(PlaceProvider provider, String providerPlaceId);
 
   PlaceReviewResDto createPlaceReview(

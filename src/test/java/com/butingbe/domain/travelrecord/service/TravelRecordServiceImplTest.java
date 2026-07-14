@@ -1407,6 +1407,46 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("place travel records supports cursor pagination")
+  void getTravelRecordsByPlaceSupportsCursorPagination() {
+    User firstUser =
+        userRepository.save(
+            createUser("record-place-page-first@example.com", "record-place-page-first"));
+    User secondUser =
+        userRepository.save(
+            createUser("record-place-page-second@example.com", "record-place-page-second"));
+    AuthenticatedUser firstAuthenticatedUser = AuthenticatedUser.from(firstUser);
+    AuthenticatedUser secondAuthenticatedUser = AuthenticatedUser.from(secondUser);
+    TravelRecordResDto firstDraft =
+        createDraftWithOnePlace(firstAuthenticatedUser, "First Place Page");
+    TravelRecordResDto secondDraft =
+        createDraftWithOnePlace(secondAuthenticatedUser, "Second Place Page");
+    TravelRecordResDto firstPublished =
+        travelRecordService.publish(
+            firstAuthenticatedUser, firstDraft.originalTravelId(), firstDraft.travelRecordId());
+    TravelRecordResDto secondPublished =
+        travelRecordService.publish(
+            secondAuthenticatedUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
+
+    TravelRecordFeedPageResDto firstPage =
+        travelRecordService.getTravelRecordsByPlace(PlaceProvider.GOOGLE, "Busan Station", null, 1);
+    TravelRecordFeedPageResDto secondPage =
+        travelRecordService.getTravelRecordsByPlace(
+            PlaceProvider.GOOGLE, "Busan Station", firstPage.nextCursor(), 1);
+
+    assertThat(firstPage.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(secondPublished.travelRecordId());
+    assertThat(firstPage.hasNext()).isTrue();
+    assertThat(firstPage.nextCursor()).isNotBlank();
+    assertThat(secondPage.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(firstPublished.travelRecordId());
+    assertThat(secondPage.hasNext()).isFalse();
+    assertThat(secondPage.nextCursor()).isNull();
+  }
+
+  @Test
   @DisplayName("author can update place review for a draft travel record place")
   void updatePlaceReviewSuccess() {
     User user = userRepository.save(createUser("review-update@example.com", "review-update"));

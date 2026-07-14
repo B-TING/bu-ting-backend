@@ -339,4 +339,44 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("provider") PlaceProvider provider,
       @Param("providerPlaceId") String providerPlaceId,
       @Param("status") TravelRecordStatus status);
+
+  @Query(
+      """
+      select distinct tr
+      from TravelRecordPlace trp
+      join trp.travelRecordDay trd
+      join trd.travelRecord tr
+      where trp.provider = :provider
+        and trp.providerPlaceId = :providerPlaceId
+        and tr.status = :status
+      order by tr.publishedAt desc, tr.createdAt desc
+      """)
+  List<TravelRecord> findPublishedRecordsByPlacePage(
+      @Param("provider") PlaceProvider provider,
+      @Param("providerPlaceId") String providerPlaceId,
+      @Param("status") TravelRecordStatus status,
+      Pageable pageable);
+
+  @Query(
+      """
+      select distinct tr
+      from TravelRecordPlace trp
+      join trp.travelRecordDay trd
+      join trd.travelRecord tr
+      where trp.provider = :provider
+        and trp.providerPlaceId = :providerPlaceId
+        and tr.status = :status
+        and (
+          tr.publishedAt < :cursorPublishedAt
+          or (tr.publishedAt = :cursorPublishedAt and tr.createdAt < :cursorCreatedAt)
+        )
+      order by tr.publishedAt desc, tr.createdAt desc
+      """)
+  List<TravelRecord> findPublishedRecordsByPlacePageAfterCursor(
+      @Param("provider") PlaceProvider provider,
+      @Param("providerPlaceId") String providerPlaceId,
+      @Param("status") TravelRecordStatus status,
+      @Param("cursorPublishedAt") LocalDateTime cursorPublishedAt,
+      @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+      Pageable pageable);
 }

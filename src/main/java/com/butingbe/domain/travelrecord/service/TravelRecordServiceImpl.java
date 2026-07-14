@@ -361,13 +361,39 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Override
   public List<TravelRecordFeedResDto> getTravelRecordsByPlace(
       PlaceProvider provider, String providerPlaceId) {
+    return getTravelRecordsByPlace(provider, providerPlaceId, null, null).items();
+  }
+
+  @Override
+  public TravelRecordFeedPageResDto getTravelRecordsByPlace(
+      PlaceProvider provider, String providerPlaceId, String cursor, Integer size) {
     validatePlaceReviewSummaryRequest(provider, providerPlaceId);
 
-    return travelRecordRepository
-        .findPublishedRecordsByPlace(provider, providerPlaceId, TravelRecordStatus.PUBLISHED)
-        .stream()
-        .map(TravelRecordFeedResDto::from)
-        .toList();
+    int pageSize = resolveFeedSize(size);
+    FeedCursor feedCursor = decodeFeedCursor(cursor);
+    validateFeedCursorSort(feedCursor, TravelRecordFeedSort.LATEST);
+    PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+    List<TravelRecord> fetchedRecords =
+        feedCursor == null
+            ? travelRecordRepository.findPublishedRecordsByPlacePage(
+                provider, providerPlaceId, TravelRecordStatus.PUBLISHED, pageRequest)
+            : travelRecordRepository.findPublishedRecordsByPlacePageAfterCursor(
+                provider,
+                providerPlaceId,
+                TravelRecordStatus.PUBLISHED,
+                feedCursor.publishedAt(),
+                feedCursor.createdAt(),
+                pageRequest);
+    boolean hasNext = fetchedRecords.size() > pageSize;
+    List<TravelRecord> pageRecords =
+        hasNext ? fetchedRecords.subList(0, pageSize) : fetchedRecords;
+    List<TravelRecordFeedResDto> items =
+        pageRecords.stream().map(TravelRecordFeedResDto::from).toList();
+
+    return new TravelRecordFeedPageResDto(
+        items,
+        hasNext ? encodeFeedCursor(pageRecords.getLast(), TravelRecordFeedSort.LATEST) : null,
+        hasNext);
   }
 
   @Override
