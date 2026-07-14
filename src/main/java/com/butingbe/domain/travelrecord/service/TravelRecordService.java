@@ -57,7 +57,30 @@ public interface TravelRecordService {
       PlaceProvider provider,
       String providerPlaceId,
       LocalDate travelStartDate,
+      LocalDate travelEndDate,
+      String region,
+      String city,
+      TravelRecordFeedSort sort);
+
+  TravelRecordFeedPageResDto getLatestFeed(
+      String cursor,
+      Integer size,
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
       LocalDate travelEndDate);
+
+  TravelRecordFeedPageResDto getLatestFeed(
+      String cursor,
+      Integer size,
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
+      LocalDate travelEndDate,
+      String region,
+      String city);
 
   List<TravelRecordManageResDto> getMyRecords(AuthenticatedUser authenticatedUser);
 

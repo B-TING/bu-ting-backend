@@ -177,7 +177,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   @Override
   public TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size) {
-    return getLatestFeed(cursor, size, null, null, null, null, null, null);
+    return getLatestFeed(cursor, size, null, null, null, null, null, null, null, null);
   }
 
   @Override
@@ -190,7 +190,40 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       LocalDate travelStartDate,
       LocalDate travelEndDate) {
     return getLatestFeed(
-        cursor, size, keyword, provider, providerPlaceId, travelStartDate, travelEndDate, null);
+        cursor,
+        size,
+        keyword,
+        provider,
+        providerPlaceId,
+        travelStartDate,
+        travelEndDate,
+        null,
+        null,
+        null);
+  }
+
+  @Override
+  public TravelRecordFeedPageResDto getLatestFeed(
+      String cursor,
+      Integer size,
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
+      LocalDate travelEndDate,
+      String region,
+      String city) {
+    return getLatestFeed(
+        cursor,
+        size,
+        keyword,
+        provider,
+        providerPlaceId,
+        travelStartDate,
+        travelEndDate,
+        region,
+        city,
+        null);
   }
 
   @Override
@@ -203,12 +236,38 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       LocalDate travelStartDate,
       LocalDate travelEndDate,
       TravelRecordFeedSort sort) {
+    return getLatestFeed(
+        cursor,
+        size,
+        keyword,
+        provider,
+        providerPlaceId,
+        travelStartDate,
+        travelEndDate,
+        null,
+        null,
+        sort);
+  }
+
+  @Override
+  public TravelRecordFeedPageResDto getLatestFeed(
+      String cursor,
+      Integer size,
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
+      LocalDate travelEndDate,
+      String region,
+      String city,
+      TravelRecordFeedSort sort) {
     TravelRecordFeedSort feedSort = sort == null ? TravelRecordFeedSort.LATEST : sort;
     int pageSize = resolveFeedSize(size);
     FeedCursor feedCursor = decodeFeedCursor(cursor);
     validateFeedCursorSort(feedCursor, feedSort);
     FeedSearchCondition searchCondition =
-        resolveFeedSearchCondition(keyword, provider, providerPlaceId, travelStartDate, travelEndDate);
+        resolveFeedSearchCondition(
+            keyword, provider, providerPlaceId, travelStartDate, travelEndDate, region, city);
     PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
     List<TravelRecord> fetchedRecords = findFeedRecords(feedCursor, searchCondition, feedSort, pageRequest);
     boolean hasNext = fetchedRecords.size() > pageSize;
@@ -825,6 +884,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             searchCondition.hasPlace(),
             searchCondition.provider(),
             searchCondition.providerPlaceId(),
+            searchCondition.hasRegion(),
+            searchCondition.regionPattern(),
+            searchCondition.hasCity(),
+            searchCondition.cityPattern(),
             searchCondition.hasTravelStartDate(),
             searchCondition.travelStartDate(),
             searchCondition.hasTravelEndDate(),
@@ -837,6 +900,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             searchCondition.hasPlace(),
             searchCondition.provider(),
             searchCondition.providerPlaceId(),
+            searchCondition.hasRegion(),
+            searchCondition.regionPattern(),
+            searchCondition.hasCity(),
+            searchCondition.cityPattern(),
             searchCondition.hasTravelStartDate(),
             searchCondition.travelStartDate(),
             searchCondition.hasTravelEndDate(),
@@ -849,6 +916,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             searchCondition.hasPlace(),
             searchCondition.provider(),
             searchCondition.providerPlaceId(),
+            searchCondition.hasRegion(),
+            searchCondition.regionPattern(),
+            searchCondition.hasCity(),
+            searchCondition.cityPattern(),
             searchCondition.hasTravelStartDate(),
             searchCondition.travelStartDate(),
             searchCondition.hasTravelEndDate(),
@@ -867,6 +938,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
           searchCondition.hasPlace(),
           searchCondition.provider(),
           searchCondition.providerPlaceId(),
+          searchCondition.hasRegion(),
+          searchCondition.regionPattern(),
+          searchCondition.hasCity(),
+          searchCondition.cityPattern(),
           searchCondition.hasTravelStartDate(),
           searchCondition.travelStartDate(),
           searchCondition.hasTravelEndDate(),
@@ -882,6 +957,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
           searchCondition.hasPlace(),
           searchCondition.provider(),
           searchCondition.providerPlaceId(),
+          searchCondition.hasRegion(),
+          searchCondition.regionPattern(),
+          searchCondition.hasCity(),
+          searchCondition.cityPattern(),
           searchCondition.hasTravelStartDate(),
           searchCondition.travelStartDate(),
           searchCondition.hasTravelEndDate(),
@@ -897,6 +976,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
           searchCondition.hasPlace(),
           searchCondition.provider(),
           searchCondition.providerPlaceId(),
+          searchCondition.hasRegion(),
+          searchCondition.regionPattern(),
+          searchCondition.hasCity(),
+          searchCondition.cityPattern(),
           searchCondition.hasTravelStartDate(),
           searchCondition.travelStartDate(),
           searchCondition.hasTravelEndDate(),
@@ -910,10 +993,17 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       PlaceProvider provider,
       String providerPlaceId,
       LocalDate travelStartDate,
-      LocalDate travelEndDate) {
+      LocalDate travelEndDate,
+      String region,
+      String city) {
     String normalizedKeyword =
         keyword == null || keyword.isBlank() ? null : keyword.trim().toLowerCase();
+    String normalizedRegion =
+        region == null || region.isBlank() ? null : region.trim().toLowerCase();
+    String normalizedCity = city == null || city.isBlank() ? null : city.trim().toLowerCase();
     boolean hasKeyword = normalizedKeyword != null;
+    boolean hasRegion = normalizedRegion != null;
+    boolean hasCity = normalizedCity != null;
     boolean hasProviderPlaceId = providerPlaceId != null && !providerPlaceId.isBlank();
 
     if ((provider == null && hasProviderPlaceId) || (provider != null && !hasProviderPlaceId)) {
@@ -932,6 +1022,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         provider != null,
         provider,
         hasProviderPlaceId ? providerPlaceId.trim() : "",
+        hasRegion,
+        hasRegion ? "%" + normalizedRegion + "%" : "",
+        hasCity,
+        hasCity ? "%" + normalizedCity + "%" : "",
         travelStartDate != null,
         travelStartDate,
         travelEndDate != null,
@@ -1009,6 +1103,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       boolean hasPlace,
       PlaceProvider provider,
       String providerPlaceId,
+      boolean hasRegion,
+      String regionPattern,
+      boolean hasCity,
+      String cityPattern,
       boolean hasTravelStartDate,
       LocalDate travelStartDate,
       boolean hasTravelEndDate,

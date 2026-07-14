@@ -492,6 +492,45 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("latest feed filters by region and city")
+  void getLatestFeedFiltersByRegionAndCity() {
+    User busanUser =
+        userRepository.save(createUser("record-filter-busan@example.com", "record-filter-busan"));
+    User jejuUser =
+        userRepository.save(createUser("record-filter-jeju@example.com", "record-filter-jeju"));
+    AuthenticatedUser busanAuthenticatedUser = AuthenticatedUser.from(busanUser);
+    AuthenticatedUser jejuAuthenticatedUser = AuthenticatedUser.from(jejuUser);
+    TravelRecordResDto busanDraft =
+        createDraftWithOnePlace(
+            busanAuthenticatedUser, "Busan Route", "Gwangalli Beach", "Busan Suyeong-gu");
+    TravelRecordResDto jejuDraft =
+        createDraftWithOnePlace(
+            jejuAuthenticatedUser, "Jeju Route", "Seongsan Ilchulbong", "Jeju Seogwipo-si");
+    TravelRecordResDto busanPublished =
+        travelRecordService.publish(
+            busanAuthenticatedUser, busanDraft.originalTravelId(), busanDraft.travelRecordId());
+    TravelRecordResDto jejuPublished =
+        travelRecordService.publish(
+            jejuAuthenticatedUser, jejuDraft.originalTravelId(), jejuDraft.travelRecordId());
+
+    TravelRecordFeedPageResDto regionResult =
+        travelRecordService.getLatestFeed(
+            null, null, null, null, null, null, null, "busan", null);
+    TravelRecordFeedPageResDto cityResult =
+        travelRecordService.getLatestFeed(
+            null, null, null, null, null, null, null, null, "seogwipo");
+
+    assertThat(regionResult.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .contains(busanPublished.travelRecordId())
+        .doesNotContain(jejuPublished.travelRecordId());
+    assertThat(cityResult.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .contains(jejuPublished.travelRecordId())
+        .doesNotContain(busanPublished.travelRecordId());
+  }
+
+  @Test
   @DisplayName("latest feed search rejects invalid filters")
   void getLatestFeedRejectsInvalidFilters() {
     assertThatThrownBy(
@@ -1632,11 +1671,16 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
   private TravelRecordResDto createDraftWithOnePlace(
       AuthenticatedUser authenticatedUser, String title, String placeName) {
+    return createDraftWithOnePlace(authenticatedUser, title, placeName, "Busan");
+  }
+
+  private TravelRecordResDto createDraftWithOnePlace(
+      AuthenticatedUser authenticatedUser, String title, String placeName, String address) {
     TravelResDto travel = createCompletedTravel(authenticatedUser);
     PlanResDto firstDay =
         travelService.createPlan(
             authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
-    createPlace(authenticatedUser, firstDay.planId(), 1, placeName);
+    createPlace(authenticatedUser, firstDay.planId(), 1, placeName, address);
 
     return travelRecordService.createDraft(
         authenticatedUser,
@@ -1646,13 +1690,22 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
   private PlanPlaceResDto createPlace(
       AuthenticatedUser authenticatedUser, java.util.UUID planId, Integer sequence, String name) {
+    return createPlace(authenticatedUser, planId, sequence, name, "Busan");
+  }
+
+  private PlanPlaceResDto createPlace(
+      AuthenticatedUser authenticatedUser,
+      java.util.UUID planId,
+      Integer sequence,
+      String name,
+      String address) {
     return travelService.createPlanPlace(
         authenticatedUser,
         planId,
         new PlanPlaceCreateReqDto(
             sequence,
             name,
-            "Busan",
+            address,
             35.115,
             129.041,
             PlaceProvider.GOOGLE,

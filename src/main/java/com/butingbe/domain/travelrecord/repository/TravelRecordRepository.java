@@ -52,6 +52,32 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
               and trpPlace.providerPlaceId = :providerPlaceId
           )
         )
+        and (
+          :hasRegion = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpRegion
+            join trpRegion.travelRecordDay trdRegion
+            where trdRegion.travelRecord = tr
+              and (
+                lower(trpRegion.placeName) like :regionPattern
+                or lower(coalesce(trpRegion.address, '')) like :regionPattern
+              )
+          )
+        )
+        and (
+          :hasCity = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpCity
+            join trpCity.travelRecordDay trdCity
+            where trdCity.travelRecord = tr
+              and (
+                lower(trpCity.placeName) like :cityPattern
+                or lower(coalesce(trpCity.address, '')) like :cityPattern
+              )
+          )
+        )
         and (:hasTravelStartDate = false or tr.travelEndDate >= :travelStartDate)
         and (:hasTravelEndDate = false or tr.travelStartDate <= :travelEndDate)
       order by tr.publishedAt desc, tr.createdAt desc
@@ -63,6 +89,10 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasPlace") boolean hasPlace,
       @Param("provider") PlaceProvider provider,
       @Param("providerPlaceId") String providerPlaceId,
+      @Param("hasRegion") boolean hasRegion,
+      @Param("regionPattern") String regionPattern,
+      @Param("hasCity") boolean hasCity,
+      @Param("cityPattern") String cityPattern,
       @Param("hasTravelStartDate") boolean hasTravelStartDate,
       @Param("travelStartDate") LocalDate travelStartDate,
       @Param("hasTravelEndDate") boolean hasTravelEndDate,
@@ -101,6 +131,32 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
               and trpPlace.providerPlaceId = :providerPlaceId
           )
         )
+        and (
+          :hasRegion = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpRegion
+            join trpRegion.travelRecordDay trdRegion
+            where trdRegion.travelRecord = tr
+              and (
+                lower(trpRegion.placeName) like :regionPattern
+                or lower(coalesce(trpRegion.address, '')) like :regionPattern
+              )
+          )
+        )
+        and (
+          :hasCity = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpCity
+            join trpCity.travelRecordDay trdCity
+            where trdCity.travelRecord = tr
+              and (
+                lower(trpCity.placeName) like :cityPattern
+                or lower(coalesce(trpCity.address, '')) like :cityPattern
+              )
+          )
+        )
         and (:hasTravelStartDate = false or tr.travelEndDate >= :travelStartDate)
         and (:hasTravelEndDate = false or tr.travelStartDate <= :travelEndDate)
       order by tr.publishedAt desc, tr.createdAt desc
@@ -114,6 +170,10 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasPlace") boolean hasPlace,
       @Param("provider") PlaceProvider provider,
       @Param("providerPlaceId") String providerPlaceId,
+      @Param("hasRegion") boolean hasRegion,
+      @Param("regionPattern") String regionPattern,
+      @Param("hasCity") boolean hasCity,
+      @Param("cityPattern") String cityPattern,
       @Param("hasTravelStartDate") boolean hasTravelStartDate,
       @Param("travelStartDate") LocalDate travelStartDate,
       @Param("hasTravelEndDate") boolean hasTravelEndDate,
@@ -148,6 +208,32 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
               and trpPlace.providerPlaceId = :providerPlaceId
           )
         )
+        and (
+          :hasRegion = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpRegion
+            join trpRegion.travelRecordDay trdRegion
+            where trdRegion.travelRecord = tr
+              and (
+                lower(trpRegion.placeName) like :regionPattern
+                or lower(coalesce(trpRegion.address, '')) like :regionPattern
+              )
+          )
+        )
+        and (
+          :hasCity = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpCity
+            join trpCity.travelRecordDay trdCity
+            where trdCity.travelRecord = tr
+              and (
+                lower(trpCity.placeName) like :cityPattern
+                or lower(coalesce(trpCity.address, '')) like :cityPattern
+              )
+          )
+        )
         and (:hasTravelStartDate = false or tr.travelEndDate >= :travelStartDate)
         and (:hasTravelEndDate = false or tr.travelStartDate <= :travelEndDate)
       order by tr.likeCount desc, tr.publishedAt desc, tr.createdAt desc
@@ -159,6 +245,10 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasPlace") boolean hasPlace,
       @Param("provider") PlaceProvider provider,
       @Param("providerPlaceId") String providerPlaceId,
+      @Param("hasRegion") boolean hasRegion,
+      @Param("regionPattern") String regionPattern,
+      @Param("hasCity") boolean hasCity,
+      @Param("cityPattern") String cityPattern,
       @Param("hasTravelStartDate") boolean hasTravelStartDate,
       @Param("travelStartDate") LocalDate travelStartDate,
       @Param("hasTravelEndDate") boolean hasTravelEndDate,
@@ -202,6 +292,32 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
               and trpPlace.providerPlaceId = :providerPlaceId
           )
         )
+        and (
+          :hasRegion = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpRegion
+            join trpRegion.travelRecordDay trdRegion
+            where trdRegion.travelRecord = tr
+              and (
+                lower(trpRegion.placeName) like :regionPattern
+                or lower(coalesce(trpRegion.address, '')) like :regionPattern
+              )
+          )
+        )
+        and (
+          :hasCity = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpCity
+            join trpCity.travelRecordDay trdCity
+            where trdCity.travelRecord = tr
+              and (
+                lower(trpCity.placeName) like :cityPattern
+                or lower(coalesce(trpCity.address, '')) like :cityPattern
+              )
+          )
+        )
         and (:hasTravelStartDate = false or tr.travelEndDate >= :travelStartDate)
         and (:hasTravelEndDate = false or tr.travelStartDate <= :travelEndDate)
       order by tr.likeCount desc, tr.publishedAt desc, tr.createdAt desc
@@ -216,6 +332,10 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasPlace") boolean hasPlace,
       @Param("provider") PlaceProvider provider,
       @Param("providerPlaceId") String providerPlaceId,
+      @Param("hasRegion") boolean hasRegion,
+      @Param("regionPattern") String regionPattern,
+      @Param("hasCity") boolean hasCity,
+      @Param("cityPattern") String cityPattern,
       @Param("hasTravelStartDate") boolean hasTravelStartDate,
       @Param("travelStartDate") LocalDate travelStartDate,
       @Param("hasTravelEndDate") boolean hasTravelEndDate,
@@ -250,6 +370,32 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
               and trpPlace.providerPlaceId = :providerPlaceId
           )
         )
+        and (
+          :hasRegion = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpRegion
+            join trpRegion.travelRecordDay trdRegion
+            where trdRegion.travelRecord = tr
+              and (
+                lower(trpRegion.placeName) like :regionPattern
+                or lower(coalesce(trpRegion.address, '')) like :regionPattern
+              )
+          )
+        )
+        and (
+          :hasCity = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpCity
+            join trpCity.travelRecordDay trdCity
+            where trdCity.travelRecord = tr
+              and (
+                lower(trpCity.placeName) like :cityPattern
+                or lower(coalesce(trpCity.address, '')) like :cityPattern
+              )
+          )
+        )
         and (:hasTravelStartDate = false or tr.travelEndDate >= :travelStartDate)
         and (:hasTravelEndDate = false or tr.travelStartDate <= :travelEndDate)
       order by tr.viewCount desc, tr.publishedAt desc, tr.createdAt desc
@@ -261,6 +407,10 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasPlace") boolean hasPlace,
       @Param("provider") PlaceProvider provider,
       @Param("providerPlaceId") String providerPlaceId,
+      @Param("hasRegion") boolean hasRegion,
+      @Param("regionPattern") String regionPattern,
+      @Param("hasCity") boolean hasCity,
+      @Param("cityPattern") String cityPattern,
       @Param("hasTravelStartDate") boolean hasTravelStartDate,
       @Param("travelStartDate") LocalDate travelStartDate,
       @Param("hasTravelEndDate") boolean hasTravelEndDate,
@@ -304,6 +454,32 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
               and trpPlace.providerPlaceId = :providerPlaceId
           )
         )
+        and (
+          :hasRegion = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpRegion
+            join trpRegion.travelRecordDay trdRegion
+            where trdRegion.travelRecord = tr
+              and (
+                lower(trpRegion.placeName) like :regionPattern
+                or lower(coalesce(trpRegion.address, '')) like :regionPattern
+              )
+          )
+        )
+        and (
+          :hasCity = false
+          or exists (
+            select 1
+            from TravelRecordPlace trpCity
+            join trpCity.travelRecordDay trdCity
+            where trdCity.travelRecord = tr
+              and (
+                lower(trpCity.placeName) like :cityPattern
+                or lower(coalesce(trpCity.address, '')) like :cityPattern
+              )
+          )
+        )
         and (:hasTravelStartDate = false or tr.travelEndDate >= :travelStartDate)
         and (:hasTravelEndDate = false or tr.travelStartDate <= :travelEndDate)
       order by tr.viewCount desc, tr.publishedAt desc, tr.createdAt desc
@@ -318,6 +494,10 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       @Param("hasPlace") boolean hasPlace,
       @Param("provider") PlaceProvider provider,
       @Param("providerPlaceId") String providerPlaceId,
+      @Param("hasRegion") boolean hasRegion,
+      @Param("regionPattern") String regionPattern,
+      @Param("hasCity") boolean hasCity,
+      @Param("cityPattern") String cityPattern,
       @Param("hasTravelStartDate") boolean hasTravelStartDate,
       @Param("travelStartDate") LocalDate travelStartDate,
       @Param("hasTravelEndDate") boolean hasTravelEndDate,

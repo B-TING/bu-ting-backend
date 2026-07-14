@@ -48,10 +48,21 @@ public class PublicTravelRecordController {
           LocalDate travelStartDate,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
           LocalDate travelEndDate,
+      @RequestParam(required = false) String region,
+      @RequestParam(required = false) String city,
       @RequestParam(required = false) TravelRecordFeedSort sort) {
     return ResponseEntity.ok(
         travelRecordService.getLatestFeed(
-            cursor, size, keyword, provider, providerPlaceId, travelStartDate, travelEndDate, sort));
+            cursor,
+            size,
+            keyword,
+            provider,
+            providerPlaceId,
+            travelStartDate,
+            travelEndDate,
+            region,
+            city,
+            sort));
   }
 
   @GetMapping("/me")
