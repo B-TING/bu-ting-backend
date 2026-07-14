@@ -66,6 +66,19 @@ public interface TravelRecordService {
       TravelRecordFeedSort sort);
 
   TravelRecordFeedPageResDto getLatestFeed(
+      AuthenticatedUser authenticatedUser,
+      String cursor,
+      Integer size,
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
+      LocalDate travelEndDate,
+      String region,
+      String city,
+      TravelRecordFeedSort sort);
+
+  TravelRecordFeedPageResDto getLatestFeed(
       String cursor,
       Integer size,
       String keyword,
@@ -127,6 +140,13 @@ public interface TravelRecordService {
 
   TravelRecordFeedPageResDto getTravelRecordsByPlace(
       PlaceProvider provider, String providerPlaceId, String cursor, Integer size);
+
+  TravelRecordFeedPageResDto getTravelRecordsByPlace(
+      AuthenticatedUser authenticatedUser,
+      PlaceProvider provider,
+      String providerPlaceId,
+      String cursor,
+      Integer size);
 
   PlaceReviewSummaryResDto getPlaceReviewSummary(PlaceProvider provider, String providerPlaceId);
 

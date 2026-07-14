@@ -17,9 +17,14 @@ public record TravelRecordFeedResDto(
     LocalDate travelEndDate,
     LocalDateTime publishedAt,
     long likeCount,
-    long viewCount) {
+    long viewCount,
+    boolean likedByMe) {
 
   public static TravelRecordFeedResDto from(TravelRecord travelRecord) {
+    return from(travelRecord, false);
+  }
+
+  public static TravelRecordFeedResDto from(TravelRecord travelRecord, boolean likedByMe) {
     return new TravelRecordFeedResDto(
         travelRecord.getId(),
         travelRecord.getOriginalTravel() == null ? null : travelRecord.getOriginalTravel().getId(),
@@ -32,6 +37,7 @@ public record TravelRecordFeedResDto(
         travelRecord.getTravelEndDate(),
         travelRecord.getPublishedAt(),
         travelRecord.getLikeCount(),
-        travelRecord.getViewCount());
+        travelRecord.getViewCount(),
+        likedByMe);
   }
 }

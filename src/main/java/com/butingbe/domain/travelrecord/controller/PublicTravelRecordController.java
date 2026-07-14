@@ -42,6 +42,7 @@ public class PublicTravelRecordController {
 
   @GetMapping
   public ResponseEntity<TravelRecordFeedPageResDto> getLatestFeed(
+      @AuthenticationPrincipal AuthenticatedUser user,
       @RequestParam(required = false) String cursor,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String keyword,
@@ -56,6 +57,7 @@ public class PublicTravelRecordController {
       @RequestParam(required = false) TravelRecordFeedSort sort) {
     return ResponseEntity.ok(
         travelRecordService.getLatestFeed(
+            user,
             cursor,
             size,
             keyword,

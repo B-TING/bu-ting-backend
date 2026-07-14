@@ -60,6 +60,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -186,7 +187,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   @Override
   public TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size) {
-    return getLatestFeed(cursor, size, null, null, null, null, null, null, null, null);
+    return getLatestFeed(null, cursor, size, null, null, null, null, null, null, null, null);
   }
 
   @Override
@@ -199,6 +200,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       LocalDate travelStartDate,
       LocalDate travelEndDate) {
     return getLatestFeed(
+        null,
         cursor,
         size,
         keyword,
@@ -223,6 +225,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       String region,
       String city) {
     return getLatestFeed(
+        null,
         cursor,
         size,
         keyword,
@@ -246,6 +249,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       LocalDate travelEndDate,
       TravelRecordFeedSort sort) {
     return getLatestFeed(
+        null,
         cursor,
         size,
         keyword,
@@ -270,6 +274,33 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       String region,
       String city,
       TravelRecordFeedSort sort) {
+    return getLatestFeed(
+        null,
+        cursor,
+        size,
+        keyword,
+        provider,
+        providerPlaceId,
+        travelStartDate,
+        travelEndDate,
+        region,
+        city,
+        sort);
+  }
+
+  @Override
+  public TravelRecordFeedPageResDto getLatestFeed(
+      AuthenticatedUser authenticatedUser,
+      String cursor,
+      Integer size,
+      String keyword,
+      PlaceProvider provider,
+      String providerPlaceId,
+      LocalDate travelStartDate,
+      LocalDate travelEndDate,
+      String region,
+      String city,
+      TravelRecordFeedSort sort) {
     TravelRecordFeedSort feedSort = sort == null ? TravelRecordFeedSort.LATEST : sort;
     int pageSize = resolveFeedSize(size);
     FeedCursor feedCursor = decodeFeedCursor(cursor);
@@ -282,8 +313,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     boolean hasNext = fetchedRecords.size() > pageSize;
     List<TravelRecord> pageRecords =
         hasNext ? fetchedRecords.subList(0, pageSize) : fetchedRecords;
-    List<TravelRecordFeedResDto> items =
-        pageRecords.stream().map(TravelRecordFeedResDto::from).toList();
+    List<TravelRecordFeedResDto> items = toFeedResponses(pageRecords, authenticatedUser);
 
     return new TravelRecordFeedPageResDto(
         items,
@@ -496,12 +526,22 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Override
   public List<TravelRecordFeedResDto> getTravelRecordsByPlace(
       PlaceProvider provider, String providerPlaceId) {
-    return getTravelRecordsByPlace(provider, providerPlaceId, null, null).items();
+    return getTravelRecordsByPlace(null, provider, providerPlaceId, null, null).items();
   }
 
   @Override
   public TravelRecordFeedPageResDto getTravelRecordsByPlace(
       PlaceProvider provider, String providerPlaceId, String cursor, Integer size) {
+    return getTravelRecordsByPlace(null, provider, providerPlaceId, cursor, size);
+  }
+
+  @Override
+  public TravelRecordFeedPageResDto getTravelRecordsByPlace(
+      AuthenticatedUser authenticatedUser,
+      PlaceProvider provider,
+      String providerPlaceId,
+      String cursor,
+      Integer size) {
     validatePlaceReviewSummaryRequest(provider, providerPlaceId);
 
     int pageSize = resolveFeedSize(size);
@@ -522,8 +562,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     boolean hasNext = fetchedRecords.size() > pageSize;
     List<TravelRecord> pageRecords =
         hasNext ? fetchedRecords.subList(0, pageSize) : fetchedRecords;
-    List<TravelRecordFeedResDto> items =
-        pageRecords.stream().map(TravelRecordFeedResDto::from).toList();
+    List<TravelRecordFeedResDto> items = toFeedResponses(pageRecords, authenticatedUser);
 
     return new TravelRecordFeedPageResDto(
         items,
@@ -723,6 +762,32 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             .toList();
 
     return TravelRecordResDto.of(travelRecord, days);
+  }
+
+  private List<TravelRecordFeedResDto> toFeedResponses(
+      List<TravelRecord> travelRecords, AuthenticatedUser authenticatedUser) {
+    if (travelRecords.isEmpty()) {
+      return List.of();
+    }
+
+    UUID authenticatedUserId =
+        authenticatedUser == null || authenticatedUser.id() == null ? null : authenticatedUser.id();
+    if (authenticatedUserId == null) {
+      return travelRecords.stream().map(TravelRecordFeedResDto::from).toList();
+    }
+
+    Set<UUID> likedTravelRecordIds =
+        Set.copyOf(
+            travelRecordLikeRepository.findLikedTravelRecordIds(
+                authenticatedUserId,
+                travelRecords.stream().map(TravelRecord::getId).toList()));
+
+    return travelRecords.stream()
+        .map(
+            travelRecord ->
+                TravelRecordFeedResDto.from(
+                    travelRecord, likedTravelRecordIds.contains(travelRecord.getId())))
+        .toList();
   }
 
   private TravelRecordDayResDto toDayResponse(TravelRecordDay day) {

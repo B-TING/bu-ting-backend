@@ -3052,6 +3052,10 @@ components:
           type: integer
           format: int64
           example: 120
+        likedByMe:
+          type: boolean
+          description: 로그인한 사용자가 해당 여행 기록에 좋아요를 눌렀는지 여부입니다. 비로그인 요청이면 false입니다.
+          example: true
     TravelRecordManageResponse:
       type: object
       properties:

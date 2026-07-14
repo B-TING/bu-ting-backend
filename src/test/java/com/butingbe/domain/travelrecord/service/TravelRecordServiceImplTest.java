@@ -1160,6 +1160,49 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("feed marks records liked by authenticated user")
+  void getLatestFeedIncludesLikedByMe() {
+    User firstAuthor =
+        userRepository.save(
+            createUser("record-feed-liked-first-author@example.com", "feed-liked-first-author"));
+    User secondAuthor =
+        userRepository.save(
+            createUser("record-feed-liked-second-author@example.com", "feed-liked-second-author"));
+    User viewer =
+        userRepository.save(createUser("record-feed-liked-viewer@example.com", "feed-liked-viewer"));
+    AuthenticatedUser firstAuthorUser = AuthenticatedUser.from(firstAuthor);
+    AuthenticatedUser secondAuthorUser = AuthenticatedUser.from(secondAuthor);
+    AuthenticatedUser viewerUser = AuthenticatedUser.from(viewer);
+    TravelRecordResDto firstDraft = createDraftWithOnePlace(firstAuthorUser, "Liked Feed");
+    TravelRecordResDto secondDraft = createDraftWithOnePlace(secondAuthorUser, "Not Liked Feed");
+    TravelRecordResDto firstPublished =
+        travelRecordService.publish(
+            firstAuthorUser, firstDraft.originalTravelId(), firstDraft.travelRecordId());
+    TravelRecordResDto secondPublished =
+        travelRecordService.publish(
+            secondAuthorUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
+    travelRecordService.likeTravelRecord(viewerUser, firstPublished.travelRecordId());
+
+    TravelRecordFeedPageResDto authenticatedFeed =
+        travelRecordService.getLatestFeed(
+            viewerUser, null, null, null, null, null, null, null, null, null, null);
+    TravelRecordFeedPageResDto anonymousFeed = travelRecordService.getLatestFeed(null, null);
+
+    assertThat(authenticatedFeed.items())
+        .filteredOn(item -> item.travelRecordId().equals(firstPublished.travelRecordId()))
+        .extracting(TravelRecordFeedResDto::likedByMe)
+        .containsExactly(true);
+    assertThat(authenticatedFeed.items())
+        .filteredOn(item -> item.travelRecordId().equals(secondPublished.travelRecordId()))
+        .extracting(TravelRecordFeedResDto::likedByMe)
+        .containsExactly(false);
+    assertThat(anonymousFeed.items())
+        .filteredOn(item -> item.travelRecordId().equals(firstPublished.travelRecordId()))
+        .extracting(TravelRecordFeedResDto::likedByMe)
+        .containsExactly(false);
+  }
+
+  @Test
   @DisplayName("like rejects duplicated travel record like")
   void likeTravelRecordRejectsDuplicate() {
     User author =
