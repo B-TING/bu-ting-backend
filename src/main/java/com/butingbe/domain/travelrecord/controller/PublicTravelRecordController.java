@@ -2,9 +2,12 @@ package com.butingbe.domain.travelrecord.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.entity.PlaceProvider;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordCommentResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
@@ -169,6 +172,53 @@ public class PublicTravelRecordController {
     }
 
     travelRecordService.unlikeTravelRecord(user, travelRecordId);
+
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/{travelRecordId}/comments")
+  public ResponseEntity<TravelRecordCommentResDto> createComment(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelRecordId,
+      @RequestBody @Valid TravelRecordCommentCreateReqDto request) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(travelRecordService.createComment(user, travelRecordId, request));
+  }
+
+  @GetMapping("/{travelRecordId}/comments")
+  public ResponseEntity<List<TravelRecordCommentResDto>> getComments(
+      @PathVariable UUID travelRecordId) {
+    return ResponseEntity.ok(travelRecordService.getComments(travelRecordId));
+  }
+
+  @PatchMapping("/{travelRecordId}/comments/{commentId}")
+  public ResponseEntity<TravelRecordCommentResDto> updateComment(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelRecordId,
+      @PathVariable UUID commentId,
+      @RequestBody @Valid TravelRecordCommentUpdateReqDto request) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(
+        travelRecordService.updateComment(user, travelRecordId, commentId, request));
+  }
+
+  @DeleteMapping("/{travelRecordId}/comments/{commentId}")
+  public ResponseEntity<Void> deleteComment(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelRecordId,
+      @PathVariable UUID commentId) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    travelRecordService.deleteComment(user, travelRecordId, commentId);
 
     return ResponseEntity.noContent().build();
   }

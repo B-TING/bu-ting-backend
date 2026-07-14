@@ -13,12 +13,15 @@ import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordCommentResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
@@ -28,6 +31,7 @@ import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto.TravelRe
 import com.butingbe.domain.travelrecord.entity.PlaceReview;
 import com.butingbe.domain.travelrecord.entity.TravelRecord;
 import com.butingbe.domain.travelrecord.entity.TravelRecordBookmark;
+import com.butingbe.domain.travelrecord.entity.TravelRecordComment;
 import com.butingbe.domain.travelrecord.entity.TravelRecordDay;
 import com.butingbe.domain.travelrecord.entity.TravelRecordLike;
 import com.butingbe.domain.travelrecord.entity.TravelRecordPlace;
@@ -35,6 +39,7 @@ import com.butingbe.domain.travelrecord.entity.TravelRecordRoute;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
 import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordBookmarkRepository;
+import com.butingbe.domain.travelrecord.repository.TravelRecordCommentRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordLikeRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
@@ -71,6 +76,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private static final String DEFAULT_TITLE = "여행 기록";
   private static final int DEFAULT_FEED_SIZE = 20;
   private static final int MAX_FEED_SIZE = 50;
+  private static final int MAX_COMMENT_CONTENT_LENGTH = 1000;
   private static final int MAX_PLACE_REVIEW_TAG_COUNT = 10;
   private static final int MAX_PLACE_REVIEW_TAG_LENGTH = 30;
 
@@ -87,6 +93,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private final PlaceReviewRepository placeReviewRepository;
   private final TravelRecordBookmarkRepository travelRecordBookmarkRepository;
   private final TravelRecordLikeRepository travelRecordLikeRepository;
+  private final TravelRecordCommentRepository travelRecordCommentRepository;
 
   @Override
   @Transactional
@@ -420,6 +427,73 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   @Override
+  @Transactional
+  public TravelRecordCommentResDto createComment(
+      AuthenticatedUser authenticatedUser,
+      UUID travelRecordId,
+      TravelRecordCommentCreateReqDto request) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validatePublished(travelRecord);
+    validateCommentCreateRequest(request);
+
+    TravelRecordComment comment =
+        travelRecordCommentRepository.save(
+            TravelRecordComment.builder()
+                .travelRecord(travelRecord)
+                .author(author)
+                .content(request.content().trim())
+                .build());
+
+    return TravelRecordCommentResDto.from(comment);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<TravelRecordCommentResDto> getComments(UUID travelRecordId) {
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validatePublished(travelRecord);
+
+    return travelRecordCommentRepository
+        .findByTravelRecord_IdOrderByCreatedAtAsc(travelRecordId)
+        .stream()
+        .map(TravelRecordCommentResDto::from)
+        .toList();
+  }
+
+  @Override
+  @Transactional
+  public TravelRecordCommentResDto updateComment(
+      AuthenticatedUser authenticatedUser,
+      UUID travelRecordId,
+      UUID commentId,
+      TravelRecordCommentUpdateReqDto request) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validatePublished(travelRecord);
+    validateCommentUpdateRequest(request);
+
+    TravelRecordComment comment = findCommentInTravelRecord(commentId, travelRecordId);
+    validateCommentAuthor(comment, author.getId());
+    comment.update(request.content().trim());
+
+    return TravelRecordCommentResDto.from(comment);
+  }
+
+  @Override
+  @Transactional
+  public void deleteComment(
+      AuthenticatedUser authenticatedUser, UUID travelRecordId, UUID commentId) {
+    User author = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validatePublished(travelRecord);
+
+    TravelRecordComment comment = findCommentInTravelRecord(commentId, travelRecordId);
+    validateCommentAuthor(comment, author.getId());
+    travelRecordCommentRepository.delete(comment);
+  }
+
+  @Override
   public List<TravelRecordFeedResDto> getTravelRecordsByPlace(
       PlaceProvider provider, String providerPlaceId) {
     return getTravelRecordsByPlace(provider, providerPlaceId, null, null).items();
@@ -704,6 +778,12 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .orElseThrow(() -> new ResourceNotFoundException("Place review not found."));
   }
 
+  private TravelRecordComment findCommentInTravelRecord(UUID commentId, UUID travelRecordId) {
+    return travelRecordCommentRepository
+        .findByIdAndTravelRecord_Id(commentId, travelRecordId)
+        .orElseThrow(() -> new ResourceNotFoundException("Travel record comment not found."));
+  }
+
   private void validateTravelMember(UUID travelId, UUID userId) {
     if (!travelMemberRepository.existsByTravel_IdAndUser_Id(travelId, userId)) {
       throw new ForbiddenException("User is not a travel member.");
@@ -720,6 +800,12 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private void validateAuthor(TravelRecord travelRecord, UUID userId) {
     if (!travelRecord.getAuthor().getId().equals(userId)) {
       throw new ForbiddenException("User is not the travel record author.");
+    }
+  }
+
+  private void validateCommentAuthor(TravelRecordComment comment, UUID userId) {
+    if (!comment.getAuthor().getId().equals(userId)) {
+      throw new ForbiddenException("User is not the travel record comment author.");
     }
   }
 
@@ -764,6 +850,32 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
     if (request.title() != null && request.title().isBlank()) {
       throw new IllegalArgumentException("Travel record title cannot be blank.");
+    }
+  }
+
+  private void validateCommentCreateRequest(TravelRecordCommentCreateReqDto request) {
+    if (request == null || request.content() == null || request.content().isBlank()) {
+      throw new IllegalArgumentException("Travel record comment content is required.");
+    }
+
+    if (request.content().trim().length() > MAX_COMMENT_CONTENT_LENGTH) {
+      throw new IllegalArgumentException(
+          "Travel record comment content must be "
+              + MAX_COMMENT_CONTENT_LENGTH
+              + " characters or less.");
+    }
+  }
+
+  private void validateCommentUpdateRequest(TravelRecordCommentUpdateReqDto request) {
+    if (request == null || request.content() == null || request.content().isBlank()) {
+      throw new IllegalArgumentException("Travel record comment content is required.");
+    }
+
+    if (request.content().trim().length() > MAX_COMMENT_CONTENT_LENGTH) {
+      throw new IllegalArgumentException(
+          "Travel record comment content must be "
+              + MAX_COMMENT_CONTENT_LENGTH
+              + " characters or less.");
     }
   }
 

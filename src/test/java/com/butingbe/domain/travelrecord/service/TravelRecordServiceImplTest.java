@@ -20,12 +20,15 @@ import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.service.TravelService;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordCommentResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
@@ -1190,6 +1193,149 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             () -> travelRecordService.likeTravelRecord(authenticatedUser, draft.travelRecordId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Travel record not found.");
+  }
+
+  @Test
+  @DisplayName("user can create and list comments for a published travel record")
+  void createAndGetCommentsSuccess() {
+    User author =
+        userRepository.save(createUser("record-comment-author@example.com", "record-comment-author"));
+    User commenter =
+        userRepository.save(
+            createUser("record-comment-user@example.com", "record-comment-user"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    AuthenticatedUser commenterUser = AuthenticatedUser.from(commenter);
+    TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Comment Target");
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelRecordCommentResDto created =
+        travelRecordService.createComment(
+            commenterUser,
+            published.travelRecordId(),
+            new TravelRecordCommentCreateReqDto("  Great route!  "));
+
+    assertThat(created.commentId()).isNotNull();
+    assertThat(created.travelRecordId()).isEqualTo(published.travelRecordId());
+    assertThat(created.authorId()).isEqualTo(commenter.getId());
+    assertThat(created.authorNickname()).isEqualTo(commenter.getNickname());
+    assertThat(created.content()).isEqualTo("Great route!");
+
+    List<TravelRecordCommentResDto> comments =
+        travelRecordService.getComments(published.travelRecordId());
+
+    assertThat(comments)
+        .extracting(TravelRecordCommentResDto::commentId)
+        .containsExactly(created.commentId());
+  }
+
+  @Test
+  @DisplayName("comment rejects non-published travel record")
+  void createCommentRejectsNonPublishedRecord() {
+    User user =
+        userRepository.save(createUser("record-comment-draft-user@example.com", "record-comment-draft-user"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Draft Comment");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createComment(
+                    authenticatedUser,
+                    draft.travelRecordId(),
+                    new TravelRecordCommentCreateReqDto("Cannot comment")))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel record not found.");
+  }
+
+  @Test
+  @DisplayName("comment content cannot be blank")
+  void createCommentRejectsBlankContent() {
+    User author =
+        userRepository.save(
+            createUser("record-comment-blank-author@example.com", "record-comment-blank-author"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Blank Comment");
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, draft.originalTravelId(), draft.travelRecordId());
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createComment(
+                    authorUser,
+                    published.travelRecordId(),
+                    new TravelRecordCommentCreateReqDto("   ")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record comment content is required.");
+  }
+
+  @Test
+  @DisplayName("comment author can update and delete comment")
+  void updateAndDeleteCommentSuccess() {
+    User author =
+        userRepository.save(
+            createUser("record-comment-update-author@example.com", "record-comment-update-author"));
+    User commenter =
+        userRepository.save(
+            createUser("record-comment-update-user@example.com", "record-comment-update-user"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    AuthenticatedUser commenterUser = AuthenticatedUser.from(commenter);
+    TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Update Comment");
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, draft.originalTravelId(), draft.travelRecordId());
+    TravelRecordCommentResDto created =
+        travelRecordService.createComment(
+            commenterUser,
+            published.travelRecordId(),
+            new TravelRecordCommentCreateReqDto("Before"));
+
+    TravelRecordCommentResDto updated =
+        travelRecordService.updateComment(
+            commenterUser,
+            published.travelRecordId(),
+            created.commentId(),
+            new TravelRecordCommentUpdateReqDto("After"));
+
+    assertThat(updated.commentId()).isEqualTo(created.commentId());
+    assertThat(updated.content()).isEqualTo("After");
+
+    travelRecordService.deleteComment(commenterUser, published.travelRecordId(), created.commentId());
+
+    assertThat(travelRecordService.getComments(published.travelRecordId())).isEmpty();
+  }
+
+  @Test
+  @DisplayName("comment cannot be updated by another user")
+  void updateCommentRejectsNonAuthor() {
+    User author =
+        userRepository.save(
+            createUser("record-comment-forbidden-author@example.com", "record-comment-forbidden-author"));
+    User commenter =
+        userRepository.save(
+            createUser("record-comment-forbidden-user@example.com", "record-comment-forbidden-user"));
+    User outsider =
+        userRepository.save(
+            createUser("record-comment-forbidden-outsider@example.com", "record-comment-forbidden-outsider"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    AuthenticatedUser commenterUser = AuthenticatedUser.from(commenter);
+    AuthenticatedUser outsiderUser = AuthenticatedUser.from(outsider);
+    TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Forbidden Comment");
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, draft.originalTravelId(), draft.travelRecordId());
+    TravelRecordCommentResDto created =
+        travelRecordService.createComment(
+            commenterUser,
+            published.travelRecordId(),
+            new TravelRecordCommentCreateReqDto("Owner only"));
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateComment(
+                    outsiderUser,
+                    published.travelRecordId(),
+                    created.commentId(),
+                    new TravelRecordCommentUpdateReqDto("Nope")))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not the travel record comment author.");
   }
 
   @Test

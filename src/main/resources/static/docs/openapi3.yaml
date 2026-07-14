@@ -2486,6 +2486,166 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/travel-records/{travelRecordId}/comments:
+    post:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 댓글 작성
+      description: 공개 발행된 여행 기록에 댓글을 작성합니다. 댓글 내용은 앞뒤 공백을 제거해 저장합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordCommentCreateRequest"
+            example:
+              content: 이 코스 참고하기 좋아요!
+      responses:
+        "201":
+          description: 댓글 작성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordCommentResponse"
+        "400":
+          description: 댓글 내용 검증 실패 또는 공개되지 않은 기록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 공개 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    get:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 댓글 목록 조회
+      description: 공개 발행된 여행 기록의 댓글을 작성일 오름차순으로 조회합니다.
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: 댓글 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TravelRecordCommentResponse"
+        "404":
+          description: 공개 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/{travelRecordId}/comments/{commentId}:
+    patch:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 댓글 수정
+      description: 댓글 작성자만 본인 댓글을 수정할 수 있습니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+        - name: commentId
+          in: path
+          required: true
+          description: 댓글 ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordCommentUpdateRequest"
+            example:
+              content: 직접 따라가 봤는데 동선이 좋아요.
+      responses:
+        "200":
+          description: 댓글 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordCommentResponse"
+        "400":
+          description: 댓글 내용 검증 실패 또는 공개되지 않은 기록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 댓글 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 공개 여행 기록 또는 댓글을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 댓글 삭제
+      description: 댓글 작성자만 본인 댓글을 삭제할 수 있습니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+        - name: commentId
+          in: path
+          required: true
+          description: 댓글 ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: 댓글 삭제 성공
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 댓글 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 공개 여행 기록 또는 댓글을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/places/travel-records:
     get:
       tags:
@@ -2987,6 +3147,59 @@ components:
           type: integer
           format: int64
           example: 8
+    TravelRecordCommentCreateRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          maxLength: 1000
+          description: 댓글 내용입니다. 앞뒤 공백은 저장 전에 제거됩니다.
+          example: 이 코스 참고하기 좋아요!
+    TravelRecordCommentUpdateRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          maxLength: 1000
+          description: 수정할 댓글 내용입니다. 앞뒤 공백은 저장 전에 제거됩니다.
+          example: 직접 따라가 봤는데 동선이 좋아요.
+    TravelRecordCommentResponse:
+      type: object
+      properties:
+        commentId:
+          type: string
+          format: uuid
+          example: 82000000-0000-0000-0000-000000000001
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        authorId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        authorNickname:
+          type: string
+          example: 여행자
+        authorProfileImageUrl:
+          type: string
+          nullable: true
+          example: https://example.com/profile.jpg
+        content:
+          type: string
+          example: 이 코스 참고하기 좋아요!
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T11:20:00"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T11:25:00"
     PlaceReviewCreateRequest:
       type: object
       required:

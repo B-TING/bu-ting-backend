@@ -4,12 +4,15 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
+import com.butingbe.domain.travelrecord.dto.response.TravelRecordCommentResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedPageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordFeedResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
@@ -103,6 +106,21 @@ public interface TravelRecordService {
   TravelRecordLikeResDto likeTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
 
   void unlikeTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId);
+
+  TravelRecordCommentResDto createComment(
+      AuthenticatedUser authenticatedUser,
+      UUID travelRecordId,
+      TravelRecordCommentCreateReqDto request);
+
+  List<TravelRecordCommentResDto> getComments(UUID travelRecordId);
+
+  TravelRecordCommentResDto updateComment(
+      AuthenticatedUser authenticatedUser,
+      UUID travelRecordId,
+      UUID commentId,
+      TravelRecordCommentUpdateReqDto request);
+
+  void deleteComment(AuthenticatedUser authenticatedUser, UUID travelRecordId, UUID commentId);
 
   List<TravelRecordFeedResDto> getTravelRecordsByPlace(
       PlaceProvider provider, String providerPlaceId);
