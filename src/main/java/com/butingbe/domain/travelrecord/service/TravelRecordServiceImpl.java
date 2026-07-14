@@ -71,6 +71,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private static final String DEFAULT_TITLE = "여행 기록";
   private static final int DEFAULT_FEED_SIZE = 20;
   private static final int MAX_FEED_SIZE = 50;
+  private static final int MAX_PLACE_REVIEW_TAG_COUNT = 10;
+  private static final int MAX_PLACE_REVIEW_TAG_LENGTH = 30;
 
   private final TravelRepository travelRepository;
   private final PlanRepository planRepository;
@@ -486,6 +488,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     validateAuthor(travelRecord, author.getId());
     validateDraft(travelRecord);
     validatePlaceReviewCreateRequest(request);
+    List<String> tags = normalizePlaceReviewTags(request.tags());
 
     TravelRecordPlace travelRecordPlace =
         findTravelRecordPlaceInRecord(travelRecordPlaceId, travelRecordId);
@@ -497,6 +500,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
                 .travelRecordPlace(travelRecordPlace)
                 .rating(request.rating())
                 .content(request.content())
+                .tags(tags)
                 .build());
 
     return PlaceReviewResDto.from(placeReview);
@@ -544,7 +548,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       return PlaceReviewResDto.from(placeReview);
     }
 
-    placeReview.update(request.rating(), request.content());
+    List<String> tags = request.tags() == null ? null : normalizePlaceReviewTags(request.tags());
+    placeReview.update(request.rating(), request.content(), tags);
     return PlaceReviewResDto.from(placeReview);
   }
 
@@ -780,6 +785,35 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     if (request.rating() < 1 || request.rating() > 5) {
       throw new IllegalArgumentException("Place review rating must be between 1 and 5.");
     }
+  }
+
+  private List<String> normalizePlaceReviewTags(List<String> tags) {
+    if (tags == null || tags.isEmpty()) {
+      return List.of();
+    }
+
+    List<String> normalizedTags =
+        tags.stream()
+            .filter(tag -> tag != null && !tag.isBlank())
+            .map(String::trim)
+            .distinct()
+            .toList();
+
+    if (normalizedTags.size() > MAX_PLACE_REVIEW_TAG_COUNT) {
+      throw new IllegalArgumentException(
+          "Place review tags must be " + MAX_PLACE_REVIEW_TAG_COUNT + " or fewer.");
+    }
+
+    boolean hasTooLongTag =
+        normalizedTags.stream().anyMatch(tag -> tag.length() > MAX_PLACE_REVIEW_TAG_LENGTH);
+    if (hasTooLongTag) {
+      throw new IllegalArgumentException(
+          "Place review tag must be "
+              + MAX_PLACE_REVIEW_TAG_LENGTH
+              + " characters or less.");
+    }
+
+    return normalizedTags;
   }
 
   private void validatePlaceReviewSummaryRequest(PlaceProvider provider, String providerPlaceId) {

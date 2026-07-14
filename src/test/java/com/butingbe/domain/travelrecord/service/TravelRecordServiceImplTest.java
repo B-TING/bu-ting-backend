@@ -1206,11 +1206,13 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             draft.originalTravelId(),
             draft.travelRecordId(),
             place.travelRecordPlaceId(),
-            new PlaceReviewCreateReqDto(5, "Best place in this route"));
+            new PlaceReviewCreateReqDto(
+                5, "Best place in this route", List.of("  야경  ", "힐링", "야경", "")));
 
     assertThat(result.travelRecordPlaceId()).isEqualTo(place.travelRecordPlaceId());
     assertThat(result.rating()).isEqualTo(5);
     assertThat(result.content()).isEqualTo("Best place in this route");
+    assertThat(result.tags()).containsExactly("야경", "힐링");
     assertThat(placeReviewRepository.findByTravelRecordPlace_Id(place.travelRecordPlaceId()))
         .isPresent();
   }
@@ -1274,7 +1276,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             draft.originalTravelId(),
             draft.travelRecordId(),
             place.travelRecordPlaceId(),
-            new PlaceReviewCreateReqDto(5, "Worth visiting"));
+            new PlaceReviewCreateReqDto(5, "Worth visiting", List.of("맛집", "재방문")));
 
     PlaceReviewResDto result =
         travelRecordService.getPlaceReview(
@@ -1287,6 +1289,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.travelRecordPlaceId()).isEqualTo(place.travelRecordPlaceId());
     assertThat(result.rating()).isEqualTo(5);
     assertThat(result.content()).isEqualTo("Worth visiting");
+    assertThat(result.tags()).containsExactly("맛집", "재방문");
   }
 
   @Test
@@ -1333,13 +1336,13 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         firstDraft.originalTravelId(),
         firstDraft.travelRecordId(),
         firstPlace.travelRecordPlaceId(),
-        new PlaceReviewCreateReqDto(4, "Good route"));
+        new PlaceReviewCreateReqDto(4, "Good route", List.of("야경", "가족")));
     travelRecordService.createPlaceReview(
         secondAuthenticatedUser,
         secondDraft.originalTravelId(),
         secondDraft.travelRecordId(),
         secondPlace.travelRecordPlaceId(),
-        new PlaceReviewCreateReqDto(5, "Perfect stop"));
+        new PlaceReviewCreateReqDto(5, "Perfect stop", List.of("맛집")));
     travelRecordService.createPlaceReview(
         draftAuthenticatedUser,
         hiddenDraft.originalTravelId(),
@@ -1364,6 +1367,9 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.reviews())
         .extracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::content)
         .containsExactlyInAnyOrder("Perfect stop", "Good route");
+    assertThat(result.reviews())
+        .flatExtracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::tags)
+        .contains("야경", "가족", "맛집");
     assertThat(result.reviews())
         .extracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::travelRecordId)
         .doesNotContain(hiddenDraft.travelRecordId());
@@ -1505,10 +1511,11 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             draft.originalTravelId(),
             draft.travelRecordId(),
             place.travelRecordPlaceId(),
-            new PlaceReviewUpdateReqDto(5, "After"));
+            new PlaceReviewUpdateReqDto(5, "After", List.of("  야경", "카페", "야경")));
 
     assertThat(result.rating()).isEqualTo(5);
     assertThat(result.content()).isEqualTo("After");
+    assertThat(result.tags()).containsExactly("야경", "카페");
   }
 
   @Test
@@ -1519,11 +1526,11 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
     var place = draft.days().getFirst().places().getFirst();
     travelRecordService.createPlaceReview(
-        authenticatedUser,
-        draft.originalTravelId(),
-        draft.travelRecordId(),
-        place.travelRecordPlaceId(),
-        new PlaceReviewCreateReqDto(4, "Before"));
+            authenticatedUser,
+            draft.originalTravelId(),
+            draft.travelRecordId(),
+            place.travelRecordPlaceId(),
+            new PlaceReviewCreateReqDto(4, "Before", List.of("기존")));
 
     PlaceReviewResDto result =
         travelRecordService.updatePlaceReview(
@@ -1535,6 +1542,59 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     assertThat(result.rating()).isEqualTo(4);
     assertThat(result.content()).isEqualTo("Only content changed");
+    assertThat(result.tags()).containsExactly("기존");
+  }
+
+  @Test
+  @DisplayName("place review update can clear tags with empty list")
+  void updatePlaceReviewCanClearTags() {
+    User user =
+        userRepository.save(createUser("review-clear-tags@example.com", "review-clear-tags"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+    travelRecordService.createPlaceReview(
+        authenticatedUser,
+        draft.originalTravelId(),
+        draft.travelRecordId(),
+        place.travelRecordPlaceId(),
+        new PlaceReviewCreateReqDto(4, "Before", List.of("야경", "가족")));
+
+    PlaceReviewResDto result =
+        travelRecordService.updatePlaceReview(
+            authenticatedUser,
+            draft.originalTravelId(),
+            draft.travelRecordId(),
+            place.travelRecordPlaceId(),
+            new PlaceReviewUpdateReqDto(null, null, List.of()));
+
+    assertThat(result.rating()).isEqualTo(4);
+    assertThat(result.content()).isEqualTo("Before");
+    assertThat(result.tags()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("place review tags must be 10 or fewer")
+  void createPlaceReviewRejectsTooManyTags() {
+    User user =
+        userRepository.save(createUser("review-too-many-tags@example.com", "review-too-many-tags"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
+    var place = draft.days().getFirst().places().getFirst();
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    draft.originalTravelId(),
+                    draft.travelRecordId(),
+                    place.travelRecordPlaceId(),
+                    new PlaceReviewCreateReqDto(
+                        5,
+                        "Too many tags",
+                        List.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Place review tags must be 10 or fewer.");
   }
 
   @Test

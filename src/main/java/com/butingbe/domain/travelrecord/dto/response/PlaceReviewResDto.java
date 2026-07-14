@@ -2,6 +2,7 @@ package com.butingbe.domain.travelrecord.dto.response;
 
 import com.butingbe.domain.travelrecord.entity.PlaceReview;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record PlaceReviewResDto(
@@ -9,6 +10,7 @@ public record PlaceReviewResDto(
     UUID travelRecordPlaceId,
     Integer rating,
     String content,
+    List<String> tags,
     LocalDateTime createdAt,
     LocalDateTime updatedAt) {
 
@@ -18,6 +20,7 @@ public record PlaceReviewResDto(
         placeReview.getTravelRecordPlace().getId(),
         placeReview.getRating(),
         placeReview.getContent(),
+        List.copyOf(placeReview.getTags()),
         placeReview.getCreatedAt(),
         placeReview.getUpdatedAt());
   }

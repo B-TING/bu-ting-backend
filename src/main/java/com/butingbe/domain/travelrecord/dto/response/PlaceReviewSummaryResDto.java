@@ -42,6 +42,7 @@ public record PlaceReviewSummaryResDto(
       String placeName,
       Integer rating,
       String content,
+      List<String> tags,
       LocalDateTime createdAt,
       LocalDateTime updatedAt) {
 
@@ -59,6 +60,7 @@ public record PlaceReviewSummaryResDto(
           place.getPlaceName(),
           placeReview.getRating(),
           placeReview.getContent(),
+          List.copyOf(placeReview.getTags()),
           placeReview.getCreatedAt(),
           placeReview.getUpdatedAt());
     }

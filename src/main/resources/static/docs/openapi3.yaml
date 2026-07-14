@@ -1928,6 +1928,9 @@ paths:
             example:
               rating: 5
               content: 노을이 정말 예뻤어요.
+              tags:
+                - 야경
+                - 가족여행
       responses:
         "201":
           description: 생성 성공
@@ -2013,6 +2016,9 @@ paths:
             example:
               rating: 4
               content: 좋았지만 사람이 많았어요.
+              tags:
+                - 카페
+                - 재방문
       responses:
         "200":
           description: OK
@@ -2995,6 +3001,16 @@ components:
           type: string
           nullable: true
           example: 노을이 정말 예뻤어요.
+        tags:
+          type: array
+          description: 장소 후기 태그입니다. 빈 문자열은 제거되고, 중복 태그는 하나만 저장됩니다.
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 30
+          example:
+            - 야경
+            - 가족여행
     PlaceReviewUpdateRequest:
       type: object
       properties:
@@ -3008,6 +3024,17 @@ components:
           type: string
           nullable: true
           example: 좋았지만 사람이 많았어요.
+        tags:
+          type: array
+          nullable: true
+          description: null이면 기존 태그를 유지하고, 빈 배열이면 태그를 모두 삭제합니다.
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 30
+          example:
+            - 카페
+            - 재방문
     PlaceReviewResponse:
       type: object
       properties:
@@ -3028,6 +3055,13 @@ components:
           type: string
           nullable: true
           example: 노을이 정말 예뻤어요.
+        tags:
+          type: array
+          items:
+            type: string
+          example:
+            - 야경
+            - 가족여행
         createdAt:
           type: string
           format: date-time
@@ -3105,6 +3139,13 @@ components:
           type: string
           nullable: true
           example: 노을이 정말 예뻤어요.
+        tags:
+          type: array
+          items:
+            type: string
+          example:
+            - 야경
+            - 가족여행
         createdAt:
           type: string
           format: date-time
