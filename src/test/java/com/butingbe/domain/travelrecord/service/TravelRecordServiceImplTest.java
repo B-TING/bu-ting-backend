@@ -89,12 +89,13 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         travelRecordService.createDraft(
             authenticatedUser,
             travel.id(),
-            new TravelRecordCreateReqDto("Summer Busan", "Great trip", "https://image.test/1"));
+            new TravelRecordCreateReqDto("Summer Busan", "Great trip", "https://image.test/1", 5));
 
     assertThat(result.originalTravelId()).isEqualTo(travel.id());
     assertThat(result.authorId()).isEqualTo(user.getId());
     assertThat(result.status()).isEqualTo(TravelRecordStatus.DRAFT);
     assertThat(result.title()).isEqualTo("Summer Busan");
+    assertThat(result.overallRating()).isEqualTo(5);
     assertThat(result.days()).hasSize(1);
     assertThat(result.days().getFirst().places()).hasSize(2);
     assertThat(result.days().getFirst().places().getFirst().placeName())
@@ -1392,13 +1393,20 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             draft.originalTravelId(),
             place.originalPlanPlaceId(),
             new PlaceReviewCreateReqDto(
-                5, "Best place in this route", List.of("  야경  ", "힐링", "야경", "")));
+                5,
+                "Best place in this route",
+                List.of("  night  ", "return", "night", ""),
+                90,
+                List.of(" https://image.test/place.jpg ", "https://video.test/place.mp4")));
 
     assertThat(result.planPlaceId()).isEqualTo(place.originalPlanPlaceId());
     assertThat(result.travelRecordPlaceId()).isNull();
     assertThat(result.rating()).isEqualTo(5);
+    assertThat(result.stayMinutes()).isEqualTo(90);
     assertThat(result.content()).isEqualTo("Best place in this route");
-    assertThat(result.tags()).containsExactly("야경", "힐링");
+    assertThat(result.tags()).containsExactly("night", "return");
+    assertThat(result.mediaUrls())
+        .containsExactly("https://image.test/place.jpg", "https://video.test/place.mp4");
     assertThat(placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(
             place.originalPlanPlaceId(), user.getId()))
         .isPresent();

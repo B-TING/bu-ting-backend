@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PlaceReviewImageRepository extends JpaRepository<PlaceReviewImage, UUID> {
 
   List<PlaceReviewImage> findByPlaceReview_IdOrderBySequenceAsc(UUID placeReviewId);
+
+  void deleteByPlaceReview_Id(UUID placeReviewId);
 }

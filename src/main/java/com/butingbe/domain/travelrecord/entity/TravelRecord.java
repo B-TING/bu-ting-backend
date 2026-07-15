@@ -58,6 +58,9 @@ public class TravelRecord {
   @Column(name = "cover_image_url", length = 1000)
   private String coverImageUrl;
 
+  @Column(name = "overall_rating")
+  private Integer overallRating;
+
   @Column(name = "travel_start_date", nullable = false)
   private LocalDate travelStartDate;
 
@@ -92,6 +95,7 @@ public class TravelRecord {
       String title,
       String content,
       String coverImageUrl,
+      Integer overallRating,
       LocalDate travelStartDate,
       LocalDate travelEndDate,
       TravelRecordStatus status,
@@ -103,6 +107,7 @@ public class TravelRecord {
     this.title = title;
     this.content = content;
     this.coverImageUrl = coverImageUrl;
+    this.overallRating = overallRating;
     this.travelStartDate = travelStartDate;
     this.travelEndDate = travelEndDate;
     this.status = status != null ? status : TravelRecordStatus.DRAFT;
@@ -112,6 +117,11 @@ public class TravelRecord {
   }
 
   public void updateContent(String title, String content, String coverImageUrl) {
+    updateContent(title, content, coverImageUrl, null);
+  }
+
+  public void updateContent(
+      String title, String content, String coverImageUrl, Integer overallRating) {
     if (title != null) {
       this.title = title;
     }
@@ -120,6 +130,9 @@ public class TravelRecord {
     }
     if (coverImageUrl != null) {
       this.coverImageUrl = coverImageUrl;
+    }
+    if (overallRating != null) {
+      this.overallRating = overallRating;
     }
   }
 

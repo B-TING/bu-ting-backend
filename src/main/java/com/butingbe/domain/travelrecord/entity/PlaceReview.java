@@ -62,6 +62,9 @@ public class PlaceReview {
   @Column(nullable = false)
   private Integer rating;
 
+  @Column(name = "stay_minutes")
+  private Integer stayMinutes;
+
   @Column(columnDefinition = "text")
   private String content;
 
@@ -87,19 +90,24 @@ public class PlaceReview {
       User author,
       TravelRecordPlace travelRecordPlace,
       Integer rating,
+      Integer stayMinutes,
       String content,
       List<String> tags) {
     this.planPlace = planPlace;
     this.author = author;
     this.travelRecordPlace = travelRecordPlace;
     this.rating = rating;
+    this.stayMinutes = stayMinutes;
     this.content = content;
     updateTags(tags);
   }
 
-  public void update(Integer rating, String content, List<String> tags) {
+  public void update(Integer rating, Integer stayMinutes, String content, List<String> tags) {
     if (rating != null) {
       this.rating = rating;
+    }
+    if (stayMinutes != null) {
+      this.stayMinutes = stayMinutes;
     }
     if (content != null) {
       this.content = content;

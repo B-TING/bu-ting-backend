@@ -2781,12 +2781,20 @@ components:
         content:
           type: string
           nullable: true
-          example: 여유롭게 다녀온 2일 부산 여행 코스입니다.
+          description: 여행기 본문입니다. 필수는 아닙니다.
+          example: 자유롭게 다녀온 2박 부산 여행 코스입니다.
         coverImageUrl:
           type: string
           maxLength: 1000
           nullable: true
           example: https://example.com/cover.jpg
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: 여행 플랜 전체 평점입니다.
+          example: 5
     TravelRecordUpdateRequest:
       type: object
       properties:
@@ -2794,16 +2802,24 @@ components:
           type: string
           maxLength: 100
           nullable: true
-          example: 수정한 부산 여행
+          example: 수정된 부산 여행
         content:
           type: string
           nullable: true
-          example: 수정한 여행 기록 본문입니다.
+          description: 여행기 본문입니다. 필수는 아닙니다.
+          example: 수정된 여행 기록 본문입니다.
         coverImageUrl:
           type: string
           maxLength: 1000
           nullable: true
           example: https://example.com/new-cover.jpg
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: 여행 플랜 전체 평점입니다.
+          example: 4
     TravelRecordStatus:
       type: string
       enum:
@@ -2846,6 +2862,13 @@ components:
           type: string
           nullable: true
           example: https://example.com/cover.jpg
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: 여행 플랜 전체 평점입니다.
+          example: 5
         travelStartDate:
           type: string
           format: date
@@ -3017,6 +3040,13 @@ components:
           type: string
           nullable: true
           example: https://example.com/cover.jpg
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: 여행 플랜 전체 평점입니다.
+          example: 5
         travelStartDate:
           type: string
           format: date
@@ -3072,6 +3102,13 @@ components:
           type: string
           nullable: true
           example: https://example.com/cover.jpg
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: 여행 플랜 전체 평점입니다.
+          example: 5
         travelStartDate:
           type: string
           format: date
@@ -3205,10 +3242,11 @@ components:
         content:
           type: string
           nullable: true
-          example: 노을이 정말 예뻤어요.
+          description: 장소 후기 및 팁입니다.
+          example: 전망이 정말 좋았어요.
         tags:
           type: array
-          description: 장소 후기 태그입니다. 빈 문자열은 제거되고, 중복 태그는 하나만 저장됩니다.
+          description: 장소 후기 태그입니다. 빈 문자열은 제거하고, 중복 태그는 하나만 저장됩니다.
           maxItems: 10
           items:
             type: string
@@ -3216,6 +3254,22 @@ components:
           example:
             - 야경
             - 가족여행
+        stayMinutes:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: 실제 체류 시간입니다. 단위는 분입니다.
+          example: 90
+        mediaUrls:
+          type: array
+          description: 장소 후기 사진/동영상 URL 목록입니다.
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 1000
+          example:
+            - https://example.com/place-photo.jpg
+            - https://example.com/place-video.mp4
     PlaceReviewUpdateRequest:
       type: object
       properties:
@@ -3228,7 +3282,8 @@ components:
         content:
           type: string
           nullable: true
-          example: 좋았지만 사람이 많았어요.
+          description: 장소 후기 및 팁입니다.
+          example: 좋지만 사람이 많았어요.
         tags:
           type: array
           nullable: true
@@ -3240,6 +3295,22 @@ components:
           example:
             - 카페
             - 재방문
+        stayMinutes:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: 실제 체류 시간입니다. 단위는 분입니다.
+          example: 75
+        mediaUrls:
+          type: array
+          nullable: true
+          description: null이면 기존 미디어를 유지하고, 빈 배열이면 모두 삭제합니다.
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 1000
+          example:
+            - https://example.com/new-place-photo.jpg
     PlaceReviewResponse:
       type: object
       properties:
@@ -3262,10 +3333,17 @@ components:
           minimum: 1
           maximum: 5
           example: 5
+        stayMinutes:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: 실제 체류 시간입니다. 단위는 분입니다.
+          example: 90
         content:
           type: string
           nullable: true
-          example: 노을이 정말 예뻤어요.
+          description: 장소 후기 및 팁입니다.
+          example: 전망이 정말 좋았어요.
         tags:
           type: array
           items:
@@ -3273,6 +3351,13 @@ components:
           example:
             - 야경
             - 가족여행
+        mediaUrls:
+          type: array
+          items:
+            type: string
+          example:
+            - https://example.com/place-photo.jpg
+            - https://example.com/place-video.mp4
         createdAt:
           type: string
           format: date-time

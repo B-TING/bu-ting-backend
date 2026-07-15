@@ -5,6 +5,9 @@ ALTER TABLE place_review
     ADD COLUMN author_id uuid;
 
 ALTER TABLE place_review
+    ADD COLUMN stay_minutes integer;
+
+ALTER TABLE place_review
     ALTER COLUMN travel_record_place_id DROP NOT NULL;
 
 ALTER TABLE place_review
@@ -29,6 +32,10 @@ ALTER TABLE place_review
             OR
             (plan_place_id IS NULL AND travel_record_place_id IS NOT NULL)
         );
+
+ALTER TABLE place_review
+    ADD CONSTRAINT chk_place_review_stay_minutes
+        CHECK (stay_minutes IS NULL OR stay_minutes >= 0);
 
 CREATE INDEX idx_place_review_plan_place_id
     ON place_review (plan_place_id);
