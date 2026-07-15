@@ -153,26 +153,17 @@ public interface TravelRecordService {
   PlaceReviewResDto createPlaceReview(
       AuthenticatedUser authenticatedUser,
       UUID travelId,
-      UUID travelRecordId,
-      UUID travelRecordPlaceId,
+      UUID planPlaceId,
       PlaceReviewCreateReqDto request);
 
   PlaceReviewResDto getPlaceReview(
-      AuthenticatedUser authenticatedUser,
-      UUID travelId,
-      UUID travelRecordId,
-      UUID travelRecordPlaceId);
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID planPlaceId);
 
   PlaceReviewResDto updatePlaceReview(
       AuthenticatedUser authenticatedUser,
       UUID travelId,
-      UUID travelRecordId,
-      UUID travelRecordPlaceId,
+      UUID planPlaceId,
       PlaceReviewUpdateReqDto request);
 
-  void deletePlaceReview(
-      AuthenticatedUser authenticatedUser,
-      UUID travelId,
-      UUID travelRecordId,
-      UUID travelRecordPlaceId);
+  void deletePlaceReview(AuthenticatedUser authenticatedUser, UUID travelId, UUID planPlaceId);
 }

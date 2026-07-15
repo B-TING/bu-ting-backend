@@ -1907,18 +1907,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
-  /api/v1/travels/{travelId}/records/{travelRecordId}/places/{travelRecordPlaceId}/review:
+  /api/v1/travels/{travelId}/plans/places/{planPlaceId}/review:
     post:
       tags:
         - TravelRecord
-      summary: 여행 기록 장소 후기 작성
-      description: 작성자 본인의 여행 기록에 포함된 특정 장소에 별점과 후기를 작성합니다.
+      summary: 일정 장소 후기 작성
+      description: 여행 멤버가 여행기 초안 생성 전에도 일정 장소(PlanPlace)에 별점과 후기를 작성합니다. 여행기 초안 생성 시 이 후기는 여행기 장소 후기 스냅샷으로 복사됩니다.
       security:
         - opaqueToken: []
       parameters:
         - $ref: "#/components/parameters/TravelId"
-        - $ref: "#/components/parameters/TravelRecordId"
-        - $ref: "#/components/parameters/TravelRecordPlaceId"
+        - $ref: "#/components/parameters/PlanPlaceId"
       requestBody:
         required: true
         content:
@@ -1927,7 +1926,7 @@ paths:
               $ref: "#/components/schemas/PlaceReviewCreateRequest"
             example:
               rating: 5
-              content: 노을이 정말 예뻤어요.
+              content: 전망이 정말 좋았어요.
               tags:
                 - 야경
                 - 가족여행
@@ -1951,13 +1950,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "403":
-          description: 작성자가 아님
+          description: 여행 멤버가 아님
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "404":
-          description: 여행 기록 장소를 찾을 수 없음
+          description: 여행 또는 일정 장소를 찾을 수 없음
           content:
             application/json:
               schema:
@@ -1965,16 +1964,16 @@ paths:
     get:
       tags:
         - TravelRecord
-      summary: 여행 기록 장소 후기 조회
+      summary: 일정 장소 후기 조회
+      description: 여행 멤버가 일정 장소(PlanPlace)에 작성된 본 플랫폼 후기를 조회합니다.
       security:
         - opaqueToken: []
       parameters:
         - $ref: "#/components/parameters/TravelId"
-        - $ref: "#/components/parameters/TravelRecordId"
-        - $ref: "#/components/parameters/TravelRecordPlaceId"
+        - $ref: "#/components/parameters/PlanPlaceId"
       responses:
         "200":
-          description: OK
+          description: 조회 성공
           content:
             application/json:
               schema:
@@ -1986,13 +1985,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "403":
-          description: 작성자가 아님
+          description: 여행 멤버가 아님
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "404":
-          description: 장소 후기를 찾을 수 없음
+          description: 여행, 일정 장소 또는 후기를 찾을 수 없음
           content:
             application/json:
               schema:
@@ -2000,13 +1999,13 @@ paths:
     patch:
       tags:
         - TravelRecord
-      summary: 여행 기록 장소 후기 수정
+      summary: 일정 장소 후기 수정
+      description: 여행 멤버가 일정 장소(PlanPlace)에 작성한 후기의 별점, 본문, 태그를 수정합니다.
       security:
         - opaqueToken: []
       parameters:
         - $ref: "#/components/parameters/TravelId"
-        - $ref: "#/components/parameters/TravelRecordId"
-        - $ref: "#/components/parameters/TravelRecordPlaceId"
+        - $ref: "#/components/parameters/PlanPlaceId"
       requestBody:
         required: false
         content:
@@ -2015,13 +2014,13 @@ paths:
               $ref: "#/components/schemas/PlaceReviewUpdateRequest"
             example:
               rating: 4
-              content: 좋았지만 사람이 많았어요.
+              content: 좋지만 사람이 많았어요.
               tags:
                 - 카페
                 - 재방문
       responses:
         "200":
-          description: OK
+          description: 수정 성공
           content:
             application/json:
               schema:
@@ -2039,13 +2038,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "403":
-          description: 작성자가 아님
+          description: 여행 멤버가 아님
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "404":
-          description: 장소 후기를 찾을 수 없음
+          description: 여행, 일정 장소 또는 후기를 찾을 수 없음
           content:
             application/json:
               schema:
@@ -2053,13 +2052,13 @@ paths:
     delete:
       tags:
         - TravelRecord
-      summary: 여행 기록 장소 후기 삭제
+      summary: 일정 장소 후기 삭제
+      description: 여행 멤버가 일정 장소(PlanPlace)에 작성한 후기를 삭제합니다.
       security:
         - opaqueToken: []
       parameters:
         - $ref: "#/components/parameters/TravelId"
-        - $ref: "#/components/parameters/TravelRecordId"
-        - $ref: "#/components/parameters/TravelRecordPlaceId"
+        - $ref: "#/components/parameters/PlanPlaceId"
       responses:
         "204":
           description: 삭제 성공
@@ -2070,18 +2069,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "403":
-          description: 작성자가 아님
+          description: 여행 멤버가 아님
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "404":
-          description: 장소 후기를 찾을 수 없음
+          description: 여행, 일정 장소 또는 후기를 찾을 수 없음
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
-
   /api/v1/travel-records:
     get:
       tags:
@@ -3249,9 +3247,15 @@ components:
           type: string
           format: uuid
           example: 90000000-0000-0000-0000-000000000001
+        planPlaceId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 30000000-0000-0000-0000-000000000001
         travelRecordPlaceId:
           type: string
           format: uuid
+          nullable: true
           example: 70000000-0000-0000-0000-000000000001
         rating:
           type: integer

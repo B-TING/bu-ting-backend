@@ -867,8 +867,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.createPlaceReview(
         authenticatedUser,
         draft.originalTravelId(),
-        draft.travelRecordId(),
-        place.travelRecordPlaceId(),
+        place.originalPlanPlaceId(),
         new PlaceReviewCreateReqDto(5, "Before hidden"));
     TravelRecordResDto published =
         travelRecordService.publish(
@@ -932,14 +931,10 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     User user =
         userRepository.save(createUser("record-republish@example.com", "record-republish"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
-    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Republish Me");
-    var place = draft.days().getFirst().places().getFirst();
-    travelRecordService.createPlaceReview(
-        authenticatedUser,
-        draft.originalTravelId(),
-        draft.travelRecordId(),
-        place.travelRecordPlaceId(),
-        new PlaceReviewCreateReqDto(5, "Back again"));
+    TravelRecordResDto draft =
+        createDraftWithOneReviewedPlace(
+                authenticatedUser, "Republish Me", 5, "Back again", List.of())
+            .draft();
     TravelRecordResDto published =
         travelRecordService.publish(
             authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
@@ -1384,7 +1379,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("author can create place review for a draft travel record place")
+  @DisplayName("travel member can create place review for a plan place")
   void createPlaceReviewSuccess() {
     User user = userRepository.save(createUser("review-owner@example.com", "review-owner"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
@@ -1395,21 +1390,64 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         travelRecordService.createPlaceReview(
             authenticatedUser,
             draft.originalTravelId(),
-            draft.travelRecordId(),
-            place.travelRecordPlaceId(),
+            place.originalPlanPlaceId(),
             new PlaceReviewCreateReqDto(
                 5, "Best place in this route", List.of("  야경  ", "힐링", "야경", "")));
 
-    assertThat(result.travelRecordPlaceId()).isEqualTo(place.travelRecordPlaceId());
+    assertThat(result.planPlaceId()).isEqualTo(place.originalPlanPlaceId());
+    assertThat(result.travelRecordPlaceId()).isNull();
     assertThat(result.rating()).isEqualTo(5);
     assertThat(result.content()).isEqualTo("Best place in this route");
     assertThat(result.tags()).containsExactly("야경", "힐링");
-    assertThat(placeReviewRepository.findByTravelRecordPlace_Id(place.travelRecordPlaceId()))
+    assertThat(placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(
+            place.originalPlanPlaceId(), user.getId()))
         .isPresent();
   }
 
   @Test
-  @DisplayName("place review cannot be created twice for the same travel record place")
+  @DisplayName("travel member can create place review before travel is completed")
+  void createPlaceReviewBeforeTravelCompleted() {
+    User user =
+        userRepository.save(createUser("review-before-completed@example.com", "review-before"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel =
+        travelService.createTravel(
+            authenticatedUser,
+            new TravelCreateReqDto(
+                "Busan",
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto place =
+        createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+
+    PlaceReviewResDto result =
+        travelRecordService.createPlaceReview(
+            authenticatedUser,
+            travel.id(),
+            place.planPlaceId(),
+            new PlaceReviewCreateReqDto(5, "Already impressive"));
+
+    assertThat(result.planPlaceId()).isEqualTo(place.planPlaceId());
+    assertThat(result.rating()).isEqualTo(5);
+    assertThat(placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(
+            place.planPlaceId(), user.getId()))
+        .isPresent();
+  }
+
+  @Test
+  @DisplayName("place review cannot be created twice for the same plan place")
   void createPlaceReviewRejectsDuplicate() {
     User user = userRepository.save(createUser("review-duplicate@example.com", "review-duplicate"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
@@ -1418,8 +1456,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.createPlaceReview(
         authenticatedUser,
         draft.originalTravelId(),
-        draft.travelRecordId(),
-        place.travelRecordPlaceId(),
+        place.originalPlanPlaceId(),
         new PlaceReviewCreateReqDto(4, "Good"));
 
     assertThatThrownBy(
@@ -1427,8 +1464,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.createPlaceReview(
                     authenticatedUser,
                     draft.originalTravelId(),
-                    draft.travelRecordId(),
-                    place.travelRecordPlaceId(),
+                    place.originalPlanPlaceId(),
                     new PlaceReviewCreateReqDto(5, "Again")))
         .isInstanceOf(DuplicateResourceException.class)
         .hasMessage("Place review already exists.");
@@ -1447,15 +1483,14 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.createPlaceReview(
                     authenticatedUser,
                     draft.originalTravelId(),
-                    draft.travelRecordId(),
-                    place.travelRecordPlaceId(),
+                    place.originalPlanPlaceId(),
                     new PlaceReviewCreateReqDto(6, "Too high")))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Place review rating must be between 1 and 5.");
   }
 
   @Test
-  @DisplayName("author can get place review for a draft travel record place")
+  @DisplayName("travel member can get place review for a plan place")
   void getPlaceReviewSuccess() {
     User user = userRepository.save(createUser("review-get@example.com", "review-get"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
@@ -1465,19 +1500,18 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         travelRecordService.createPlaceReview(
             authenticatedUser,
             draft.originalTravelId(),
-            draft.travelRecordId(),
-            place.travelRecordPlaceId(),
+            place.originalPlanPlaceId(),
             new PlaceReviewCreateReqDto(5, "Worth visiting", List.of("맛집", "재방문")));
 
     PlaceReviewResDto result =
         travelRecordService.getPlaceReview(
             authenticatedUser,
             draft.originalTravelId(),
-            draft.travelRecordId(),
-            place.travelRecordPlaceId());
+            place.originalPlanPlaceId());
 
     assertThat(result.placeReviewId()).isEqualTo(created.placeReviewId());
-    assertThat(result.travelRecordPlaceId()).isEqualTo(place.travelRecordPlaceId());
+    assertThat(result.planPlaceId()).isEqualTo(place.originalPlanPlaceId());
+    assertThat(result.travelRecordPlaceId()).isNull();
     assertThat(result.rating()).isEqualTo(5);
     assertThat(result.content()).isEqualTo("Worth visiting");
     assertThat(result.tags()).containsExactly("맛집", "재방문");
@@ -1496,8 +1530,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.getPlaceReview(
                     authenticatedUser,
                     draft.originalTravelId(),
-                    draft.travelRecordId(),
-                    place.travelRecordPlaceId()))
+                    place.originalPlanPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Place review not found.");
   }
@@ -1515,31 +1548,18 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     AuthenticatedUser firstAuthenticatedUser = AuthenticatedUser.from(firstUser);
     AuthenticatedUser secondAuthenticatedUser = AuthenticatedUser.from(secondUser);
     AuthenticatedUser draftAuthenticatedUser = AuthenticatedUser.from(draftUser);
-    TravelRecordResDto firstDraft = createDraftWithOnePlace(firstAuthenticatedUser, "First Record");
+    TravelRecordResDto firstDraft =
+        createDraftWithOneReviewedPlace(
+                firstAuthenticatedUser, "First Record", 4, "Good route", List.of("야경", "가족"))
+            .draft();
     TravelRecordResDto secondDraft =
-        createDraftWithOnePlace(secondAuthenticatedUser, "Second Record");
-    TravelRecordResDto hiddenDraft = createDraftWithOnePlace(draftAuthenticatedUser, "Draft Record");
-    var firstPlace = firstDraft.days().getFirst().places().getFirst();
-    var secondPlace = secondDraft.days().getFirst().places().getFirst();
-    var hiddenPlace = hiddenDraft.days().getFirst().places().getFirst();
-    travelRecordService.createPlaceReview(
-        firstAuthenticatedUser,
-        firstDraft.originalTravelId(),
-        firstDraft.travelRecordId(),
-        firstPlace.travelRecordPlaceId(),
-        new PlaceReviewCreateReqDto(4, "Good route", List.of("야경", "가족")));
-    travelRecordService.createPlaceReview(
-        secondAuthenticatedUser,
-        secondDraft.originalTravelId(),
-        secondDraft.travelRecordId(),
-        secondPlace.travelRecordPlaceId(),
-        new PlaceReviewCreateReqDto(5, "Perfect stop", List.of("맛집")));
-    travelRecordService.createPlaceReview(
-        draftAuthenticatedUser,
-        hiddenDraft.originalTravelId(),
-        hiddenDraft.travelRecordId(),
-        hiddenPlace.travelRecordPlaceId(),
-        new PlaceReviewCreateReqDto(1, "Still draft"));
+        createDraftWithOneReviewedPlace(
+                secondAuthenticatedUser, "Second Record", 5, "Perfect stop", List.of("맛집"))
+            .draft();
+    TravelRecordResDto hiddenDraft =
+        createDraftWithOneReviewedPlace(
+                draftAuthenticatedUser, "Draft Record", 1, "Still draft", List.of())
+            .draft();
     travelRecordService.publish(
         firstAuthenticatedUser, firstDraft.originalTravelId(), firstDraft.travelRecordId());
     travelRecordService.publish(
@@ -1696,16 +1716,14 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.createPlaceReview(
         authenticatedUser,
         draft.originalTravelId(),
-        draft.travelRecordId(),
-        place.travelRecordPlaceId(),
+        place.originalPlanPlaceId(),
         new PlaceReviewCreateReqDto(3, "Before"));
 
     PlaceReviewResDto result =
         travelRecordService.updatePlaceReview(
             authenticatedUser,
             draft.originalTravelId(),
-            draft.travelRecordId(),
-            place.travelRecordPlaceId(),
+            place.originalPlanPlaceId(),
             new PlaceReviewUpdateReqDto(5, "After", List.of("  야경", "카페", "야경")));
 
     assertThat(result.rating()).isEqualTo(5);
@@ -1723,16 +1741,14 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.createPlaceReview(
             authenticatedUser,
             draft.originalTravelId(),
-            draft.travelRecordId(),
-            place.travelRecordPlaceId(),
+            place.originalPlanPlaceId(),
             new PlaceReviewCreateReqDto(4, "Before", List.of("기존")));
 
     PlaceReviewResDto result =
         travelRecordService.updatePlaceReview(
             authenticatedUser,
             draft.originalTravelId(),
-            draft.travelRecordId(),
-            place.travelRecordPlaceId(),
+            place.originalPlanPlaceId(),
             new PlaceReviewUpdateReqDto(null, "Only content changed"));
 
     assertThat(result.rating()).isEqualTo(4);
@@ -1751,16 +1767,14 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.createPlaceReview(
         authenticatedUser,
         draft.originalTravelId(),
-        draft.travelRecordId(),
-        place.travelRecordPlaceId(),
+        place.originalPlanPlaceId(),
         new PlaceReviewCreateReqDto(4, "Before", List.of("야경", "가족")));
 
     PlaceReviewResDto result =
         travelRecordService.updatePlaceReview(
             authenticatedUser,
             draft.originalTravelId(),
-            draft.travelRecordId(),
-            place.travelRecordPlaceId(),
+            place.originalPlanPlaceId(),
             new PlaceReviewUpdateReqDto(null, null, List.of()));
 
     assertThat(result.rating()).isEqualTo(4);
@@ -1782,8 +1796,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.createPlaceReview(
                     authenticatedUser,
                     draft.originalTravelId(),
-                    draft.travelRecordId(),
-                    place.travelRecordPlaceId(),
+                    place.originalPlanPlaceId(),
                     new PlaceReviewCreateReqDto(
                         5,
                         "Too many tags",
@@ -1806,8 +1819,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.updatePlaceReview(
                     authenticatedUser,
                     draft.originalTravelId(),
-                    draft.travelRecordId(),
-                    place.travelRecordPlaceId(),
+                    place.originalPlanPlaceId(),
                     new PlaceReviewUpdateReqDto(5, "Missing")))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Place review not found.");
@@ -1824,8 +1836,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.createPlaceReview(
         authenticatedUser,
         draft.originalTravelId(),
-        draft.travelRecordId(),
-        place.travelRecordPlaceId(),
+        place.originalPlanPlaceId(),
         new PlaceReviewCreateReqDto(4, "Before"));
 
     assertThatThrownBy(
@@ -1833,8 +1844,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.updatePlaceReview(
                     authenticatedUser,
                     draft.originalTravelId(),
-                    draft.travelRecordId(),
-                    place.travelRecordPlaceId(),
+                    place.originalPlanPlaceId(),
                     new PlaceReviewUpdateReqDto(0, "Invalid")))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Place review rating must be between 1 and 5.");
@@ -1850,25 +1860,23 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.createPlaceReview(
         authenticatedUser,
         draft.originalTravelId(),
-        draft.travelRecordId(),
-        place.travelRecordPlaceId(),
+        place.originalPlanPlaceId(),
         new PlaceReviewCreateReqDto(5, "Delete me"));
 
     travelRecordService.deletePlaceReview(
         authenticatedUser,
         draft.originalTravelId(),
-        draft.travelRecordId(),
-        place.travelRecordPlaceId());
+        place.originalPlanPlaceId());
 
-    assertThat(placeReviewRepository.findByTravelRecordPlace_Id(place.travelRecordPlaceId()))
+    assertThat(placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(
+            place.originalPlanPlaceId(), user.getId()))
         .isEmpty();
     assertThatThrownBy(
             () ->
                 travelRecordService.getPlaceReview(
                     authenticatedUser,
                     draft.originalTravelId(),
-                    draft.travelRecordId(),
-                    place.travelRecordPlaceId()))
+                    place.originalPlanPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Place review not found.");
   }
@@ -1887,8 +1895,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.deletePlaceReview(
                     authenticatedUser,
                     draft.originalTravelId(),
-                    draft.travelRecordId(),
-                    place.travelRecordPlaceId()))
+                    place.originalPlanPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Place review not found.");
   }
@@ -1942,6 +1949,36 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         travel.id(),
         title == null ? null : new TravelRecordCreateReqDto(title, null, null));
   }
+
+  private DraftWithPlanPlace createDraftWithOneReviewedPlace(
+      AuthenticatedUser authenticatedUser,
+      String title,
+      Integer rating,
+      String content,
+      List<String> tags) {
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto place =
+        createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+
+    travelRecordService.createPlaceReview(
+        authenticatedUser,
+        travel.id(),
+        place.planPlaceId(),
+        new PlaceReviewCreateReqDto(rating, content, tags));
+
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            title == null ? null : new TravelRecordCreateReqDto(title, null, null));
+
+    return new DraftWithPlanPlace(draft, place);
+  }
+
+  private record DraftWithPlanPlace(TravelRecordResDto draft, PlanPlaceResDto planPlace) {}
 
   private PlanPlaceResDto createPlace(
       AuthenticatedUser authenticatedUser, java.util.UUID planId, Integer sequence, String name) {

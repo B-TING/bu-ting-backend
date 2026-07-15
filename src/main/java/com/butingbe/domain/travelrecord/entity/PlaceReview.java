@@ -1,5 +1,7 @@
 package com.butingbe.domain.travelrecord.entity;
 
+import com.butingbe.domain.travel.entity.PlanPlace;
+import com.butingbe.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.ElementCollection;
@@ -9,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
@@ -29,6 +32,9 @@ import org.hibernate.annotations.UpdateTimestamp;
     name = "place_review",
     uniqueConstraints = {
       @UniqueConstraint(
+          name = "uk_place_review_plan_place_author",
+          columnNames = {"plan_place_id", "author_id"}),
+      @UniqueConstraint(
           name = "uk_place_review_record_place",
           columnNames = {"travel_record_place_id"})
     })
@@ -41,8 +47,16 @@ public class PlaceReview {
   @Column(nullable = false, updatable = false)
   private UUID id;
 
-  @OneToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "travel_record_place_id", nullable = false)
+  @OneToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "plan_place_id")
+  private PlanPlace planPlace;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "author_id")
+  private User author;
+
+  @OneToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "travel_record_place_id")
   private TravelRecordPlace travelRecordPlace;
 
   @Column(nullable = false)
@@ -69,7 +83,14 @@ public class PlaceReview {
 
   @Builder
   public PlaceReview(
-      TravelRecordPlace travelRecordPlace, Integer rating, String content, List<String> tags) {
+      PlanPlace planPlace,
+      User author,
+      TravelRecordPlace travelRecordPlace,
+      Integer rating,
+      String content,
+      List<String> tags) {
+    this.planPlace = planPlace;
+    this.author = author;
     this.travelRecordPlace = travelRecordPlace;
     this.rating = rating;
     this.content = content;

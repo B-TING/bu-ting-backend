@@ -7,6 +7,7 @@ import java.util.UUID;
 
 public record PlaceReviewResDto(
     UUID placeReviewId,
+    UUID planPlaceId,
     UUID travelRecordPlaceId,
     Integer rating,
     String content,
@@ -17,7 +18,8 @@ public record PlaceReviewResDto(
   public static PlaceReviewResDto from(PlaceReview placeReview) {
     return new PlaceReviewResDto(
         placeReview.getId(),
-        placeReview.getTravelRecordPlace().getId(),
+        placeReview.getPlanPlace() == null ? null : placeReview.getPlanPlace().getId(),
+        placeReview.getTravelRecordPlace() == null ? null : placeReview.getTravelRecordPlace().getId(),
         placeReview.getRating(),
         placeReview.getContent(),
         List.copyOf(placeReview.getTags()),

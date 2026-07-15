@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface PlaceReviewRepository extends JpaRepository<PlaceReview, UUID> {
 
+  Optional<PlaceReview> findByPlanPlace_IdAndAuthor_Id(UUID planPlaceId, UUID authorId);
+
   Optional<PlaceReview> findByTravelRecordPlace_Id(UUID travelRecordPlaceId);
 
   @Query(
