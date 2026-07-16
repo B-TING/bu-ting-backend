@@ -16,7 +16,7 @@ import java.util.UUID;
 
 public record TravelRecordResDto(
     UUID travelRecordId,
-    UUID originalTravelId,
+    UUID travelId,
     UUID authorId,
     String authorNickname,
     String title,
@@ -57,6 +57,10 @@ public record TravelRecordResDto(
         days);
   }
 
+  public UUID originalTravelId() {
+    return travelId;
+  }
+
   public record TravelRecordDayResDto(
       UUID travelRecordDayId,
       UUID originalPlanId,
@@ -81,7 +85,7 @@ public record TravelRecordResDto(
 
   public record TravelRecordPlaceResDto(
       UUID travelRecordPlaceId,
-      UUID originalPlanPlaceId,
+      UUID planPlaceId,
       Integer sequence,
       String placeName,
       String address,
@@ -112,6 +116,10 @@ public record TravelRecordResDto(
           place.getScheduledTime(),
           place.getVisited(),
           routeToNext == null ? null : TravelRecordRouteResDto.from(routeToNext));
+    }
+
+    public UUID originalPlanPlaceId() {
+      return planPlaceId;
     }
   }
 

@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public record TravelRecordFeedResDto(
     UUID travelRecordId,
-    UUID originalTravelId,
+    UUID travelId,
     UUID authorId,
     String authorNickname,
     String title,
@@ -41,5 +41,9 @@ public record TravelRecordFeedResDto(
         travelRecord.getLikeCount(),
         travelRecord.getViewCount(),
         likedByMe);
+  }
+
+  public UUID originalTravelId() {
+    return travelId;
   }
 }

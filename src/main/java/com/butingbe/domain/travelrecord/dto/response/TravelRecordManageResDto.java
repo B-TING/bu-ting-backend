@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public record TravelRecordManageResDto(
     UUID travelRecordId,
-    UUID originalTravelId,
+    UUID travelId,
     UUID authorId,
     String title,
     String content,
@@ -40,5 +40,9 @@ public record TravelRecordManageResDto(
         travelRecord.getViewCount(),
         travelRecord.getCreatedAt(),
         travelRecord.getUpdatedAt());
+  }
+
+  public UUID originalTravelId() {
+    return travelId;
   }
 }

@@ -1688,7 +1688,7 @@ paths:
         {
           "messageId": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
           "roomId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-          "userId": "7b8c9d0e-1f2a-3b4c-5d6e-7f8a9b0c1d2e",
+          "senderId": "7b8c9d0e-1f2a-3b4c-5d6e-7f8a9b0c1d2e",
           "senderNickname": "수영구보안관",
           "content": "안녕하세요! 반갑습니다.",
           "createdAt": "2026-07-03T15:10:12.793+09:00"
@@ -2839,9 +2839,10 @@ components:
           type: string
           format: uuid
           example: 60000000-0000-0000-0000-000000000001
-        originalTravelId:
+        travelId:
           type: string
           format: uuid
+          description: 이 여행기가 생성된 원본 여행 일정 Travel의 ID
           nullable: true
           example: 10000000-0000-0000-0000-000000000001
         authorId:
@@ -2926,9 +2927,10 @@ components:
           type: string
           format: uuid
           example: 70000000-0000-0000-0000-000000000001
-        originalPlanPlaceId:
+        planPlaceId:
           type: string
           format: uuid
+          description: 이 여행기 장소 스냅샷이 참조하는 원본 PlanPlace ID
           nullable: true
           example: 30000000-0000-0000-0000-000000000001
         sequence:
@@ -3014,9 +3016,10 @@ components:
           type: string
           format: uuid
           example: 60000000-0000-0000-0000-000000000001
-        originalTravelId:
+        travelId:
           type: string
           format: uuid
+          description: 이 여행기가 생성된 원본 여행 일정 Travel의 ID
           nullable: true
           example: 10000000-0000-0000-0000-000000000001
         authorId:
@@ -3079,9 +3082,10 @@ components:
           type: string
           format: uuid
           example: 60000000-0000-0000-0000-000000000001
-        originalTravelId:
+        travelId:
           type: string
           format: uuid
+          description: 이 여행기가 생성된 원본 여행 일정 Travel의 ID
           nullable: true
           example: 10000000-0000-0000-0000-000000000001
         authorId:
@@ -4529,7 +4533,7 @@ components:
           format: uuid
           description: 채팅방 고유 UUID
           example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
-        userId:
+        senderId:
           type: string
           format: uuid
           description: 메시지를 보낸 유저 고유 UUID
