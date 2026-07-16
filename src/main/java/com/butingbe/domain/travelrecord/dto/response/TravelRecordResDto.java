@@ -18,6 +18,7 @@ public record TravelRecordResDto(
     UUID travelRecordId,
     UUID originalTravelId,
     UUID authorId,
+    String authorNickname,
     String title,
     String content,
     String coverImageUrl,
@@ -28,13 +29,20 @@ public record TravelRecordResDto(
     LocalDateTime publishedAt,
     long likeCount,
     long viewCount,
+    boolean likedByMe,
     List<TravelRecordDayResDto> days) {
 
   public static TravelRecordResDto of(TravelRecord travelRecord, List<TravelRecordDayResDto> days) {
+    return of(travelRecord, days, false);
+  }
+
+  public static TravelRecordResDto of(
+      TravelRecord travelRecord, List<TravelRecordDayResDto> days, boolean likedByMe) {
     return new TravelRecordResDto(
         travelRecord.getId(),
         travelRecord.getOriginalTravel() == null ? null : travelRecord.getOriginalTravel().getId(),
         travelRecord.getAuthor().getId(),
+        travelRecord.getAuthor().getNickname(),
         travelRecord.getTitle(),
         travelRecord.getContent(),
         travelRecord.getCoverImageUrl(),
@@ -45,6 +53,7 @@ public record TravelRecordResDto(
         travelRecord.getPublishedAt(),
         travelRecord.getLikeCount(),
         travelRecord.getViewCount(),
+        likedByMe,
         days);
   }
 

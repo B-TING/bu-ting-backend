@@ -1,8 +1,5 @@
 package com.butingbe.domain.travelrecord.dto.response;
 
-import com.butingbe.domain.travelrecord.entity.PlaceReview;
-import com.butingbe.domain.travelrecord.entity.TravelRecord;
-import com.butingbe.domain.travelrecord.entity.TravelRecordPlace;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -19,10 +16,9 @@ public record PlaceReviewSummaryResDto(
       String placeId,
       double averageRating,
       Map<Integer, Long> ratingCounts,
-      List<PlaceReview> reviews) {
+      List<PlaceReviewItemResDto> reviews) {
     return new PlaceReviewSummaryResDto(
-        placeId, reviews.size(), averageRating, ratingCounts,
-        reviews.stream().map(PlaceReviewItemResDto::from).toList());
+        placeId, reviews.size(), averageRating, ratingCounts, List.copyOf(reviews));
   }
 
   public record PlaceReviewItemResDto(
@@ -34,28 +30,10 @@ public record PlaceReviewSummaryResDto(
       UUID travelRecordPlaceId,
       String placeName,
       Integer rating,
+      Integer stayMinutes,
       String content,
       List<String> tags,
+      List<String> mediaUrls,
       LocalDateTime createdAt,
-      LocalDateTime updatedAt) {
-
-    public static PlaceReviewItemResDto from(PlaceReview placeReview) {
-      TravelRecordPlace place = placeReview.getTravelRecordPlace();
-      TravelRecord travelRecord = place.getTravelRecordDay().getTravelRecord();
-
-      return new PlaceReviewItemResDto(
-          placeReview.getId(),
-          travelRecord.getId(),
-          travelRecord.getTitle(),
-          travelRecord.getAuthor().getId(),
-          travelRecord.getAuthor().getNickname(),
-          place.getId(),
-          place.getPlaceName(),
-          placeReview.getRating(),
-          placeReview.getContent(),
-          List.copyOf(placeReview.getTags()),
-          placeReview.getCreatedAt(),
-          placeReview.getUpdatedAt());
-    }
-  }
+      LocalDateTime updatedAt) {}
 }

@@ -186,11 +186,17 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Override
   @Transactional
   public TravelRecordResDto getPublished(UUID travelRecordId) {
+    return getPublished(null, travelRecordId);
+  }
+
+  @Override
+  @Transactional
+  public TravelRecordResDto getPublished(AuthenticatedUser authenticatedUser, UUID travelRecordId) {
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validatePublished(travelRecord);
     travelRecord.increaseViewCount();
 
-    return toResponse(travelRecord);
+    return toResponse(travelRecord, isLikedBy(authenticatedUser, travelRecord.getId()));
   }
 
   @Override
@@ -340,7 +346,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validateAuthor(travelRecord, author.getId());
 
-    return toResponse(travelRecord);
+    return toResponse(travelRecord, isLikedBy(authenticatedUser, travelRecord.getId()));
   }
 
   @Override
@@ -586,7 +592,12 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         normalizedPlaceId,
         calculateAverageRating(reviews),
         calculateRatingCounts(reviews),
-        reviews);
+        reviews.stream()
+            .map(
+                review ->
+                    toPlaceReviewSummaryItem(
+                        review, findPlaceReviewMediaUrls(review.getId())))
+            .toList());
   }
 
   @Override
@@ -602,7 +613,12 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         providerPlaceId,
         calculateAverageRating(reviews),
         calculateRatingCounts(reviews),
-        reviews);
+        reviews.stream()
+            .map(
+                review ->
+                    toPlaceReviewSummaryItem(
+                        review, findPlaceReviewMediaUrls(review.getId())))
+            .toList());
   }
 
   @Override
@@ -781,13 +797,24 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   private TravelRecordResDto toResponse(TravelRecord travelRecord) {
+    return toResponse(travelRecord, false);
+  }
+
+  private TravelRecordResDto toResponse(TravelRecord travelRecord, boolean likedByMe) {
     List<TravelRecordDayResDto> days =
         travelRecordDayRepository.findByTravelRecord_IdOrderByDayNumberAsc(travelRecord.getId())
             .stream()
             .map(this::toDayResponse)
             .toList();
 
-    return TravelRecordResDto.of(travelRecord, days);
+    return TravelRecordResDto.of(travelRecord, days, likedByMe);
+  }
+
+  private boolean isLikedBy(AuthenticatedUser authenticatedUser, UUID travelRecordId) {
+    return authenticatedUser != null
+        && authenticatedUser.id() != null
+        && travelRecordLikeRepository.existsByUser_IdAndTravelRecord_Id(
+            authenticatedUser.id(), travelRecordId);
   }
 
   private List<TravelRecordFeedResDto> toFeedResponses(
@@ -829,6 +856,28 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   private PlaceReviewResDto toPlaceReviewResponse(PlaceReview placeReview) {
     return PlaceReviewResDto.from(placeReview, findPlaceReviewMediaUrls(placeReview.getId()));
+  }
+
+  private PlaceReviewSummaryResDto.PlaceReviewItemResDto toPlaceReviewSummaryItem(
+      PlaceReview placeReview, List<String> mediaUrls) {
+    TravelRecordPlace place = placeReview.getTravelRecordPlace();
+    TravelRecord travelRecord = place.getTravelRecordDay().getTravelRecord();
+
+    return new PlaceReviewSummaryResDto.PlaceReviewItemResDto(
+        placeReview.getId(),
+        travelRecord.getId(),
+        travelRecord.getTitle(),
+        travelRecord.getAuthor().getId(),
+        travelRecord.getAuthor().getNickname(),
+        place.getId(),
+        place.getPlaceName(),
+        placeReview.getRating(),
+        placeReview.getStayMinutes(),
+        placeReview.getContent(),
+        List.copyOf(placeReview.getTags()),
+        List.copyOf(mediaUrls),
+        placeReview.getCreatedAt(),
+        placeReview.getUpdatedAt());
   }
 
   private List<String> findPlaceReviewMediaUrls(UUID placeReviewId) {

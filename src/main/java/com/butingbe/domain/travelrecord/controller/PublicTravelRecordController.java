@@ -223,7 +223,8 @@ public class PublicTravelRecordController {
   }
 
   @GetMapping("/{travelRecordId}")
-  public ResponseEntity<TravelRecordResDto> getPublished(@PathVariable UUID travelRecordId) {
-    return ResponseEntity.ok(travelRecordService.getPublished(travelRecordId));
+  public ResponseEntity<TravelRecordResDto> getPublished(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID travelRecordId) {
+    return ResponseEntity.ok(travelRecordService.getPublished(user, travelRecordId));
   }
 }

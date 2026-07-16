@@ -1,5 +1,6 @@
 package com.butingbe.domain.travel.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.butingbe.domain.travel.entity.CompanionType;
 import com.butingbe.domain.travel.entity.TravelPace;
 import com.butingbe.domain.travel.entity.TravelStyle;
@@ -18,5 +19,10 @@ public record TravelCreateReqDto(
     TravelPace pace,
     Integer companionCount,
     String preferredFoods,
-    CompanionType companionTypes,
-    String accommodationArea) {}
+    @JsonAlias("companionTypes") CompanionType companionType,
+    String accommodationArea) {
+
+  public CompanionType companionTypes() {
+    return companionType;
+  }
+}

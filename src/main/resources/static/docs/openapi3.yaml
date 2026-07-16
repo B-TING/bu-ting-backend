@@ -1,4 +1,4 @@
-openapi: 3.0.3
+﻿openapi: 3.0.3
 info:
   title: B-ting Backend API
   description: B-ting backend API documentation.
@@ -790,9 +790,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatMessageResponse"
+                $ref: "#/components/schemas/ChatMessageListEnvelope"
         "400":
           description: 존재하지 않는 방 ID, 존재하지 않는 기준 메시지 ID(커서)이거나 잘못된 요청
           content:
@@ -831,7 +829,7 @@ paths:
               pace: RELAXED
               companionCount: 2
               preferredFoods: 해산물
-              companionTypes: FRIEND
+              companionType: FRIEND
               accommodationArea: 해운대
       responses:
         "201":
@@ -3922,7 +3920,7 @@ components:
           type: string
           nullable: true
           example: 해산물
-        companionTypes:
+        companionType:
           $ref: "#/components/schemas/CompanionType"
         accommodationArea:
           type: string
@@ -3933,7 +3931,7 @@ components:
         - $ref: "#/components/schemas/TravelCreateRequest"
         - type: object
           properties:
-            id:
+            travelId:
               type: string
               format: uuid
               example: 10000000-0000-0000-0000-000000000001
@@ -4521,7 +4519,7 @@ components:
     ChatMessageResponse:
       type: object
       properties:
-        id:
+        messageId:
           type: string
           format: uuid
           description: 메시지 고유 식별자 ID (uuid)
@@ -4549,3 +4547,26 @@ components:
           format: date-time
           description: 메시지 생성 일시 (ISO 8601 포맷)
           example: "2026-07-01T23:15:00Z"
+        isMine:
+          type: boolean
+          nullable: true
+          description: REST 히스토리 조회에서 현재 사용자가 보낸 메시지 여부입니다. STOMP 브로드캐스트에서는 null일 수 있습니다.
+          example: false
+    ChatMessageListResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessageResponse"
+    ChatMessageListEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 채팅 메시지 목록 조회
+        data:
+          $ref: "#/components/schemas/ChatMessageListResponse"

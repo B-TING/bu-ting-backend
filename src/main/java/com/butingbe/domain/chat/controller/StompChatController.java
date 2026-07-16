@@ -1,6 +1,7 @@
 package com.butingbe.domain.chat.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.dto.ChatMessageRequest;
 import com.butingbe.domain.chat.entity.ChatMessage;
 import com.butingbe.domain.chat.repository.ChatMessageRepository;
@@ -40,7 +41,8 @@ public class StompChatController {
             .content(dto.content())
             .build();
 
-    chatMessageRepository.save(chatMessage);
-    messagingTemplate.convertAndSend("/sub/chat/room/" + dto.roomId(), chatMessage);
+    ChatMessage savedMessage = chatMessageRepository.save(chatMessage);
+    messagingTemplate.convertAndSend(
+        "/sub/chat/room/" + dto.roomId(), ChatMessageResponse.from(savedMessage, null));
   }
 }

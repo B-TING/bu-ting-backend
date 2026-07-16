@@ -1,6 +1,7 @@
 package com.butingbe.domain.chat.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.chat.dto.ChatMessageListResponse;
 import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.dto.ChatroomResponse;
 import com.butingbe.domain.chat.entity.ChatZone;
@@ -52,7 +53,7 @@ public class LocalChatroomController {
   }
 
   @GetMapping("/{roomId}/messages")
-  public ResponseEntity<List<ChatMessageResponse>> getMessages(
+  public ResponseEntity<ApiResponse<ChatMessageListResponse>> getMessages(
       @PathVariable UUID roomId,
       @RequestParam(required = false) UUID lastMessageId,
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
@@ -64,6 +65,7 @@ public class LocalChatroomController {
     List<ChatMessageResponse> history =
         localChatroomService.getChatRoom(roomId, authenticatedUser.id(), lastMessageId);
 
-    return ResponseEntity.ok(history);
+    return ResponseEntity.ok(
+        ApiResponse.success("채팅 메시지 목록 조회", new ChatMessageListResponse(history)));
   }
 }

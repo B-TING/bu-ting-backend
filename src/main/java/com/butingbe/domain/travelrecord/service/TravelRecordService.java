@@ -41,6 +41,8 @@ public interface TravelRecordService {
 
   TravelRecordResDto getPublished(UUID travelRecordId);
 
+  TravelRecordResDto getPublished(AuthenticatedUser authenticatedUser, UUID travelRecordId);
+
   TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size);
 
   TravelRecordFeedPageResDto getLatestFeed(
