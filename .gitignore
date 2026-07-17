@@ -61,5 +61,8 @@ application-oauth.yaml
 # macOS
 .DS_Store
 
+# Local AI agent instructions
+AGENTS.md
+
 # Local runtime data
 postgres_data/
