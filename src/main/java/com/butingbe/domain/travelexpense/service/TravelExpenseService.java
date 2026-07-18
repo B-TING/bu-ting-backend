@@ -133,9 +133,7 @@ public class TravelExpenseService {
     if (authenticatedUser == null || authenticatedUser.id() == null) {
       throw new UnauthenticatedException();
     }
-    if (!travelRepository.existsById(travelId)) {
-      throw new ResourceNotFoundException("Travel not found.");
-    }
+    lockTravel(travelId);
     TravelMember requester =
         travelMemberAuthorization.requireMember(travelId, authenticatedUser.id());
     TravelExpense expense =
