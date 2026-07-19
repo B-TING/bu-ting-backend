@@ -650,15 +650,6 @@ paths:
       summary: 주변 물품 보관소 조회
       description: 부산 도시철도 물품보관소 정적 데이터와 역 좌표를 기준으로 가까운 보관소를 거리순으로 반환합니다.
       parameters:
-        - name: latitude
-          in: query
-          required: true
-          schema:
-            type: number
-            format: double
-            minimum: -90
-            maximum: 90
-          example: 35.1796
         - name: longitude
           in: query
           required: true
@@ -668,6 +659,15 @@ paths:
             minimum: -180
             maximum: 180
           example: 129.0756
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+          example: 35.1796
         - name: radius
           in: query
           required: true
@@ -1815,10 +1815,9 @@ components:
   schemas:
     StorageLocationResponse:
       type: object
-      required: [ id, line, stationName, locationDetail, latitude, longitude, distanceMeters, openNow, counts, cost, company ]
+      required: [ line, stationName, locationDetail, latitude, longitude, distanceMeters, openNow, counts, cost, company, fees ]
       properties:
-        id: { type: string, format: uuid, example: "550e8400-e29b-41d4-a716-446655440000" }
-        line: { type: integer, example: 1 }
+        line: { type: string, example: "1호선" }
         stationName: { type: string, example: 다대포해수욕장 }
         locationDetail: { type: string, example: "(B1) 대합실 고객센터 근처" }
         latitude: { type: number, format: double, example: 35.0514 }
@@ -1834,6 +1833,22 @@ components:
             extraLarge: { type: integer, example: 4 }
         cost: { type: string, example: "특대: 6,000원 / 대:4,000원" }
         company: { type: string, example: 위드락커 }
+        fees:
+          type: array
+          items:
+            type: object
+            required: [ schedule, items ]
+            properties:
+              schedule: { type: string, example: DEFAULT }
+              items:
+                type: array
+                items:
+                  type: object
+                  required: [ size, amount, unit ]
+                  properties:
+                    size: { type: string, example: SMALL }
+                    amount: { type: integer, example: 2000 }
+                    unit: { type: string, example: "3시간당" }
     OAuthLoginRequest:
       type: object
       required:
