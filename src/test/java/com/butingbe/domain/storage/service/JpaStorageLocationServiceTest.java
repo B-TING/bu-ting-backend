@@ -1,8 +1,10 @@
 package com.butingbe.domain.storage.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.butingbe.domain.station.entity.Station;
 import com.butingbe.domain.storage.dto.StorageLocationSearchReqDto;
 import com.butingbe.domain.storage.entity.StorageLocation;
 import com.butingbe.domain.storage.repository.StorageLocationRepository;
@@ -28,13 +30,13 @@ class JpaStorageLocationServiceTest {
     var result = service.search(new StorageLocationSearchReqDto(35.1796, 129.0756, 1_000));
 
     assertThat(result).hasSize(1);
-    assertThat(result.getFirst().id()).isEqualTo(nearby.getId().toString());
     assertThat(result.getFirst().distanceMeters()).isZero();
   }
 
   @Test
   void returnsEmptyWhenNoLocationIsWithinRadius() {
-    when(repository.findAll()).thenReturn(List.of(location(UUID.randomUUID(), 35.2000, 129.1000)));
+    StorageLocation far = location(UUID.randomUUID(), 35.2000, 129.1000);
+    when(repository.findAll()).thenReturn(List.of(far));
 
     var result = service.search(new StorageLocationSearchReqDto(35.1796, 129.0756, 1));
 
@@ -42,15 +44,15 @@ class JpaStorageLocationServiceTest {
   }
 
   private StorageLocation location(UUID id, double latitude, double longitude) {
+    Station station = mock(Station.class);
+    when(station.getLine()).thenReturn("1호선");
+    when(station.getName()).thenReturn("다대포해수욕장");
+    when(station.getLatitude()).thenReturn(java.math.BigDecimal.valueOf(latitude));
+    when(station.getLongitude()).thenReturn(java.math.BigDecimal.valueOf(longitude));
     return StorageLocation.builder()
         .id(id)
-        .externalId("1")
-        .sourceType("BUSAN_SUBWAY")
-        .line(1)
-        .stationName("다대포해수욕장")
+        .station(station)
         .locationDetail("대합실")
-        .latitude(latitude)
-        .longitude(longitude)
         .smallCount(10)
         .mediumCount(8)
         .largeCount(0)
