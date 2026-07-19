@@ -35,8 +35,8 @@ public class JpaStorageLocationService implements StorageLocationService {
                 distanceMeters(
                     request.latitude(),
                     request.longitude(),
-                    location.getLatitude(),
-                    location.getLongitude()));
+                    location.getStation().getLatitude().doubleValue(),
+                    location.getStation().getLongitude().doubleValue()));
     return StorageLocationResDto.from(location, distance);
   }
 
