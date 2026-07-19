@@ -8,7 +8,8 @@ CREATE TABLE station (
     longitude NUMERIC(10, 7) NOT NULL,
     latitude NUMERIC(10, 7) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_station_operator_line_name UNIQUE (operator, line, name)
 );
 
 CREATE INDEX idx_station_name ON station (name);
