@@ -7,8 +7,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public record StorageLocationResDto(
-    String id,
-    int line,
+    String line,
     String stationName,
     String locationDetail,
     double latitude,
@@ -25,7 +24,6 @@ public record StorageLocationResDto(
   public static StorageLocationResDto from(
       Locker locker, Coordinate coordinate, int distanceMeters) {
     return new StorageLocationResDto(
-        locker.id(),
         locker.line(),
         locker.name(),
         locker.locationDetail(),
@@ -45,7 +43,7 @@ public record StorageLocationResDto(
 
   public record Locker(
       String id,
-      int line,
+      String line,
       String name,
       String locationDetail,
       Counts counts,
@@ -61,12 +59,11 @@ public record StorageLocationResDto(
 
   public static StorageLocationResDto from(StorageLocation location, int distanceMeters) {
     return new StorageLocationResDto(
-        location.getId().toString(),
-        location.getLine(),
-        location.getStationName(),
+        location.getStation().getLine(),
+        location.getStation().getName(),
         location.getLocationDetail(),
-        location.getLatitude(),
-        location.getLongitude(),
+        location.getStation().getLatitude().doubleValue(),
+        location.getStation().getLongitude().doubleValue(),
         distanceMeters,
         true,
         new Counts(
