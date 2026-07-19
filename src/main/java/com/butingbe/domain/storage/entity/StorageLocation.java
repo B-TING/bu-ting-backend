@@ -1,12 +1,15 @@
 package com.butingbe.domain.storage.entity;
 
-import com.butingbe.global.common.BaseEntity;
+import com.butingbe.domain.station.entity.Station;
+import com.butingbe.global.common.TimestampEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.util.List;
@@ -20,33 +23,19 @@ import lombok.NoArgsConstructor;
 @Table(name = "locker_location")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class StorageLocation extends BaseEntity {
+public class StorageLocation extends TimestampEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   @Column(nullable = false, updatable = false)
   private UUID id;
 
-  @Column(name = "external_id", nullable = false, length = 100)
-  private String externalId;
-
-  @Column(name = "source_type", nullable = false, length = 50)
-  private String sourceType;
-
-  @Column(name = "subway_line", nullable = false)
-  private Integer line;
-
-  @Column(name = "name", nullable = false, length = 100)
-  private String stationName;
-
   @Column(name = "location_detail", columnDefinition = "text")
   private String locationDetail;
 
-  @Column(nullable = false)
-  private Double latitude;
-
-  @Column(nullable = false)
-  private Double longitude;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "station_id", nullable = false)
+  private Station station;
 
   @Column(name = "small_count", nullable = false)
   private Integer smallCount;
@@ -72,13 +61,8 @@ public class StorageLocation extends BaseEntity {
   @Builder
   public StorageLocation(
       UUID id,
-      String externalId,
-      String sourceType,
-      Integer line,
-      String stationName,
+      Station station,
       String locationDetail,
-      Double latitude,
-      Double longitude,
       Integer smallCount,
       Integer mediumCount,
       Integer largeCount,
@@ -86,13 +70,8 @@ public class StorageLocation extends BaseEntity {
       String costRaw,
       String company) {
     this.id = id;
-    this.externalId = externalId;
-    this.sourceType = sourceType;
-    this.line = line;
-    this.stationName = stationName;
+    this.station = station;
     this.locationDetail = locationDetail;
-    this.latitude = latitude;
-    this.longitude = longitude;
     this.smallCount = smallCount;
     this.mediumCount = mediumCount;
     this.largeCount = largeCount;

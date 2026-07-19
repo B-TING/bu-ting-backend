@@ -1,5 +1,6 @@
 package com.butingbe.domain.storage.entity;
 
+import com.butingbe.global.common.TimestampEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -18,7 +19,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "locker_fee")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class LockerFee {
+public class LockerFee extends TimestampEntity {
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
