@@ -9,6 +9,7 @@ import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceVisitedUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
@@ -146,6 +147,34 @@ class TravelServiceImplTest extends AbstractContainerTest {
     assertThat(result.durationMinutes()).isEqualTo(90);
     assertThat(result.scheduledTime()).isEqualTo(LocalTime.of(11, 30));
     assertThat(result.memo()).isEqualTo("Lunch before beach");
+  }
+
+  @Test
+  @DisplayName("plan place visited status can be checked and unchecked")
+  void updatePlanPlaceVisitedChangesVisitedStatus() {
+    User user = userRepository.save(createUser("visited-place@example.com", "visited-place"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto place = createPlace(authenticatedUser, plan.planId(), 1, "Busan Station");
+
+    PlanPlaceResDto checked =
+        travelService.updatePlanPlaceVisited(
+            authenticatedUser, place.planPlaceId(), new PlanPlaceVisitedUpdateReqDto(true));
+
+    assertThat(checked.visited()).isTrue();
+    assertThat(planPlaceRepository.findById(place.planPlaceId()).orElseThrow().getVisited())
+        .isTrue();
+
+    PlanPlaceResDto unchecked =
+        travelService.updatePlanPlaceVisited(
+            authenticatedUser, place.planPlaceId(), new PlanPlaceVisitedUpdateReqDto(false));
+
+    assertThat(unchecked.visited()).isFalse();
+    assertThat(planPlaceRepository.findById(place.planPlaceId()).orElseThrow().getVisited())
+        .isFalse();
   }
 
   @Test

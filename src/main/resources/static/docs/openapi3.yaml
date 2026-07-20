@@ -1251,6 +1251,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/plans/places/{planPlaceId}/visited:
+    patch:
+      tags:
+        - Travel
+      summary: 세부 여행지 방문 체크 변경
+      description: 세부 여행지의 방문 완료 여부를 체크하거나 해제합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/PlanPlaceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanPlaceVisitedUpdateRequest"
+            example:
+              visited: true
+      responses:
+        "200":
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanPlaceResponse"
+        "400":
+          description: visited 값 누락 또는 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 여행 멤버가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 세부 여행지를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/plans/places/{planPlaceId}/place:
     patch:
       tags:
@@ -4058,6 +4108,15 @@ components:
           type: string
           nullable: true
           example: 점심 예약
+    PlanPlaceVisitedUpdateRequest:
+      type: object
+      required:
+        - visited
+      properties:
+        visited:
+          type: boolean
+          description: 방문 완료 여부
+          example: true
     PlanPlaceUpdatePlaceRequest:
       type: object
       required:
