@@ -9,6 +9,10 @@ spring:
     encoding: UTF-8
   jackson:
     time-zone: Asia/Seoul
+  servlet:
+    multipart:
+      max-file-size: ${FILE_MAX_SIZE:50MB}
+      max-request-size: ${FILE_MAX_REQUEST_SIZE:50MB}
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
