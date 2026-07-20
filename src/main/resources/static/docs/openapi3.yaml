@@ -1777,7 +1777,7 @@ paths:
       tags:
         - TravelRecord
       summary: 여행 기록 초안 생성
-      description: 완료된 여행 일정 전체 경로를 스냅샷으로 저장하여 비공개 초안 여행 기록을 생성합니다.
+      description: 완료된 여행 일정 전체 경로를 스냅샷으로 저장하여 비공개 초안 여행 기록을 생성합니다. 전체 별점(overallRating)은 초안 생성 시 함께 저장할 수 있으며, 공개 발행 전에는 필수입니다.
       security:
         - opaqueToken: []
       parameters:
@@ -1792,6 +1792,7 @@ paths:
               title: 부산 맛집 여행
               content: 여유롭게 다녀온 2일 부산 여행 코스입니다.
               coverImageUrl: https://example.com/cover.jpg
+              overallRating: 5
       responses:
         "201":
           description: 생성 성공
@@ -1864,7 +1865,7 @@ paths:
       tags:
         - TravelRecord
       summary: 여행 기록 초안 수정
-      description: 초안의 제목, 본문, 커버 이미지를 수정합니다. 요청 본문은 생략할 수 있습니다.
+      description: 초안의 제목, 본문, 커버 이미지, 전체 별점을 수정합니다. 요청 본문은 생략할 수 있습니다.
       security:
         - opaqueToken: []
       parameters:
@@ -1880,6 +1881,7 @@ paths:
               title: 수정한 부산 여행
               content: 수정한 여행 기록 본문입니다.
               coverImageUrl: https://example.com/new-cover.jpg
+              overallRating: 4
       responses:
         "200":
           description: OK
