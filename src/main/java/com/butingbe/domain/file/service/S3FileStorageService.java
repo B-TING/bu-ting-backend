@@ -1,6 +1,8 @@
 package com.butingbe.domain.file.service;
 
 import com.butingbe.domain.file.dto.FileUploadResDto;
+import com.butingbe.domain.file.entity.FileMetadata;
+import com.butingbe.domain.file.repository.FileMetadataRepository;
 import java.io.IOException;
 import java.util.Set;
 import java.util.UUID;
@@ -21,6 +23,7 @@ public class S3FileStorageService implements FileStorageService {
       Set.of("image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime");
 
   private final S3Client s3Client;
+  private final FileMetadataRepository fileMetadataRepository;
 
   @Value("${file-storage.s3.bucket}")
   private String bucket;
@@ -53,6 +56,20 @@ public class S3FileStorageService implements FileStorageService {
     } catch (IOException exception) {
       throw new IllegalStateException("파일을 읽을 수 없습니다.", exception);
     }
+    try {
+      fileMetadataRepository.save(
+          FileMetadata.builder()
+              .objectKey(key)
+              .originalFileName(file.getOriginalFilename())
+              .contentType(contentType)
+              .mediaType(contentType.startsWith("video/") ? "VIDEO" : "IMAGE")
+              .fileSize(file.getSize())
+              .bucket(bucket)
+              .build());
+    } catch (RuntimeException exception) {
+      s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+      throw exception;
+    }
     String url = "https://" + bucket + ".s3." + region + ".amazonaws.com/" + key;
     return new FileUploadResDto(key, file.getOriginalFilename(), contentType, file.getSize(), url);
   }
@@ -63,6 +80,7 @@ public class S3FileStorageService implements FileStorageService {
       throw new IllegalArgumentException("유효하지 않은 파일 키입니다.");
     }
     s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(fileKey).build());
+    fileMetadataRepository.findByObjectKey(fileKey).ifPresent(fileMetadataRepository::delete);
   }
 
   private void validate(MultipartFile file) {
