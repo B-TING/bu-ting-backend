@@ -26,6 +26,13 @@ spring:
     baseline-version: 1
     locations: classpath:db/migration
 
+file-storage:
+  s3:
+    bucket: ${S3_BUCKET:}
+    region: ${AWS_REGION:ap-northeast-2}
+    key-prefix: ${S3_KEY_PREFIX:uploads}
+    max-file-size: ${S3_MAX_FILE_SIZE:52428800}
+
 oauth:
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
