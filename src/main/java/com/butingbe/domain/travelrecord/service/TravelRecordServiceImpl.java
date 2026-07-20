@@ -1006,6 +1006,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .isEmpty()) {
       throw new IllegalArgumentException("Travel record itinerary is required.");
     }
+
+    if (travelRecord.getOverallRating() == null) {
+      throw new IllegalArgumentException("Travel record overall rating is required.");
+    }
   }
 
   private void validatePublished(TravelRecord travelRecord) {

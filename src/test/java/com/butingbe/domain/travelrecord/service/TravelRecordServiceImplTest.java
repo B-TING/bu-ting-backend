@@ -312,6 +312,31 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("travel record without overall rating cannot be published")
+  void publishRejectsMissingOverallRating() {
+    User user =
+        userRepository.save(createUser("record-publish-rating@example.com", "record-rating"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto("No Rating", "Missing rating", null));
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.publish(
+                    authenticatedUser, draft.originalTravelId(), draft.travelRecordId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record overall rating is required.");
+  }
+
+  @Test
   @DisplayName("published travel record can be viewed publicly")
   void getPublishedSuccess() {
     User user =
@@ -1955,7 +1980,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     return travelRecordService.createDraft(
         authenticatedUser,
         travel.id(),
-        title == null ? null : new TravelRecordCreateReqDto(title, null, null));
+        new TravelRecordCreateReqDto(title, null, null, 5));
   }
 
   private DraftWithPlanPlace createDraftWithOneReviewedPlace(
@@ -1981,7 +2006,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         travelRecordService.createDraft(
             authenticatedUser,
             travel.id(),
-            title == null ? null : new TravelRecordCreateReqDto(title, null, null));
+            new TravelRecordCreateReqDto(title, null, null, 5));
 
     return new DraftWithPlanPlace(draft, place);
   }

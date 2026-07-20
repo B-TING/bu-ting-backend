@@ -1917,7 +1917,7 @@ paths:
       tags:
         - TravelRecord
       summary: 여행 기록 공개 발행
-      description: 작성자 본인의 초안을 공개 발행합니다. 발행된 기록은 공개 피드와 공개 상세 조회에 노출됩니다.
+      description: 작성자 본인의 초안을 공개 발행합니다. 발행된 기록은 공개 피드와 공개 상세 조회에 노출됩니다. 공개 발행 전에는 제목, 일정 스냅샷, 전체 별점이 필요합니다.
       security:
         - opaqueToken: []
       parameters:
@@ -1931,7 +1931,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/TravelRecordResponse"
         "400":
-          description: 발행할 수 없는 기록
+          description: 제목, 일정 스냅샷 또는 전체 별점이 없어 발행할 수 없는 기록
           content:
             application/json:
               schema:
@@ -2841,7 +2841,7 @@ components:
           minimum: 1
           maximum: 5
           nullable: true
-          description: 여행 플랜 전체 평점입니다.
+          description: 여행 플랜 전체 평점입니다. 초안 생성 시 생략할 수 있지만 공개 발행 전에는 필요합니다.
           example: 5
     TravelRecordUpdateRequest:
       type: object
@@ -2866,7 +2866,7 @@ components:
           minimum: 1
           maximum: 5
           nullable: true
-          description: 여행 플랜 전체 평점입니다.
+          description: 여행 플랜 전체 평점입니다. 공개 발행 전에는 필요합니다.
           example: 4
     TravelRecordStatus:
       type: string
