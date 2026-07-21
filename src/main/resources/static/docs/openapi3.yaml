@@ -1,4 +1,4 @@
-openapi: 3.0.3
+﻿openapi: 3.0.3
 info:
   title: B-ting Backend API
   description: B-ting backend API documentation.
@@ -23,6 +23,8 @@ tags:
     description: 여행 생성 및 일정 관리 API
   - name: TravelTeam
     description: 여행 초대 및 멤버 관리 API
+  - name: TravelRecord
+    description: 여행 기록 피드, 초안, 발행, 북마크, 좋아요, 장소 후기 API
   - name: Chat
     description: Chat APIs
   - name: WebSocket STOMP
@@ -836,9 +838,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatMessageResponse"
+                $ref: "#/components/schemas/ChatMessageListEnvelope"
         "400":
           description: 존재하지 않는 방 ID, 존재하지 않는 기준 메시지 ID(커서)이거나 잘못된 요청
           content:
@@ -877,7 +877,7 @@ paths:
               pace: RELAXED
               companionCount: 2
               preferredFoods: 해산물
-              companionTypes: FRIEND
+              companionType: FRIEND
               accommodationArea: 해운대
       responses:
         "201":
@@ -1280,6 +1280,56 @@ paths:
       responses:
         "204":
           description: 삭제 성공
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 여행 멤버가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 세부 여행지를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/plans/places/{planPlaceId}/visited:
+    patch:
+      tags:
+        - Travel
+      summary: 세부 여행지 방문 체크 변경
+      description: 세부 여행지의 방문 완료 여부를 체크하거나 해제합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/PlanPlaceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanPlaceVisitedUpdateRequest"
+            example:
+              visited: true
+      responses:
+        "200":
+          description: 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanPlaceResponse"
+        "400":
+          description: visited 값 누락 또는 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "401":
           description: 인증 실패
           content:
@@ -1736,7 +1786,7 @@ paths:
         {
           "messageId": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
           "roomId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-          "userId": "7b8c9d0e-1f2a-3b4c-5d6e-7f8a9b0c1d2e",
+          "senderId": "7b8c9d0e-1f2a-3b4c-5d6e-7f8a9b0c1d2e",
           "senderNickname": "수영구보안관",
           "content": "안녕하세요! 반갑습니다.",
           "createdAt": "2026-07-03T15:10:12.793+09:00"
@@ -1770,6 +1820,993 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/travels/{travelId}/records:
+    post:
+      tags:
+        - TravelRecord
+      summary: 여행 기록 초안 생성
+      description: 완료된 여행 일정 전체 경로를 스냅샷으로 저장하여 비공개 초안 여행 기록을 생성합니다. 전체 별점(overallRating)은 초안 생성 시 함께 저장할 수 있으며, 공개 발행 전에는 필수입니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordCreateRequest"
+            example:
+              title: 부산 맛집 여행
+              content: 여유롭게 다녀온 2일 부산 여행 코스입니다.
+              coverImageUrl: https://example.com/cover.jpg
+              overallRating: 5
+      responses:
+        "201":
+          description: 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "400":
+          description: 검증 실패 또는 스냅샷 생성 불가
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 여행 멤버가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travels/{travelId}/records/{travelRecordId}:
+    get:
+      tags:
+        - TravelRecord
+      summary: 여행 기록 초안 상세 조회
+      description: 초안 상세를 조회합니다. 원본 여행에 속한 작성자만 조회할 수 있습니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    patch:
+      tags:
+        - TravelRecord
+      summary: 여행 기록 초안 수정
+      description: 초안의 제목, 본문, 커버 이미지, 전체 별점을 수정합니다. 요청 본문은 생략할 수 있습니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/TravelRecordId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordUpdateRequest"
+            example:
+              title: 수정한 부산 여행
+              content: 수정한 여행 기록 본문입니다.
+              coverImageUrl: https://example.com/new-cover.jpg
+              overallRating: 4
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "400":
+          description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travels/{travelId}/records/{travelRecordId}/publish:
+    post:
+      tags:
+        - TravelRecord
+      summary: 여행 기록 공개 발행
+      description: 작성자 본인의 초안을 공개 발행합니다. 발행된 기록은 공개 피드와 공개 상세 조회에 노출됩니다. 공개 발행 전에는 제목, 일정 스냅샷, 전체 별점이 필요합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: 발행 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "400":
+          description: 제목, 일정 스냅샷 또는 전체 별점이 없어 발행할 수 없는 기록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travels/{travelId}/plans/places/{planPlaceId}/review:
+    post:
+      tags:
+        - TravelRecord
+      summary: 일정 장소 후기 작성
+      description: 여행 멤버가 여행기 초안 생성 전에도 일정 장소(PlanPlace)에 별점과 후기를 작성합니다. 여행기 초안 생성 시 이 후기는 여행기 장소 후기 스냅샷으로 복사됩니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/PlanPlaceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceReviewCreateRequest"
+            example:
+              rating: 5
+              content: 전망이 정말 좋았어요.
+              tags:
+                - 야경
+                - 가족여행
+      responses:
+        "201":
+          description: 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceReviewResponse"
+        "400":
+          description: 검증 실패 또는 중복 후기
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 여행 멤버가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행 또는 일정 장소를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    get:
+      tags:
+        - TravelRecord
+      summary: 일정 장소 후기 조회
+      description: 여행 멤버가 일정 장소(PlanPlace)에 작성된 본 플랫폼 후기를 조회합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/PlanPlaceId"
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceReviewResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 여행 멤버가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행, 일정 장소 또는 후기를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    patch:
+      tags:
+        - TravelRecord
+      summary: 일정 장소 후기 수정
+      description: 여행 멤버가 일정 장소(PlanPlace)에 작성한 후기의 별점, 본문, 태그를 수정합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/PlanPlaceId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceReviewUpdateRequest"
+            example:
+              rating: 4
+              content: 좋지만 사람이 많았어요.
+              tags:
+                - 카페
+                - 재방문
+      responses:
+        "200":
+          description: 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceReviewResponse"
+        "400":
+          description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 여행 멤버가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행, 일정 장소 또는 후기를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - TravelRecord
+      summary: 일정 장소 후기 삭제
+      description: 여행 멤버가 일정 장소(PlanPlace)에 작성한 후기를 삭제합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+        - $ref: "#/components/parameters/PlanPlaceId"
+      responses:
+        "204":
+          description: 삭제 성공
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 여행 멤버가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행, 일정 장소 또는 후기를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/travel-records:
+    get:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 피드 조회
+      description: 공개 발행된 여행 기록 피드를 조회합니다. 커서 페이지네이션, 키워드/장소/여행일자/지역/도시 필터, 정렬을 지원합니다.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 이전 페이지 응답의 nextCursor 값입니다.
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: keyword
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 제목, 본문, 장소명을 검색합니다.
+        - name: placeId
+          in: query
+          required: false
+          description: 특정 장소를 포함한 여행 기록만 조회할 때 사용하는 장소 ID입니다.
+          schema:
+            type: string
+          example: google-place-id
+        - name: travelStartDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: travelEndDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: region
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 장소명 또는 주소에 해당 지역 문자열이 포함된 여행 기록만 조회합니다.
+          example: 부산
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 장소명 또는 주소에 해당 도시 문자열이 포함된 여행 기록만 조회합니다.
+          example: 서귀포
+        - name: sort
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TravelRecordFeedSort"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordFeedPageResponse"
+        "400":
+          description: 잘못된 필터 또는 커서
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/{travelRecordId}:
+    get:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 상세 조회
+      description: 공개 발행된 여행 기록 상세를 조회합니다. 조회 시 조회수가 증가합니다.
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "404":
+          description: 공개 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/me:
+    get:
+      tags:
+        - TravelRecord
+      summary: 내 여행 기록 목록 조회
+      description: 인증된 사용자가 작성한 DRAFT, PUBLISHED, HIDDEN 상태의 여행 기록 목록을 조회합니다.
+      security:
+        - opaqueToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TravelRecordManageResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/me/bookmarks:
+    get:
+      tags:
+        - TravelRecord
+      summary: 내가 북마크한 여행 기록 조회
+      security:
+        - opaqueToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TravelRecordBookmarkResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/me/{travelRecordId}:
+    get:
+      tags:
+        - TravelRecord
+      summary: 내 여행 기록 상세 조회
+      description: 작성자는 DRAFT, PUBLISHED, HIDDEN 상태의 기록을 모두 조회할 수 있습니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    patch:
+      tags:
+        - TravelRecord
+      summary: 내 여행 기록 수정
+      description: DRAFT는 자유롭게 수정할 수 있고, PUBLISHED/HIDDEN은 제목, 본문, 커버 이미지를 수정할 수 있습니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordUpdateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "400":
+          description: 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/me/{travelRecordId}/hide:
+    post:
+      tags:
+        - TravelRecord
+      summary: 내 여행 기록 숨김 처리
+      description: 작성자 본인의 공개 기록을 HIDDEN 상태로 변경하여 공개 피드와 공개 상세 조회에서 제외합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: 숨김 처리 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/me/{travelRecordId}/republish:
+    post:
+      tags:
+        - TravelRecord
+      summary: 내 숨김 여행 기록 재공개
+      description: 작성자 본인의 HIDDEN 상태 기록을 다시 PUBLISHED 상태로 변경합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: 재공개 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordResponse"
+        "400":
+          description: 재공개할 수 없는 기록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/{travelRecordId}/bookmarks:
+    post:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 북마크
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "201":
+          description: 북마크 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordBookmarkResponse"
+        "400":
+          description: 중복 북마크 또는 공개되지 않은 기록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - TravelRecord
+      summary: 여행 기록 북마크 삭제
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "204":
+          description: 북마크 삭제 성공
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/{travelRecordId}/likes:
+    post:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 좋아요
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "201":
+          description: 좋아요 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordLikeResponse"
+        "400":
+          description: 중복 좋아요 또는 공개되지 않은 기록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - TravelRecord
+      summary: 여행 기록 좋아요 취소
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "204":
+          description: 좋아요 취소 성공
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/{travelRecordId}/comments:
+    post:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 댓글 작성
+      description: 공개 발행된 여행 기록에 댓글을 작성합니다. 댓글 내용은 앞뒤 공백을 제거해 저장합니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordCommentCreateRequest"
+            example:
+              content: 이 코스 참고하기 좋아요!
+      responses:
+        "201":
+          description: 댓글 작성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordCommentResponse"
+        "400":
+          description: 댓글 내용 검증 실패 또는 공개되지 않은 기록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 공개 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    get:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 댓글 목록 조회
+      description: 공개 발행된 여행 기록의 댓글을 작성일 오름차순으로 조회합니다.
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      responses:
+        "200":
+          description: 댓글 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TravelRecordCommentResponse"
+        "404":
+          description: 공개 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travel-records/{travelRecordId}/comments/{commentId}:
+    patch:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 댓글 수정
+      description: 댓글 작성자만 본인 댓글을 수정할 수 있습니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+        - name: commentId
+          in: path
+          required: true
+          description: 댓글 ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordCommentUpdateRequest"
+            example:
+              content: 직접 따라가 봤는데 동선이 좋아요.
+      responses:
+        "200":
+          description: 댓글 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordCommentResponse"
+        "400":
+          description: 댓글 내용 검증 실패 또는 공개되지 않은 기록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 댓글 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 공개 여행 기록 또는 댓글을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록 댓글 삭제
+      description: 댓글 작성자만 본인 댓글을 삭제할 수 있습니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+        - name: commentId
+          in: path
+          required: true
+          description: 댓글 ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: 댓글 삭제 성공
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 댓글 작성자가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 공개 여행 기록 또는 댓글을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/places/travel-records:
+    get:
+      tags:
+        - TravelRecord
+      summary: 장소 기반 공개 여행 기록 조회
+      description: 요청한 장소 ID를 포함하는 공개 여행 기록을 조회합니다. 커서 페이지네이션을 지원합니다.
+      parameters:
+        - name: placeId
+          in: query
+          required: true
+          description: 장소 ID입니다. 현재는 여행 일정에 저장된 장소 식별자를 사용합니다.
+          schema:
+            type: string
+          example: google-place-id
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRecordFeedPageResponse"
+        "400":
+          description: 잘못된 장소 조건 또는 커서
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/places/reviews:
+    get:
+      tags:
+        - TravelRecord
+      summary: 장소 후기·별점 집계 조회
+      description: 우리 플랫폼에 등록된 특정 장소의 별점 집계와 후기 목록을 조회합니다.
+      parameters:
+        - name: placeId
+          in: query
+          required: true
+          description: 장소 ID입니다. 현재는 여행 일정에 저장된 장소 식별자를 사용합니다.
+          schema:
+            type: string
+          example: google-place-id
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceReviewSummaryResponse"
+        "400":
+          description: 잘못된 장소 조회 조건
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
 components:
   parameters:
     TravelId:
@@ -1799,6 +2836,24 @@ components:
         type: string
         format: uuid
       example: 30000000-0000-0000-0000-000000000001
+    TravelRecordId:
+      name: travelRecordId
+      in: path
+      required: true
+      description: 여행 기록 ID
+      schema:
+        type: string
+        format: uuid
+      example: 60000000-0000-0000-0000-000000000001
+    TravelRecordPlaceId:
+      name: travelRecordPlaceId
+      in: path
+      required: true
+      description: 여행 기록 장소 ID
+      schema:
+        type: string
+        format: uuid
+      example: 70000000-0000-0000-0000-000000000001
     InviteToken:
       name: token
       in: query
@@ -1813,6 +2868,688 @@ components:
       scheme: bearer
       bearerFormat: opaque
   schemas:
+    TravelRecordCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: 부산 맛집 여행
+        content:
+          type: string
+          nullable: true
+          description: 여행기 본문입니다. 필수는 아닙니다.
+          example: 자유롭게 다녀온 2박 부산 여행 코스입니다.
+        coverImageUrl:
+          type: string
+          maxLength: 1000
+          nullable: true
+          example: https://example.com/cover.jpg
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: 여행 플랜 전체 평점입니다. 초안 생성 시 생략할 수 있지만 공개 발행 전에는 필요합니다.
+          example: 5
+    TravelRecordUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: 수정된 부산 여행
+        content:
+          type: string
+          nullable: true
+          description: 여행기 본문입니다. 필수는 아닙니다.
+          example: 수정된 여행 기록 본문입니다.
+        coverImageUrl:
+          type: string
+          maxLength: 1000
+          nullable: true
+          example: https://example.com/new-cover.jpg
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: 여행 플랜 전체 평점입니다. 공개 발행 전에는 필요합니다.
+          example: 4
+    TravelRecordStatus:
+      type: string
+      enum:
+        - DRAFT
+        - PUBLISHED
+        - HIDDEN
+      example: PUBLISHED
+    TravelRecordFeedSort:
+      type: string
+      enum:
+        - LATEST
+        - MOST_LIKED
+        - MOST_VIEWED
+      example: LATEST
+    TravelRecordResponse:
+      type: object
+      properties:
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        travelId:
+          type: string
+          format: uuid
+          description: 이 여행기가 생성된 원본 여행 일정 Travel의 ID
+          nullable: true
+          example: 10000000-0000-0000-0000-000000000001
+        authorId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        title:
+          type: string
+          nullable: true
+          example: 부산 맛집 여행
+        content:
+          type: string
+          nullable: true
+          example: 여유롭게 다녀온 2일 부산 여행 코스입니다.
+        coverImageUrl:
+          type: string
+          nullable: true
+          example: https://example.com/cover.jpg
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: 여행 플랜 전체 평점입니다.
+          example: 5
+        travelStartDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-01"
+        travelEndDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-02"
+        status:
+          $ref: "#/components/schemas/TravelRecordStatus"
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-03T10:00:00"
+        likeCount:
+          type: integer
+          format: int64
+          example: 7
+        viewCount:
+          type: integer
+          format: int64
+          example: 120
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/TravelRecordDayResponse"
+    TravelRecordDayResponse:
+      type: object
+      properties:
+        travelRecordDayId:
+          type: string
+          format: uuid
+          example: 61000000-0000-0000-0000-000000000001
+        originalPlanId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 20000000-0000-0000-0000-000000000001
+        dayNumber:
+          type: integer
+          example: 1
+        visitDate:
+          type: string
+          format: date
+          example: "2026-08-01"
+        places:
+          type: array
+          items:
+            $ref: "#/components/schemas/TravelRecordPlaceResponse"
+    TravelRecordPlaceResponse:
+      type: object
+      properties:
+        travelRecordPlaceId:
+          type: string
+          format: uuid
+          example: 70000000-0000-0000-0000-000000000001
+        planPlaceId:
+          type: string
+          format: uuid
+          description: 이 여행기 장소 스냅샷이 참조하는 원본 PlanPlace ID
+          nullable: true
+          example: 30000000-0000-0000-0000-000000000001
+        sequence:
+          type: integer
+          nullable: true
+          example: 1
+        placeName:
+          type: string
+          example: 광안리 해수욕장
+        address:
+          type: string
+          nullable: true
+          example: 부산 수영구
+        latitude:
+          type: number
+          format: double
+          nullable: true
+          example: 35.153
+        longitude:
+          type: number
+          format: double
+          nullable: true
+          example: 129.118
+        provider:
+          $ref: "#/components/schemas/PlaceProvider"
+        providerPlaceId:
+          type: string
+          example: google-place-id
+        durationMinutes:
+          type: integer
+          nullable: true
+          example: 90
+        memo:
+          type: string
+          nullable: true
+          example: 노을 명소
+        scheduledTime:
+          type: string
+          format: time
+          nullable: true
+          example: "17:30:00"
+        visited:
+          type: boolean
+          nullable: true
+          example: true
+        routeToNext:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/TravelRecordRouteResponse"
+    TravelRecordRouteResponse:
+      type: object
+      properties:
+        transportType:
+          $ref: "#/components/schemas/TransportType"
+        durationMinutes:
+          type: integer
+          nullable: true
+          example: 25
+        distanceMeters:
+          type: integer
+          nullable: true
+          example: 9000
+        provider:
+          $ref: "#/components/schemas/PlaceProvider"
+    TravelRecordFeedPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TravelRecordFeedResponse"
+        nextCursor:
+          type: string
+          nullable: true
+          example: TEFURVNUfDB8MjAyNi0wOC0wM1QxMDowMDowMHwyMDI2LTA4LTAzVDA5OjAwOjAw
+        hasNext:
+          type: boolean
+          example: true
+    TravelRecordFeedResponse:
+      type: object
+      properties:
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        travelId:
+          type: string
+          format: uuid
+          description: 이 여행기가 생성된 원본 여행 일정 Travel의 ID
+          nullable: true
+          example: 10000000-0000-0000-0000-000000000001
+        authorId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        authorNickname:
+          type: string
+          example: 여행자
+        title:
+          type: string
+          nullable: true
+          example: 부산 맛집 여행
+        content:
+          type: string
+          nullable: true
+          example: 여유롭게 다녀온 2일 부산 여행 코스입니다.
+        coverImageUrl:
+          type: string
+          nullable: true
+          example: https://example.com/cover.jpg
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: 여행 플랜 전체 평점입니다.
+          example: 5
+        travelStartDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-01"
+        travelEndDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-02"
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-03T10:00:00"
+        likeCount:
+          type: integer
+          format: int64
+          example: 7
+        viewCount:
+          type: integer
+          format: int64
+          example: 120
+        likedByMe:
+          type: boolean
+          description: 로그인한 사용자가 해당 여행 기록에 좋아요를 눌렀는지 여부입니다. 비로그인 요청이면 false입니다.
+          example: true
+    TravelRecordManageResponse:
+      type: object
+      properties:
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        travelId:
+          type: string
+          format: uuid
+          description: 이 여행기가 생성된 원본 여행 일정 Travel의 ID
+          nullable: true
+          example: 10000000-0000-0000-0000-000000000001
+        authorId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        title:
+          type: string
+          nullable: true
+          example: 부산 맛집 여행
+        content:
+          type: string
+          nullable: true
+          example: 여유롭게 다녀온 2일 부산 여행 코스입니다.
+        coverImageUrl:
+          type: string
+          nullable: true
+          example: https://example.com/cover.jpg
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: 여행 플랜 전체 평점입니다.
+          example: 5
+        travelStartDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-01"
+        travelEndDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-08-02"
+        status:
+          $ref: "#/components/schemas/TravelRecordStatus"
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-03T10:00:00"
+        likeCount:
+          type: integer
+          format: int64
+          example: 7
+        viewCount:
+          type: integer
+          format: int64
+          example: 120
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-03T09:00:00"
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-03T09:30:00"
+    TravelRecordBookmarkResponse:
+      type: object
+      properties:
+        bookmarkId:
+          type: string
+          format: uuid
+          example: 80000000-0000-0000-0000-000000000001
+        bookmarkedAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T11:00:00"
+        travelRecord:
+          $ref: "#/components/schemas/TravelRecordFeedResponse"
+    TravelRecordLikeResponse:
+      type: object
+      properties:
+        likeId:
+          type: string
+          format: uuid
+          example: 81000000-0000-0000-0000-000000000001
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        likedAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T11:10:00"
+        likeCount:
+          type: integer
+          format: int64
+          example: 8
+    TravelRecordCommentCreateRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          maxLength: 1000
+          description: 댓글 내용입니다. 앞뒤 공백은 저장 전에 제거됩니다.
+          example: 이 코스 참고하기 좋아요!
+    TravelRecordCommentUpdateRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          maxLength: 1000
+          description: 수정할 댓글 내용입니다. 앞뒤 공백은 저장 전에 제거됩니다.
+          example: 직접 따라가 봤는데 동선이 좋아요.
+    TravelRecordCommentResponse:
+      type: object
+      properties:
+        commentId:
+          type: string
+          format: uuid
+          example: 82000000-0000-0000-0000-000000000001
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        authorId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        authorNickname:
+          type: string
+          example: 여행자
+        authorProfileImageUrl:
+          type: string
+          nullable: true
+          example: https://example.com/profile.jpg
+        content:
+          type: string
+          example: 이 코스 참고하기 좋아요!
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T11:20:00"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T11:25:00"
+    PlaceReviewCreateRequest:
+      type: object
+      required:
+        - rating
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        content:
+          type: string
+          nullable: true
+          description: 장소 후기 및 팁입니다.
+          example: 전망이 정말 좋았어요.
+        tags:
+          type: array
+          description: 장소 후기 태그입니다. 빈 문자열은 제거하고, 중복 태그는 하나만 저장됩니다.
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 30
+          example:
+            - 야경
+            - 가족여행
+        stayMinutes:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: 실제 체류 시간입니다. 단위는 분입니다.
+          example: 90
+        mediaUrls:
+          type: array
+          description: 장소 후기 사진/동영상 URL 목록입니다.
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 1000
+          example:
+            - https://example.com/place-photo.jpg
+            - https://example.com/place-video.mp4
+    PlaceReviewUpdateRequest:
+      type: object
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          example: 4
+        content:
+          type: string
+          nullable: true
+          description: 장소 후기 및 팁입니다.
+          example: 좋지만 사람이 많았어요.
+        tags:
+          type: array
+          nullable: true
+          description: null이면 기존 태그를 유지하고, 빈 배열이면 태그를 모두 삭제합니다.
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 30
+          example:
+            - 카페
+            - 재방문
+        stayMinutes:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: 실제 체류 시간입니다. 단위는 분입니다.
+          example: 75
+        mediaUrls:
+          type: array
+          nullable: true
+          description: null이면 기존 미디어를 유지하고, 빈 배열이면 모두 삭제합니다.
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 1000
+          example:
+            - https://example.com/new-place-photo.jpg
+    PlaceReviewResponse:
+      type: object
+      properties:
+        placeReviewId:
+          type: string
+          format: uuid
+          example: 90000000-0000-0000-0000-000000000001
+        planPlaceId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 30000000-0000-0000-0000-000000000001
+        travelRecordPlaceId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 70000000-0000-0000-0000-000000000001
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        stayMinutes:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: 실제 체류 시간입니다. 단위는 분입니다.
+          example: 90
+        content:
+          type: string
+          nullable: true
+          description: 장소 후기 및 팁입니다.
+          example: 전망이 정말 좋았어요.
+        tags:
+          type: array
+          items:
+            type: string
+          example:
+            - 야경
+            - 가족여행
+        mediaUrls:
+          type: array
+          items:
+            type: string
+          example:
+            - https://example.com/place-photo.jpg
+            - https://example.com/place-video.mp4
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T12:00:00"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T12:10:00"
+    PlaceReviewSummaryResponse:
+      type: object
+      properties:
+        placeId:
+          type: string
+          example: google-place-id
+        reviewCount:
+          type: integer
+          format: int64
+          example: 12
+        averageRating:
+          type: number
+          format: double
+          example: 4.6
+        ratingCounts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          example:
+            "1": 0
+            "2": 1
+            "3": 2
+            "4": 3
+            "5": 6
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlaceReviewSummaryItemResponse"
+    PlaceReviewSummaryItemResponse:
+      type: object
+      properties:
+        placeReviewId:
+          type: string
+          format: uuid
+          example: 90000000-0000-0000-0000-000000000001
+        travelRecordId:
+          type: string
+          format: uuid
+          example: 60000000-0000-0000-0000-000000000001
+        travelRecordTitle:
+          type: string
+          nullable: true
+          example: 부산 맛집 여행
+        authorId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        authorNickname:
+          type: string
+          example: 여행자
+        travelRecordPlaceId:
+          type: string
+          format: uuid
+          example: 70000000-0000-0000-0000-000000000001
+        placeName:
+          type: string
+          example: 광안리 해수욕장
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        content:
+          type: string
+          nullable: true
+          example: 노을이 정말 예뻤어요.
+        tags:
+          type: array
+          items:
+            type: string
+          example:
+            - 야경
+            - 가족여행
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T12:00:00"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-08-03T12:10:00"
     StorageLocationResponse:
       type: object
       required: [ line, stationName, locationDetail, latitude, longitude, distanceMeters, openNow, counts, cost, company, fees ]
@@ -2323,7 +4060,7 @@ components:
           type: string
           nullable: true
           example: 해산물
-        companionTypes:
+        companionType:
           $ref: "#/components/schemas/CompanionType"
         accommodationArea:
           type: string
@@ -2334,7 +4071,7 @@ components:
         - $ref: "#/components/schemas/TravelCreateRequest"
         - type: object
           properties:
-            id:
+            travelId:
               type: string
               format: uuid
               example: 10000000-0000-0000-0000-000000000001
@@ -2457,6 +4194,15 @@ components:
           type: string
           nullable: true
           example: 점심 예약
+    PlanPlaceVisitedUpdateRequest:
+      type: object
+      required:
+        - visited
+      properties:
+        visited:
+          type: boolean
+          description: 방문 완료 여부
+          example: true
     PlanPlaceUpdatePlaceRequest:
       type: object
       required:
@@ -2922,7 +4668,7 @@ components:
     ChatMessageResponse:
       type: object
       properties:
-        id:
+        messageId:
           type: string
           format: uuid
           description: 메시지 고유 식별자 ID (uuid)
@@ -2932,7 +4678,7 @@ components:
           format: uuid
           description: 채팅방 고유 UUID
           example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
-        userId:
+        senderId:
           type: string
           format: uuid
           description: 메시지를 보낸 유저 고유 UUID
@@ -2950,3 +4696,26 @@ components:
           format: date-time
           description: 메시지 생성 일시 (ISO 8601 포맷)
           example: "2026-07-01T23:15:00Z"
+        isMine:
+          type: boolean
+          nullable: true
+          description: REST 히스토리 조회에서 현재 사용자가 보낸 메시지 여부입니다. STOMP 브로드캐스트에서는 null일 수 있습니다.
+          example: false
+    ChatMessageListResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessageResponse"
+    ChatMessageListEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 채팅 메시지 목록 조회
+        data:
+          $ref: "#/components/schemas/ChatMessageListResponse"

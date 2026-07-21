@@ -14,6 +14,7 @@ import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceVisitedUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
@@ -59,7 +60,7 @@ class PlanControllerTest {
   }
 
   @Test
-  @DisplayName("plan에 속한 장소 목록을 조회한다")
+  @DisplayName("get plan places")
   void getPlanPlaces() throws Exception {
     mockMvc
         .perform(get("/plans/{planId}/places", FakeTravelService.PLAN_ID))
@@ -69,7 +70,7 @@ class PlanControllerTest {
   }
 
   @Test
-  @DisplayName("plan에 장소를 추가한다")
+  @DisplayName("create plan place")
   void createPlanPlace() throws Exception {
     mockMvc
         .perform(
@@ -93,7 +94,7 @@ class PlanControllerTest {
   }
 
   @Test
-  @DisplayName("장소의 메모와 방문 예정 시간을 수정한다")
+  @DisplayName("update plan place schedule fields")
   void updatePlanPlace() {
     var response =
         planController.updatePlanPlace(
@@ -110,7 +111,7 @@ class PlanControllerTest {
   }
 
   @Test
-  @DisplayName("plan place location can be replaced")
+  @DisplayName("replace plan place location")
   void updatePlanPlacePlace() throws Exception {
     mockMvc
         .perform(
@@ -138,7 +139,27 @@ class PlanControllerTest {
   }
 
   @Test
-  @DisplayName("드래그 앤 드롭 결과 순서 배열을 service에 전달한다")
+  @DisplayName("update plan place visited status")
+  void updatePlanPlaceVisited() throws Exception {
+    mockMvc
+        .perform(
+            patch("/plans/places/{planPlaceId}/visited", FakeTravelService.PLACE_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "visited": true
+                    }
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.planPlaceId").value(FakeTravelService.PLACE_ID.toString()))
+        .andExpect(jsonPath("$.visited").value(true));
+
+    assertThat(travelService.updatedVisitedRequest.visited()).isTrue();
+  }
+
+  @Test
+  @DisplayName("update plan place sequence")
   void updatePlanPlaceSequence() throws Exception {
     UUID anotherPlaceId = UUID.fromString("30000000-0000-0000-0000-000000000002");
 
@@ -159,7 +180,7 @@ class PlanControllerTest {
   }
 
   @Test
-  @DisplayName("장소 삭제 요청을 service에 위임한다")
+  @DisplayName("delete plan place")
   void deletePlanPlace() throws Exception {
     mockMvc
         .perform(delete("/plans/places/{planPlaceId}", FakeTravelService.PLACE_ID))
@@ -197,6 +218,7 @@ class PlanControllerTest {
     UUID deletedPlanPlaceId;
     PlanPlaceUpdateReqDto updatedPlanPlaceRequest;
     PlanPlaceUpdatePlaceReqDto updatedPlaceRequest;
+    PlanPlaceVisitedUpdateReqDto updatedVisitedRequest;
 
     @Override
     public TravelResDto createTravel(
@@ -262,6 +284,28 @@ class PlanControllerTest {
           null,
           null,
           false);
+    }
+
+    @Override
+    public PlanPlaceResDto updatePlanPlaceVisited(
+        AuthenticatedUser authenticatedUser,
+        UUID planPlaceId,
+        PlanPlaceVisitedUpdateReqDto request) {
+      updatedVisitedRequest = request;
+      return new PlanPlaceResDto(
+          planPlaceId,
+          PLAN_ID,
+          1,
+          "Busan Station",
+          "Busan",
+          35.115,
+          129.041,
+          PlaceProvider.GOOGLE,
+          "google-place-id",
+          30,
+          null,
+          null,
+          request.visited());
     }
 
     @Override

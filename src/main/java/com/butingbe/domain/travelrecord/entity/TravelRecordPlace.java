@@ -1,5 +1,6 @@
-package com.butingbe.domain.travel.entity;
+package com.butingbe.domain.travelrecord.entity;
 
+import com.butingbe.domain.travel.entity.PlaceProvider;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -21,15 +22,15 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(
-    name = "plan_place",
+    name = "travel_record_place",
     uniqueConstraints = {
       @UniqueConstraint(
-          name = "uk_plan_place_sequence",
-          columnNames = {"plan_id", "sequence"})
+          name = "uk_travel_record_place_sequence",
+          columnNames = {"travel_record_day_id", "sequence"})
     })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PlanPlace {
+public class TravelRecordPlace {
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -37,8 +38,11 @@ public class PlanPlace {
   private UUID id;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "plan_id", nullable = false)
-  private Plan plan;
+  @JoinColumn(name = "travel_record_day_id", nullable = false)
+  private TravelRecordDay travelRecordDay;
+
+  @Column(name = "original_plan_place_id")
+  private UUID originalPlanPlaceId;
 
   @Column(nullable = false)
   private Integer sequence;
@@ -73,8 +77,9 @@ public class PlanPlace {
   private Boolean visited = false;
 
   @Builder
-  public PlanPlace(
-      Plan plan,
+  public TravelRecordPlace(
+      TravelRecordDay travelRecordDay,
+      UUID originalPlanPlaceId,
       Integer sequence,
       String placeName,
       String address,
@@ -86,7 +91,8 @@ public class PlanPlace {
       String memo,
       LocalTime scheduledTime,
       Boolean visited) {
-    this.plan = plan;
+    this.travelRecordDay = travelRecordDay;
+    this.originalPlanPlaceId = originalPlanPlaceId;
     this.sequence = sequence;
     this.placeName = placeName;
     this.address = address;
@@ -98,42 +104,5 @@ public class PlanPlace {
     this.memo = memo;
     this.scheduledTime = scheduledTime;
     this.visited = visited != null ? visited : false;
-  }
-
-  public void changeSequence(Integer sequence) {
-    this.sequence = sequence;
-  }
-
-  public void updateSchedule(Integer durationMinutes, LocalTime scheduledTime, String memo) {
-    if (durationMinutes != null) {
-      this.durationMinutes = durationMinutes;
-    }
-    if (scheduledTime != null) {
-      this.scheduledTime = scheduledTime;
-    }
-    if (memo != null) {
-      this.memo = memo;
-    }
-  }
-
-  public void updateVisited(Boolean visited) {
-    if (visited != null) {
-      this.visited = visited;
-    }
-  }
-
-  public void updatePlace(
-      String placeName,
-      String address,
-      Double latitude,
-      Double longitude,
-      PlaceProvider provider,
-      String providerPlaceId) {
-    this.placeName = placeName;
-    this.address = address;
-    this.latitude = latitude;
-    this.longitude = longitude;
-    this.provider = provider;
-    this.providerPlaceId = providerPlaceId;
   }
 }

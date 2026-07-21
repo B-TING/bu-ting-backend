@@ -7,6 +7,7 @@ import com.butingbe.domain.travel.entity.PlanRoute;
 import com.butingbe.domain.travel.entity.TransportType;
 import com.butingbe.domain.travel.entity.Travel;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,6 +43,8 @@ public record TravelPlansResDto(UUID travelId, String title, List<PlanDayResDto>
       PlaceProvider provider,
       String providerPlaceId,
       Integer durationMinutes,
+      String memo,
+      LocalTime scheduledTime,
       Boolean visited,
       PlanRouteResDto routeToNext) {
 
@@ -56,6 +59,8 @@ public record TravelPlansResDto(UUID travelId, String title, List<PlanDayResDto>
           place.getProvider(),
           place.getProviderPlaceId(),
           place.getDurationMinutes(),
+          place.getMemo(),
+          place.getScheduledTime(),
           place.getVisited(),
           routeToNext == null ? null : PlanRouteResDto.from(routeToNext));
     }
