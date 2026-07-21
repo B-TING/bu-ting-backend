@@ -288,7 +288,9 @@ class PlanControllerTest {
 
     @Override
     public PlanPlaceResDto updatePlanPlaceVisited(
-        AuthenticatedUser authenticatedUser, UUID planPlaceId, PlanPlaceVisitedUpdateReqDto request) {
+        AuthenticatedUser authenticatedUser,
+        UUID planPlaceId,
+        PlanPlaceVisitedUpdateReqDto request) {
       updatedVisitedRequest = request;
       return new PlanPlaceResDto(
           planPlaceId,

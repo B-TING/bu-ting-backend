@@ -36,9 +36,9 @@ import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
 import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
-import com.butingbe.domain.travelrecord.repository.TravelRecordRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
+import com.butingbe.domain.travelrecord.repository.TravelRecordRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRouteRepository;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
@@ -81,8 +81,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
     PlanPlaceResDto firstPlace =
         createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station");
-    PlanPlaceResDto secondPlace =
-        createPlace(authenticatedUser, firstDay.planId(), 2, "Haeundae");
+    PlanPlaceResDto secondPlace = createPlace(authenticatedUser, firstDay.planId(), 2, "Haeundae");
     saveRoute(firstPlace, secondPlace);
 
     TravelRecordResDto result =
@@ -98,16 +97,20 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.overallRating()).isEqualTo(5);
     assertThat(result.days()).hasSize(1);
     assertThat(result.days().getFirst().places()).hasSize(2);
-    assertThat(result.days().getFirst().places().getFirst().placeName())
-        .isEqualTo("Busan Station");
+    assertThat(result.days().getFirst().places().getFirst().placeName()).isEqualTo("Busan Station");
     assertThat(result.days().getFirst().places().getFirst().routeToNext().transportType())
         .isEqualTo(TransportType.PUBLIC_TRANSPORT);
-    assertThat(travelRecordDayRepository.findByTravelRecord_IdOrderByDayNumberAsc(result.travelRecordId()))
+    assertThat(
+            travelRecordDayRepository.findByTravelRecord_IdOrderByDayNumberAsc(
+                result.travelRecordId()))
         .hasSize(1);
-    assertThat(travelRecordPlaceRepository.findByProviderAndProviderPlaceId(
-            PlaceProvider.GOOGLE, "Busan Station"))
+    assertThat(
+            travelRecordPlaceRepository.findByProviderAndProviderPlaceId(
+                PlaceProvider.GOOGLE, "Busan Station"))
         .hasSize(1);
-    assertThat(travelRecordRouteRepository.findByTravelRecordDay_Id(result.days().getFirst().travelRecordDayId()))
+    assertThat(
+            travelRecordRouteRepository.findByTravelRecordDay_Id(
+                result.days().getFirst().travelRecordDayId()))
         .hasSize(1);
   }
 
@@ -135,7 +138,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         travelService.createPlan(
             authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
     createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station");
-    TravelRecordResDto draft = travelRecordService.createDraft(authenticatedUser, travel.id(), null);
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(authenticatedUser, travel.id(), null);
 
     TravelRecordResDto result =
         travelRecordService.getDraft(authenticatedUser, travel.id(), draft.travelRecordId());
@@ -143,14 +147,14 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.travelRecordId()).isEqualTo(draft.travelRecordId());
     assertThat(result.status()).isEqualTo(TravelRecordStatus.DRAFT);
     assertThat(result.days()).hasSize(1);
-    assertThat(result.days().getFirst().places().getFirst().placeName())
-        .isEqualTo("Busan Station");
+    assertThat(result.days().getFirst().places().getFirst().placeName()).isEqualTo("Busan Station");
   }
 
   @Test
   @DisplayName("non-author cannot get draft travel record")
   void getDraftRejectsNonAuthor() {
-    User owner = userRepository.save(createUser("record-owner-get@example.com", "record-owner-get"));
+    User owner =
+        userRepository.save(createUser("record-owner-get@example.com", "record-owner-get"));
     User outsider =
         userRepository.save(createUser("record-outsider-get@example.com", "record-outsider-get"));
     AuthenticatedUser ownerUser = AuthenticatedUser.from(owner);
@@ -220,7 +224,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     User user = userRepository.save(createUser("record-blank@example.com", "record-blank"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelResDto travel = createCompletedTravel(authenticatedUser);
-    TravelRecordResDto draft = travelRecordService.createDraft(authenticatedUser, travel.id(), null);
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(authenticatedUser, travel.id(), null);
 
     assertThatThrownBy(
             () ->
@@ -284,7 +289,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         userRepository.save(createUser("record-publish-again@example.com", "record-publish-again"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
-    travelRecordService.publish(authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+    travelRecordService.publish(
+        authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
 
     assertThatThrownBy(
             () ->
@@ -301,7 +307,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         userRepository.save(createUser("record-publish-empty@example.com", "record-publish-empty"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelResDto travel = createCompletedTravel(authenticatedUser);
-    TravelRecordResDto draft = travelRecordService.createDraft(authenticatedUser, travel.id(), null);
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(authenticatedUser, travel.id(), null);
 
     assertThatThrownBy(
             () ->
@@ -354,8 +361,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.status()).isEqualTo(TravelRecordStatus.PUBLISHED);
     assertThat(result.publishedAt()).isNotNull();
     assertThat(result.days()).hasSize(1);
-    assertThat(result.days().getFirst().places().getFirst().placeName())
-        .isEqualTo("Busan Station");
+    assertThat(result.days().getFirst().places().getFirst().placeName()).isEqualTo("Busan Station");
   }
 
   @Test
@@ -412,7 +418,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("latest feed supports cursor pagination")
   void getLatestFeedSupportsCursorPagination() {
     User firstUser =
-        userRepository.save(createUser("record-feed-page-first@example.com", "record-feed-page-first"));
+        userRepository.save(
+            createUser("record-feed-page-first@example.com", "record-feed-page-first"));
     User secondUser =
         userRepository.save(
             createUser("record-feed-page-second@example.com", "record-feed-page-second"));
@@ -496,7 +503,9 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         createDraftWithOnePlace(beachAuthenticatedUser, "Beach Route", "Haeundae");
     TravelRecordResDto stationPublished =
         travelRecordService.publish(
-            stationAuthenticatedUser, stationDraft.originalTravelId(), stationDraft.travelRecordId());
+            stationAuthenticatedUser,
+            stationDraft.originalTravelId(),
+            stationDraft.travelRecordId());
     TravelRecordResDto beachPublished =
         travelRecordService.publish(
             beachAuthenticatedUser, beachDraft.originalTravelId(), beachDraft.travelRecordId());
@@ -552,8 +561,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             jejuAuthenticatedUser, jejuDraft.originalTravelId(), jejuDraft.travelRecordId());
 
     TravelRecordFeedPageResDto regionResult =
-        travelRecordService.getLatestFeed(
-            null, null, null, null, null, null, null, "busan", null);
+        travelRecordService.getLatestFeed(null, null, null, null, null, null, null, "busan", null);
     TravelRecordFeedPageResDto cityResult =
         travelRecordService.getLatestFeed(
             null, null, null, null, null, null, null, null, "seogwipo");
@@ -574,7 +582,13 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThatThrownBy(
             () ->
                 travelRecordService.getLatestFeed(
-                    null, null, null, null, null, LocalDate.of(2026, 9, 3), LocalDate.of(2026, 9, 1)))
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    LocalDate.of(2026, 9, 3),
+                    LocalDate.of(2026, 9, 1)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Travel end date cannot be before travel start date.");
   }
@@ -583,8 +597,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("latest feed can be sorted by like count")
   void getLatestFeedSortsByLikeCount() {
     User lowLikeAuthor =
-        userRepository.save(
-            createUser("record-sort-like-low@example.com", "record-sort-like-low"));
+        userRepository.save(createUser("record-sort-like-low@example.com", "record-sort-like-low"));
     User highLikeAuthor =
         userRepository.save(
             createUser("record-sort-like-high@example.com", "record-sort-like-high"));
@@ -597,13 +610,17 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     TravelRecordResDto lowDraft = createDraftWithOnePlace(lowAuthorUser, "Low Like");
     TravelRecordResDto highDraft = createDraftWithOnePlace(highAuthorUser, "High Like");
     TravelRecordResDto lowPublished =
-        travelRecordService.publish(lowAuthorUser, lowDraft.originalTravelId(), lowDraft.travelRecordId());
+        travelRecordService.publish(
+            lowAuthorUser, lowDraft.originalTravelId(), lowDraft.travelRecordId());
     TravelRecordResDto highPublished =
         travelRecordService.publish(
             highAuthorUser, highDraft.originalTravelId(), highDraft.travelRecordId());
-    travelRecordService.likeTravelRecord(AuthenticatedUser.from(likerOne), lowPublished.travelRecordId());
-    travelRecordService.likeTravelRecord(AuthenticatedUser.from(likerOne), highPublished.travelRecordId());
-    travelRecordService.likeTravelRecord(AuthenticatedUser.from(likerTwo), highPublished.travelRecordId());
+    travelRecordService.likeTravelRecord(
+        AuthenticatedUser.from(likerOne), lowPublished.travelRecordId());
+    travelRecordService.likeTravelRecord(
+        AuthenticatedUser.from(likerOne), highPublished.travelRecordId());
+    travelRecordService.likeTravelRecord(
+        AuthenticatedUser.from(likerTwo), highPublished.travelRecordId());
 
     TravelRecordFeedPageResDto firstPage =
         travelRecordService.getLatestFeed(
@@ -634,8 +651,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("latest feed can be sorted by view count")
   void getLatestFeedSortsByViewCount() {
     User lowViewAuthor =
-        userRepository.save(
-            createUser("record-sort-view-low@example.com", "record-sort-view-low"));
+        userRepository.save(createUser("record-sort-view-low@example.com", "record-sort-view-low"));
     User highViewAuthor =
         userRepository.save(
             createUser("record-sort-view-high@example.com", "record-sort-view-high"));
@@ -644,7 +660,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     TravelRecordResDto lowDraft = createDraftWithOnePlace(lowAuthorUser, "Low View");
     TravelRecordResDto highDraft = createDraftWithOnePlace(highAuthorUser, "High View");
     TravelRecordResDto lowPublished =
-        travelRecordService.publish(lowAuthorUser, lowDraft.originalTravelId(), lowDraft.travelRecordId());
+        travelRecordService.publish(
+            lowAuthorUser, lowDraft.originalTravelId(), lowDraft.travelRecordId());
     TravelRecordResDto highPublished =
         travelRecordService.publish(
             highAuthorUser, highDraft.originalTravelId(), highDraft.travelRecordId());
@@ -673,7 +690,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             createUser("record-sort-cursor-second@example.com", "record-sort-cursor-second"));
     AuthenticatedUser firstAuthenticatedUser = AuthenticatedUser.from(firstUser);
     AuthenticatedUser secondAuthenticatedUser = AuthenticatedUser.from(secondUser);
-    TravelRecordResDto firstDraft = createDraftWithOnePlace(firstAuthenticatedUser, "First Cursor Sort");
+    TravelRecordResDto firstDraft =
+        createDraftWithOnePlace(firstAuthenticatedUser, "First Cursor Sort");
     TravelRecordResDto secondDraft =
         createDraftWithOnePlace(secondAuthenticatedUser, "Second Cursor Sort");
     travelRecordService.publish(
@@ -737,7 +755,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     User user = userRepository.save(createUser("record-my-detail@example.com", "record-my-detail"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Draft Detail");
-    TravelRecordResDto publishedDraft = createDraftWithOnePlace(authenticatedUser, "Published Detail");
+    TravelRecordResDto publishedDraft =
+        createDraftWithOnePlace(authenticatedUser, "Published Detail");
     TravelRecordResDto hiddenDraft = createDraftWithOnePlace(authenticatedUser, "Hidden Detail");
     TravelRecordResDto published =
         travelRecordService.publish(
@@ -763,7 +782,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("non-author cannot get my travel record detail")
   void getMyRecordRejectsNonAuthor() {
     User owner =
-        userRepository.save(createUser("record-my-detail-owner@example.com", "record-my-detail-owner"));
+        userRepository.save(
+            createUser("record-my-detail-owner@example.com", "record-my-detail-owner"));
     User outsider =
         userRepository.save(
             createUser("record-my-detail-outsider@example.com", "record-my-detail-outsider"));
@@ -771,7 +791,9 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     TravelRecordResDto draft = createDraftWithOnePlace(ownerUser, "Owner Detail");
 
     assertThatThrownBy(
-            () -> travelRecordService.getMyRecord(AuthenticatedUser.from(outsider), draft.travelRecordId()))
+            () ->
+                travelRecordService.getMyRecord(
+                    AuthenticatedUser.from(outsider), draft.travelRecordId()))
         .isInstanceOf(ForbiddenException.class)
         .hasMessage("User is not the travel record author.");
   }
@@ -794,7 +816,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         travelRecordService.updateMyRecord(
             authenticatedUser,
             draft.travelRecordId(),
-            new TravelRecordUpdateReqDto("Draft After", "Draft content", "https://image.test/draft"));
+            new TravelRecordUpdateReqDto(
+                "Draft After", "Draft content", "https://image.test/draft"));
     TravelRecordResDto publishedResult =
         travelRecordService.updateMyRecord(
             authenticatedUser,
@@ -805,7 +828,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         travelRecordService.updateMyRecord(
             authenticatedUser,
             hiddenDraft.travelRecordId(),
-            new TravelRecordUpdateReqDto("Hidden After", "Hidden content", "https://image.test/hidden"));
+            new TravelRecordUpdateReqDto(
+                "Hidden After", "Hidden content", "https://image.test/hidden"));
 
     assertThat(draftResult.status()).isEqualTo(TravelRecordStatus.DRAFT);
     assertThat(draftResult.title()).isEqualTo("Draft After");
@@ -822,7 +846,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("my record update keeps existing values when fields are null")
   void updateMyRecordKeepsExistingValuesForNullFields() {
     User user =
-        userRepository.save(createUser("record-my-update-null@example.com", "record-my-update-null"));
+        userRepository.save(
+            createUser("record-my-update-null@example.com", "record-my-update-null"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Keep Before");
     TravelRecordResDto updated =
@@ -903,7 +928,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         travelRecordService.hideMyRecord(authenticatedUser, published.travelRecordId());
 
     assertThat(result.status()).isEqualTo(TravelRecordStatus.HIDDEN);
-    assertThat(travelRecordService.getMyRecord(authenticatedUser, published.travelRecordId()).status())
+    assertThat(
+            travelRecordService.getMyRecord(authenticatedUser, published.travelRecordId()).status())
         .isEqualTo(TravelRecordStatus.HIDDEN);
     assertThatThrownBy(() -> travelRecordService.getPublished(published.travelRecordId()))
         .isInstanceOf(ResourceNotFoundException.class)
@@ -911,8 +937,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(travelRecordService.getLatestFeed(null, null).items())
         .extracting(TravelRecordFeedResDto::travelRecordId)
         .doesNotContain(published.travelRecordId());
-    assertThat(travelRecordService.getPlaceReviewSummary("Busan Station")
-            .reviews())
+    assertThat(travelRecordService.getPlaceReviewSummary("Busan Station").reviews())
         .extracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::travelRecordId)
         .doesNotContain(published.travelRecordId());
   }
@@ -946,7 +971,9 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     TravelRecordResDto draft = createDraftWithOnePlace(ownerUser, "Owner Hide");
 
     assertThatThrownBy(
-            () -> travelRecordService.hideMyRecord(AuthenticatedUser.from(outsider), draft.travelRecordId()))
+            () ->
+                travelRecordService.hideMyRecord(
+                    AuthenticatedUser.from(outsider), draft.travelRecordId()))
         .isInstanceOf(ForbiddenException.class)
         .hasMessage("User is not the travel record author.");
   }
@@ -954,8 +981,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @Test
   @DisplayName("author can republish own hidden travel record")
   void republishMyRecordRepublishesHiddenPublishedRecord() {
-    User user =
-        userRepository.save(createUser("record-republish@example.com", "record-republish"));
+    User user = userRepository.save(createUser("record-republish@example.com", "record-republish"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto draft =
         createDraftWithOneReviewedPlace(
@@ -977,8 +1003,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(travelRecordService.getLatestFeed(null, null).items())
         .extracting(TravelRecordFeedResDto::travelRecordId)
         .contains(published.travelRecordId());
-    assertThat(travelRecordService.getPlaceReviewSummary("Busan Station")
-            .reviews())
+    assertThat(travelRecordService.getPlaceReviewSummary("Busan Station").reviews())
         .extracting(PlaceReviewSummaryResDto.PlaceReviewItemResDto::travelRecordId)
         .contains(published.travelRecordId());
   }
@@ -1026,7 +1051,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("user can bookmark a published travel record")
   void bookmarkTravelRecordSuccess() {
     User author =
-        userRepository.save(createUser("record-bookmark-author@example.com", "record-bookmark-author"));
+        userRepository.save(
+            createUser("record-bookmark-author@example.com", "record-bookmark-author"));
     User user =
         userRepository.save(createUser("record-bookmark-user@example.com", "record-bookmark-user"));
     AuthenticatedUser authorUser = AuthenticatedUser.from(author);
@@ -1049,10 +1075,13 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   void bookmarkTravelRecordRejectsDuplicate() {
     User author =
         userRepository.save(
-            createUser("record-bookmark-duplicate-author@example.com", "record-bookmark-duplicate-author"));
+            createUser(
+                "record-bookmark-duplicate-author@example.com",
+                "record-bookmark-duplicate-author"));
     User user =
         userRepository.save(
-            createUser("record-bookmark-duplicate-user@example.com", "record-bookmark-duplicate-user"));
+            createUser(
+                "record-bookmark-duplicate-user@example.com", "record-bookmark-duplicate-user"));
     AuthenticatedUser authorUser = AuthenticatedUser.from(author);
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Duplicate Bookmark");
@@ -1061,7 +1090,9 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.bookmarkTravelRecord(authenticatedUser, published.travelRecordId());
 
     assertThatThrownBy(
-            () -> travelRecordService.bookmarkTravelRecord(authenticatedUser, published.travelRecordId()))
+            () ->
+                travelRecordService.bookmarkTravelRecord(
+                    authenticatedUser, published.travelRecordId()))
         .isInstanceOf(DuplicateResourceException.class)
         .hasMessage("Travel record bookmark already exists.");
   }
@@ -1076,7 +1107,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Draft Bookmark");
 
     assertThatThrownBy(
-            () -> travelRecordService.bookmarkTravelRecord(authenticatedUser, draft.travelRecordId()))
+            () ->
+                travelRecordService.bookmarkTravelRecord(authenticatedUser, draft.travelRecordId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Travel record not found.");
   }
@@ -1088,7 +1120,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         userRepository.save(
             createUser("record-unbookmark-author@example.com", "record-unbookmark-author"));
     User user =
-        userRepository.save(createUser("record-unbookmark-user@example.com", "record-unbookmark-user"));
+        userRepository.save(
+            createUser("record-unbookmark-user@example.com", "record-unbookmark-user"));
     AuthenticatedUser authorUser = AuthenticatedUser.from(author);
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Unbookmark Target");
@@ -1109,15 +1142,18 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         userRepository.save(
             createUser("record-bookmark-list-author@example.com", "record-bookmark-list-author"));
     User user =
-        userRepository.save(createUser("record-bookmark-list-user@example.com", "record-bookmark-list-user"));
+        userRepository.save(
+            createUser("record-bookmark-list-user@example.com", "record-bookmark-list-user"));
     AuthenticatedUser authorUser = AuthenticatedUser.from(author);
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto firstDraft = createDraftWithOnePlace(authorUser, "First Bookmark");
     TravelRecordResDto secondDraft = createDraftWithOnePlace(authorUser, "Second Bookmark");
     TravelRecordResDto firstPublished =
-        travelRecordService.publish(authorUser, firstDraft.originalTravelId(), firstDraft.travelRecordId());
+        travelRecordService.publish(
+            authorUser, firstDraft.originalTravelId(), firstDraft.travelRecordId());
     TravelRecordResDto secondPublished =
-        travelRecordService.publish(authorUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
+        travelRecordService.publish(
+            authorUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
     travelRecordService.bookmarkTravelRecord(authenticatedUser, firstPublished.travelRecordId());
     travelRecordService.bookmarkTravelRecord(authenticatedUser, secondPublished.travelRecordId());
     travelRecordService.hideMyRecord(authorUser, firstPublished.travelRecordId());
@@ -1192,7 +1228,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         userRepository.save(
             createUser("record-feed-liked-second-author@example.com", "feed-liked-second-author"));
     User viewer =
-        userRepository.save(createUser("record-feed-liked-viewer@example.com", "feed-liked-viewer"));
+        userRepository.save(
+            createUser("record-feed-liked-viewer@example.com", "feed-liked-viewer"));
     AuthenticatedUser firstAuthorUser = AuthenticatedUser.from(firstAuthor);
     AuthenticatedUser secondAuthorUser = AuthenticatedUser.from(secondAuthor);
     AuthenticatedUser viewerUser = AuthenticatedUser.from(viewer);
@@ -1242,7 +1279,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.likeTravelRecord(authenticatedUser, published.travelRecordId());
 
     assertThatThrownBy(
-            () -> travelRecordService.likeTravelRecord(authenticatedUser, published.travelRecordId()))
+            () ->
+                travelRecordService.likeTravelRecord(authenticatedUser, published.travelRecordId()))
         .isInstanceOf(DuplicateResourceException.class)
         .hasMessage("Travel record like already exists.");
   }
@@ -1251,7 +1289,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("like rejects non-published travel record")
   void likeTravelRecordRejectsNonPublishedRecord() {
     User user =
-        userRepository.save(createUser("record-like-draft-user@example.com", "record-like-draft-user"));
+        userRepository.save(
+            createUser("record-like-draft-user@example.com", "record-like-draft-user"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Draft Like");
 
@@ -1265,10 +1304,10 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("user can create and list comments for a published travel record")
   void createAndGetCommentsSuccess() {
     User author =
-        userRepository.save(createUser("record-comment-author@example.com", "record-comment-author"));
-    User commenter =
         userRepository.save(
-            createUser("record-comment-user@example.com", "record-comment-user"));
+            createUser("record-comment-author@example.com", "record-comment-author"));
+    User commenter =
+        userRepository.save(createUser("record-comment-user@example.com", "record-comment-user"));
     AuthenticatedUser authorUser = AuthenticatedUser.from(author);
     AuthenticatedUser commenterUser = AuthenticatedUser.from(commenter);
     TravelRecordResDto draft = createDraftWithOnePlace(authorUser, "Comment Target");
@@ -1299,7 +1338,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("comment rejects non-published travel record")
   void createCommentRejectsNonPublishedRecord() {
     User user =
-        userRepository.save(createUser("record-comment-draft-user@example.com", "record-comment-draft-user"));
+        userRepository.save(
+            createUser("record-comment-draft-user@example.com", "record-comment-draft-user"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Draft Comment");
 
@@ -1364,7 +1404,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(updated.commentId()).isEqualTo(created.commentId());
     assertThat(updated.content()).isEqualTo("After");
 
-    travelRecordService.deleteComment(commenterUser, published.travelRecordId(), created.commentId());
+    travelRecordService.deleteComment(
+        commenterUser, published.travelRecordId(), created.commentId());
 
     assertThat(travelRecordService.getComments(published.travelRecordId())).isEmpty();
   }
@@ -1374,13 +1415,17 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   void updateCommentRejectsNonAuthor() {
     User author =
         userRepository.save(
-            createUser("record-comment-forbidden-author@example.com", "record-comment-forbidden-author"));
+            createUser(
+                "record-comment-forbidden-author@example.com", "record-comment-forbidden-author"));
     User commenter =
         userRepository.save(
-            createUser("record-comment-forbidden-user@example.com", "record-comment-forbidden-user"));
+            createUser(
+                "record-comment-forbidden-user@example.com", "record-comment-forbidden-user"));
     User outsider =
         userRepository.save(
-            createUser("record-comment-forbidden-outsider@example.com", "record-comment-forbidden-outsider"));
+            createUser(
+                "record-comment-forbidden-outsider@example.com",
+                "record-comment-forbidden-outsider"));
     AuthenticatedUser authorUser = AuthenticatedUser.from(author);
     AuthenticatedUser commenterUser = AuthenticatedUser.from(commenter);
     AuthenticatedUser outsiderUser = AuthenticatedUser.from(outsider);
@@ -1432,8 +1477,9 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.tags()).containsExactly("night", "return");
     assertThat(result.mediaUrls())
         .containsExactly("https://image.test/place.jpg", "https://video.test/place.mp4");
-    assertThat(placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(
-            place.originalPlanPlaceId(), user.getId()))
+    assertThat(
+            placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(
+                place.originalPlanPlaceId(), user.getId()))
         .isPresent();
   }
 
@@ -1474,8 +1520,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     assertThat(result.planPlaceId()).isEqualTo(place.planPlaceId());
     assertThat(result.rating()).isEqualTo(5);
-    assertThat(placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(
-            place.planPlaceId(), user.getId()))
+    assertThat(
+            placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(place.planPlaceId(), user.getId()))
         .isPresent();
   }
 
@@ -1538,9 +1584,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     PlaceReviewResDto result =
         travelRecordService.getPlaceReview(
-            authenticatedUser,
-            draft.originalTravelId(),
-            place.originalPlanPlaceId());
+            authenticatedUser, draft.originalTravelId(), place.originalPlanPlaceId());
 
     assertThat(result.placeReviewId()).isEqualTo(created.placeReviewId());
     assertThat(result.planPlaceId()).isEqualTo(place.originalPlanPlaceId());
@@ -1561,9 +1605,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThatThrownBy(
             () ->
                 travelRecordService.getPlaceReview(
-                    authenticatedUser,
-                    draft.originalTravelId(),
-                    place.originalPlanPlaceId()))
+                    authenticatedUser, draft.originalTravelId(), place.originalPlanPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Place review not found.");
   }
@@ -1598,8 +1640,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     travelRecordService.publish(
         secondAuthenticatedUser, secondDraft.originalTravelId(), secondDraft.travelRecordId());
 
-    PlaceReviewSummaryResDto result =
-        travelRecordService.getPlaceReviewSummary("Busan Station");
+    PlaceReviewSummaryResDto result = travelRecordService.getPlaceReviewSummary("Busan Station");
 
     assertThat(result.placeId()).isEqualTo("Busan Station");
     assertThat(result.reviewCount()).isEqualTo(2);
@@ -1621,8 +1662,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @Test
   @DisplayName("place review summary returns empty aggregate when there are no public reviews")
   void getPlaceReviewSummaryReturnsEmptyAggregate() {
-    PlaceReviewSummaryResDto result =
-        travelRecordService.getPlaceReviewSummary("missing-place");
+    PlaceReviewSummaryResDto result = travelRecordService.getPlaceReviewSummary("missing-place");
 
     assertThat(result.reviewCount()).isZero();
     assertThat(result.averageRating()).isEqualTo(0.0);
@@ -1635,17 +1675,13 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("place travel records returns published records containing the place")
   void getTravelRecordsByPlaceReturnsPublishedRecordsContainingPlace() {
     User firstUser =
-        userRepository.save(
-            createUser("record-place-first@example.com", "record-place-first"));
+        userRepository.save(createUser("record-place-first@example.com", "record-place-first"));
     User secondUser =
-        userRepository.save(
-            createUser("record-place-second@example.com", "record-place-second"));
+        userRepository.save(createUser("record-place-second@example.com", "record-place-second"));
     User hiddenUser =
-        userRepository.save(
-            createUser("record-place-hidden@example.com", "record-place-hidden"));
+        userRepository.save(createUser("record-place-hidden@example.com", "record-place-hidden"));
     User otherUser =
-        userRepository.save(
-            createUser("record-place-other@example.com", "record-place-other"));
+        userRepository.save(createUser("record-place-other@example.com", "record-place-other"));
     AuthenticatedUser firstAuthenticatedUser = AuthenticatedUser.from(firstUser);
     AuthenticatedUser secondAuthenticatedUser = AuthenticatedUser.from(secondUser);
     AuthenticatedUser hiddenAuthenticatedUser = AuthenticatedUser.from(hiddenUser);
@@ -1772,10 +1808,10 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
     var place = draft.days().getFirst().places().getFirst();
     travelRecordService.createPlaceReview(
-            authenticatedUser,
-            draft.originalTravelId(),
-            place.originalPlanPlaceId(),
-            new PlaceReviewCreateReqDto(4, "Before", List.of("기존")));
+        authenticatedUser,
+        draft.originalTravelId(),
+        place.originalPlanPlaceId(),
+        new PlaceReviewCreateReqDto(4, "Before", List.of("기존")));
 
     PlaceReviewResDto result =
         travelRecordService.updatePlaceReview(
@@ -1842,7 +1878,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("place review update returns not found when review does not exist")
   void updatePlaceReviewNotFound() {
     User user =
-        userRepository.save(createUser("review-update-missing@example.com", "review-update-missing"));
+        userRepository.save(
+            createUser("review-update-missing@example.com", "review-update-missing"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
     var place = draft.days().getFirst().places().getFirst();
@@ -1897,19 +1934,16 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         new PlaceReviewCreateReqDto(5, "Delete me"));
 
     travelRecordService.deletePlaceReview(
-        authenticatedUser,
-        draft.originalTravelId(),
-        place.originalPlanPlaceId());
+        authenticatedUser, draft.originalTravelId(), place.originalPlanPlaceId());
 
-    assertThat(placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(
-            place.originalPlanPlaceId(), user.getId()))
+    assertThat(
+            placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(
+                place.originalPlanPlaceId(), user.getId()))
         .isEmpty();
     assertThatThrownBy(
             () ->
                 travelRecordService.getPlaceReview(
-                    authenticatedUser,
-                    draft.originalTravelId(),
-                    place.originalPlanPlaceId()))
+                    authenticatedUser, draft.originalTravelId(), place.originalPlanPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Place review not found.");
   }
@@ -1918,7 +1952,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @DisplayName("place review delete returns not found when review does not exist")
   void deletePlaceReviewNotFound() {
     User user =
-        userRepository.save(createUser("review-delete-missing@example.com", "review-delete-missing"));
+        userRepository.save(
+            createUser("review-delete-missing@example.com", "review-delete-missing"));
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser);
     var place = draft.days().getFirst().places().getFirst();
@@ -1926,9 +1961,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThatThrownBy(
             () ->
                 travelRecordService.deletePlaceReview(
-                    authenticatedUser,
-                    draft.originalTravelId(),
-                    place.originalPlanPlaceId()))
+                    authenticatedUser, draft.originalTravelId(), place.originalPlanPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Place review not found.");
   }
@@ -1978,9 +2011,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     createPlace(authenticatedUser, firstDay.planId(), 1, placeName, address);
 
     return travelRecordService.createDraft(
-        authenticatedUser,
-        travel.id(),
-        new TravelRecordCreateReqDto(title, null, null, 5));
+        authenticatedUser, travel.id(), new TravelRecordCreateReqDto(title, null, null, 5));
   }
 
   private DraftWithPlanPlace createDraftWithOneReviewedPlace(
@@ -2004,9 +2035,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     TravelRecordResDto draft =
         travelRecordService.createDraft(
-            authenticatedUser,
-            travel.id(),
-            new TravelRecordCreateReqDto(title, null, null, 5));
+            authenticatedUser, travel.id(), new TravelRecordCreateReqDto(title, null, null, 5));
 
     return new DraftWithPlanPlace(draft, place);
   }

@@ -2,8 +2,8 @@ package com.butingbe.domain.travelrecord.entity;
 
 import com.butingbe.domain.travel.entity.PlanPlace;
 import com.butingbe.domain.user.entity.User;
-import jakarta.persistence.Column;
 import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

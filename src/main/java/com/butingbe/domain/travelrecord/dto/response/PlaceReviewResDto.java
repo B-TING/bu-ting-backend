@@ -25,7 +25,9 @@ public record PlaceReviewResDto(
     return new PlaceReviewResDto(
         placeReview.getId(),
         placeReview.getPlanPlace() == null ? null : placeReview.getPlanPlace().getId(),
-        placeReview.getTravelRecordPlace() == null ? null : placeReview.getTravelRecordPlace().getId(),
+        placeReview.getTravelRecordPlace() == null
+            ? null
+            : placeReview.getTravelRecordPlace().getId(),
         placeReview.getRating(),
         placeReview.getStayMinutes(),
         placeReview.getContent(),

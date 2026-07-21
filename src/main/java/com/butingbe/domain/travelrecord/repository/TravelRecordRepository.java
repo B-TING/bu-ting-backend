@@ -502,8 +502,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       order by tr.publishedAt desc, tr.createdAt desc
       """)
   List<TravelRecord> findPublishedRecordsByPlace(
-      @Param("placeId") String placeId,
-      @Param("status") TravelRecordStatus status);
+      @Param("placeId") String placeId, @Param("status") TravelRecordStatus status);
 
   @Query(
       """

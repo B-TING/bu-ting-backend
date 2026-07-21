@@ -6,8 +6,8 @@ import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
-import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewResDto;
 import com.butingbe.domain.travelrecord.dto.response.PlaceReviewSummaryResDto;
@@ -143,10 +143,7 @@ public interface TravelRecordService {
       PlaceProvider provider, String providerPlaceId, String cursor, Integer size);
 
   TravelRecordFeedPageResDto getTravelRecordsByPlace(
-      AuthenticatedUser authenticatedUser,
-      String placeId,
-      String cursor,
-      Integer size);
+      AuthenticatedUser authenticatedUser, String placeId, String cursor, Integer size);
 
   PlaceReviewSummaryResDto getPlaceReviewSummary(String placeId);
 

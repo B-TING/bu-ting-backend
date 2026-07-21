@@ -78,7 +78,8 @@ public record TravelRecordResDto(
           day.getDayNumber(),
           day.getVisitDate(),
           places.stream()
-              .map(place -> TravelRecordPlaceResDto.of(place, routeByFromPlaceId.get(place.getId())))
+              .map(
+                  place -> TravelRecordPlaceResDto.of(place, routeByFromPlaceId.get(place.getId())))
               .toList());
     }
   }

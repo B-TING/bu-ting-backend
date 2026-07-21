@@ -27,7 +27,11 @@ import lombok.NoArgsConstructor;
     uniqueConstraints = {
       @UniqueConstraint(
           name = "uk_travel_record_route_from_to",
-          columnNames = {"travel_record_day_id", "from_travel_record_place_id", "to_travel_record_place_id"})
+          columnNames = {
+            "travel_record_day_id",
+            "from_travel_record_place_id",
+            "to_travel_record_place_id"
+          })
     })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

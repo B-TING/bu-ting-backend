@@ -1,8 +1,8 @@
 package com.butingbe.domain.chat.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
-import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.dto.ChatMessageRequest;
+import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.entity.ChatMessage;
 import com.butingbe.domain.chat.repository.ChatMessageRepository;
 import lombok.RequiredArgsConstructor;

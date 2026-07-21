@@ -253,7 +253,9 @@ class TravelControllerTest {
 
     @Override
     public PlanPlaceResDto updatePlanPlaceVisited(
-        AuthenticatedUser authenticatedUser, UUID planPlaceId, PlanPlaceVisitedUpdateReqDto request) {
+        AuthenticatedUser authenticatedUser,
+        UUID planPlaceId,
+        PlanPlaceVisitedUpdateReqDto request) {
       throw new UnsupportedOperationException();
     }
 

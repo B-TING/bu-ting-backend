@@ -1,9 +1,9 @@
 package com.butingbe.domain.travel.dto.request;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
 import com.butingbe.domain.travel.entity.CompanionType;
 import com.butingbe.domain.travel.entity.TravelPace;
 import com.butingbe.domain.travel.entity.TravelStyle;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
