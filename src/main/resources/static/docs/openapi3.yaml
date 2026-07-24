@@ -2830,7 +2830,7 @@ paths:
         - name: from
           in: query
           required: false
-          description: 조회 시작 일시. ISO-8601 date-time 형식입니다.
+          description: 조회 시작 일시. 국제 표준 날짜-시간 형식입니다.
           schema:
             type: string
             format: date-time
@@ -2838,7 +2838,7 @@ paths:
         - name: to
           in: query
           required: false
-          description: 조회 종료 일시. ISO-8601 date-time 형식입니다.
+          description: 조회 종료 일시. 국제 표준 날짜-시간 형식입니다.
           schema:
             type: string
             format: date-time
@@ -2846,7 +2846,7 @@ paths:
         - name: payerId
           in: query
           required: false
-          description: 결제자 ID. 기존 payerUserId 쿼리 파라미터도 호환됩니다.
+          description: 결제자 식별자. 기존 payerUserId 쿼리 파라미터도 호환됩니다.
           schema:
             type: string
             format: uuid
@@ -2872,7 +2872,7 @@ paths:
         - name: sort
           in: query
           required: false
-          description: 정렬 조건. 기본값은 spentAt,desc 입니다.
+          description: 정렬 조건. 기본값은 사용 일시 내림차순입니다.
           schema:
             type: string
           example: spentAt,desc
@@ -5095,7 +5095,7 @@ components:
       example: FOOD
     ExpenseSplitType:
       type: string
-      description: 경비 분할 방식. 현재 API는 균등 분할만 생성/수정합니다.
+      description: 경비 분할 방식. 현재 API는 균등 분할만 생성/수정합니다. CUSTOM은 향후 직접 분담 금액 지정 기능을 위한 예약 값입니다.
       enum:
         - EQUAL
         - CUSTOM
@@ -5125,19 +5125,19 @@ components:
           type: string
           minLength: 3
           maxLength: 3
-          description: ISO 4217 통화 코드. 생략하면 서버 기본값을 사용합니다.
+          description: 국제 표준 3자리 통화 코드. 생략하면 서버 기본값을 사용합니다.
           example: KRW
         category:
           $ref: "#/components/schemas/ExpenseCategory"
         payerId:
           type: string
           format: uuid
-          description: 실제 결제자 ID. 여행 멤버여야 합니다. 기존 payerUserId도 요청에서 호환됩니다.
+          description: 실제 결제자 식별자. 여행 멤버여야 합니다. 기존 payerUserId도 요청에서 호환됩니다.
           example: 50000000-0000-0000-0000-000000000001
         participantIds:
           type: array
           minItems: 1
-          description: 경비를 나눠 부담할 여행 멤버 ID 목록. 기존 participantUserIds도 요청에서 호환됩니다.
+          description: 경비를 나눠 부담할 여행 멤버 식별자 목록. 기존 participantUserIds도 요청에서 호환됩니다.
           items:
             type: string
             format: uuid
@@ -5165,40 +5165,49 @@ components:
         expenseId:
           type: string
           format: uuid
+          description: 생성된 여행 경비 식별자
           example: 60000000-0000-0000-0000-000000000001
         travelId:
           type: string
           format: uuid
+          description: 경비가 속한 여행 식별자
           example: 10000000-0000-0000-0000-000000000001
         title:
           type: string
+          description: 경비 제목
           example: 광안리 저녁 식사
         amount:
           type: integer
           format: int64
+          description: 총 결제 금액
           example: 60000
         currency:
           type: string
+          description: 통화 코드
           example: KRW
         category:
           $ref: "#/components/schemas/ExpenseCategory"
         payerId:
           type: string
           format: uuid
+          description: 실제 결제자 식별자
           example: 50000000-0000-0000-0000-000000000001
         creatorId:
           type: string
           format: uuid
+          description: 경비를 등록한 사용자 식별자
           example: 50000000-0000-0000-0000-000000000001
         splitType:
           $ref: "#/components/schemas/ExpenseSplitType"
         spentAt:
           type: string
           format: date-time
+          description: 경비가 발생한 일시
           example: "2026-08-01T19:30:00"
         memo:
           type: string
           nullable: true
+          description: 경비 메모
           example: 회비로 결제
         shares:
           type: array
@@ -5211,30 +5220,37 @@ components:
         participantId:
           type: string
           format: uuid
+          description: 분담자 식별자
           example: 50000000-0000-0000-0000-000000000001
         shareAmount:
           type: integer
           format: int64
+          description: 해당 분담자가 부담해야 하는 금액
           example: 20000
     TravelExpenseListResponse:
       type: object
       properties:
         content:
           type: array
+          description: 현재 페이지의 경비 목록
           items:
             $ref: "#/components/schemas/TravelExpenseListItem"
         page:
           type: integer
+          description: 현재 페이지 번호
           example: 0
         size:
           type: integer
+          description: 페이지 크기
           example: 20
         totalElements:
           type: integer
           format: int64
+          description: 전체 경비 수
           example: 12
         totalPages:
           type: integer
+          description: 전체 페이지 수
           example: 1
     TravelExpenseListItem:
       type: object
@@ -5242,16 +5258,20 @@ components:
         expenseId:
           type: string
           format: uuid
+          description: 여행 경비 식별자
           example: 60000000-0000-0000-0000-000000000001
         title:
           type: string
+          description: 경비 제목
           example: 광안리 저녁 식사
         amount:
           type: integer
           format: int64
+          description: 총 결제 금액
           example: 60000
         currency:
           type: string
+          description: 통화 코드
           example: KRW
         category:
           $ref: "#/components/schemas/ExpenseCategory"
@@ -5260,14 +5280,17 @@ components:
         participantCount:
           type: integer
           format: int64
+          description: 분담에 참여한 인원 수
           example: 3
         spentAt:
           type: string
           format: date-time
+          description: 경비가 발생한 일시
           example: "2026-08-01T19:30:00"
         createdAt:
           type: string
           format: date-time
+          description: 경비 등록 일시
           example: "2026-08-01T20:00:00"
     TravelExpenseDetailResponse:
       type: object
@@ -5275,20 +5298,25 @@ components:
         expenseId:
           type: string
           format: uuid
+          description: 여행 경비 식별자
           example: 60000000-0000-0000-0000-000000000001
         travelId:
           type: string
           format: uuid
+          description: 경비가 속한 여행 식별자
           example: 10000000-0000-0000-0000-000000000001
         title:
           type: string
+          description: 경비 제목
           example: 광안리 저녁 식사
         amount:
           type: integer
           format: int64
+          description: 총 결제 금액
           example: 60000
         currency:
           type: string
+          description: 통화 코드
           example: KRW
         category:
           $ref: "#/components/schemas/ExpenseCategory"
@@ -5301,13 +5329,16 @@ components:
         spentAt:
           type: string
           format: date-time
+          description: 경비가 발생한 일시
           example: "2026-08-01T19:30:00"
         memo:
           type: string
           nullable: true
+          description: 경비 메모
           example: 회비로 결제
         shares:
           type: array
+          description: 참여자별 분담 상세 목록
           items:
             $ref: "#/components/schemas/TravelExpenseShareDetail"
         editable:
@@ -5317,10 +5348,12 @@ components:
         createdAt:
           type: string
           format: date-time
+          description: 경비 등록 일시
           example: "2026-08-01T20:00:00"
         updatedAt:
           type: string
           format: date-time
+          description: 경비 마지막 수정 일시
           example: "2026-08-01T20:10:00"
     TravelExpenseUserSummary:
       type: object
@@ -5328,9 +5361,11 @@ components:
         userId:
           type: string
           format: uuid
+          description: 사용자 식별자
           example: 50000000-0000-0000-0000-000000000001
         nickname:
           type: string
+          description: 사용자 닉네임
           example: 여행방장
     TravelExpenseShareDetail:
       type: object
@@ -5338,13 +5373,16 @@ components:
         participantId:
           type: string
           format: uuid
+          description: 분담자 식별자
           example: 50000000-0000-0000-0000-000000000001
         nickname:
           type: string
+          description: 분담자 닉네임
           example: 여행방장
         shareAmount:
           type: integer
           format: int64
+          description: 해당 분담자가 부담해야 하는 금액
           example: 20000
     TravelExpenseSummaryResponse:
       type: object
@@ -5352,6 +5390,7 @@ components:
         travelId:
           type: string
           format: uuid
+          description: 요약 대상 여행 식별자
           example: 10000000-0000-0000-0000-000000000001
         expenseCount:
           type: integer
@@ -5360,34 +5399,41 @@ components:
           example: 5
         currencySummaries:
           type: array
+          description: 통화별 경비 요약 목록
           items:
             $ref: "#/components/schemas/TravelExpenseCurrencySummary"
         from:
           type: string
           format: date-time
           nullable: true
+          description: 집계 시작 일시. 지정하지 않으면 전체 기간을 집계합니다.
           example: "2026-08-01T00:00:00"
         to:
           type: string
           format: date-time
           nullable: true
+          description: 집계 종료 일시. 지정하지 않으면 전체 기간을 집계합니다.
           example: "2026-08-03T23:59:59"
     TravelExpenseCurrencySummary:
       type: object
       properties:
         currency:
           type: string
+          description: 통화 코드
           example: KRW
         totalAmount:
           type: integer
           format: int64
+          description: 해당 통화의 총 지출 금액
           example: 180000
         categorySummaries:
           type: array
+          description: 카테고리별 지출 요약 목록
           items:
             $ref: "#/components/schemas/TravelExpenseCategorySummary"
         memberSummaries:
           type: array
+          description: 멤버별 결제/부담/잔액 요약 목록
           items:
             $ref: "#/components/schemas/TravelExpenseMemberSummary"
     TravelExpenseCategorySummary:
@@ -5398,10 +5444,12 @@ components:
         amount:
           type: integer
           format: int64
+          description: 해당 카테고리의 지출 금액
           example: 90000
         expenseCount:
           type: integer
           format: int64
+          description: 해당 카테고리의 경비 건수
           example: 2
         ratio:
           type: number
@@ -5414,9 +5462,11 @@ components:
         memberId:
           type: string
           format: uuid
+          description: 여행 멤버 식별자
           example: 50000000-0000-0000-0000-000000000001
         nickname:
           type: string
+          description: 여행 멤버 닉네임
           example: 여행방장
         paidAmount:
           type: integer
@@ -5439,6 +5489,7 @@ components:
         travelId:
           type: string
           format: uuid
+          description: 정산 대상 여행 식별자
           example: 10000000-0000-0000-0000-000000000001
         confirmed:
           type: boolean
@@ -5448,13 +5499,13 @@ components:
           type: string
           format: uuid
           nullable: true
-          description: 정산을 확정한 방장 ID. 미확정 미리보기에서는 null입니다.
+          description: 정산을 확정한 방장 식별자. 미확정 미리보기에서는 빈 값입니다.
           example: 50000000-0000-0000-0000-000000000001
         confirmedAt:
           type: string
           format: date-time
           nullable: true
-          description: 정산 확정 일시. 미확정 미리보기에서는 null입니다.
+          description: 정산 확정 일시. 미확정 미리보기에서는 빈 값입니다.
           example: "2026-08-04T10:00:00"
         transfers:
           type: array
@@ -5466,11 +5517,12 @@ components:
       properties:
         currency:
           type: string
+          description: 송금 통화 코드
           example: KRW
         senderId:
           type: string
           format: uuid
-          description: 송금할 사용자 ID
+          description: 송금할 사용자 식별자
           example: 50000000-0000-0000-0000-000000000002
         senderNickname:
           type: string
@@ -5479,7 +5531,7 @@ components:
         receiverId:
           type: string
           format: uuid
-          description: 받을 사용자 ID
+          description: 받을 사용자 식별자
           example: 50000000-0000-0000-0000-000000000001
         receiverNickname:
           type: string
