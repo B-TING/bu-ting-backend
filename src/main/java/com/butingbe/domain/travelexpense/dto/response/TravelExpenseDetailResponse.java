@@ -4,6 +4,7 @@ import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
 import com.butingbe.domain.travelexpense.entity.ExpenseSplitType;
 import com.butingbe.domain.travelexpense.entity.TravelExpense;
 import com.butingbe.domain.travelexpense.entity.TravelExpenseShare;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -47,11 +48,16 @@ public record TravelExpenseDetailResponse(
 
   public record UserSummary(UUID userId, String nickname) {}
 
-  public record ShareDetail(UUID userId, String nickname, Long shareAmount) {
+  public record ShareDetail(UUID participantId, String nickname, Long shareAmount) {
 
     private static ShareDetail from(TravelExpenseShare share) {
       return new ShareDetail(
           share.getUser().getId(), share.getUser().getNickname(), share.getShareAmount());
+    }
+
+    @JsonIgnore
+    public UUID userId() {
+      return participantId;
     }
   }
 }

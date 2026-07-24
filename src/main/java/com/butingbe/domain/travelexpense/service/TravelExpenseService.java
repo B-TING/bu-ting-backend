@@ -147,11 +147,11 @@ public class TravelExpenseService {
         "Only the expense creator or travel leader can modify this expense.");
     validateSettlementOpen(travelId);
 
-    validateDistinctParticipants(request.participantUserIds());
+    validateDistinctParticipants(request.participantIds());
     Map<UUID, User> membersById = findMembersById(travelId);
-    User payer = requireTravelMember(membersById, request.payerUserId(), "Payer");
+    User payer = requireTravelMember(membersById, request.payerId(), "Payer");
     List<User> participants =
-        request.participantUserIds().stream()
+        request.participantIds().stream()
             .map(userId -> requireTravelMember(membersById, userId, "Participant"))
             .toList();
     List<Long> amounts = calculateEqualShares(request.amount(), participants.size());
@@ -212,7 +212,7 @@ public class TravelExpenseService {
       ExpenseCategory category,
       LocalDateTime from,
       LocalDateTime to,
-      UUID payerUserId,
+      UUID payerId,
       Pageable pageable) {
     if (authenticatedUser == null || authenticatedUser.id() == null) {
       throw new UnauthenticatedException();
@@ -225,7 +225,7 @@ public class TravelExpenseService {
 
     Page<TravelExpense> expensePage =
         travelExpenseRepository.findAll(
-            expenseSpecification(travelId, category, from, to, payerUserId), pageable);
+            expenseSpecification(travelId, category, from, to, payerId), pageable);
     Map<UUID, Long> participantCounts = findParticipantCounts(expensePage.getContent());
     return TravelExpenseListResponse.of(expensePage, participantCounts);
   }
@@ -242,11 +242,11 @@ public class TravelExpenseService {
         travelMemberAuthorization.requireMember(travelId, authenticatedUser.id());
     validateSettlementOpen(travelId);
 
-    validateDistinctParticipants(request.participantUserIds());
+    validateDistinctParticipants(request.participantIds());
     Map<UUID, User> membersById = findMembersById(travelId);
-    User payer = requireTravelMember(membersById, request.payerUserId(), "Payer");
+    User payer = requireTravelMember(membersById, request.payerId(), "Payer");
     List<User> participants =
-        request.participantUserIds().stream()
+        request.participantIds().stream()
             .map(userId -> requireTravelMember(membersById, userId, "Participant"))
             .toList();
 
@@ -296,9 +296,9 @@ public class TravelExpenseService {
         .toList();
   }
 
-  private void validateDistinctParticipants(List<UUID> participantUserIds) {
-    Set<UUID> uniqueIds = new HashSet<>(participantUserIds);
-    if (uniqueIds.size() != participantUserIds.size()) {
+  private void validateDistinctParticipants(List<UUID> participantIds) {
+    Set<UUID> uniqueIds = new HashSet<>(participantIds);
+    if (uniqueIds.size() != participantIds.size()) {
       throw new IllegalArgumentException("Expense participants must not be duplicated.");
     }
   }
@@ -433,7 +433,7 @@ public class TravelExpenseService {
       ExpenseCategory category,
       LocalDateTime from,
       LocalDateTime to,
-      UUID payerUserId) {
+      UUID payerId) {
     Specification<TravelExpense> specification =
         (root, query, builder) -> builder.equal(root.get("travel").get("id"), travelId);
     if (category != null) {
@@ -452,11 +452,11 @@ public class TravelExpenseService {
           specification.and(
               (root, query, builder) -> builder.lessThanOrEqualTo(root.get("spentAt"), to));
     }
-    if (payerUserId != null) {
+    if (payerId != null) {
       specification =
           specification.and(
               (root, query, builder) ->
-                  builder.equal(root.get("payer").get("id"), payerUserId));
+                  builder.equal(root.get("payer").get("id"), payerId));
     }
     return specification;
   }

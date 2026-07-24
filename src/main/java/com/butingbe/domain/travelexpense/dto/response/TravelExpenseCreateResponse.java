@@ -4,6 +4,7 @@ import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
 import com.butingbe.domain.travelexpense.entity.ExpenseSplitType;
 import com.butingbe.domain.travelexpense.entity.TravelExpense;
 import com.butingbe.domain.travelexpense.entity.TravelExpenseShare;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -15,8 +16,8 @@ public record TravelExpenseCreateResponse(
     Long amount,
     String currency,
     ExpenseCategory category,
-    UUID payerUserId,
-    UUID createdByUserId,
+    UUID payerId,
+    UUID creatorId,
     ExpenseSplitType splitType,
     LocalDateTime spentAt,
     String memo,
@@ -39,10 +40,25 @@ public record TravelExpenseCreateResponse(
         shares.stream().map(ShareResponse::from).toList());
   }
 
-  public record ShareResponse(UUID userId, Long shareAmount) {
+  @JsonIgnore
+  public UUID payerUserId() {
+    return payerId;
+  }
+
+  @JsonIgnore
+  public UUID createdByUserId() {
+    return creatorId;
+  }
+
+  public record ShareResponse(UUID participantId, Long shareAmount) {
 
     private static ShareResponse from(TravelExpenseShare share) {
       return new ShareResponse(share.getUser().getId(), share.getShareAmount());
+    }
+
+    @JsonIgnore
+    public UUID userId() {
+      return participantId;
     }
   }
 }

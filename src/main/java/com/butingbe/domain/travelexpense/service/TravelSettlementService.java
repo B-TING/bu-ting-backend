@@ -86,8 +86,8 @@ public class TravelSettlementService {
                               TravelSettlementTransfer.builder()
                                   .settlement(settlement)
                                   .currency(transfer.currency())
-                                  .fromUser(requireUser(users, transfer.fromUserId()))
-                                  .toUser(requireUser(users, transfer.toUserId()))
+                                  .fromUser(requireUser(users, transfer.senderId()))
+                                  .toUser(requireUser(users, transfer.receiverId()))
                                   .amount(transfer.amount())
                                   .build())
                       .toList();
@@ -140,9 +140,9 @@ public class TravelSettlementService {
       transfers.add(
           new Transfer(
               currency,
-              debtor.member.userId(),
+              debtor.member.memberId(),
               debtor.member.nickname(),
-              creditor.member.userId(),
+              creditor.member.memberId(),
               creditor.member.nickname(),
               amount));
       debtor.remaining -= amount;
@@ -171,7 +171,7 @@ public class TravelSettlementService {
   private Map<UUID, User> usersById(List<Transfer> transfers) {
     List<UUID> userIds =
         transfers.stream()
-            .flatMap(transfer -> Stream.of(transfer.fromUserId(), transfer.toUserId()))
+            .flatMap(transfer -> Stream.of(transfer.senderId(), transfer.receiverId()))
             .distinct()
             .toList();
     Map<UUID, User> users = new LinkedHashMap<>();
@@ -205,7 +205,7 @@ public class TravelSettlementService {
         Comparator.comparingLong((Position position) -> position.remaining)
             .reversed()
             .thenComparing(position -> position.member.nickname())
-            .thenComparing(position -> position.member.userId());
+            .thenComparing(position -> position.member.memberId());
 
     private final MemberSummary member;
     private long remaining;

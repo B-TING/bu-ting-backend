@@ -102,6 +102,7 @@ public class TravelExpenseController {
           LocalDateTime from,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
           LocalDateTime to,
+      @RequestParam(required = false) UUID payerId,
       @RequestParam(required = false) UUID payerUserId,
       @PageableDefault(size = 20, sort = "spentAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
@@ -111,7 +112,13 @@ public class TravelExpenseController {
 
     return ResponseEntity.ok(
         travelExpenseService.getExpenses(
-            user, travelId, category, from, to, payerUserId, pageable));
+            user,
+            travelId,
+            category,
+            from,
+            to,
+            payerId != null ? payerId : payerUserId,
+            pageable));
   }
 
   @PostMapping

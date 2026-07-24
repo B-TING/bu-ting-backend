@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelexpense.dto.response;
 
 import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,5 +24,11 @@ public record TravelExpenseSummaryResponse(
       ExpenseCategory category, long amount, long expenseCount, BigDecimal ratio) {}
 
   public record MemberSummary(
-      UUID userId, String nickname, long paidAmount, long shareAmount, long balance) {}
+      UUID memberId, String nickname, long paidAmount, long shareAmount, long balance) {
+
+    @JsonIgnore
+    public UUID userId() {
+      return memberId;
+    }
+  }
 }

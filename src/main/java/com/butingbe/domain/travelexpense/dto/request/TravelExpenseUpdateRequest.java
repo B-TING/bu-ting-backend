@@ -1,6 +1,8 @@
 package com.butingbe.domain.travelexpense.dto.request;
 
 import com.butingbe.domain.travelexpense.entity.ExpenseCategory;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -15,7 +17,18 @@ public record TravelExpenseUpdateRequest(
     @NotNull @Positive Long amount,
     @Size(min = 3, max = 3) String currency,
     @NotNull ExpenseCategory category,
-    @NotNull UUID payerUserId,
-    @NotEmpty List<@NotNull UUID> participantUserIds,
+    @JsonAlias("payerUserId") @NotNull UUID payerId,
+    @JsonAlias("participantUserIds") @NotEmpty List<@NotNull UUID> participantIds,
     @NotNull LocalDateTime spentAt,
-    @Size(max = 500) String memo) {}
+    @Size(max = 500) String memo) {
+
+  @JsonIgnore
+  public UUID payerUserId() {
+    return payerId;
+  }
+
+  @JsonIgnore
+  public List<UUID> participantUserIds() {
+    return participantIds;
+  }
+}
