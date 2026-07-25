@@ -4,6 +4,7 @@ import com.butingbe.domain.file.dto.FileUploadResDto;
 import com.butingbe.domain.file.entity.FileMetadata;
 import com.butingbe.domain.file.repository.FileMetadataRepository;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +15,10 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 @Service
 @RequiredArgsConstructor
@@ -24,18 +28,19 @@ public class S3FileStorageService implements FileStorageService {
 
   private final S3Client s3Client;
   private final FileMetadataRepository fileMetadataRepository;
+  private final S3Presigner s3Presigner;
 
   @Value("${file-storage.s3.bucket}")
   private String bucket;
-
-  @Value("${file-storage.s3.region}")
-  private String region;
 
   @Value("${file-storage.s3.max-file-size:52428800}")
   private long maxFileSize;
 
   @Value("${file-storage.s3.key-prefix:uploads}")
   private String keyPrefix;
+
+  @Value("${file-storage.s3.presigned-url-expiration:3600}")
+  private long presignedUrlExpiration;
 
   @Override
   public FileUploadResDto upload(MultipartFile file) {
@@ -70,7 +75,7 @@ public class S3FileStorageService implements FileStorageService {
       s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
       throw exception;
     }
-    String url = "https://" + bucket + ".s3." + region + ".amazonaws.com/" + key;
+    String url = createPresignedGetUrl(key);
     return new FileUploadResDto(key, file.getOriginalFilename(), contentType, file.getSize(), url);
   }
 
@@ -93,5 +98,15 @@ public class S3FileStorageService implements FileStorageService {
     if (!ALLOWED_TYPES.contains(file.getContentType())) {
       throw new IllegalArgumentException("지원하지 않는 파일 형식입니다.");
     }
+  }
+
+  private String createPresignedGetUrl(String key) {
+    GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(bucket).key(key).build();
+    GetObjectPresignRequest presignRequest =
+        GetObjectPresignRequest.builder()
+            .signatureDuration(Duration.ofSeconds(presignedUrlExpiration))
+            .getObjectRequest(getObjectRequest)
+            .build();
+    return s3Presigner.presignGetObject(presignRequest).url().toString();
   }
 }

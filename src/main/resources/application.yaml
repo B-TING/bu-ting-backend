@@ -36,6 +36,7 @@ file-storage:
     region: ${AWS_REGION:ap-northeast-2}
     key-prefix: ${S3_KEY_PREFIX:uploads}
     max-file-size: ${S3_MAX_FILE_SIZE:52428800}
+    presigned-url-expiration: ${S3_PRESIGNED_URL_EXPIRATION:3600}
 
 oauth:
   google:

@@ -655,6 +655,7 @@ paths:
       description: |
         이미지는 JPEG, PNG, WebP, 영상은 MP4, MOV 형식만 업로드할 수 있습니다.
         파일 하나당 최대 50MB이며, 업로드한 파일은 S3에 저장되고 파일 메타데이터가 DB에 기록됩니다.
+        응답 URL은 기본 1시간 동안만 사용할 수 있는 Presigned GET URL입니다.
       requestBody:
         required: true
         content:
@@ -3631,8 +3632,8 @@ components:
         url:
           type: string
           format: uri
-          description: S3 객체 URL
-          example: https://example-bucket.s3.ap-northeast-2.amazonaws.com/uploads/images/550e8400-e29b-41d4-a716-446655440000.png
+          description: 만료 시간이 있는 S3 Presigned GET URL (기본 1시간)
+          example: https://example-bucket.s3.ap-northeast-2.amazonaws.com/uploads/images/550e8400-e29b-41d4-a716-446655440000.png?X-Amz-Algorithm=AWS4-HMAC-SHA256
     StorageLocationResponse:
       type: object
       required: [ line, stationName, locationDetail, latitude, longitude, distanceMeters, openNow, counts, cost, company, fees ]
