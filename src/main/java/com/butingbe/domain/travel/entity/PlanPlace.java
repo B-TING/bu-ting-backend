@@ -116,6 +116,12 @@ public class PlanPlace {
     }
   }
 
+  public void updateVisited(Boolean visited) {
+    if (visited != null) {
+      this.visited = visited;
+    }
+  }
+
   public void updatePlace(
       String placeName,
       String address,

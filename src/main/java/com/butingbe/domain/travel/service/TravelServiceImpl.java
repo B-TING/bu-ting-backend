@@ -6,6 +6,7 @@ import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceVisitedUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
@@ -222,6 +223,21 @@ public class TravelServiceImpl implements TravelService {
         request.providerPlaceId());
     planRouteRepository.deleteByPlan_Id(plan.getId());
 
+    return PlanPlaceResDto.from(planPlace);
+  }
+
+  @Override
+  @Transactional
+  public PlanPlaceResDto updatePlanPlaceVisited(
+      AuthenticatedUser authenticatedUser, UUID planPlaceId, PlanPlaceVisitedUpdateReqDto request) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    PlanPlace planPlace =
+        planPlaceRepository
+            .findById(planPlaceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Plan place not found."));
+    validateTravelMember(planPlace.getPlan().getTravel().getId(), user.getId());
+
+    planPlace.updateVisited(request.visited());
     return PlanPlaceResDto.from(planPlace);
   }
 

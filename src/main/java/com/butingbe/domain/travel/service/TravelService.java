@@ -6,6 +6,7 @@ import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceVisitedUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
@@ -39,6 +40,9 @@ public interface TravelService {
 
   PlanPlaceResDto updatePlanPlacePlace(
       AuthenticatedUser authenticatedUser, UUID planPlaceId, PlanPlaceUpdatePlaceReqDto request);
+
+  PlanPlaceResDto updatePlanPlaceVisited(
+      AuthenticatedUser authenticatedUser, UUID planPlaceId, PlanPlaceVisitedUpdateReqDto request);
 
   List<PlanPlaceResDto> updatePlanPlaceSequence(
       AuthenticatedUser authenticatedUser, UUID planId, PlanPlaceSequenceUpdateReqDto request);

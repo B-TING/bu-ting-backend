@@ -5,9 +5,9 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 public record ChatMessageResponse(
-    UUID id,
+    UUID messageId,
     UUID roomId,
-    UUID userId,
+    UUID senderId,
     String senderNickname,
     String content,
     OffsetDateTime createdAt,
@@ -21,5 +21,13 @@ public record ChatMessageResponse(
         entity.getContent(),
         entity.getCreatedAt(),
         isMine);
+  }
+
+  public UUID id() {
+    return messageId;
+  }
+
+  public UUID userId() {
+    return senderId;
   }
 }

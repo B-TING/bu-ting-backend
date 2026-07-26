@@ -73,8 +73,12 @@ class TravelTeamServiceTest extends AbstractContainerTest {
   @DisplayName("user can get all my travels when status is omitted")
   void getMyTravelsWithoutStatus() {
     User user = userRepository.save(createUser("all-my-travels@example.com", "my-travels"));
-    Travel planned = travelRepository.save(createTravel("Planned", TravelStatus.PLANNED));
-    Travel completed = travelRepository.save(createTravel("Completed", TravelStatus.COMPLETED));
+    Travel planned =
+        travelRepository.save(
+            createTravel("Planned", TravelStatus.PLANNED, LocalDate.of(2026, 8, 1)));
+    Travel completed =
+        travelRepository.save(
+            createTravel("Completed", TravelStatus.COMPLETED, LocalDate.of(2026, 9, 1)));
     saveMember(planned, user, TravelTeamRole.MEMBER);
     saveMember(completed, user, TravelTeamRole.MEMBER);
 
@@ -433,10 +437,14 @@ class TravelTeamServiceTest extends AbstractContainerTest {
   }
 
   private Travel createTravel(String title, TravelStatus status) {
+    return createTravel(title, status, LocalDate.of(2026, 8, 1));
+  }
+
+  private Travel createTravel(String title, TravelStatus status, LocalDate startDate) {
     return Travel.builder()
         .title(title)
-        .startDate(LocalDate.of(2026, 8, 1))
-        .endDate(LocalDate.of(2026, 8, 3))
+        .startDate(startDate)
+        .endDate(startDate.plusDays(2))
         .status(status)
         .build();
   }

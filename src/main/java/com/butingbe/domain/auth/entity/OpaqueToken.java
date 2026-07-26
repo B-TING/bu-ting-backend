@@ -1,7 +1,7 @@
 package com.butingbe.domain.auth.entity;
 
 import com.butingbe.domain.user.entity.User;
-import com.butingbe.global.common.BaseEntity;
+import com.butingbe.global.common.TimestampEntity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
     })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class OpaqueToken extends BaseEntity {
+public class OpaqueToken extends TimestampEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)

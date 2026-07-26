@@ -5,6 +5,7 @@ import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdatePlaceReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceUpdateReqDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceVisitedUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.service.TravelService;
 import com.butingbe.global.error.exception.UnauthenticatedException;
@@ -76,6 +77,18 @@ public class PlanController {
     }
 
     return ResponseEntity.ok(travelService.updatePlanPlacePlace(user, planPlaceId, request));
+  }
+
+  @PatchMapping("/places/{planPlaceId}/visited")
+  public ResponseEntity<PlanPlaceResDto> updatePlanPlaceVisited(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID planPlaceId,
+      @RequestBody @Valid PlanPlaceVisitedUpdateReqDto request) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.ok(travelService.updatePlanPlaceVisited(user, planPlaceId, request));
   }
 
   @PatchMapping("/{planId}/places/sequence")

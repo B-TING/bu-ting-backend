@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record TravelResDto(
-    UUID id,
+    UUID travelId,
     String title,
     LocalDate startDate,
     LocalDate endDate,
@@ -23,7 +23,7 @@ public record TravelResDto(
     TravelPace pace,
     Integer companionCount,
     String preferredFoods,
-    CompanionType companionTypes,
+    CompanionType companionType,
     String accommodationArea) {
 
   public static TravelResDto from(Travel travel) {
@@ -43,5 +43,13 @@ public record TravelResDto(
         travel.getPreferredFoods(),
         travel.getCompanionTypes(),
         travel.getAccommodationArea());
+  }
+
+  public UUID id() {
+    return travelId;
+  }
+
+  public CompanionType companionTypes() {
+    return companionType;
   }
 }
