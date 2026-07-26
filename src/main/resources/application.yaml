@@ -9,6 +9,10 @@ spring:
     encoding: UTF-8
   jackson:
     time-zone: Asia/Seoul
+  servlet:
+    multipart:
+      max-file-size: ${FILE_MAX_SIZE:50MB}
+      max-request-size: ${FILE_MAX_REQUEST_SIZE:50MB}
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -25,6 +29,14 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
     locations: classpath:db/migration
+
+file-storage:
+  s3:
+    bucket: ${S3_BUCKET:}
+    region: ${AWS_REGION:ap-northeast-2}
+    key-prefix: ${S3_KEY_PREFIX:uploads}
+    max-file-size: ${S3_MAX_FILE_SIZE:52428800}
+    presigned-url-expiration: ${S3_PRESIGNED_URL_EXPIRATION:3600}
 
 oauth:
   google:
