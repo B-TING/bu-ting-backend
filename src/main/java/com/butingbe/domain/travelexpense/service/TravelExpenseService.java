@@ -72,7 +72,7 @@ public class TravelExpenseService {
     if (authenticatedUser == null || authenticatedUser.id() == null) {
       throw new UnauthenticatedException();
     }
-    lockTravel(travelId);
+    requireTravel(travelId);
     travelMemberAuthorization.validateMember(travelId, authenticatedUser.id());
     validateExpensePeriod(from, to);
 
@@ -344,6 +344,12 @@ public class TravelExpenseService {
     return travelRepository
         .findByIdForUpdate(travelId)
         .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
+  }
+
+  private void requireTravel(UUID travelId) {
+    if (!travelRepository.existsById(travelId)) {
+      throw new ResourceNotFoundException("Travel not found.");
+    }
   }
 
   private Map<UUID, Long> findParticipantCounts(List<TravelExpense> expenses) {
