@@ -4384,6 +4384,9 @@ components:
           example: false
     TravelPlansResponse:
       type: object
+      required:
+        - startDate
+        - endDate
       properties:
         travelId:
           type: string
