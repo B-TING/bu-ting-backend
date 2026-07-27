@@ -62,9 +62,7 @@ public class TravelSettlementService {
             .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
     TravelMember leader =
         travelMemberAuthorization.requireLeader(
-            travelId,
-            authenticatedUser.id(),
-            "Only the travel leader can confirm settlement.");
+            travelId, authenticatedUser.id(), "Only the travel leader can confirm settlement.");
 
     return travelSettlementRepository
         .findByTravel_Id(travelId)
@@ -103,20 +101,20 @@ public class TravelSettlementService {
         travelId, calculateTransfers(authenticatedUser, travelId));
   }
 
-  private List<Transfer> calculateTransfers(
-      AuthenticatedUser authenticatedUser, UUID travelId) {
+  private List<Transfer> calculateTransfers(AuthenticatedUser authenticatedUser, UUID travelId) {
     TravelExpenseSummaryResponse summary =
         travelExpenseService.getExpenseSummary(authenticatedUser, travelId, null, null);
     List<Transfer> transfers = new ArrayList<>();
-    summary.currencySummaries().forEach(
-        currency ->
-            transfers.addAll(
-                calculateCurrencyTransfers(currency.currency(), currency.memberSummaries())));
+    summary
+        .currencySummaries()
+        .forEach(
+            currency ->
+                transfers.addAll(
+                    calculateCurrencyTransfers(currency.currency(), currency.memberSummaries())));
     return List.copyOf(transfers);
   }
 
-  static List<Transfer> calculateCurrencyTransfers(
-      String currency, List<MemberSummary> members) {
+  static List<Transfer> calculateCurrencyTransfers(String currency, List<MemberSummary> members) {
     List<Position> debtors =
         members.stream()
             .filter(member -> member.balance() < 0)

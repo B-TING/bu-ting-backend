@@ -50,8 +50,7 @@ public class TravelExpenseController {
       throw new UnauthenticatedException();
     }
 
-    return ResponseEntity.ok(
-        travelExpenseService.getExpenseSummary(user, travelId, from, to));
+    return ResponseEntity.ok(travelExpenseService.getExpenseSummary(user, travelId, from, to));
   }
 
   @DeleteMapping("/{expenseId}")
@@ -112,13 +111,7 @@ public class TravelExpenseController {
 
     return ResponseEntity.ok(
         travelExpenseService.getExpenses(
-            user,
-            travelId,
-            category,
-            from,
-            to,
-            payerId != null ? payerId : payerUserId,
-            pageable));
+            user, travelId, category, from, to, payerId != null ? payerId : payerUserId, pageable));
   }
 
   @PostMapping

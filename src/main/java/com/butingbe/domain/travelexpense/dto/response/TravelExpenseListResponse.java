@@ -9,11 +9,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 
 public record TravelExpenseListResponse(
-    List<ExpenseSummary> content,
-    int page,
-    int size,
-    long totalElements,
-    int totalPages) {
+    List<ExpenseSummary> content, int page, int size, long totalElements, int totalPages) {
 
   public static TravelExpenseListResponse of(
       Page<TravelExpense> expensePage, Map<UUID, Long> participantCounts) {

@@ -42,11 +42,7 @@ class TravelExpenseTest {
 
     assertThatThrownBy(
             () ->
-                TravelExpenseShare.builder()
-                    .expense(expense)
-                    .user(payer)
-                    .shareAmount(-1L)
-                    .build())
+                TravelExpenseShare.builder().expense(expense).user(payer).shareAmount(-1L).build())
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Share amount must not be negative.");
   }

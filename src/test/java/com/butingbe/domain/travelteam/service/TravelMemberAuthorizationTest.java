@@ -2,6 +2,7 @@ package com.butingbe.domain.travelteam.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.butingbe.domain.travelteam.entity.TravelMember;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.repository.TravelMemberRepository;

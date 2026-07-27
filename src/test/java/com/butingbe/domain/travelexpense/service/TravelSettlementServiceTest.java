@@ -148,7 +148,8 @@ class TravelSettlementServiceTest extends AbstractContainerTest {
     assertThat(travelExpenseRepository.existsById(expense.expenseId())).isTrue();
   }
 
-  private void assertSettlementConfirmed(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
+  private void assertSettlementConfirmed(
+      org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
     assertThatThrownBy(call)
         .isInstanceOf(ConflictException.class)
         .hasMessage("SETTLEMENT_CONFIRMED");
@@ -226,6 +227,5 @@ class TravelSettlementServiceTest extends AbstractContainerTest {
         TravelMember.builder().travel(travel).user(user).role(role).build());
   }
 
-  private record TestTravel(
-      Travel travel, User leader, User firstMember, User secondMember) {}
+  private record TestTravel(Travel travel, User leader, User firstMember, User secondMember) {}
 }

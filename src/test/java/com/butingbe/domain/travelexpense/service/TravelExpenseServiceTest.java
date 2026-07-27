@@ -24,9 +24,9 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
-import com.butingbe.support.AbstractContainerTest;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
+import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -60,17 +60,15 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
         travelExpenseService.createEqualExpense(
             AuthenticatedUser.from(creator),
             travel.getId(),
-            request(
-                10_000L,
-                creator,
-                List.of(second.getId(), creator.getId(), third.getId())));
+            request(10_000L, creator, List.of(second.getId(), creator.getId(), third.getId())));
 
     assertThat(response.splitType()).isEqualTo(ExpenseSplitType.EQUAL);
     assertThat(response.currency()).isEqualTo("KRW");
     assertThat(response.shares())
         .extracting(TravelExpenseCreateResponse.ShareResponse::shareAmount)
         .containsExactly(3_334L, 3_333L, 3_333L);
-    assertThat(response.shares()).extracting(share -> share.userId())
+    assertThat(response.shares())
+        .extracting(share -> share.userId())
         .containsExactly(second.getId(), creator.getId(), third.getId());
     assertThat(response.shares().stream().mapToLong(share -> share.shareAmount()).sum())
         .isEqualTo(10_000L);
@@ -116,8 +114,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
 
   @Test
   void calculatesEqualSharesForAmountSmallerThanParticipantCount() {
-    assertThat(TravelExpenseService.calculateEqualShares(2L, 3))
-        .containsExactly(1L, 1L, 0L);
+    assertThat(TravelExpenseService.calculateEqualShares(2L, 3)).containsExactly(1L, 1L, 0L);
   }
 
   @Test
@@ -583,11 +580,13 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
             LocalDateTime.of(2026, 7, 13, 23, 59));
 
     assertThat(response.expenseCount()).isEqualTo(1);
-    assertThat(response.currencySummaries()).singleElement()
+    assertThat(response.currencySummaries())
+        .singleElement()
         .satisfies(
             summary -> {
               assertThat(summary.totalAmount()).isEqualTo(10_000L);
-              assertThat(summary.categorySummaries()).singleElement()
+              assertThat(summary.categorySummaries())
+                  .singleElement()
                   .satisfies(
                       category ->
                           assertThat(category.category()).isEqualTo(ExpenseCategory.TRANSPORT));
@@ -656,8 +655,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
       ExpenseCategory category,
       LocalDateTime spentAt,
       List<java.util.UUID> participants) {
-    return createExpense(
-        payer, travel, title, 10_000L, "KRW", category, spentAt, participants);
+    return createExpense(payer, travel, title, 10_000L, "KRW", category, spentAt, participants);
   }
 
   private TravelExpenseCreateResponse createExpense(
@@ -673,14 +671,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
         AuthenticatedUser.from(payer),
         travel.getId(),
         new TravelExpenseCreateRequest(
-            title,
-            amount,
-            currency,
-            category,
-            payer.getId(),
-            participants,
-            spentAt,
-            null));
+            title, amount, currency, category, payer.getId(), participants, spentAt, null));
   }
 
   private User saveUser(String nickname) {

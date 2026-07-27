@@ -65,10 +65,7 @@ public class TravelExpenseService {
   private final TravelSettlementRepository travelSettlementRepository;
 
   public TravelExpenseSummaryResponse getExpenseSummary(
-      AuthenticatedUser authenticatedUser,
-      UUID travelId,
-      LocalDateTime from,
-      LocalDateTime to) {
+      AuthenticatedUser authenticatedUser, UUID travelId, LocalDateTime from, LocalDateTime to) {
     if (authenticatedUser == null || authenticatedUser.id() == null) {
       throw new UnauthenticatedException();
     }
@@ -76,8 +73,7 @@ public class TravelExpenseService {
     travelMemberAuthorization.validateMember(travelId, authenticatedUser.id());
     validateExpensePeriod(from, to);
 
-    List<CurrencyTotal> totals =
-        travelExpenseRepository.summarizeCurrencies(travelId, from, to);
+    List<CurrencyTotal> totals = travelExpenseRepository.summarizeCurrencies(travelId, from, to);
     List<CategoryTotal> categories =
         travelExpenseRepository.summarizeCategories(travelId, from, to);
     List<MemberAmount> paidAmounts =
@@ -90,17 +86,14 @@ public class TravelExpenseService {
         totals.stream()
             .map(
                 total ->
-                    toCurrencySummary(
-                        total, categories, paidAmounts, shareAmounts, currentMembers))
+                    toCurrencySummary(total, categories, paidAmounts, shareAmounts, currentMembers))
             .toList();
     long expenseCount = totals.stream().mapToLong(CurrencyTotal::getExpenseCount).sum();
-    return new TravelExpenseSummaryResponse(
-        travelId, expenseCount, currencySummaries, from, to);
+    return new TravelExpenseSummaryResponse(travelId, expenseCount, currencySummaries, from, to);
   }
 
   @Transactional
-  public void deleteExpense(
-      AuthenticatedUser authenticatedUser, UUID travelId, UUID expenseId) {
+  public void deleteExpense(AuthenticatedUser authenticatedUser, UUID travelId, UUID expenseId) {
     if (authenticatedUser == null || authenticatedUser.id() == null) {
       throw new UnauthenticatedException();
     }
@@ -392,20 +385,18 @@ public class TravelExpenseService {
         .filter(paid -> paid.getCurrency().equals(total.getCurrency()))
         .forEach(
             paid ->
-                memberAmounts
-                    .computeIfAbsent(
-                        paid.getUserId(),
-                        id -> new MemberAmounts(id, paid.getNickname()))
-                    .paidAmount += paid.getAmount());
+                memberAmounts.computeIfAbsent(
+                            paid.getUserId(), id -> new MemberAmounts(id, paid.getNickname()))
+                        .paidAmount +=
+                    paid.getAmount());
     shareAmounts.stream()
         .filter(share -> share.getCurrency().equals(total.getCurrency()))
         .forEach(
             share ->
-                memberAmounts
-                    .computeIfAbsent(
-                        share.getUserId(),
-                        id -> new MemberAmounts(id, share.getNickname()))
-                    .shareAmount += share.getAmount());
+                memberAmounts.computeIfAbsent(
+                            share.getUserId(), id -> new MemberAmounts(id, share.getNickname()))
+                        .shareAmount +=
+                    share.getAmount());
 
     List<MemberSummary> memberSummaries =
         memberAmounts.values().stream()
@@ -435,11 +426,7 @@ public class TravelExpenseService {
   }
 
   private Specification<TravelExpense> expenseSpecification(
-      UUID travelId,
-      ExpenseCategory category,
-      LocalDateTime from,
-      LocalDateTime to,
-      UUID payerId) {
+      UUID travelId, ExpenseCategory category, LocalDateTime from, LocalDateTime to, UUID payerId) {
     Specification<TravelExpense> specification =
         (root, query, builder) -> builder.equal(root.get("travel").get("id"), travelId);
     if (category != null) {
@@ -450,8 +437,7 @@ public class TravelExpenseService {
     if (from != null) {
       specification =
           specification.and(
-              (root, query, builder) ->
-                  builder.greaterThanOrEqualTo(root.get("spentAt"), from));
+              (root, query, builder) -> builder.greaterThanOrEqualTo(root.get("spentAt"), from));
     }
     if (to != null) {
       specification =
@@ -461,8 +447,7 @@ public class TravelExpenseService {
     if (payerId != null) {
       specification =
           specification.and(
-              (root, query, builder) ->
-                  builder.equal(root.get("payer").get("id"), payerId));
+              (root, query, builder) -> builder.equal(root.get("payer").get("id"), payerId));
     }
     return specification;
   }

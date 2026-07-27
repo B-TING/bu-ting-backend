@@ -136,7 +136,8 @@ public class TravelExpense {
   }
 
   private static String normalizeCurrency(String currency) {
-    String normalized = currency == null || currency.isBlank() ? "KRW" : currency.trim().toUpperCase();
+    String normalized =
+        currency == null || currency.isBlank() ? "KRW" : currency.trim().toUpperCase();
     if (normalized.length() != 3) {
       throw new IllegalArgumentException("Currency must be a 3-letter code.");
     }
