@@ -17,6 +17,8 @@ tags:
     description: Place search APIs
   - name: Storage
     description: 물품 보관소 API
+  - name: File
+    description: 이미지 및 영상 파일 업로드 API
   - name: TravelSurvey
     description: Travel survey profile APIs
   - name: Travel
@@ -443,7 +445,7 @@ paths:
       summary: 사용자 회원가입
       description: 인증된 B-TING opaque token을 확인한 뒤 이메일과 닉네임으로 사용자를 생성합니다.
       security:
-        - opaqueToken: []
+        - opaqueToken: [ ]
       requestBody:
         required: true
         content:
@@ -643,6 +645,64 @@ paths:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/files:
+    post:
+      tags:
+        - File
+      summary: 이미지 또는 영상 파일 업로드
+      description: |
+        이미지는 JPEG, PNG, WebP, 영상은 MP4, MOV 형식만 업로드할 수 있습니다.
+        파일 하나당 최대 50MB이며, 업로드한 파일은 S3에 저장되고 파일 메타데이터가 DB에 기록됩니다.
+        응답 URL은 기본 1시간 동안만 사용할 수 있는 Presigned GET URL입니다.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 업로드할 이미지 또는 영상 파일 (최대 50MB)
+      responses:
+        "200":
+          description: 업로드 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileUploadResponse"
+        "400":
+          description: 비어 있는 파일, 지원하지 않는 파일 형식 또는 파일 크기 제한 초과
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - File
+      summary: 업로드 파일 삭제
+      description: S3 객체와 DB에 저장된 파일 메타데이터를 함께 삭제합니다.
+      parameters:
+        - name: fileKey
+          in: query
+          required: true
+          description: 업로드 응답으로 받은 S3 객체 키
+          schema:
+            type: string
+            maxLength: 500
+          example: uploads/images/550e8400-e29b-41d4-a716-446655440000.png
+      responses:
+        "204":
+          description: 삭제 성공
+        "400":
+          description: 유효하지 않은 파일 키
           content:
             application/json:
               schema:
@@ -3998,6 +4058,30 @@ components:
           type: string
           format: date-time
           example: "2026-08-03T12:10:00"
+    FileUploadResponse:
+      type: object
+      required: [ fileKey, originalFileName, contentType, fileSize, url ]
+      properties:
+        fileKey:
+          type: string
+          description: 삭제 요청에 사용하는 S3 객체 키
+          example: uploads/images/550e8400-e29b-41d4-a716-446655440000.png
+        originalFileName:
+          type: string
+          example: busan-trip.png
+        contentType:
+          type: string
+          example: image/png
+        fileSize:
+          type: integer
+          format: int64
+          description: 파일 크기(Byte)
+          example: 245760
+        url:
+          type: string
+          format: uri
+          description: 만료 시간이 있는 S3 Presigned GET URL (기본 1시간)
+          example: https://example-bucket.s3.ap-northeast-2.amazonaws.com/uploads/images/550e8400-e29b-41d4-a716-446655440000.png?X-Amz-Algorithm=AWS4-HMAC-SHA256
     StorageLocationResponse:
       type: object
       required: [ line, stationName, locationDetail, latitude, longitude, distanceMeters, openNow, counts, cost, company, fees ]

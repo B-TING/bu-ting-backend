@@ -84,6 +84,8 @@ repositories {
 }
 
 dependencies {
+    implementation(platform("software.amazon.awssdk:bom:2.31.63"))
+    implementation("software.amazon.awssdk:s3")
     // Web & Validation & Actuator
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-validation")
