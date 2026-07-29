@@ -207,7 +207,7 @@ public class TourApiPlaceService implements PlaceService {
             .retrieve()
             .body(TourApiResponse.class);
 
-    TourApiResponse.Body body = body(response);
+    TourApiResponse.Body body = requireLocationSearchResults(body(response));
     List<PlaceResDto> places =
         items(body).stream().filter(Objects::nonNull).map(PlaceResDto::from).toList();
     return new PlaceSearchResDto(body.pageNo(), body.numOfRows(), body.totalCount(), places);
@@ -250,6 +250,13 @@ public class TourApiPlaceService implements PlaceService {
       return new TourApiResponse.Body(new TourApiResponse.Items(List.of()), 0, 0, 0);
     }
     return response.response().body();
+  }
+
+  private TourApiResponse.Body requireLocationSearchResults(TourApiResponse.Body body) {
+    if (body.totalCount() == 0) {
+      throw new IllegalArgumentException("No places found for the requested location.");
+    }
+    return body;
   }
 
   private List<TourPlaceItem> items(TourApiResponse.Body body) {

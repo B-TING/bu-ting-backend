@@ -17,7 +17,6 @@ import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
-import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -34,6 +33,7 @@ public class TravelTeamService {
   private final TravelMemberRepository travelMemberRepository;
   private final TravelRepository travelRepository;
   private final UserRepository userRepository;
+  private final TravelMemberAuthorization travelMemberAuthorization;
   private final String inviteBaseUrl;
 
   public TravelTeamService(
@@ -41,6 +41,7 @@ public class TravelTeamService {
       TravelMemberRepository travelMemberRepository,
       TravelRepository travelRepository,
       UserRepository userRepository,
+      TravelMemberAuthorization travelMemberAuthorization,
       @Value(
               "${travel-team.invite.base-url:${TRAVEL_INVITE_BASE_URL:https://yourdomain.com/invite}}")
           String inviteBaseUrl) {
@@ -48,6 +49,7 @@ public class TravelTeamService {
     this.travelMemberRepository = travelMemberRepository;
     this.travelRepository = travelRepository;
     this.userRepository = userRepository;
+    this.travelMemberAuthorization = travelMemberAuthorization;
     this.inviteBaseUrl = normalizeInviteBaseUrl(inviteBaseUrl);
   }
 
@@ -60,7 +62,7 @@ public class TravelTeamService {
       AuthenticatedUser authenticatedUser, UUID travelId) {
     User user = findAuthenticatedUser(authenticatedUser);
     validateTravelExists(travelId);
-    validateTravelMember(travelId, user.getId());
+    travelMemberAuthorization.validateMember(travelId, user.getId());
 
     return travelMemberRepository.findMembersByTravelId(travelId).stream()
         .map(TravelMemberResponse::from)
@@ -82,13 +84,8 @@ public class TravelTeamService {
     validateTravelExists(travelId);
 
     TravelMember leader =
-        travelMemberRepository
-            .findByTravel_IdAndUser_Id(travelId, user.getId())
-            .orElseThrow(() -> new ForbiddenException("User is not a travel member."));
-
-    if (leader.getRole() != TravelTeamRole.LEADER) {
-      throw new ForbiddenException("Only travel leaders can remove members.");
-    }
+        travelMemberAuthorization.requireLeader(
+            travelId, user.getId(), "Only travel leaders can remove members.");
 
     if (user.getId().equals(targetUserId)) {
       throw new IllegalArgumentException("Leader cannot remove themselves.");
@@ -113,13 +110,8 @@ public class TravelTeamService {
     validateTravelExists(travelId);
 
     TravelMember currentLeader =
-        travelMemberRepository
-            .findByTravel_IdAndUser_Id(travelId, user.getId())
-            .orElseThrow(() -> new ForbiddenException("User is not a travel member."));
-
-    if (currentLeader.getRole() != TravelTeamRole.LEADER) {
-      throw new ForbiddenException("Only travel leaders can transfer leader role.");
-    }
+        travelMemberAuthorization.requireLeader(
+            travelId, user.getId(), "Only travel leaders can transfer leader role.");
 
     if (user.getId().equals(request.newLeaderUserId())) {
       throw new IllegalArgumentException("New leader must be another travel member.");
@@ -137,7 +129,9 @@ public class TravelTeamService {
   @Transactional
   public TravelInviteLinkInfoResponse getInviteLink(
       AuthenticatedUser authenticatedUser, UUID travelId) {
-    validateLeader(authenticatedUser, travelId, "Only travel leaders can get invite links.");
+    User user = findAuthenticatedUser(authenticatedUser);
+    travelMemberAuthorization.requireLeader(
+        travelId, user.getId(), "Only travel leaders can get invite links.");
     validateTravelExists(travelId);
 
     TravelInvite invite =
@@ -151,7 +145,9 @@ public class TravelTeamService {
 
   @Transactional
   public void deleteInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
-    validateLeader(authenticatedUser, travelId, "Only travel leaders can delete invite links.");
+    User user = findAuthenticatedUser(authenticatedUser);
+    travelMemberAuthorization.requireLeader(
+        travelId, user.getId(), "Only travel leaders can delete invite links.");
     validateTravelExists(travelId);
 
     travelInviteRepository.deleteByTravel_IdAndUsedFalse(travelId);
@@ -159,7 +155,9 @@ public class TravelTeamService {
 
   @Transactional
   public String createInviteLink(AuthenticatedUser authenticatedUser, UUID travelId) {
-    validateLeader(authenticatedUser, travelId, "Only travel leaders can create invite links.");
+    User user = findAuthenticatedUser(authenticatedUser);
+    travelMemberAuthorization.requireLeader(
+        travelId, user.getId(), "Only travel leaders can create invite links.");
 
     Travel travel =
         travelRepository
@@ -197,10 +195,7 @@ public class TravelTeamService {
   @Transactional
   public void exitTravel(AuthenticatedUser authenticatedUser, UUID travelId) {
     User user = findAuthenticatedUser(authenticatedUser);
-    TravelMember member =
-        travelMemberRepository
-            .findByTravel_IdAndUser_Id(travelId, user.getId())
-            .orElseThrow(() -> new IllegalArgumentException("User is not a travel member."));
+    TravelMember member = travelMemberAuthorization.requireMember(travelId, user.getId());
 
     long memberCount = travelMemberRepository.countByTravel_Id(travelId);
 
@@ -236,17 +231,6 @@ public class TravelTeamService {
     return invite;
   }
 
-  private void validateLeader(AuthenticatedUser authenticatedUser, UUID travelId, String message) {
-    User user = findAuthenticatedUser(authenticatedUser);
-    boolean leader =
-        travelMemberRepository.existsByTravel_IdAndUser_IdAndRole(
-            travelId, user.getId(), TravelTeamRole.LEADER);
-
-    if (!leader) {
-      throw new IllegalArgumentException(message);
-    }
-  }
-
   private String toInviteLink(String token) {
     return inviteBaseUrl + "?token=" + token;
   }
@@ -264,12 +248,6 @@ public class TravelTeamService {
   private void validateTravelExists(UUID travelId) {
     if (!travelRepository.existsById(travelId)) {
       throw new IllegalArgumentException("Travel not found.");
-    }
-  }
-
-  private void validateTravelMember(UUID travelId, UUID userId) {
-    if (!travelMemberRepository.existsByTravel_IdAndUser_Id(travelId, userId)) {
-      throw new ForbiddenException("User is not a travel member.");
     }
   }
 
