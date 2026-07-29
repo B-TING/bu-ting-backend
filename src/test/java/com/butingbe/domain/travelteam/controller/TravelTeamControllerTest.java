@@ -214,7 +214,7 @@ class TravelTeamControllerTest {
     TravelStatus myTravelsStatus;
 
     FakeTravelTeamService() {
-      super(null, null, null, null, "https://yourdomain.com/invite");
+      super(null, null, null, null, null, "https://yourdomain.com/invite");
     }
 
     @Override

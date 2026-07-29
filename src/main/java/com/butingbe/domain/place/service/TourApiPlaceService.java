@@ -177,6 +177,7 @@ public class TourApiPlaceService implements PlaceService {
     if (!StringUtils.hasText(serviceKey)) {
       throw new IllegalStateException("Tour API service key is not configured.");
     }
+
     int page = request.pageOrDefault();
     int size = request.sizeOrDefault();
     TourApiResponse response =
