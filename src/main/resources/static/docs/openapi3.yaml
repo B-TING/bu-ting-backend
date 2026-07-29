@@ -298,6 +298,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PlaceSearchResponse"
+        "400":
+          description: 유효하지 않은 요청 또는 검색 결과 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/places/festivals:
     get:
       tags:

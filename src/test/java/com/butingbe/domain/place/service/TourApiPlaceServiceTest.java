@@ -1,6 +1,7 @@
 package com.butingbe.domain.place.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -93,6 +94,48 @@ class TourApiPlaceServiceTest {
     assertThat(response.places().getFirst().latitude()).isEqualTo(35.1724954738);
     assertThat(response.places().getFirst().regionCode()).isEqualTo("26");
     assertThat(response.places().getFirst().districtCode()).isEqualTo("440");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("공공데이터가 빈 문자열 items를 반환하면 잘못된 위치 검색으로 처리한다")
+  void searchPlacesByLocationRejectsWhenTourApiItemsAreEmptyString() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(
+            requestTo(
+                org.hamcrest.Matchers.startsWith("https://tour.example.com/locationBasedList2")))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "response": {
+                    "header": {
+                      "resultCode": "0000",
+                      "resultMsg": "OK"
+                    },
+                    "body": {
+                      "numOfRows": 20,
+                      "pageNo": 1,
+                      "totalCount": 0,
+                      "items": ""
+                    }
+                  }
+                }
+                """,
+                MediaType.APPLICATION_JSON));
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                placeService.searchPlacesByLocation(
+                    new PlaceLocationSearchReqDto(1, 20, 128.9084, 35.1487, 3000, "32", "E")))
+        .withMessage("No places found for the requested location.");
     server.verify();
   }
 
