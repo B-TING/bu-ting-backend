@@ -587,8 +587,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         reviews.stream()
             .map(
                 review ->
-                    toPlaceReviewSummaryItem(
-                        review, createPresignedUrls(findPlaceReviewMediaFileKeys(review.getId()))))
+                    toPlaceReviewSummaryItem(review, findPlaceReviewMediaUrls(review.getId())))
             .toList());
   }
 
@@ -608,8 +607,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         reviews.stream()
             .map(
                 review ->
-                    toPlaceReviewSummaryItem(
-                        review, createPresignedUrls(findPlaceReviewMediaFileKeys(review.getId()))))
+                    toPlaceReviewSummaryItem(review, findPlaceReviewMediaUrls(review.getId())))
             .toList());
   }
 
@@ -758,9 +756,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
                       .content(sourceReview.getContent())
                       .tags(List.copyOf(sourceReview.getTags()))
                       .build();
-              List<String> mediaFileKeys = findPlaceReviewMediaFileKeys(sourceReview.getId());
               PlaceReview savedReview = placeReviewRepository.save(snapshotReview);
-              savePlaceReviewMedia(savedReview, mediaFileKeys);
+              copyPlaceReviewMedia(sourceReview, savedReview);
             });
   }
 
@@ -847,8 +844,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   private PlaceReviewResDto toPlaceReviewResponse(PlaceReview placeReview) {
-    return PlaceReviewResDto.from(
-        placeReview, createPresignedUrls(findPlaceReviewMediaFileKeys(placeReview.getId())));
+    return PlaceReviewResDto.from(placeReview, findPlaceReviewMediaUrls(placeReview.getId()));
   }
 
   private PlaceReviewSummaryResDto.PlaceReviewItemResDto toPlaceReviewSummaryItem(
@@ -873,10 +869,16 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         placeReview.getUpdatedAt());
   }
 
-  private List<String> findPlaceReviewMediaFileKeys(UUID placeReviewId) {
+  private List<String> findPlaceReviewMediaUrls(UUID placeReviewId) {
     return placeReviewImageRepository.findByPlaceReview_IdOrderBySequenceAsc(placeReviewId).stream()
-        .map(PlaceReviewImage::getFileKey)
+        .map(this::toMediaUrl)
         .toList();
+  }
+
+  private String toMediaUrl(PlaceReviewImage image) {
+    return image.getFileKey() == null
+        ? image.getExternalUrl()
+        : fileStorageService.getPresignedUrl(image.getFileKey());
   }
 
   private void savePlaceReviewMedia(PlaceReview placeReview, List<String> mediaFileKeys) {
@@ -886,9 +888,23 @@ public class TravelRecordServiceImpl implements TravelRecordService {
           PlaceReviewImage.builder()
               .placeReview(placeReview)
               .fileKey(mediaFileKeys.get(index))
+              .externalUrl(null)
               .sequence(index + 1)
               .build());
     }
+  }
+
+  private void copyPlaceReviewMedia(PlaceReview sourceReview, PlaceReview targetReview) {
+    placeReviewImageRepository.findByPlaceReview_IdOrderBySequenceAsc(sourceReview.getId()).stream()
+        .map(
+            image ->
+                PlaceReviewImage.builder()
+                    .placeReview(targetReview)
+                    .fileKey(image.getFileKey())
+                    .externalUrl(image.getExternalUrl())
+                    .sequence(image.getSequence())
+                    .build())
+        .forEach(placeReviewImageRepository::save);
   }
 
   private User findAuthenticatedUser(AuthenticatedUser authenticatedUser) {
@@ -1171,10 +1187,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     return normalizedMediaFileKeys;
-  }
-
-  private List<String> createPresignedUrls(List<String> mediaFileKeys) {
-    return mediaFileKeys.stream().map(fileStorageService::getPresignedUrl).toList();
   }
 
   private void validatePlaceReviewSummaryRequest(PlaceProvider provider, String providerPlaceId) {
