@@ -1,6 +1,7 @@
 package com.butingbe.domain.place.controller;
 
 import com.butingbe.domain.place.dto.request.FestivalSearchReqDto;
+import com.butingbe.domain.place.dto.request.PlaceKeywordSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceLocationSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceSearchReqDto;
 import com.butingbe.domain.place.dto.response.FestivalSearchResDto;
@@ -28,6 +29,12 @@ public class PlaceController {
   public ResponseEntity<PlaceSearchResDto> searchPlaces(
       @ModelAttribute @Valid PlaceSearchReqDto request) {
     return ResponseEntity.ok(placeService.searchPlaces(request));
+  }
+
+  @GetMapping("/search")
+  public ResponseEntity<PlaceSearchResDto> searchPlacesByKeyword(
+      @ModelAttribute @Valid PlaceKeywordSearchReqDto request) {
+    return ResponseEntity.ok(placeService.searchPlacesByKeyword(request));
   }
 
   @GetMapping("/location")
