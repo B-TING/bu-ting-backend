@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.file.dto.FileUploadResDto;
+import com.butingbe.domain.file.service.FileStorageService;
 import com.butingbe.domain.travel.dto.request.PlanCreateReqDto;
 import com.butingbe.domain.travel.dto.request.PlanPlaceCreateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
@@ -54,10 +56,39 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Transactional
+@Import(TravelRecordServiceImplTest.FileStorageTestConfig.class)
 class TravelRecordServiceImplTest extends AbstractContainerTest {
+
+  @TestConfiguration
+  static class FileStorageTestConfig {
+
+    @Bean
+    @Primary
+    FileStorageService fileStorageService() {
+      return new FileStorageService() {
+        @Override
+        public FileUploadResDto upload(MultipartFile file) {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getPresignedUrl(String fileKey) {
+          return "https://signed.example.com/" + fileKey;
+        }
+
+        @Override
+        public void delete(String fileKey) {}
+      };
+    }
+  }
 
   @Autowired private TravelRecordService travelRecordService;
   @Autowired private TravelService travelService;
@@ -1467,7 +1498,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 "Best place in this route",
                 List.of("  night  ", "return", "night", ""),
                 90,
-                List.of(" https://image.test/place.jpg ", "https://video.test/place.mp4")));
+                List.of(" uploads/images/place.jpg ", "uploads/videos/place.mp4")));
 
     assertThat(result.planPlaceId()).isEqualTo(place.originalPlanPlaceId());
     assertThat(result.travelRecordPlaceId()).isNull();
@@ -1476,7 +1507,9 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.content()).isEqualTo("Best place in this route");
     assertThat(result.tags()).containsExactly("night", "return");
     assertThat(result.mediaUrls())
-        .containsExactly("https://image.test/place.jpg", "https://video.test/place.mp4");
+        .containsExactly(
+            "https://signed.example.com/uploads/images/place.jpg",
+            "https://signed.example.com/uploads/videos/place.mp4");
     assertThat(
             placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(
                 place.originalPlanPlaceId(), user.getId()))

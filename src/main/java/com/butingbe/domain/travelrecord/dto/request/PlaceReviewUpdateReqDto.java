@@ -11,7 +11,7 @@ public record PlaceReviewUpdateReqDto(
     String content,
     List<String> tags,
     @Min(value = 0, message = "Stay minutes must be 0 or greater.") Integer stayMinutes,
-    List<String> mediaUrls) {
+    List<String> mediaFileKeys) {
 
   public PlaceReviewUpdateReqDto(Integer rating, String content) {
     this(rating, content, null, null, null);

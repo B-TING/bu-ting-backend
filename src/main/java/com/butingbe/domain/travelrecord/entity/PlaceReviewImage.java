@@ -37,16 +37,16 @@ public class PlaceReviewImage {
   @JoinColumn(name = "place_review_id", nullable = false)
   private PlaceReview placeReview;
 
-  @Column(nullable = false, length = 1000)
-  private String url;
+  @Column(name = "file_key", nullable = false, length = 500)
+  private String fileKey;
 
   @Column(nullable = false)
   private Integer sequence;
 
   @Builder
-  public PlaceReviewImage(PlaceReview placeReview, String url, Integer sequence) {
+  public PlaceReviewImage(PlaceReview placeReview, String fileKey, Integer sequence) {
     this.placeReview = placeReview;
-    this.url = url;
+    this.fileKey = fileKey;
     this.sequence = sequence;
   }
 }
