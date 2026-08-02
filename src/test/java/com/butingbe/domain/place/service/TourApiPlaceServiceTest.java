@@ -6,6 +6,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.butingbe.domain.place.dto.request.FestivalSearchReqDto;
+import com.butingbe.domain.place.dto.request.PlaceKeywordSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceLocationSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceSearchReqDto;
 import com.butingbe.domain.place.dto.response.FestivalSearchResDto;
@@ -95,6 +96,83 @@ class TourApiPlaceServiceTest {
     assertThat(response.places().getFirst().regionCode()).isEqualTo("26");
     assertThat(response.places().getFirst().districtCode()).isEqualTo("440");
     server.verify();
+  }
+
+  @Test
+  @DisplayName("해운대, 광안리 맛집, 부산역 키워드 검색 결과를 Place DTO로 변환한다")
+  void searchPlacesMapsKeywordSearchResultsToPlaceDtos() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(
+            requestTo(org.hamcrest.Matchers.containsString("keyword=%ED%95%B4%EC%9A%B4%EB%8C%80")))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(withSuccess(keywordSearchResponse("해운대해수욕장"), MediaType.APPLICATION_JSON));
+    server
+        .expect(
+            requestTo(
+                org.hamcrest.Matchers.containsString(
+                    "keyword=%EA%B4%91%EC%95%88%EB%A6%AC%20%EB%A7%9B%EC%A7%91")))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(withSuccess(keywordSearchResponse("광안리 맛집"), MediaType.APPLICATION_JSON));
+    server
+        .expect(
+            requestTo(org.hamcrest.Matchers.containsString("keyword=%EB%B6%80%EC%82%B0%EC%97%AD")))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(withSuccess(keywordSearchResponse("부산역"), MediaType.APPLICATION_JSON));
+
+    assertThat(
+            placeService
+                .searchPlacesByKeyword(new PlaceKeywordSearchReqDto("해운대", 1, 20, null, null, null))
+                .places())
+        .singleElement()
+        .extracting("title")
+        .isEqualTo("해운대해수욕장");
+    assertThat(
+            placeService
+                .searchPlacesByKeyword(
+                    new PlaceKeywordSearchReqDto("광안리 맛집", 1, 20, null, "39", null))
+                .places())
+        .singleElement()
+        .extracting("title")
+        .isEqualTo("광안리 맛집");
+    assertThat(
+            placeService
+                .searchPlacesByKeyword(new PlaceKeywordSearchReqDto("부산역", 1, 20, null, null, null))
+                .places())
+        .singleElement()
+        .extracting("title")
+        .isEqualTo("부산역");
+    server.verify();
+  }
+
+  private String keywordSearchResponse(String title) {
+    return """
+        {
+          "response": {
+            "body": {
+              "numOfRows": 20,
+              "pageNo": 1,
+              "totalCount": 1,
+              "items": {
+                "item": [{
+                  "contentid": "12345",
+                  "contenttypeid": "12",
+                  "title": "%s",
+                  "addr1": "부산광역시",
+                  "mapx": "129.160",
+                  "mapy": "35.163",
+                  "lDongRegnCd": "26"
+                }]
+              }
+            }
+          }
+        }
+        """
+        .formatted(title);
   }
 
   @Test

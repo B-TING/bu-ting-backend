@@ -1,5 +1,6 @@
 package com.butingbe.global.error;
 
+import com.butingbe.domain.place.exception.PlaceKeywordNotFoundException;
 import com.butingbe.global.common.ApiResponse;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
@@ -80,6 +81,13 @@ public class GlobalExceptionHandler {
     log.warn("Resource Not Found Exception: {}", e.getMessage());
 
     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+  }
+
+  @ExceptionHandler(PlaceKeywordNotFoundException.class)
+  public ResponseEntity<ApiResponse<Void>> handlePlaceKeywordNotFoundException(
+      PlaceKeywordNotFoundException e, HttpServletRequest request) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

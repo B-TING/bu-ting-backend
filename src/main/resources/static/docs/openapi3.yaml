@@ -200,6 +200,74 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PlaceSearchResponse"
+  /api/v1/places/search:
+    get:
+      tags:
+        - Place
+      summary: 키워드 기반 장소 검색
+      description: |
+        한국관광공사 키워드 관광정보(searchKeyword2)를 조회해 부산 지역 장소를 검색합니다.
+        검색 결과가 없으면 404를 반환합니다.
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          description: 검색할 장소 키워드
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          example: 해운대
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: districtCode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: contentTypeId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: arrange
+          in: query
+          required: false
+          schema:
+            type: string
+            default: A
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceSearchResponse"
+        "400":
+          description: 키워드 누락 또는 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 검색 결과 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/places/location:
     get:
       tags:
@@ -3876,16 +3944,16 @@ components:
           nullable: true
           description: 실제 체류 시간입니다. 단위는 분입니다.
           example: 90
-        mediaUrls:
+        mediaFileKeys:
           type: array
-          description: 장소 후기 사진/동영상 URL 목록입니다.
+          description: 파일 업로드 API에서 받은 장소 후기 사진/동영상 fileKey 목록입니다. URL이 아닌 fileKey를 전달합니다.
           maxItems: 20
           items:
             type: string
-            maxLength: 1000
+            maxLength: 500
           example:
-            - https://example.com/place-photo.jpg
-            - https://example.com/place-video.mp4
+            - uploads/images/550e8400-e29b-41d4-a716-446655440000.jpg
+            - uploads/videos/550e8400-e29b-41d4-a716-446655440001.mp4
     PlaceReviewUpdateRequest:
       type: object
       properties:
@@ -3917,16 +3985,16 @@ components:
           nullable: true
           description: 실제 체류 시간입니다. 단위는 분입니다.
           example: 75
-        mediaUrls:
+        mediaFileKeys:
           type: array
           nullable: true
-          description: null이면 기존 미디어를 유지하고, 빈 배열이면 모두 삭제합니다.
+          description: null이면 기존 미디어를 유지하고, 빈 배열이면 모두 삭제합니다. 파일 업로드 API에서 받은 fileKey를 전달합니다.
           maxItems: 20
           items:
             type: string
-            maxLength: 1000
+            maxLength: 500
           example:
-            - https://example.com/new-place-photo.jpg
+            - uploads/images/550e8400-e29b-41d4-a716-446655440000.jpg
     PlaceReviewResponse:
       type: object
       properties:
@@ -3969,6 +4037,7 @@ components:
             - 가족여행
         mediaUrls:
           type: array
+          description: 조회 시 새로 발급되는 Presigned URL 목록입니다. URL은 기본 1시간 후 만료됩니다.
           items:
             type: string
           example:

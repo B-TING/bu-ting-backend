@@ -11,6 +11,7 @@ import com.butingbe.domain.file.entity.FileMetadata;
 import com.butingbe.domain.file.repository.FileMetadataRepository;
 import java.net.URI;
 import java.time.Duration;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -78,5 +79,21 @@ class S3FileStorageServiceTest {
         .hasMessage("파일 크기 제한을 초과했습니다.");
 
     verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+  }
+
+  @Test
+  void createsPresignedGetUrlForRegisteredFileKey() throws Exception {
+    String fileKey = "uploads/images/busan.png";
+    when(fileMetadataRepository.findByObjectKey(fileKey))
+        .thenReturn(Optional.of(FileMetadata.builder().objectKey(fileKey).build()));
+    when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+        .thenReturn(presignedGetObjectRequest);
+    when(presignedGetObjectRequest.url())
+        .thenReturn(URI.create("https://signed.example.com/busan.png?signature=new").toURL());
+
+    String url = service.getPresignedUrl(fileKey);
+
+    assertThat(url).isEqualTo("https://signed.example.com/busan.png?signature=new");
+    verify(fileMetadataRepository).findByObjectKey(fileKey);
   }
 }
