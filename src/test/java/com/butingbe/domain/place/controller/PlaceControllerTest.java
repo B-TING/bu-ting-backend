@@ -105,7 +105,7 @@ class PlaceControllerTest {
         .willThrow(new PlaceKeywordNotFoundException());
 
     mockMvc
-        .perform(get("/api/v1/places/search").param("keyword", "없는장소"))
+        .perform(get("/api/v1/places/search").locale(Locale.KOREAN).param("keyword", "없는장소"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.message").value("검색어와 일치하는 장소를 찾을 수 없습니다."));
   }
