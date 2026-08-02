@@ -3944,16 +3944,16 @@ components:
           nullable: true
           description: 실제 체류 시간입니다. 단위는 분입니다.
           example: 90
-        mediaUrls:
+        mediaFileKeys:
           type: array
-          description: 장소 후기 사진/동영상 URL 목록입니다.
+          description: 파일 업로드 API에서 받은 장소 후기 사진/동영상 fileKey 목록입니다. URL이 아닌 fileKey를 전달합니다.
           maxItems: 20
           items:
             type: string
-            maxLength: 1000
+            maxLength: 500
           example:
-            - https://example.com/place-photo.jpg
-            - https://example.com/place-video.mp4
+            - uploads/images/550e8400-e29b-41d4-a716-446655440000.jpg
+            - uploads/videos/550e8400-e29b-41d4-a716-446655440001.mp4
     PlaceReviewUpdateRequest:
       type: object
       properties:
@@ -3985,16 +3985,16 @@ components:
           nullable: true
           description: 실제 체류 시간입니다. 단위는 분입니다.
           example: 75
-        mediaUrls:
+        mediaFileKeys:
           type: array
           nullable: true
-          description: null이면 기존 미디어를 유지하고, 빈 배열이면 모두 삭제합니다.
+          description: null이면 기존 미디어를 유지하고, 빈 배열이면 모두 삭제합니다. 파일 업로드 API에서 받은 fileKey를 전달합니다.
           maxItems: 20
           items:
             type: string
-            maxLength: 1000
+            maxLength: 500
           example:
-            - https://example.com/new-place-photo.jpg
+            - uploads/images/550e8400-e29b-41d4-a716-446655440000.jpg
     PlaceReviewResponse:
       type: object
       properties:
@@ -4037,6 +4037,7 @@ components:
             - 가족여행
         mediaUrls:
           type: array
+          description: 조회 시 새로 발급되는 Presigned URL 목록입니다. URL은 기본 1시간 후 만료됩니다.
           items:
             type: string
           example:

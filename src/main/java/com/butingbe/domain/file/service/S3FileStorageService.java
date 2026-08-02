@@ -81,11 +81,18 @@ public class S3FileStorageService implements FileStorageService {
 
   @Override
   public void delete(String fileKey) {
-    if (!StringUtils.hasText(fileKey) || fileKey.contains("..") || fileKey.startsWith("/")) {
-      throw new IllegalArgumentException("유효하지 않은 파일 키입니다.");
-    }
+    validateFileKey(fileKey);
     s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(fileKey).build());
     fileMetadataRepository.findByObjectKey(fileKey).ifPresent(fileMetadataRepository::delete);
+  }
+
+  @Override
+  public String getPresignedUrl(String fileKey) {
+    validateFileKey(fileKey);
+    fileMetadataRepository
+        .findByObjectKey(fileKey)
+        .orElseThrow(() -> new IllegalArgumentException("등록되지 않은 파일입니다."));
+    return createPresignedGetUrl(fileKey);
   }
 
   private void validate(MultipartFile file) {
@@ -97,6 +104,12 @@ public class S3FileStorageService implements FileStorageService {
     }
     if (!ALLOWED_TYPES.contains(file.getContentType())) {
       throw new IllegalArgumentException("지원하지 않는 파일 형식입니다.");
+    }
+  }
+
+  private void validateFileKey(String fileKey) {
+    if (!StringUtils.hasText(fileKey) || fileKey.contains("..") || fileKey.startsWith("/")) {
+      throw new IllegalArgumentException("유효하지 않은 파일 키입니다.");
     }
   }
 

@@ -6,5 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 public interface FileStorageService {
   FileUploadResDto upload(MultipartFile file);
 
+  String getPresignedUrl(String fileKey);
+
   void delete(String fileKey);
 }

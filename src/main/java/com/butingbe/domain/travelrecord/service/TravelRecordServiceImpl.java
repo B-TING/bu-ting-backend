@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelrecord.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.file.service.FileStorageService;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.Plan;
 import com.butingbe.domain.travel.entity.PlanPlace;
@@ -83,7 +84,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private static final int MAX_PLACE_REVIEW_TAG_COUNT = 10;
   private static final int MAX_PLACE_REVIEW_TAG_LENGTH = 30;
   private static final int MAX_PLACE_REVIEW_MEDIA_COUNT = 20;
-  private static final int MAX_PLACE_REVIEW_MEDIA_URL_LENGTH = 1000;
+  private static final int MAX_PLACE_REVIEW_MEDIA_FILE_KEY_LENGTH = 500;
 
   private final TravelRepository travelRepository;
   private final PlanRepository planRepository;
@@ -95,6 +96,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private final TravelRecordDayRepository travelRecordDayRepository;
   private final TravelRecordPlaceRepository travelRecordPlaceRepository;
   private final TravelRecordRouteRepository travelRecordRouteRepository;
+  private final FileStorageService fileStorageService;
   private final PlaceReviewRepository placeReviewRepository;
   private final PlaceReviewImageRepository placeReviewImageRepository;
   private final TravelRecordBookmarkRepository travelRecordBookmarkRepository;
@@ -585,7 +587,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         reviews.stream()
             .map(
                 review ->
-                    toPlaceReviewSummaryItem(review, findPlaceReviewMediaUrls(review.getId())))
+                    toPlaceReviewSummaryItem(
+                        review, createPresignedUrls(findPlaceReviewMediaFileKeys(review.getId()))))
             .toList());
   }
 
@@ -605,7 +608,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         reviews.stream()
             .map(
                 review ->
-                    toPlaceReviewSummaryItem(review, findPlaceReviewMediaUrls(review.getId())))
+                    toPlaceReviewSummaryItem(
+                        review, createPresignedUrls(findPlaceReviewMediaFileKeys(review.getId()))))
             .toList());
   }
 
@@ -620,7 +624,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     validateTravelMember(travelId, author.getId());
     validatePlaceReviewCreateRequest(request);
     List<String> tags = normalizePlaceReviewTags(request.tags());
-    List<String> mediaUrls = normalizePlaceReviewMediaUrls(request.mediaUrls());
+    List<String> mediaFileKeys = normalizePlaceReviewMediaFileKeys(request.mediaFileKeys());
 
     PlanPlace planPlace = findPlanPlaceInTravel(planPlaceId, travelId);
     validatePlaceReviewNotDuplicated(planPlaceId, author.getId());
@@ -636,9 +640,9 @@ public class TravelRecordServiceImpl implements TravelRecordService {
                 .tags(tags)
                 .build());
 
-    savePlaceReviewMedia(placeReview, mediaUrls);
+    savePlaceReviewMedia(placeReview, mediaFileKeys);
 
-    return PlaceReviewResDto.from(placeReview, mediaUrls);
+    return toPlaceReviewResponse(placeReview);
   }
 
   @Override
@@ -672,8 +676,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
     List<String> tags = request.tags() == null ? null : normalizePlaceReviewTags(request.tags());
     placeReview.update(request.rating(), request.stayMinutes(), request.content(), tags);
-    if (request.mediaUrls() != null) {
-      savePlaceReviewMedia(placeReview, normalizePlaceReviewMediaUrls(request.mediaUrls()));
+    if (request.mediaFileKeys() != null) {
+      savePlaceReviewMedia(placeReview, normalizePlaceReviewMediaFileKeys(request.mediaFileKeys()));
     }
     return toPlaceReviewResponse(placeReview);
   }
@@ -754,9 +758,9 @@ public class TravelRecordServiceImpl implements TravelRecordService {
                       .content(sourceReview.getContent())
                       .tags(List.copyOf(sourceReview.getTags()))
                       .build();
-              List<String> mediaUrls = findPlaceReviewMediaUrls(sourceReview.getId());
+              List<String> mediaFileKeys = findPlaceReviewMediaFileKeys(sourceReview.getId());
               PlaceReview savedReview = placeReviewRepository.save(snapshotReview);
-              savePlaceReviewMedia(savedReview, mediaUrls);
+              savePlaceReviewMedia(savedReview, mediaFileKeys);
             });
   }
 
@@ -843,7 +847,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   private PlaceReviewResDto toPlaceReviewResponse(PlaceReview placeReview) {
-    return PlaceReviewResDto.from(placeReview, findPlaceReviewMediaUrls(placeReview.getId()));
+    return PlaceReviewResDto.from(
+        placeReview, createPresignedUrls(findPlaceReviewMediaFileKeys(placeReview.getId())));
   }
 
   private PlaceReviewSummaryResDto.PlaceReviewItemResDto toPlaceReviewSummaryItem(
@@ -868,19 +873,19 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         placeReview.getUpdatedAt());
   }
 
-  private List<String> findPlaceReviewMediaUrls(UUID placeReviewId) {
+  private List<String> findPlaceReviewMediaFileKeys(UUID placeReviewId) {
     return placeReviewImageRepository.findByPlaceReview_IdOrderBySequenceAsc(placeReviewId).stream()
-        .map(PlaceReviewImage::getUrl)
+        .map(PlaceReviewImage::getFileKey)
         .toList();
   }
 
-  private void savePlaceReviewMedia(PlaceReview placeReview, List<String> mediaUrls) {
+  private void savePlaceReviewMedia(PlaceReview placeReview, List<String> mediaFileKeys) {
     placeReviewImageRepository.deleteByPlaceReview_Id(placeReview.getId());
-    for (int index = 0; index < mediaUrls.size(); index++) {
+    for (int index = 0; index < mediaFileKeys.size(); index++) {
       placeReviewImageRepository.save(
           PlaceReviewImage.builder()
               .placeReview(placeReview)
-              .url(mediaUrls.get(index))
+              .fileKey(mediaFileKeys.get(index))
               .sequence(index + 1)
               .build());
     }
@@ -1138,34 +1143,38 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     return normalizedTags;
   }
 
-  private List<String> normalizePlaceReviewMediaUrls(List<String> mediaUrls) {
-    if (mediaUrls == null || mediaUrls.isEmpty()) {
+  private List<String> normalizePlaceReviewMediaFileKeys(List<String> mediaFileKeys) {
+    if (mediaFileKeys == null || mediaFileKeys.isEmpty()) {
       return List.of();
     }
 
-    List<String> normalizedMediaUrls =
-        mediaUrls.stream()
-            .filter(url -> url != null && !url.isBlank())
+    List<String> normalizedMediaFileKeys =
+        mediaFileKeys.stream()
+            .filter(fileKey -> fileKey != null && !fileKey.isBlank())
             .map(String::trim)
             .distinct()
             .toList();
 
-    if (normalizedMediaUrls.size() > MAX_PLACE_REVIEW_MEDIA_COUNT) {
+    if (normalizedMediaFileKeys.size() > MAX_PLACE_REVIEW_MEDIA_COUNT) {
       throw new IllegalArgumentException(
-          "Place review media URLs must be " + MAX_PLACE_REVIEW_MEDIA_COUNT + " or fewer.");
+          "Place review media file keys must be " + MAX_PLACE_REVIEW_MEDIA_COUNT + " or fewer.");
     }
 
-    boolean hasTooLongUrl =
-        normalizedMediaUrls.stream()
-            .anyMatch(url -> url.length() > MAX_PLACE_REVIEW_MEDIA_URL_LENGTH);
-    if (hasTooLongUrl) {
+    boolean hasTooLongFileKey =
+        normalizedMediaFileKeys.stream()
+            .anyMatch(fileKey -> fileKey.length() > MAX_PLACE_REVIEW_MEDIA_FILE_KEY_LENGTH);
+    if (hasTooLongFileKey) {
       throw new IllegalArgumentException(
-          "Place review media URL must be "
-              + MAX_PLACE_REVIEW_MEDIA_URL_LENGTH
+          "Place review media file key must be "
+              + MAX_PLACE_REVIEW_MEDIA_FILE_KEY_LENGTH
               + " characters or less.");
     }
 
-    return normalizedMediaUrls;
+    return normalizedMediaFileKeys;
+  }
+
+  private List<String> createPresignedUrls(List<String> mediaFileKeys) {
+    return mediaFileKeys.stream().map(fileStorageService::getPresignedUrl).toList();
   }
 
   private void validatePlaceReviewSummaryRequest(PlaceProvider provider, String providerPlaceId) {
