@@ -7,6 +7,7 @@ import com.butingbe.domain.place.dto.googleplaces.GooglePlaceSearchRequest.Coord
 import com.butingbe.domain.place.dto.googleplaces.GooglePlaceSearchRequest.LocationBias;
 import com.butingbe.domain.place.dto.googleplaces.GooglePlaceSearchResponse;
 import com.butingbe.domain.place.dto.request.FestivalSearchReqDto;
+import com.butingbe.domain.place.dto.request.PlaceKeywordSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceLocationSearchReqDto;
 import com.butingbe.domain.place.dto.request.PlaceSearchReqDto;
 import com.butingbe.domain.place.dto.response.*;
@@ -15,6 +16,7 @@ import com.butingbe.domain.place.dto.tourapi.TourApiCommonResponse.TourCommonIte
 import com.butingbe.domain.place.dto.tourapi.TourApiDetailResponse;
 import com.butingbe.domain.place.dto.tourapi.TourApiResponse;
 import com.butingbe.domain.place.dto.tourapi.TourPlaceItem;
+import com.butingbe.domain.place.exception.PlaceKeywordNotFoundException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -118,6 +120,46 @@ public class TourApiPlaceService implements PlaceService {
             .body(TourApiResponse.class);
 
     TourApiResponse.Body body = body(response);
+    List<PlaceResDto> places =
+        items(body).stream().filter(Objects::nonNull).map(PlaceResDto::from).toList();
+    return new PlaceSearchResDto(body.pageNo(), body.numOfRows(), body.totalCount(), places);
+  }
+
+  @Override
+  public PlaceSearchResDto searchPlacesByKeyword(PlaceKeywordSearchReqDto request) {
+    if (!StringUtils.hasText(serviceKey)) {
+      throw new IllegalStateException("Tour API service key is not configured.");
+    }
+
+    TourApiResponse response =
+        restClient
+            .get()
+            .uri(
+                baseUrl + "/searchKeyword2",
+                uriBuilder -> {
+                  uriBuilder
+                      .queryParam("numOfRows", request.sizeOrDefault())
+                      .queryParam("pageNo", request.pageOrDefault())
+                      .queryParam("MobileOS", DEFAULT_MOBILE_OS)
+                      .queryParam("MobileApp", DEFAULT_MOBILE_APP)
+                      .queryParam("_type", DEFAULT_RESPONSE_TYPE)
+                      .queryParam("arrange", request.arrangeOrDefault())
+                      .queryParam("keyword", request.normalizedKeyword())
+                      .queryParam("serviceKey", serviceKey)
+                      .queryParam("lDongRegnCd", BUSAN_REGION_CODE);
+
+                  if (StringUtils.hasText(request.districtCodeOrNull())) {
+                    uriBuilder.queryParam("lDongSignguCd", request.districtCodeOrNull());
+                  }
+                  if (StringUtils.hasText(request.contentTypeIdOrNull())) {
+                    uriBuilder.queryParam("contentTypeId", request.contentTypeIdOrNull());
+                  }
+                  return uriBuilder.build();
+                })
+            .retrieve()
+            .body(TourApiResponse.class);
+
+    TourApiResponse.Body body = requireKeywordSearchResults(body(response));
     List<PlaceResDto> places =
         items(body).stream().filter(Objects::nonNull).map(PlaceResDto::from).toList();
     return new PlaceSearchResDto(body.pageNo(), body.numOfRows(), body.totalCount(), places);
@@ -255,6 +297,13 @@ public class TourApiPlaceService implements PlaceService {
   private TourApiResponse.Body requireLocationSearchResults(TourApiResponse.Body body) {
     if (body.totalCount() == 0) {
       throw new IllegalArgumentException("No places found for the requested location.");
+    }
+    return body;
+  }
+
+  private TourApiResponse.Body requireKeywordSearchResults(TourApiResponse.Body body) {
+    if (body.totalCount() == 0) {
+      throw new PlaceKeywordNotFoundException();
     }
     return body;
   }

@@ -200,6 +200,74 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PlaceSearchResponse"
+  /api/v1/places/search:
+    get:
+      tags:
+        - Place
+      summary: 키워드 기반 장소 검색
+      description: |
+        한국관광공사 키워드 관광정보(searchKeyword2)를 조회해 부산 지역 장소를 검색합니다.
+        검색 결과가 없으면 404를 반환합니다.
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          description: 검색할 장소 키워드
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          example: 해운대
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: districtCode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: contentTypeId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: arrange
+          in: query
+          required: false
+          schema:
+            type: string
+            default: A
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceSearchResponse"
+        "400":
+          description: 키워드 누락 또는 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 검색 결과 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/places/location:
     get:
       tags:
