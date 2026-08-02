@@ -744,7 +744,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: 업로드할 이미지 또는 영상 파일 (최대 50MB)
+                  description: 업로드할 이미지 또는 영상 파일 (JPEG, PNG, WebP, MP4, MOV / 최대 50MB). Swagger UI의 Select file에서 파일을 선택합니다.
       responses:
         "200":
           description: 업로드 성공
@@ -2164,6 +2164,10 @@ paths:
               tags:
                 - 야경
                 - 가족여행
+              stayMinutes: 90
+              mediaFileKeys:
+                - uploads/images/550e8400-e29b-41d4-a716-446655440000.jpg
+                - uploads/videos/550e8400-e29b-41d4-a716-446655440001.mp4
       responses:
         "201":
           description: 생성 성공
@@ -2234,7 +2238,7 @@ paths:
       tags:
         - TravelRecord
       summary: 일정 장소 후기 수정
-      description: 여행 멤버가 일정 장소(PlanPlace)에 작성한 후기의 별점, 본문, 태그를 수정합니다.
+      description: 여행 멤버가 일정 장소(PlanPlace)에 작성한 후기의 별점, 본문, 태그, 체류 시간과 미디어를 수정합니다.
       security:
         - opaqueToken: []
       parameters:
@@ -2252,6 +2256,9 @@ paths:
               tags:
                 - 카페
                 - 재방문
+              stayMinutes: 75
+              mediaFileKeys:
+                - uploads/images/550e8400-e29b-41d4-a716-446655440002.jpg
       responses:
         "200":
           description: 수정 성공
@@ -2512,6 +2519,11 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/TravelRecordUpdateRequest"
+            example:
+              title: 수정한 부산 여행
+              content: 수정한 여행 기록 본문입니다.
+              coverImageUrl: https://example.com/new-cover.jpg
+              overallRating: 4
       responses:
         "200":
           description: OK
@@ -4118,6 +4130,12 @@ components:
           type: string
           nullable: true
           example: 노을이 정말 예뻤어요.
+        stayMinutes:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: 실제 체류 시간입니다. 단위는 분입니다.
+          example: 90
         tags:
           type: array
           items:
@@ -4125,6 +4143,14 @@ components:
           example:
             - 야경
             - 가족여행
+        mediaUrls:
+          type: array
+          description: 조회 시 새로 발급되는 Presigned URL 목록입니다. URL은 기본 1시간 후 만료됩니다.
+          items:
+            type: string
+          example:
+            - https://example-bucket.s3.ap-northeast-2.amazonaws.com/uploads/images/550e8400-e29b-41d4-a716-446655440000.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256
+            - https://example-bucket.s3.ap-northeast-2.amazonaws.com/uploads/videos/550e8400-e29b-41d4-a716-446655440001.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256
         createdAt:
           type: string
           format: date-time
