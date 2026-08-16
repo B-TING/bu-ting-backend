@@ -66,6 +66,7 @@ public class TravelServiceImpl implements TravelService {
             .title(request.title())
             .startDate(request.startDate())
             .endDate(request.endDate())
+            .destination(request.destination())
             .status(TravelStatus.PLANNED)
             .hasHeavyBaggage(request.hasHeavyBaggage())
             .hasPets(request.hasPets())

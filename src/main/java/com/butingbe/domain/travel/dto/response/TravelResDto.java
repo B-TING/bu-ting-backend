@@ -14,6 +14,7 @@ public record TravelResDto(
     String title,
     LocalDate startDate,
     LocalDate endDate,
+    String destination,
     TravelStatus status,
     LocalDateTime createdAt,
     Boolean hasHeavyBaggage,
@@ -26,12 +27,48 @@ public record TravelResDto(
     CompanionType companionType,
     String accommodationArea) {
 
+  public TravelResDto(
+      UUID travelId,
+      String title,
+      LocalDate startDate,
+      LocalDate endDate,
+      TravelStatus status,
+      LocalDateTime createdAt,
+      Boolean hasHeavyBaggage,
+      Boolean hasPets,
+      TravelStyle travelStyle,
+      Boolean preferFlatTerrain,
+      TravelPace pace,
+      Integer companionCount,
+      String preferredFoods,
+      CompanionType companionType,
+      String accommodationArea) {
+    this(
+        travelId,
+        title,
+        startDate,
+        endDate,
+        null,
+        status,
+        createdAt,
+        hasHeavyBaggage,
+        hasPets,
+        travelStyle,
+        preferFlatTerrain,
+        pace,
+        companionCount,
+        preferredFoods,
+        companionType,
+        accommodationArea);
+  }
+
   public static TravelResDto from(Travel travel) {
     return new TravelResDto(
         travel.getId(),
         travel.getTitle(),
         travel.getStartDate(),
         travel.getEndDate(),
+        travel.getDestination(),
         travel.getStatus(),
         travel.getCreatedAt(),
         travel.getHasHeavyBaggage(),

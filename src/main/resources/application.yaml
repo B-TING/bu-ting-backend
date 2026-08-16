@@ -1,4 +1,13 @@
 spring:
+  ai:
+    openai:
+      api-key: ${AI_API_KEY:}
+      base-url: ${AI_BASE_URL:https://api.openai.com}
+      chat:
+        model: ${AI_MODEL:gpt-4o-mini}
+        temperature: 0.2
+        response-format:
+          type: JSON_OBJECT
   application:
     name: buting-be
   threads:
