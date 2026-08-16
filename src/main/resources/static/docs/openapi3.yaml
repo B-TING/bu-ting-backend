@@ -1006,6 +1006,7 @@ paths:
               title: 부산 여행
               startDate: "2026-08-01"
               endDate: "2026-08-03"
+              destination: 부산
               hasHeavyBaggage: false
               hasPets: false
               travelStyle: REST
@@ -1097,6 +1098,54 @@ paths:
                 $ref: "#/components/schemas/PlanResponse"
         "400":
           description: 검증 실패, 중복된 일차, 또는 여행 기간 밖의 날짜
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 여행 멤버가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 여행을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/travels/{travelId}/ai-plans:
+    post:
+      tags:
+        - Travel
+      summary: 위저드 선택 장소 기반 AI 여행 플랜 생성
+      description: 외부 AI API를 사용해 선택된 실제 장소만으로 일정을 생성하고 저장합니다.
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - $ref: "#/components/parameters/TravelId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiTravelPlanGenerateRequest"
+      responses:
+        "201":
+          description: AI 여행 플랜 생성 및 저장 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelPlansResponse"
+        "400":
+          description: 잘못된 장소 데이터 또는 AI 응답
           content:
             application/json:
               schema:
@@ -4655,6 +4704,7 @@ components:
       required:
         - startDate
         - endDate
+        - destination
       properties:
         title:
           type: string
@@ -4669,6 +4719,10 @@ components:
           type: string
           format: date
           example: "2026-08-03"
+        destination:
+          type: string
+          minLength: 1
+          example: 부산
         hasHeavyBaggage:
           type: boolean
           nullable: true
@@ -4699,6 +4753,71 @@ components:
           type: string
           nullable: true
           example: 해운대
+    AiTravelPlanGenerateRequest:
+      type: object
+      required:
+        - selectedPlaces
+      properties:
+        selectedPlaces:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/WizardPickedPlace"
+        foodIds:
+          type: array
+          items:
+            type: string
+          example: [milmyeon, dwaeji-gukbap]
+        schedulePace:
+          type: string
+          example: RELAXED
+        purposes:
+          type: array
+          items:
+            type: string
+          example: [힐링, 맛집 탐방]
+        bookedAccommodation:
+          type: string
+          nullable: true
+          example: 해운대 호텔
+        accommodationAreaIds:
+          type: array
+          items:
+            type: string
+          example: [haeundae]
+    WizardPickedPlace:
+      type: object
+      required:
+        - provider
+        - providerPlaceId
+        - placeName
+      properties:
+        provider:
+          $ref: "#/components/schemas/PlaceProvider"
+        providerPlaceId:
+          type: string
+          example: "126081"
+        placeName:
+          type: string
+          example: 해동용궁사
+        address:
+          type: string
+          nullable: true
+          example: 부산 기장군 기장읍 용궁길 86
+        latitude:
+          type: number
+          format: double
+          nullable: true
+          example: 35.1882
+        longitude:
+          type: number
+          format: double
+          nullable: true
+          example: 129.2232
+        type:
+          type: string
+          nullable: true
+          example: TOURIST_SPOT
     TravelResponse:
       allOf:
         - $ref: "#/components/schemas/TravelCreateRequest"
