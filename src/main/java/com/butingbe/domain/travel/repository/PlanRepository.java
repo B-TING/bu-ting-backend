@@ -10,4 +10,6 @@ public interface PlanRepository extends JpaRepository<Plan, UUID> {
   List<Plan> findByTravel_IdOrderByDayNumberAsc(UUID travelId);
 
   boolean existsByTravel_IdAndDayNumber(UUID travelId, Integer dayNumber);
+
+  boolean existsByTravel_IdAndVisitDate(UUID travelId, java.time.LocalDate visitDate);
 }

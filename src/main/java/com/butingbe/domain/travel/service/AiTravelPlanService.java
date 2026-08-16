@@ -18,6 +18,7 @@ import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.util.List;
 import java.util.UUID;
@@ -52,6 +53,10 @@ public class AiTravelPlanService {
 
     TravelPlanAiResponse response = aiClient.generate(promptBuilder.build(travel, request));
     validator.validate(travel, response);
+    if (response.days().stream()
+        .anyMatch(day -> planRepository.existsByTravel_IdAndVisitDate(travelId, day.date()))) {
+      throw new ConflictException("Travel plans already exist for one or more dates.");
+    }
     List<Plan> plans = response.days().stream().map(day -> saveDay(travel, day, request)).toList();
     return TravelPlansResDto.of(travel, plans.stream().map(this::toDay).toList());
   }
