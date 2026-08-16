@@ -5287,6 +5287,9 @@ components:
           example: "2026-07-09T10:00:00"
     TravelMemberResponse:
       type: object
+      required:
+        - startDate
+        - endDate
       properties:
         memberId:
           type: string
@@ -5662,6 +5665,10 @@ components:
     TravelExpenseUserSummary:
       type: object
       properties:
+        memberId:
+          type: string
+          format: uuid
+          example: 40000000-0000-0000-0000-000000000001
         userId:
           type: string
           format: uuid
@@ -5742,6 +5749,8 @@ components:
             $ref: "#/components/schemas/TravelExpenseMemberSummary"
     TravelExpenseCategorySummary:
       type: object
+      required:
+        - newLeaderUserId
       properties:
         category:
           $ref: "#/components/schemas/ExpenseCategory"
