@@ -37,6 +37,9 @@ public class Travel {
   @Column(name = "end_date", nullable = false)
   private LocalDate endDate;
 
+  @Column(length = 100)
+  private String destination;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 30)
   private TravelStatus status;
@@ -80,6 +83,7 @@ public class Travel {
       String title,
       LocalDate startDate,
       LocalDate endDate,
+      String destination,
       TravelStatus status,
       Boolean hasHeavyBaggage,
       Boolean hasPets,
@@ -93,6 +97,7 @@ public class Travel {
     this.title = title;
     this.startDate = startDate;
     this.endDate = endDate;
+    this.destination = destination;
     this.status = status;
     this.hasHeavyBaggage = hasHeavyBaggage;
     this.hasPets = hasPets;

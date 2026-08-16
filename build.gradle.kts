@@ -84,6 +84,8 @@ repositories {
 }
 
 dependencies {
+    implementation(platform("org.springframework.ai:spring-ai-bom:2.0.0"))
+    implementation("org.springframework.ai:spring-ai-starter-model-openai")
     implementation(platform("software.amazon.awssdk:bom:2.31.63"))
     implementation("software.amazon.awssdk:s3")
     // Web & Validation & Actuator
