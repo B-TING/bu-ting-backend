@@ -1,8 +1,10 @@
 package com.butingbe.domain.travelrecord.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCloneToTravelReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;
@@ -220,6 +222,19 @@ public class PublicTravelRecordController {
     travelRecordService.deleteComment(user, travelRecordId, commentId);
 
     return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/{travelRecordId}/clone-to-travel")
+  public ResponseEntity<TravelPlansResDto> cloneToTravel(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID travelRecordId,
+      @RequestBody @Valid TravelRecordCloneToTravelReqDto request) {
+    if (user == null) {
+      throw new UnauthenticatedException();
+    }
+
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(travelRecordService.cloneToTravel(user, travelRecordId, request));
   }
 
   @GetMapping("/{travelRecordId}")

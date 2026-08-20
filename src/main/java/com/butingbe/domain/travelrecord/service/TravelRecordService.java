@@ -1,9 +1,11 @@
 package com.butingbe.domain.travelrecord.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCloneToTravelReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
@@ -42,6 +44,11 @@ public interface TravelRecordService {
   TravelRecordResDto getPublished(UUID travelRecordId);
 
   TravelRecordResDto getPublished(AuthenticatedUser authenticatedUser, UUID travelRecordId);
+
+  TravelPlansResDto cloneToTravel(
+      AuthenticatedUser authenticatedUser,
+      UUID travelRecordId,
+      TravelRecordCloneToTravelReqDto request);
 
   TravelRecordFeedPageResDto getLatestFeed(String cursor, Integer size);
 

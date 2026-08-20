@@ -2,6 +2,8 @@ package com.butingbe.domain.travelrecord.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.file.service.FileStorageService;
+import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
+import com.butingbe.domain.travel.dto.response.TravelPlansResDto.PlanDayResDto;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.Plan;
 import com.butingbe.domain.travel.entity.PlanPlace;
@@ -14,6 +16,7 @@ import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCloneToTravelReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
@@ -48,6 +51,8 @@ import com.butingbe.domain.travelrecord.repository.TravelRecordLikeRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRouteRepository;
+import com.butingbe.domain.travelteam.entity.TravelMember;
+import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
@@ -80,6 +85,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private static final String DEFAULT_TITLE = "여행 기록";
   private static final int DEFAULT_FEED_SIZE = 20;
   private static final int MAX_FEED_SIZE = 50;
+  private static final int MAX_TRAVEL_TITLE_LENGTH = 15;
   private static final int MAX_COMMENT_CONTENT_LENGTH = 1000;
   private static final int MAX_PLACE_REVIEW_TAG_COUNT = 10;
   private static final int MAX_PLACE_REVIEW_TAG_LENGTH = 30;
@@ -199,6 +205,48 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     travelRecord.increaseViewCount();
 
     return toResponse(travelRecord, isLikedBy(authenticatedUser, travelRecord.getId()));
+  }
+
+  @Override
+  @Transactional
+  public TravelPlansResDto cloneToTravel(
+      AuthenticatedUser authenticatedUser,
+      UUID travelRecordId,
+      TravelRecordCloneToTravelReqDto request) {
+    User user = findAuthenticatedUser(authenticatedUser);
+    TravelRecord travelRecord = findTravelRecord(travelRecordId);
+    validatePublished(travelRecord);
+    validateCloneToTravelRequest(request);
+
+    List<TravelRecordDay> recordDays =
+        travelRecordDayRepository.findByTravelRecord_IdOrderByDayNumberAsc(travelRecordId);
+    validateCloneableItinerary(recordDays);
+
+    LocalDate endDate = request.startDate().plusDays(recordDays.getLast().getDayNumber() - 1L);
+    Travel travel =
+        travelRepository.save(
+            Travel.builder()
+                .title(resolveCloneTitle(travelRecord, request))
+                .startDate(request.startDate())
+                .endDate(endDate)
+                .status(TravelStatus.PLANNED)
+                .hasHeavyBaggage(request.hasHeavyBaggage())
+                .hasPets(request.hasPets())
+                .travelStyle(request.travelStyle())
+                .preferFlatTerrain(request.preferFlatTerrain())
+                .pace(request.pace())
+                .companionCount(request.companionCount())
+                .preferredFoods(request.preferredFoods())
+                .companionTypes(request.companionType())
+                .accommodationArea(request.accommodationArea())
+                .build());
+
+    travelMemberRepository.save(
+        TravelMember.builder().travel(travel).user(user).role(TravelTeamRole.LEADER).build());
+
+    copyRecordItineraryToTravel(recordDays, travel, request.startDate());
+
+    return toTravelPlansResponse(travel);
   }
 
   @Override
@@ -785,6 +833,95 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
   }
 
+  private void copyRecordItineraryToTravel(
+      List<TravelRecordDay> recordDays, Travel travel, LocalDate startDate) {
+    for (TravelRecordDay recordDay : recordDays) {
+      Plan plan =
+          planRepository.save(
+              Plan.builder()
+                  .travel(travel)
+                  .dayNumber(recordDay.getDayNumber())
+                  .visitDate(startDate.plusDays(recordDay.getDayNumber() - 1L))
+                  .build());
+
+      Map<UUID, PlanPlace> copiedPlaceByRecordPlaceId = copyRecordPlaces(recordDay, plan);
+      copyRecordRoutes(recordDay, plan, copiedPlaceByRecordPlaceId);
+    }
+  }
+
+  private Map<UUID, PlanPlace> copyRecordPlaces(TravelRecordDay recordDay, Plan plan) {
+    Map<UUID, PlanPlace> copiedPlaceByRecordPlaceId = new HashMap<>();
+
+    for (TravelRecordPlace recordPlace :
+        travelRecordPlaceRepository.findByTravelRecordDay_IdOrderBySequenceAsc(recordDay.getId())) {
+      PlanPlace planPlace =
+          planPlaceRepository.save(
+              PlanPlace.builder()
+                  .plan(plan)
+                  .sequence(recordPlace.getSequence())
+                  .placeName(recordPlace.getPlaceName())
+                  .address(recordPlace.getAddress())
+                  .latitude(recordPlace.getLatitude())
+                  .longitude(recordPlace.getLongitude())
+                  .provider(recordPlace.getProvider())
+                  .providerPlaceId(recordPlace.getProviderPlaceId())
+                  .durationMinutes(recordPlace.getDurationMinutes())
+                  .memo(recordPlace.getMemo())
+                  .scheduledTime(recordPlace.getScheduledTime())
+                  .visited(false)
+                  .build());
+
+      copiedPlaceByRecordPlaceId.put(recordPlace.getId(), planPlace);
+    }
+
+    return copiedPlaceByRecordPlaceId;
+  }
+
+  private void copyRecordRoutes(
+      TravelRecordDay recordDay, Plan plan, Map<UUID, PlanPlace> copiedPlaceByRecordPlaceId) {
+    for (TravelRecordRoute recordRoute :
+        travelRecordRouteRepository.findByTravelRecordDay_Id(recordDay.getId())) {
+      PlanPlace fromPlace = copiedPlaceByRecordPlaceId.get(recordRoute.getFromPlace().getId());
+      PlanPlace toPlace = copiedPlaceByRecordPlaceId.get(recordRoute.getToPlace().getId());
+
+      if (fromPlace == null || toPlace == null) {
+        continue;
+      }
+
+      planRouteRepository.save(
+          PlanRoute.builder()
+              .plan(plan)
+              .fromPlace(fromPlace)
+              .toPlace(toPlace)
+              .transportType(recordRoute.getTransportType())
+              .durationMinutes(recordRoute.getDurationMinutes())
+              .distanceMeters(recordRoute.getDistanceMeters())
+              .provider(recordRoute.getProvider())
+              .calculatedAt(recordRoute.getCalculatedAt())
+              .build());
+    }
+  }
+
+  private TravelPlansResDto toTravelPlansResponse(Travel travel) {
+    List<PlanDayResDto> days =
+        planRepository.findByTravel_IdOrderByDayNumberAsc(travel.getId()).stream()
+            .map(this::toPlanDayResponse)
+            .toList();
+
+    return TravelPlansResDto.of(travel, days);
+  }
+
+  private PlanDayResDto toPlanDayResponse(Plan plan) {
+    Map<UUID, PlanRoute> routeByFromPlaceId =
+        planRouteRepository.findByPlan_Id(plan.getId()).stream()
+            .collect(Collectors.toMap(route -> route.getFromPlace().getId(), Function.identity()));
+
+    return PlanDayResDto.of(
+        plan,
+        planPlaceRepository.findByPlan_IdOrderBySequenceAsc(plan.getId()),
+        routeByFromPlaceId);
+  }
+
   private TravelRecordResDto toResponse(TravelRecord travelRecord) {
     return toResponse(travelRecord, false);
   }
@@ -1062,6 +1199,30 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     validateTravelRecordOverallRating(request.overallRating());
   }
 
+  private void validateCloneToTravelRequest(TravelRecordCloneToTravelReqDto request) {
+    if (request == null) {
+      throw new IllegalArgumentException("Travel clone request is required.");
+    }
+
+    if (request.startDate() == null) {
+      throw new IllegalArgumentException("Travel start date is required.");
+    }
+
+    if (request.title() != null && request.title().isBlank()) {
+      throw new IllegalArgumentException("Travel title cannot be blank.");
+    }
+
+    if (request.title() != null && request.title().length() > MAX_TRAVEL_TITLE_LENGTH) {
+      throw new IllegalArgumentException("Travel title must be 15 characters or less.");
+    }
+  }
+
+  private void validateCloneableItinerary(List<TravelRecordDay> recordDays) {
+    if (recordDays.isEmpty()) {
+      throw new IllegalArgumentException("Travel record itinerary is required.");
+    }
+  }
+
   private void validateTravelRecordOverallRating(Integer overallRating) {
     if (overallRating == null) {
       return;
@@ -1243,6 +1404,25 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     return DEFAULT_TITLE;
+  }
+
+  private String resolveCloneTitle(
+      TravelRecord travelRecord, TravelRecordCloneToTravelReqDto request) {
+    if (request.title() != null && !request.title().isBlank()) {
+      return request.title();
+    }
+
+    if (travelRecord.getTitle() != null && !travelRecord.getTitle().isBlank()) {
+      return trimTravelTitle(travelRecord.getTitle());
+    }
+
+    return DEFAULT_TITLE;
+  }
+
+  private String trimTravelTitle(String title) {
+    return title.length() <= MAX_TRAVEL_TITLE_LENGTH
+        ? title
+        : title.substring(0, MAX_TRAVEL_TITLE_LENGTH);
   }
 
   private double calculateAverageRating(List<PlaceReview> reviews) {
