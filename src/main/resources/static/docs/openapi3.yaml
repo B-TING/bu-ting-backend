@@ -2471,6 +2471,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/travel-records/{travelRecordId}/clone-to-travel:
+    post:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록을 내 여행 계획으로 불러오기
+      description: 공개 발행된 여행 기록의 일자, 장소, 이동경로 스냅샷을 복사하여 인증된 사용자의 새 여행 계획을 생성합니다. 새 여행은 PLANNED 상태로 생성되고 요청자는 방장으로 등록됩니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordCloneToTravelRequest"
+            example:
+              title: 부산 2박 3일 따라가기
+              startDate: "2026-09-10"
+              hasHeavyBaggage: true
+              hasPets: false
+              companionCount: 2
+              preferredFoods: 해산물
+              accommodationArea: 해운대
+      responses:
+        "201":
+          description: 여행 계획 불러오기 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelPlansResponse"
+        "400":
+          description: 요청값 검증 실패 또는 복사할 일정이 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 공개 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/travel-records/me:
     get:
       tags:
@@ -3561,6 +3611,68 @@ components:
           nullable: true
           description: 여행 플랜 전체 평점입니다. 공개 발행 전에는 필요합니다.
           example: 4
+    TravelRecordCloneToTravelRequest:
+      type: object
+      description: 공개 여행 기록을 내 여행 계획으로 불러올 때 사용하는 요청입니다. startDate는 필수이고 나머지 여행 요약 정보는 선택입니다.
+      required:
+        - startDate
+      properties:
+        title:
+          type: string
+          maxLength: 15
+          nullable: true
+          description: 새로 생성할 여행 제목입니다. 선택값이며 생략하면 원본 여행 기록 제목을 사용합니다. 원본 제목이 15자를 넘으면 새 여행 제목 제한에 맞춰 앞 15자만 사용합니다.
+          example: 부산 2박 3일
+        startDate:
+          type: string
+          format: date
+          description: 새 여행의 시작일입니다. 필수값이며 종료일은 원본 여행 기록의 일차 수를 기준으로 서버가 계산합니다.
+          example: "2026-09-10"
+        hasHeavyBaggage:
+          type: boolean
+          nullable: true
+          description: 무거운 짐 동반 여부입니다. 선택값입니다.
+          example: true
+        hasPets:
+          type: boolean
+          nullable: true
+          description: 반려동물 동반 여부입니다. 선택값입니다.
+          example: false
+        travelStyle:
+          nullable: true
+          description: 선호 여행 스타일입니다. 선택값입니다.
+          allOf:
+            - $ref: "#/components/schemas/TravelStyle"
+        preferFlatTerrain:
+          type: boolean
+          nullable: true
+          description: 평지 위주 경로 선호 여부입니다. 선택값입니다.
+          example: true
+        pace:
+          nullable: true
+          description: 선호 여행 속도입니다. 선택값입니다.
+          allOf:
+            - $ref: "#/components/schemas/TravelPace"
+        companionCount:
+          type: integer
+          nullable: true
+          description: 동행 인원 수입니다. 선택값입니다.
+          example: 2
+        preferredFoods:
+          type: string
+          nullable: true
+          description: 선호 음식 정보입니다. 선택값입니다.
+          example: 해산물
+        companionType:
+          nullable: true
+          description: 동행 유형입니다. 선택값입니다. 기존 companionTypes 이름으로 보내도 처리됩니다.
+          allOf:
+            - $ref: "#/components/schemas/CompanionType"
+        accommodationArea:
+          type: string
+          nullable: true
+          description: 희망 숙소 지역입니다. 선택값입니다.
+          example: 해운대
     TravelRecordStatus:
       type: string
       enum:
