@@ -2,9 +2,9 @@ package com.butingbe.domain.travelrecord.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCloneToTravelReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
-import com.butingbe.domain.travelrecord.dto.request.TravelRecordCloneToTravelReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordFeedSort;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordBookmarkResDto;

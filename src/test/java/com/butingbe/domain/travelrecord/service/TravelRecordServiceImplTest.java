@@ -416,7 +416,8 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @Test
   @DisplayName("user can clone a published travel record itinerary to a new travel plan")
   void clonePublishedTravelRecordToTravelPlan() {
-    User author = userRepository.save(createUser("record-clone-author@example.com", "clone-author"));
+    User author =
+        userRepository.save(createUser("record-clone-author@example.com", "clone-author"));
     User user = userRepository.save(createUser("record-clone-user@example.com", "clone-user"));
     AuthenticatedUser authorUser = AuthenticatedUser.from(author);
     AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
