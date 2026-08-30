@@ -1126,7 +1126,16 @@ paths:
       tags:
         - Travel
       summary: 위저드 선택 장소 기반 AI 여행 플랜 생성
-      description: 외부 AI API를 사용해 선택된 실제 장소만으로 일정을 생성하고 저장합니다.
+      description: |
+        selectedPlaces의 모든 (provider, providerPlaceId)를 전체 일정에 정확히 한 번씩 배치합니다.
+        providerPlaceId는 관광데이터 검색 API 응답의 contentId를 그대로 전달합니다.
+        LLM은 복합키·날짜·순서·memo만 결정하며 이름·주소·좌표는 요청 원본에서 채웁니다.
+        pace는 분배와 밀도만 조절하며 장소를 제외하지 않습니다.
+        서버가 좌표 기반으로 날짜별 장소를 묶으며, LLM은 해당 묶음 안에서 순서와 설명을 생성합니다.
+        동선·설명 품질이 부족하면 피드백을 포함해 최대 1회 재생성합니다. 다시 실패하면 저장하지 않습니다.
+        거리는 직선거리 기반 휴리스틱이며 실제 교통·숙소 좌표·이동 시간을 계산하지 않습니다.
+        전체 결과를 검증한 뒤 저장하며 누락·추가·중복 장소가 있으면 저장하지 않습니다.
+        관광데이터 contentId를 GOOGLE provider와 함께 사용하는 기존 앱 계약을 유지합니다.
       security:
         - opaqueToken: [ ]
       parameters:
@@ -1145,7 +1154,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/TravelPlansResponse"
         "400":
-          description: 잘못된 장소 데이터 또는 AI 응답
+          description: 잘못된 입력 장소 참조(INVALID_PLACE_REFERENCE) 또는 중복 입력(DUPLICATED_PLACE)
           content:
             application/json:
               schema:
@@ -1164,6 +1173,16 @@ paths:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           description: 여행을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+        "502":
+          description: |
+            AI 응답 무결성 검증 실패. 내부 사유는 MISSING_SELECTED_PLACE, UNEXPECTED_PLACE,
+            DUPLICATED_PLACE, INVALID_PLACE_REFERENCE, INVALID_SCHEDULE, LOW_QUALITY_PLAN으로 구분합니다.
+            기존 ApiErrorResponse 형식으로 사유별 번역 메시지를 반환합니다.
           content:
             application/json:
               schema:
@@ -2471,6 +2490,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/travel-records/{travelRecordId}/clone-to-travel:
+    post:
+      tags:
+        - TravelRecord
+      summary: 공개 여행 기록을 내 여행 계획으로 불러오기
+      description: 공개 발행된 여행 기록의 일자, 장소, 이동경로 스냅샷을 복사하여 인증된 사용자의 새 여행 계획을 생성합니다. 새 여행은 PLANNED 상태로 생성되고 요청자는 방장으로 등록됩니다.
+      security:
+        - opaqueToken: []
+      parameters:
+        - $ref: "#/components/parameters/TravelRecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRecordCloneToTravelRequest"
+            example:
+              title: 부산 2박 3일 따라가기
+              startDate: "2026-09-10"
+              hasHeavyBaggage: true
+              hasPets: false
+              companionCount: 2
+              preferredFoods: 해산물
+              accommodationArea: 해운대
+      responses:
+        "201":
+          description: 여행 계획 불러오기 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelPlansResponse"
+        "400":
+          description: 요청값 검증 실패 또는 복사할 일정이 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 공개 여행 기록을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/travel-records/me:
     get:
       tags:
@@ -3561,6 +3630,68 @@ components:
           nullable: true
           description: 여행 플랜 전체 평점입니다. 공개 발행 전에는 필요합니다.
           example: 4
+    TravelRecordCloneToTravelRequest:
+      type: object
+      description: 공개 여행 기록을 내 여행 계획으로 불러올 때 사용하는 요청입니다. startDate는 필수이고 나머지 여행 요약 정보는 선택입니다.
+      required:
+        - startDate
+      properties:
+        title:
+          type: string
+          maxLength: 15
+          nullable: true
+          description: 새로 생성할 여행 제목입니다. 선택값이며 생략하면 원본 여행 기록 제목을 사용합니다. 원본 제목이 15자를 넘으면 새 여행 제목 제한에 맞춰 앞 15자만 사용합니다.
+          example: 부산 2박 3일
+        startDate:
+          type: string
+          format: date
+          description: 새 여행의 시작일입니다. 필수값이며 종료일은 원본 여행 기록의 일차 수를 기준으로 서버가 계산합니다.
+          example: "2026-09-10"
+        hasHeavyBaggage:
+          type: boolean
+          nullable: true
+          description: 무거운 짐 동반 여부입니다. 선택값입니다.
+          example: true
+        hasPets:
+          type: boolean
+          nullable: true
+          description: 반려동물 동반 여부입니다. 선택값입니다.
+          example: false
+        travelStyle:
+          nullable: true
+          description: 선호 여행 스타일입니다. 선택값입니다.
+          allOf:
+            - $ref: "#/components/schemas/TravelStyle"
+        preferFlatTerrain:
+          type: boolean
+          nullable: true
+          description: 평지 위주 경로 선호 여부입니다. 선택값입니다.
+          example: true
+        pace:
+          nullable: true
+          description: 선호 여행 속도입니다. 선택값입니다.
+          allOf:
+            - $ref: "#/components/schemas/TravelPace"
+        companionCount:
+          type: integer
+          nullable: true
+          description: 동행 인원 수입니다. 선택값입니다.
+          example: 2
+        preferredFoods:
+          type: string
+          nullable: true
+          description: 선호 음식 정보입니다. 선택값입니다.
+          example: 해산물
+        companionType:
+          nullable: true
+          description: 동행 유형입니다. 선택값입니다. 기존 companionTypes 이름으로 보내도 처리됩니다.
+          allOf:
+            - $ref: "#/components/schemas/CompanionType"
+        accommodationArea:
+          type: string
+          nullable: true
+          description: 희망 숙소 지역입니다. 선택값입니다.
+          example: 해운대
     TravelRecordStatus:
       type: string
       enum:
@@ -4761,6 +4892,7 @@ components:
         selectedPlaces:
           type: array
           minItems: 1
+          description: 관광데이터 검색 결과 원본. 복합키 중복 없이 모든 장소를 정확히 한 번 배치합니다.
           items:
             $ref: "#/components/schemas/WizardPickedPlace"
         foodIds:
@@ -4770,6 +4902,7 @@ components:
           example: [milmyeon, dwaeji-gukbap]
         schedulePace:
           type: string
+          description: 장소 분배와 일정 밀도를 조절합니다. 선택 장소 수를 제한하지 않습니다.
           example: RELAXED
         purposes:
           type: array
@@ -4779,6 +4912,7 @@ components:
         bookedAccommodation:
           type: string
           nullable: true
+          description: 동선 참고용 숙소 이름. 정확한 위치를 조회하지 않으며 관광 장소로 자동 추가하지 않습니다.
           example: 해운대 호텔
         accommodationAreaIds:
           type: array
@@ -4791,18 +4925,23 @@ components:
         - provider
         - providerPlaceId
         - placeName
+        - address
       properties:
         provider:
           $ref: "#/components/schemas/PlaceProvider"
         providerPlaceId:
           type: string
+          description: 관광데이터 API 검색 응답의 contentId 문자열. Google Places ID로 바꾸거나 재생성하지 않습니다.
+          minLength: 1
+          maxLength: 255
           example: "126081"
         placeName:
           type: string
           example: 해동용궁사
         address:
           type: string
-          nullable: true
+          minLength: 1
+          maxLength: 255
           example: 부산 기장군 기장읍 용궁길 86
         latitude:
           type: number
@@ -5287,9 +5426,6 @@ components:
           example: "2026-07-09T10:00:00"
     TravelMemberResponse:
       type: object
-      required:
-        - startDate
-        - endDate
       properties:
         memberId:
           type: string
@@ -5665,10 +5801,6 @@ components:
     TravelExpenseUserSummary:
       type: object
       properties:
-        memberId:
-          type: string
-          format: uuid
-          example: 40000000-0000-0000-0000-000000000001
         userId:
           type: string
           format: uuid
@@ -5749,8 +5881,6 @@ components:
             $ref: "#/components/schemas/TravelExpenseMemberSummary"
     TravelExpenseCategorySummary:
       type: object
-      required:
-        - newLeaderUserId
       properties:
         category:
           $ref: "#/components/schemas/ExpenseCategory"

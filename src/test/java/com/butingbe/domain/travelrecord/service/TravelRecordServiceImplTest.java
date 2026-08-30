@@ -12,6 +12,7 @@ import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
+import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
 import com.butingbe.domain.travel.dto.response.TravelResDto;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.PlanRoute;
@@ -22,6 +23,7 @@ import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.service.TravelService;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.PlaceReviewUpdateReqDto;
+import com.butingbe.domain.travelrecord.dto.request.TravelRecordCloneToTravelReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentCreateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCommentUpdateReqDto;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCreateReqDto;
@@ -42,6 +44,8 @@ import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRouteRepository;
+import com.butingbe.domain.travelteam.entity.TravelTeamRole;
+import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
@@ -100,6 +104,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @Autowired private TravelRecordPlaceRepository travelRecordPlaceRepository;
   @Autowired private TravelRecordRouteRepository travelRecordRouteRepository;
   @Autowired private PlaceReviewRepository placeReviewRepository;
+  @Autowired private TravelMemberRepository travelMemberRepository;
 
   @Test
   @DisplayName("completed travel can be copied to a draft travel record snapshot")
@@ -406,6 +411,130 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThatThrownBy(() -> travelRecordService.getPublished(draft.travelRecordId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Travel record not found.");
+  }
+
+  @Test
+  @DisplayName("user can clone a published travel record itinerary to a new travel plan")
+  void clonePublishedTravelRecordToTravelPlan() {
+    User author =
+        userRepository.save(createUser("record-clone-author@example.com", "clone-author"));
+    User user = userRepository.save(createUser("record-clone-user@example.com", "clone-user"));
+    AuthenticatedUser authorUser = AuthenticatedUser.from(author);
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto sourceTravel = createCompletedTravel(authorUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authorUser, sourceTravel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanResDto secondDay =
+        travelService.createPlan(
+            authorUser, sourceTravel.id(), new PlanCreateReqDto(2, LocalDate.of(2026, 8, 2)));
+    PlanPlaceResDto firstPlace = createPlace(authorUser, firstDay.planId(), 1, "Busan Station");
+    PlanPlaceResDto secondPlace = createPlace(authorUser, firstDay.planId(), 2, "Haeundae");
+    createPlace(authorUser, secondDay.planId(), 1, "Gwangalli");
+    saveRoute(firstPlace, secondPlace);
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(
+            authorUser,
+            sourceTravel.id(),
+            new TravelRecordCreateReqDto("Busan Course", "Nice route", null, 5));
+    TravelRecordResDto published =
+        travelRecordService.publish(authorUser, sourceTravel.id(), draft.travelRecordId());
+
+    TravelPlansResDto result =
+        travelRecordService.cloneToTravel(
+            authenticatedUser,
+            published.travelRecordId(),
+            new TravelRecordCloneToTravelReqDto(
+                "Copied Busan",
+                LocalDate.of(2026, 9, 10),
+                true,
+                false,
+                null,
+                null,
+                null,
+                2,
+                "seafood",
+                null,
+                "Haeundae"));
+
+    assertThat(result.travelId()).isNotEqualTo(sourceTravel.id());
+    assertThat(result.title()).isEqualTo("Copied Busan");
+    assertThat(result.days()).hasSize(2);
+    assertThat(result.days())
+        .extracting(TravelPlansResDto.PlanDayResDto::visitDate)
+        .containsExactly(LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 11));
+    assertThat(result.days().getFirst().places()).hasSize(2);
+    assertThat(result.days().getFirst().places().getFirst().placeName()).isEqualTo("Busan Station");
+    assertThat(result.days().getFirst().places().getFirst().visited()).isFalse();
+    assertThat(result.days().getFirst().places().getFirst().routeToNext()).isNotNull();
+    assertThat(result.days().getFirst().places().getFirst().routeToNext().durationMinutes())
+        .isEqualTo(25);
+    assertThat(
+            travelMemberRepository
+                .findByTravel_IdAndUser_Id(result.travelId(), user.getId())
+                .orElseThrow()
+                .getRole())
+        .isEqualTo(TravelTeamRole.LEADER);
+  }
+
+  @Test
+  @DisplayName("non-published travel record cannot be cloned to a travel plan")
+  void cloneToTravelRejectsNonPublishedRecord() {
+    User user = userRepository.save(createUser("record-clone-hidden@example.com", "clone-hidden"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Hidden Course");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.cloneToTravel(
+                    authenticatedUser,
+                    draft.travelRecordId(),
+                    new TravelRecordCloneToTravelReqDto(
+                        "Copied",
+                        LocalDate.of(2026, 9, 10),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel record not found.");
+  }
+
+  @Test
+  @DisplayName("clone trims long record title when travel title is omitted")
+  void cloneToTravelTrimsLongRecordTitleWhenTitleIsOmitted() {
+    User user = userRepository.save(createUser("record-clone-title@example.com", "clone-title"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft =
+        createDraftWithOnePlace(authenticatedUser, "Very Long Busan Travel Record Title");
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelPlansResDto result =
+        travelRecordService.cloneToTravel(
+            authenticatedUser,
+            published.travelRecordId(),
+            new TravelRecordCloneToTravelReqDto(
+                null,
+                LocalDate.of(2026, 9, 10),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+    assertThat(result.title()).hasSize(15);
+    assertThat(result.title()).isEqualTo("Very Long Busan");
   }
 
   @Test

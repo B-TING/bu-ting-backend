@@ -1,14 +1,14 @@
 package com.butingbe.domain.travel.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
-import com.butingbe.domain.travel.ai.TravelPlanAiClient;
+import com.butingbe.domain.travel.ai.PlaceKey;
+import com.butingbe.domain.travel.ai.SelectedPlaceCatalog;
 import com.butingbe.domain.travel.ai.TravelPlanAiResponse;
-import com.butingbe.domain.travel.ai.TravelPlanAiResponseValidator;
-import com.butingbe.domain.travel.ai.TravelPlanPromptBuilder;
+import com.butingbe.domain.travel.ai.TravelPlanGenerator;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto;
+import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto.WizardPickedPlaceReqDto;
 import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
 import com.butingbe.domain.travel.dto.response.TravelPlansResDto.PlanDayResDto;
-import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.Plan;
 import com.butingbe.domain.travel.entity.PlanPlace;
 import com.butingbe.domain.travel.entity.Travel;
@@ -21,6 +21,7 @@ import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,9 +35,7 @@ public class AiTravelPlanService {
   private final PlanPlaceRepository planPlaceRepository;
   private final UserRepository userRepository;
   private final TravelMemberAuthorization authorization;
-  private final TravelPlanPromptBuilder promptBuilder;
-  private final TravelPlanAiClient aiClient;
-  private final TravelPlanAiResponseValidator validator;
+  private final TravelPlanGenerator generator;
 
   @Transactional
   public TravelPlansResDto generate(
@@ -51,18 +50,22 @@ public class AiTravelPlanService {
             .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
     authorization.validateMember(travelId, user.getId());
 
-    TravelPlanAiResponse response = aiClient.generate(promptBuilder.build(travel, request));
-    validator.validate(travel, response);
+    Map<PlaceKey, WizardPickedPlaceReqDto> catalog = SelectedPlaceCatalog.from(request);
+    TravelPlanAiResponse response = generator.generate(travel, request, catalog);
     if (response.days().stream()
         .anyMatch(day -> planRepository.existsByTravel_IdAndVisitDate(travelId, day.date()))) {
       throw new ConflictException("Travel plans already exist for one or more dates.");
     }
-    List<Plan> plans = response.days().stream().map(day -> saveDay(travel, day, request)).toList();
+    List<Plan> plans =
+        response.days().stream()
+            .sorted(java.util.Comparator.comparing(TravelPlanAiResponse.Day::date))
+            .map(day -> saveDay(travel, day, catalog))
+            .toList();
     return TravelPlansResDto.of(travel, plans.stream().map(this::toDay).toList());
   }
 
   private Plan saveDay(
-      Travel travel, TravelPlanAiResponse.Day day, AiTravelPlanGenerateReqDto request) {
+      Travel travel, TravelPlanAiResponse.Day day, Map<PlaceKey, WizardPickedPlaceReqDto> catalog) {
     Plan plan =
         planRepository.save(
             Plan.builder()
@@ -75,14 +78,8 @@ public class AiTravelPlanService {
                 .visitDate(day.date())
                 .build());
     for (TravelPlanAiResponse.Place place : day.places()) {
-      AiTravelPlanGenerateReqDto.WizardPickedPlaceReqDto found =
-          request.selectedPlaces().stream()
-              .filter(candidate -> candidate.placeName().equals(place.name()))
-              .findFirst()
-              .orElseThrow(
-                  () ->
-                      new IllegalArgumentException(
-                          "AI selected an unknown place: " + place.name()));
+      PlaceKey key = PlaceKey.of(place.provider(), place.providerPlaceId());
+      WizardPickedPlaceReqDto found = catalog.get(key);
       planPlaceRepository.save(
           PlanPlace.builder()
               .plan(plan)
@@ -91,9 +88,9 @@ public class AiTravelPlanService {
               .address(found.address())
               .latitude(found.latitude())
               .longitude(found.longitude())
-              .provider(PlaceProvider.valueOf(found.provider().toUpperCase()))
-              .providerPlaceId(found.providerPlaceId())
-              .memo(place.description() + "\n" + place.recommendationReason())
+              .provider(key.provider())
+              .providerPlaceId(key.providerPlaceId())
+              .memo(place.memo())
               .build());
     }
     return plan;

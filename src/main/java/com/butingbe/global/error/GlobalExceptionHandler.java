@@ -1,6 +1,7 @@
 package com.butingbe.global.error;
 
 import com.butingbe.domain.place.exception.PlaceKeywordNotFoundException;
+import com.butingbe.domain.travel.ai.TravelPlanValidationException;
 import com.butingbe.global.common.ApiResponse;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
@@ -27,6 +28,18 @@ public class GlobalExceptionHandler {
 
   private final MessageSource messageSource;
   private final LocaleResolver localeResolver;
+
+  @ExceptionHandler(TravelPlanValidationException.class)
+  public ResponseEntity<ApiResponse<Void>> handleTravelPlanValidation(
+      TravelPlanValidationException e, HttpServletRequest request) {
+    log.warn(
+        "Travel plan validation failed: reason={}, generated={}",
+        e.getReason(),
+        e.isGeneratedResponse());
+    return ResponseEntity.status(
+            e.isGeneratedResponse() ? HttpStatus.BAD_GATEWAY : HttpStatus.BAD_REQUEST)
+        .body(ApiResponse.fail(message(e.getMessage(), request)));
+  }
 
   /** 🔑 1. 인증 실패 예외 (401 Unauthorized) 우리가 만든 UnauthenticatedException이 앱 어디서든 터지면 이 메소드가 가로챕니다. */
   @ExceptionHandler(UnauthenticatedException.class)
