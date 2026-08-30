@@ -72,4 +72,30 @@ public final class TravelPlanFixtures {
                 })
             .toList());
   }
+
+  public static TravelPlanAiResponse qualityResponse() {
+    var catalog = SelectedPlaceCatalog.from(request());
+    var routes = new TravelPlanRoutePlanner().plan(travel(), catalog);
+    return new TravelPlanAiResponse(
+        routes.entrySet().stream()
+            .map(
+                entry ->
+                    new TravelPlanAiResponse.Day(
+                        entry.getKey(),
+                        IntStream.range(0, entry.getValue().size())
+                            .mapToObj(
+                                i -> {
+                                  var key = entry.getValue().get(i);
+                                  return new TravelPlanAiResponse.Place(
+                                      i + 1,
+                                      key.provider().name(),
+                                      key.providerPlaceId(),
+                                      catalog.get(key).placeName()
+                                          + " 방문 구간 "
+                                          + key.providerPlaceId()
+                                          + "에서 주변 풍경을 살펴보고 여행 목적에 맞게 여유롭게 둘러보세요.");
+                                })
+                            .toList()))
+            .toList());
+  }
 }

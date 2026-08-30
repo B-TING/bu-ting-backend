@@ -3,10 +3,8 @@ package com.butingbe.domain.travel.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.ai.PlaceKey;
 import com.butingbe.domain.travel.ai.SelectedPlaceCatalog;
-import com.butingbe.domain.travel.ai.TravelPlanAiClient;
 import com.butingbe.domain.travel.ai.TravelPlanAiResponse;
-import com.butingbe.domain.travel.ai.TravelPlanAiResponseValidator;
-import com.butingbe.domain.travel.ai.TravelPlanPromptBuilder;
+import com.butingbe.domain.travel.ai.TravelPlanGenerator;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto.WizardPickedPlaceReqDto;
 import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
@@ -37,9 +35,7 @@ public class AiTravelPlanService {
   private final PlanPlaceRepository planPlaceRepository;
   private final UserRepository userRepository;
   private final TravelMemberAuthorization authorization;
-  private final TravelPlanPromptBuilder promptBuilder;
-  private final TravelPlanAiClient aiClient;
-  private final TravelPlanAiResponseValidator validator;
+  private final TravelPlanGenerator generator;
 
   @Transactional
   public TravelPlansResDto generate(
@@ -55,8 +51,7 @@ public class AiTravelPlanService {
     authorization.validateMember(travelId, user.getId());
 
     Map<PlaceKey, WizardPickedPlaceReqDto> catalog = SelectedPlaceCatalog.from(request);
-    TravelPlanAiResponse response = aiClient.generate(promptBuilder.build(travel, request));
-    validator.validate(travel, response, catalog);
+    TravelPlanAiResponse response = generator.generate(travel, request, catalog);
     if (response.days().stream()
         .anyMatch(day -> planRepository.existsByTravel_IdAndVisitDate(travelId, day.date()))) {
       throw new ConflictException("Travel plans already exist for one or more dates.");

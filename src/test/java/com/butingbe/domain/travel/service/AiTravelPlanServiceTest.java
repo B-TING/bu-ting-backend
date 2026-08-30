@@ -1,6 +1,7 @@
 package com.butingbe.domain.travel.service;
 
 import static com.butingbe.domain.travel.ai.TravelPlanFixtures.IDS;
+import static com.butingbe.domain.travel.ai.TravelPlanFixtures.qualityResponse;
 import static com.butingbe.domain.travel.ai.TravelPlanFixtures.request;
 import static com.butingbe.domain.travel.ai.TravelPlanFixtures.response;
 import static com.butingbe.domain.travel.ai.TravelPlanFixtures.travel;
@@ -15,7 +16,10 @@ import static org.mockito.Mockito.when;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.ai.TravelPlanAiClient;
 import com.butingbe.domain.travel.ai.TravelPlanAiResponseValidator;
+import com.butingbe.domain.travel.ai.TravelPlanGenerator;
 import com.butingbe.domain.travel.ai.TravelPlanPromptBuilder;
+import com.butingbe.domain.travel.ai.TravelPlanQualityValidator;
+import com.butingbe.domain.travel.ai.TravelPlanRoutePlanner;
 import com.butingbe.domain.travel.ai.TravelPlanValidationException;
 import com.butingbe.domain.travel.entity.Plan;
 import com.butingbe.domain.travel.entity.PlanPlace;
@@ -54,9 +58,12 @@ class AiTravelPlanServiceTest {
           places,
           users,
           mock(TravelMemberAuthorization.class),
-          new TravelPlanPromptBuilder(),
-          ai,
-          new TravelPlanAiResponseValidator());
+          new TravelPlanGenerator(
+              new TravelPlanPromptBuilder(),
+              ai,
+              new TravelPlanAiResponseValidator(),
+              new TravelPlanRoutePlanner(),
+              new TravelPlanQualityValidator(new TravelPlanRoutePlanner())));
   private final UUID travelId = UUID.randomUUID();
   private final UUID userId = UUID.randomUUID();
   private final AuthenticatedUser principal = new AuthenticatedUser(userId, null, null, List.of());
@@ -78,7 +85,8 @@ class AiTravelPlanServiceTest {
       ChatModel model = mock(ChatModel.class);
       when(model.getOptions())
           .thenReturn(org.springframework.ai.chat.prompt.ChatOptions.builder().build());
-      String json = new tools.jackson.databind.json.JsonMapper().writeValueAsString(response(IDS));
+      String json =
+          new tools.jackson.databind.json.JsonMapper().writeValueAsString(qualityResponse());
       json =
           json.replace(
               "\"memo\":",
@@ -90,7 +98,7 @@ class AiTravelPlanServiceTest {
               call ->
                   new TravelPlanAiClient(ChatClient.builder(model)).generate(call.getArgument(0)));
     } else {
-      when(ai.generate(anyString())).thenReturn(response(IDS));
+      when(ai.generate(anyString())).thenReturn(qualityResponse());
     }
     List<PlanPlace> stored = new ArrayList<>();
     when(plans.save(any()))
@@ -121,11 +129,15 @@ class AiTravelPlanServiceTest {
     assertThat(output)
         .hasSize(8)
         .extracting(p -> p.providerPlaceId())
-        .containsExactlyElementsOf(IDS)
+        .containsExactlyInAnyOrderElementsOf(IDS)
         .doesNotHaveDuplicates();
     for (int i = 0; i < 8; i++) {
       var original = request().selectedPlaces().get(i);
-      var actual = output.get(i);
+      var actual =
+          output.stream()
+              .filter(p -> p.providerPlaceId().equals(original.providerPlaceId()))
+              .findFirst()
+              .orElseThrow();
       assertThat(actual.placeName()).isEqualTo(original.placeName());
       assertThat(actual.address()).isEqualTo(original.address());
       assertThat(actual.latitude()).isEqualTo(original.latitude());
@@ -161,5 +173,33 @@ class AiTravelPlanServiceTest {
             TravelPlanValidationException.class,
             e -> assertThat(e.isGeneratedResponse()).isFalse());
     verifyNoInteractions(ai, plans, places);
+  }
+
+  @Test
+  void repeatedQualityFailureDoesNotWritePlans() {
+    var poor =
+        new com.butingbe.domain.travel.ai.TravelPlanAiResponse(
+            qualityResponse().days().stream()
+                .map(
+                    day ->
+                        new com.butingbe.domain.travel.ai.TravelPlanAiResponse.Day(
+                            day.date(),
+                            day.places().stream()
+                                .map(
+                                    p ->
+                                        new com.butingbe.domain.travel.ai.TravelPlanAiResponse
+                                            .Place(
+                                            p.order(), p.provider(), p.providerPlaceId(), "추천 이유"))
+                                .toList()))
+                .toList());
+    when(ai.generate(anyString())).thenReturn(poor);
+    assertThatThrownBy(() -> service.generate(principal, travelId, request()))
+        .isInstanceOfSatisfying(
+            TravelPlanValidationException.class,
+            e ->
+                assertThat(e.getReason())
+                    .isEqualTo(TravelPlanValidationException.Reason.LOW_QUALITY_PLAN));
+    org.mockito.Mockito.verify(ai, org.mockito.Mockito.times(2)).generate(anyString());
+    verifyNoInteractions(plans, places);
   }
 }

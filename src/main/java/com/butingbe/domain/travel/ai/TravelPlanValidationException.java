@@ -8,7 +8,8 @@ public class TravelPlanValidationException extends RuntimeException {
     UNEXPECTED_PLACE,
     DUPLICATED_PLACE,
     INVALID_PLACE_REFERENCE,
-    INVALID_SCHEDULE
+    INVALID_SCHEDULE,
+    LOW_QUALITY_PLAN
   }
 
   private final Reason reason;

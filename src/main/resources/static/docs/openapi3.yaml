@@ -1131,6 +1131,9 @@ paths:
         providerPlaceId는 관광데이터 검색 API 응답의 contentId를 그대로 전달합니다.
         LLM은 복합키·날짜·순서·memo만 결정하며 이름·주소·좌표는 요청 원본에서 채웁니다.
         pace는 분배와 밀도만 조절하며 장소를 제외하지 않습니다.
+        서버가 좌표 기반으로 날짜별 장소를 묶으며, LLM은 해당 묶음 안에서 순서와 설명을 생성합니다.
+        동선·설명 품질이 부족하면 피드백을 포함해 최대 1회 재생성합니다. 다시 실패하면 저장하지 않습니다.
+        거리는 직선거리 기반 휴리스틱이며 실제 교통·숙소 좌표·이동 시간을 계산하지 않습니다.
         전체 결과를 검증한 뒤 저장하며 누락·추가·중복 장소가 있으면 저장하지 않습니다.
         관광데이터 contentId를 GOOGLE provider와 함께 사용하는 기존 앱 계약을 유지합니다.
       security:
@@ -1178,7 +1181,7 @@ paths:
         "502":
           description: |
             AI 응답 무결성 검증 실패. 내부 사유는 MISSING_SELECTED_PLACE, UNEXPECTED_PLACE,
-            DUPLICATED_PLACE, INVALID_PLACE_REFERENCE, INVALID_SCHEDULE로 구분합니다.
+            DUPLICATED_PLACE, INVALID_PLACE_REFERENCE, INVALID_SCHEDULE, LOW_QUALITY_PLAN으로 구분합니다.
             기존 ApiErrorResponse 형식으로 사유별 번역 메시지를 반환합니다.
           content:
             application/json:
