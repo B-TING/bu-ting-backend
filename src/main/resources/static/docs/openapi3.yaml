@@ -1126,7 +1126,13 @@ paths:
       tags:
         - Travel
       summary: 위저드 선택 장소 기반 AI 여행 플랜 생성
-      description: 외부 AI API를 사용해 선택된 실제 장소만으로 일정을 생성하고 저장합니다.
+      description: |
+        selectedPlaces의 모든 (provider, providerPlaceId)를 전체 일정에 정확히 한 번씩 배치합니다.
+        providerPlaceId는 관광데이터 검색 API 응답의 contentId를 그대로 전달합니다.
+        LLM은 복합키·날짜·순서·memo만 결정하며 이름·주소·좌표는 요청 원본에서 채웁니다.
+        pace는 분배와 밀도만 조절하며 장소를 제외하지 않습니다.
+        전체 결과를 검증한 뒤 저장하며 누락·추가·중복 장소가 있으면 저장하지 않습니다.
+        관광데이터 contentId를 GOOGLE provider와 함께 사용하는 기존 앱 계약을 유지합니다.
       security:
         - opaqueToken: [ ]
       parameters:
@@ -1145,7 +1151,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/TravelPlansResponse"
         "400":
-          description: 잘못된 장소 데이터 또는 AI 응답
+          description: 잘못된 입력 장소 참조(INVALID_PLACE_REFERENCE) 또는 중복 입력(DUPLICATED_PLACE)
           content:
             application/json:
               schema:
@@ -1164,6 +1170,16 @@ paths:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           description: 여행을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+        "502":
+          description: |
+            AI 응답 무결성 검증 실패. 내부 사유는 MISSING_SELECTED_PLACE, UNEXPECTED_PLACE,
+            DUPLICATED_PLACE, INVALID_PLACE_REFERENCE, INVALID_SCHEDULE로 구분합니다.
+            기존 ApiErrorResponse 형식으로 사유별 번역 메시지를 반환합니다.
           content:
             application/json:
               schema:
@@ -4873,6 +4889,7 @@ components:
         selectedPlaces:
           type: array
           minItems: 1
+          description: 관광데이터 검색 결과 원본. 복합키 중복 없이 모든 장소를 정확히 한 번 배치합니다.
           items:
             $ref: "#/components/schemas/WizardPickedPlace"
         foodIds:
@@ -4882,6 +4899,7 @@ components:
           example: [milmyeon, dwaeji-gukbap]
         schedulePace:
           type: string
+          description: 장소 분배와 일정 밀도를 조절합니다. 선택 장소 수를 제한하지 않습니다.
           example: RELAXED
         purposes:
           type: array
@@ -4891,6 +4909,7 @@ components:
         bookedAccommodation:
           type: string
           nullable: true
+          description: 동선 참고용 숙소 이름. 정확한 위치를 조회하지 않으며 관광 장소로 자동 추가하지 않습니다.
           example: 해운대 호텔
         accommodationAreaIds:
           type: array
@@ -4903,18 +4922,23 @@ components:
         - provider
         - providerPlaceId
         - placeName
+        - address
       properties:
         provider:
           $ref: "#/components/schemas/PlaceProvider"
         providerPlaceId:
           type: string
+          description: 관광데이터 API 검색 응답의 contentId 문자열. Google Places ID로 바꾸거나 재생성하지 않습니다.
+          minLength: 1
+          maxLength: 255
           example: "126081"
         placeName:
           type: string
           example: 해동용궁사
         address:
           type: string
-          nullable: true
+          minLength: 1
+          maxLength: 255
           example: 부산 기장군 기장읍 용궁길 86
         latitude:
           type: number

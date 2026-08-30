@@ -1,0 +1,43 @@
+package com.butingbe.domain.travel.ai;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+
+class TravelPlanAiClientTest {
+  @Test
+  void ignoresLlmIdentityMetadataAndParsesOnlyReferencesAndSchedule() {
+    ChatModel model = mock(ChatModel.class);
+    when(model.getOptions())
+        .thenReturn(org.springframework.ai.chat.prompt.ChatOptions.builder().build());
+    when(model.call(any(Prompt.class)))
+        .thenReturn(
+            new ChatResponse(
+                List.of(
+                    new Generation(
+                        new AssistantMessage(
+                            """
+        {"days":[{"date":"2026-09-01","places":[{"order":1,"provider":"GOOGLE",
+        "providerPlaceId":"126083","memo":"해변 산책","name":"가짜 장소", "placeName":"부산타워",
+        "address":"다른 주소","latitude":0,"longitude":0}]}]}
+        """)))));
+    var response = new TravelPlanAiClient(ChatClient.builder(model)).generate("계획을 생성하세요");
+    var place = response.days().get(0).places().get(0);
+    assertThat(place.providerPlaceId()).isEqualTo("126083");
+    assertThat(place.provider()).isEqualTo("GOOGLE");
+    assertThat(place.memo()).isEqualTo("해변 산책");
+    assertThat(TravelPlanAiResponse.Place.class.getRecordComponents())
+        .extracting(c -> c.getName())
+        .containsExactly("order", "provider", "providerPlaceId", "memo");
+  }
+}
