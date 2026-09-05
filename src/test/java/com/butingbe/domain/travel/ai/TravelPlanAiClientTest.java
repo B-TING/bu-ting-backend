@@ -3,6 +3,7 @@ package com.butingbe.domain.travel.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -74,5 +75,27 @@ class TravelPlanAiClientTest {
     assertThatThrownBy(() -> client.generate("계획을 생성하세요"))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("AI travel plan generation failed.");
+  }
+
+  @Test
+  @DisplayName("AI가 응답 본문을 주지 않으면 빈 응답으로 판단해 실패시킨다")
+  void rejectsNullEntity() {
+    ChatClient.Builder builder = mock(ChatClient.Builder.class);
+    ChatClient chatClient = mock(ChatClient.class);
+    ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
+    ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
+
+    when(builder.build()).thenReturn(chatClient);
+    when(chatClient.prompt()).thenReturn(requestSpec);
+    when(requestSpec.user(anyString())).thenReturn(requestSpec);
+    when(requestSpec.call()).thenReturn(callSpec);
+    when(callSpec.entity(TravelPlanAiResponse.class)).thenReturn(null);
+
+    TravelPlanAiClient client = new TravelPlanAiClient(builder);
+
+    assertThatThrownBy(() -> client.generate("계획을 생성하세요"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("AI travel plan generation failed.")
+        .hasRootCauseMessage("AI response is empty.");
   }
 }
