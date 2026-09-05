@@ -2,12 +2,16 @@ package com.butingbe.domain.route;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.route.dto.RoutePoint;
 import com.butingbe.domain.route.dto.response.PlanRouteResDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.Plan;
 import com.butingbe.domain.travel.entity.PlanPlace;
@@ -27,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -42,6 +47,7 @@ class TravelRouteServiceTest {
   @Mock private PlanRepository planRepository;
   @Mock private PlanPlaceRepository planPlaceRepository;
   @Mock private TravelMemberAuthorization travelMemberAuthorization;
+  @Mock private com.butingbe.domain.travel.service.TravelService travelService;
 
   private TravelRouteService travelRouteService;
   private AuthenticatedUser authenticatedUser;
@@ -57,7 +63,8 @@ class TravelRouteServiceTest {
             planPlaceRepository,
             travelMemberAuthorization,
             routeProvider,
-            new VisitOrderOptimizer(routeProvider));
+            new VisitOrderOptimizer(routeProvider),
+            travelService);
     authenticatedUser = new AuthenticatedUser(USER_ID, "u@example.com", "u", List.of());
     plan = plan();
   }
@@ -309,6 +316,85 @@ class TravelRouteServiceTest {
     var result = travelRouteService.optimizeVisitOrder(authenticatedUser, PLAN_ID, null, null);
 
     assertThat(result.skippedPlaceIds()).containsExactly(withoutCoordinates.getId());
+  }
+
+  @Test
+  @DisplayName("최적화한 순서를 일정에 반영한다")
+  void appliesOptimizedOrder() {
+    PlanPlace first = place(1, "해운대", 35.1587, 129.1604);
+    PlanPlace second = place(2, "부산역", 35.1151, 129.0413);
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(List.of(first, second));
+
+    travelRouteService.applyOptimizedOrder(
+        authenticatedUser, PLAN_ID, List.of(second.getId(), first.getId()));
+
+    ArgumentCaptor<PlanPlaceSequenceUpdateReqDto> captor =
+        ArgumentCaptor.forClass(PlanPlaceSequenceUpdateReqDto.class);
+    verify(travelService)
+        .updatePlanPlaceSequence(eq(authenticatedUser), eq(PLAN_ID), captor.capture());
+    assertThat(captor.getValue().planPlaceIds()).containsExactly(second.getId(), first.getId());
+    verify(travelMemberAuthorization).validateMember(TRAVEL_ID, USER_ID);
+  }
+
+  @Test
+  @DisplayName("요청에서 빠진 장소는 기존 순서를 유지한 채 뒤에 붙어 사라지지 않는다")
+  void keepsPlacesMissingFromTheRequest() {
+    PlanPlace located = place(1, "부산역", 35.1151, 129.0413);
+    PlanPlace withoutCoordinates = place(2, "좌표 없음", null, null);
+    PlanPlace anotherLocated = place(3, "해운대", 35.1587, 129.1604);
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(List.of(located, withoutCoordinates, anotherLocated));
+
+    // 최적화 결과에는 좌표가 있는 두 곳만 담긴다.
+    travelRouteService.applyOptimizedOrder(
+        authenticatedUser, PLAN_ID, List.of(anotherLocated.getId(), located.getId()));
+
+    ArgumentCaptor<PlanPlaceSequenceUpdateReqDto> captor =
+        ArgumentCaptor.forClass(PlanPlaceSequenceUpdateReqDto.class);
+    verify(travelService)
+        .updatePlanPlaceSequence(eq(authenticatedUser), eq(PLAN_ID), captor.capture());
+    assertThat(captor.getValue().planPlaceIds())
+        .containsExactly(anotherLocated.getId(), located.getId(), withoutCoordinates.getId());
+  }
+
+  @Test
+  @DisplayName("이 일정의 것이 아닌 장소나 중복된 장소는 반영하지 않는다")
+  void rejectsForeignOrDuplicatedPlaces() {
+    PlanPlace onlyPlace = place(1, "부산역", 35.1151, 129.0413);
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(List.of(onlyPlace));
+
+    assertThatThrownBy(
+            () ->
+                travelRouteService.applyOptimizedOrder(
+                    authenticatedUser, PLAN_ID, List.of(UUID.randomUUID())))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Plan place ids do not match this plan.");
+    assertThatThrownBy(
+            () ->
+                travelRouteService.applyOptimizedOrder(
+                    authenticatedUser, PLAN_ID, List.of(onlyPlace.getId(), onlyPlace.getId())))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Duplicated plan place id exists.");
+
+    verify(travelService, never())
+        .updatePlanPlaceSequence(any(), any(), any(PlanPlaceSequenceUpdateReqDto.class));
+  }
+
+  @Test
+  @DisplayName("반영도 인증과 일정 존재를 확인한다")
+  void applyChecksAuthenticationAndPlan() {
+    assertThatThrownBy(() -> travelRouteService.applyOptimizedOrder(null, PLAN_ID, List.of()))
+        .isInstanceOf(UnauthenticatedException.class);
+
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.empty());
+    assertThatThrownBy(
+            () -> travelRouteService.applyOptimizedOrder(authenticatedUser, PLAN_ID, List.of()))
+        .isInstanceOf(ResourceNotFoundException.class);
   }
 
   private Plan plan() {
