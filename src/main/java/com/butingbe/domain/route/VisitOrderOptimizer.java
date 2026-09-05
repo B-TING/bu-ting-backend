@@ -41,7 +41,7 @@ public class VisitOrderOptimizer {
       // 지점이 둘 이하면 바꿀 순서가 없다.
       List<RouteLeg> legs = routeProvider.legs(originalOrder, mode);
       int duration = legs.stream().mapToInt(RouteLeg::durationMinutes).sum();
-      return VisitOrderResDto.of(mode, originalOrder, legs, duration);
+      return VisitOrderResDto.of(mode, originalOrder, legs, duration, List.of());
     }
 
     int[][] durations = routeProvider.durationMatrixMinutes(originalOrder, mode);
@@ -54,7 +54,11 @@ public class VisitOrderOptimizer {
       optimizedOrder.add(originalOrder.get(index));
     }
     return VisitOrderResDto.of(
-        mode, optimizedOrder, routeProvider.legs(optimizedOrder, mode), originalDuration);
+        mode,
+        optimizedOrder,
+        routeProvider.legs(optimizedOrder, mode),
+        originalDuration,
+        List.of());
   }
 
   /** 출발 지점을 맨 앞에 두고, 없으면 장소 목록을 그대로 쓴다. */

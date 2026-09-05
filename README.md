@@ -91,6 +91,7 @@ Request flow:
 | `/api/v1/travels`                            | `TravelController`              | Travel plans, AI plan generation, status           |
 | `/api/v1/plans`                              | `PlanController`                | Plan places: add, reorder, edit, visit, delete     |
 | `/api/v1/plans/{planId}/route`               | `TravelRouteController`         | Travel legs and totals, and visit-order optimisation |
+| `/api/v1/travels/{travelId}/route`           | `TravelRouteOptimizeController` | Visit-order optimisation across every day of a travel |
 | `/api/v1/travels/{travelId}/expenses`        | `TravelExpenseController`       | Expense CRUD and summary                           |
 | `/api/v1/travels/{travelId}/expenses/settlements` | `TravelSettlementController` | Settlement confirmation                          |
 | `/api/v1/travels/{travelId}/records`         | `TravelRecordController`        | Travel record read, edit, publish                  |
