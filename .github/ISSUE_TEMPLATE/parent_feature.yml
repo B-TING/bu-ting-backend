@@ -1,8 +1,15 @@
 name: Parent Feature
 description: 여러 하위 이슈로 나누어 진행할 큰 기능을 추적합니다.
 title: "feat: "
-labels: ["feature", "parent"]
+type: Feature
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **부모 이슈입니다.** Type은 `Feature`로 자동 지정됩니다.
+        라벨은 아래에서 고른 **도메인/영역 라벨만** 붙여주세요.
+        `feature`, `fix`, `refactor` 같은 git convention 라벨은 하위 이슈에만 붙입니다.
+
   - type: textarea
     id: summary
     attributes:
@@ -15,19 +22,28 @@ body:
   - type: dropdown
     id: area
     attributes:
-      label: 작업 영역
-      description: 가장 가까운 영역을 하나만 선택해주세요.
+      label: 도메인 / 영역
+      description: 이 기능이 건드리는 영역을 모두 선택하고, 같은 이름의 라벨을 이슈에 붙여주세요.
       options:
-        - Domain
-        - Backend
-        - API
-        - Security
-        - Database
-        - Test
-        - Infra
-        - Docs
-        - Other
-      multiple: false
+        - auth
+        - chat
+        - file
+        - place
+        - station
+        - storage
+        - travel
+        - travelexpense
+        - travelrecord
+        - travelsurvey
+        - travelteam
+        - user
+        - config
+        - ci
+        - db
+        - global
+        - i18n
+        - docs
+      multiple: true
     validations:
       required: true
 
@@ -54,9 +70,18 @@ body:
     validations:
       required: true
 
+  - type: input
+    id: schedule
+    attributes:
+      label: 작업 기간
+      description: "YYYY-MM-DD ~ YYYY-MM-DD 형식으로 적어주세요."
+      placeholder: "2026-09-05 ~ 2026-09-12"
+    validations:
+      required: true
+
   - type: textarea
     id: notes
     attributes:
       label: 참고 사항
       description: 관련 브랜치, PR, 설계 결정, 논의 내용을 적어주세요.
-      placeholder: "예) Branch: feature/user"
+      placeholder: "예) 하위 이슈에서 브랜치를 만듭니다. 부모 이슈로는 브랜치를 만들지 않습니다."
