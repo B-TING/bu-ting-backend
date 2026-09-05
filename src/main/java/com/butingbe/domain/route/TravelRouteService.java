@@ -15,7 +15,10 @@ import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
+<<<<<<< HEAD
 import com.butingbe.domain.travel.service.TravelService;
+=======
+>>>>>>> origin/dev
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
@@ -136,6 +139,7 @@ public class TravelRouteService {
         route.legs(),
         route.originalDurationMinutes(),
         skippedPlaceIds);
+<<<<<<< HEAD
   }
 
   /**
@@ -178,6 +182,8 @@ public class TravelRouteService {
     if (!planPlaceIds.containsAll(requestedIds)) {
       throw new IllegalArgumentException("Plan place ids do not match this plan.");
     }
+=======
+>>>>>>> origin/dev
   }
 
   /** 임의의 두 지점 사이 구간. 현재 위치에서 다음 장소까지처럼 일정 밖의 조회에 쓴다. */
