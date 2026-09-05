@@ -53,6 +53,7 @@ import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -2205,6 +2206,288 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     authenticatedUser, draft.originalTravelId(), place.originalPlanPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("Place review not found.");
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 리소스를 가리키면 ResourceNotFoundException을 던진다")
+  void rejectsMissingResources() {
+    User user = userRepository.save(createUser("nf@example.com", "nf"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    java.util.UUID unknown = java.util.UUID.randomUUID();
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createDraft(
+                    authenticatedUser, unknown, new TravelRecordCreateReqDto("t", null, null, 5)))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel not found.");
+    assertThatThrownBy(() -> travelRecordService.getDraft(authenticatedUser, travel.id(), unknown))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel record not found.");
+    assertThatThrownBy(() -> travelRecordService.getMyRecord(authenticatedUser, unknown))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel record not found.");
+    assertThatThrownBy(() -> travelRecordService.getPublished(unknown))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel record not found.");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    unknown,
+                    new PlaceReviewCreateReqDto(5, "good")))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Plan place not found.");
+    assertThatThrownBy(
+            () -> travelRecordService.getPlaceReview(authenticatedUser, travel.id(), unknown))
+        .isInstanceOf(ResourceNotFoundException.class);
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateComment(
+                    authenticatedUser,
+                    unknown,
+                    unknown,
+                    new TravelRecordCommentUpdateReqDto("edited")))
+        .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("인증 정보가 없거나 사용자를 찾을 수 없으면 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    java.util.UUID unknown = java.util.UUID.randomUUID();
+    AuthenticatedUser unknownUser =
+        new AuthenticatedUser(unknown, "ghost@example.com", "ghost", List.of());
+
+    assertThatThrownBy(() -> travelRecordService.getMyRecords(null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(
+            () ->
+                travelRecordService.getMyRecords(
+                    new AuthenticatedUser(null, "a@example.com", "a", List.of())))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelRecordService.getMyRecords(unknownUser))
+        .isInstanceOf(UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("초안 생성·수정 요청의 제목이 공백이거나 평점이 범위를 벗어나면 거부한다")
+  void rejectsInvalidDraftRequests() {
+    User user = userRepository.save(createUser("draft-invalid@example.com", "draft-invalid"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createDraft(
+                    authenticatedUser,
+                    travel.id(),
+                    new TravelRecordCreateReqDto("   ", null, null, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record title cannot be blank.");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createDraft(
+                    authenticatedUser,
+                    travel.id(),
+                    new TravelRecordCreateReqDto("title", null, null, 6)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record overall rating must be between 1 and 5.");
+
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Valid");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateDraft(
+                    authenticatedUser,
+                    draft.originalTravelId(),
+                    draft.travelRecordId(),
+                    new TravelRecordUpdateReqDto("  ", null, null, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record title cannot be blank.");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateDraft(
+                    authenticatedUser,
+                    draft.originalTravelId(),
+                    draft.travelRecordId(),
+                    new TravelRecordUpdateReqDto("title", null, null, 0)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record overall rating must be between 1 and 5.");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateDraft(
+                    authenticatedUser,
+                    travel.id(),
+                    draft.travelRecordId(),
+                    new TravelRecordUpdateReqDto("title", null, null, 5)))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel record not found.");
+  }
+
+  @Test
+  @DisplayName("복제 요청이 없거나 시작일·제목이 규칙에 맞지 않으면 거부한다")
+  void rejectsInvalidCloneToTravelRequests() {
+    User author = userRepository.save(createUser("clone-invalid@example.com", "clone-invalid"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Clone Source");
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+    java.util.UUID recordId = published.travelRecordId();
+
+    assertThatThrownBy(() -> travelRecordService.cloneToTravel(authenticatedUser, recordId, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel clone request is required.");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.cloneToTravel(
+                    authenticatedUser,
+                    recordId,
+                    new TravelRecordCloneToTravelReqDto(
+                        "title", null, null, null, null, null, null, null, null, null, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel start date is required.");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.cloneToTravel(
+                    authenticatedUser,
+                    recordId,
+                    new TravelRecordCloneToTravelReqDto(
+                        "   ",
+                        LocalDate.of(2026, 10, 1),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel title cannot be blank.");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.cloneToTravel(
+                    authenticatedUser,
+                    recordId,
+                    new TravelRecordCloneToTravelReqDto(
+                        "0123456789012345",
+                        LocalDate.of(2026, 10, 1),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel title must be 15 characters or less.");
+  }
+
+  @Test
+  @DisplayName("댓글 내용이 비었거나 1000자를 넘으면 거부한다")
+  void rejectsInvalidCommentRequests() {
+    User author = userRepository.save(createUser("comment-invalid@example.com", "comment-invalid"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Comment Source");
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+    java.util.UUID recordId = published.travelRecordId();
+    String tooLong = "a".repeat(1001);
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createComment(
+                    authenticatedUser, recordId, new TravelRecordCommentCreateReqDto("  ")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record comment content is required.");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createComment(
+                    authenticatedUser, recordId, new TravelRecordCommentCreateReqDto(tooLong)))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    TravelRecordCommentResDto comment =
+        travelRecordService.createComment(
+            authenticatedUser, recordId, new TravelRecordCommentCreateReqDto("ok"));
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateComment(
+                    authenticatedUser,
+                    recordId,
+                    comment.commentId(),
+                    new TravelRecordCommentUpdateReqDto("  ")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record comment content is required.");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateComment(
+                    authenticatedUser,
+                    recordId,
+                    comment.commentId(),
+                    new TravelRecordCommentUpdateReqDto(tooLong)))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  @DisplayName("장소 리뷰의 평점과 체류 시간이 범위를 벗어나면 거부한다")
+  void rejectsInvalidPlaceReviewRequests() {
+    User author = userRepository.save(createUser("review-invalid@example.com", "review-invalid"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto place =
+        createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    place.planPlaceId(),
+                    new PlaceReviewCreateReqDto(null, "no rating")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Place review rating is required.");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    place.planPlaceId(),
+                    new PlaceReviewCreateReqDto(6, "too high")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Place review rating must be between 1 and 5.");
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    place.planPlaceId(),
+                    new PlaceReviewCreateReqDto(5, "negative stay", null, -1, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Stay minutes must be 0 or greater.");
+
+    travelRecordService.createPlaceReview(
+        authenticatedUser, travel.id(), place.planPlaceId(), new PlaceReviewCreateReqDto(5, "ok"));
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updatePlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    place.planPlaceId(),
+                    new PlaceReviewUpdateReqDto(0, "too low")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Place review rating must be between 1 and 5.");
   }
 
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {

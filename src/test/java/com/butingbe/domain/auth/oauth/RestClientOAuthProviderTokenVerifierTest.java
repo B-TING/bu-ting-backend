@@ -449,4 +449,227 @@ class RestClientOAuthProviderTokenVerifierTest {
             .encodeToString(payload.getBytes(StandardCharsets.UTF_8))
         + ".signature";
   }
+
+  @Test
+  @DisplayName("provider나 provider token이 비어 있으면 인증 실패로 처리한다")
+  void verifyRejectsBlankProviderOrToken() {
+    RestClientOAuthProviderTokenVerifier verifier = verifier(RestClient.builder().build());
+
+    assertThatThrownBy(() -> verifier.verify("", "token", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> verifier.verify("google", "  ", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> verifier.verify(null, "token", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("지원하지 않는 provider는 인증 실패로 처리한다")
+  void verifyRejectsUnknownProvider() {
+    RestClientOAuthProviderTokenVerifier verifier = verifier(RestClient.builder().build());
+
+    assertThatThrownBy(() -> verifier.verify("facebook", "token", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("Google client id나 redirect uri 설정이 없으면 authorization code 교환을 시도하지 않는다")
+  void verifyGoogleRejectsWhenCodeExchangeConfigIsMissing() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier = verifier(builder.build());
+
+    assertThatThrownBy(() -> verifier.verify("google", "authorization-code", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Naver client 설정이 없으면 authorization code 교환을 시도하지 않는다")
+  void verifyNaverRejectsWhenCodeExchangeConfigIsMissing() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier = verifier(builder.build());
+
+    assertThatThrownBy(() -> verifier.verify("naver", "authorization-code", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Bearer 접두사가 붙은 authorization code도 접두사를 떼고 교환한다")
+  void verifyStripsBearerPrefix() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "KAKAO_REST_API_KEY",
+            "KAKAO_CLIENT_SECRET",
+            "http://localhost:3000/oauth/kakao/callback");
+
+    server
+        .expect(requestTo("https://kauth.kakao.com/oauth/token"))
+        .andExpect(method(HttpMethod.POST))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("code=auth-code")))
+        .andRespond(
+            withSuccess(
+                """
+                {"access_token":"kakao-access-token"}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(requestTo("https://kapi.kakao.com/v2/user/me"))
+        .andExpect(method(HttpMethod.GET))
+        .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer kakao-access-token"))
+        .andRespond(
+            withSuccess(
+                """
+                {"id":12345,"kakao_account":{"email":"kakao@example.com",
+                 "profile":{"nickname":"카카오유저"}}}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    OAuth2UserInfo userInfo = verifier.verify("kakao", "  Bearer auth-code  ", null, null);
+
+    assertThat(userInfo.email()).isEqualTo("kakao@example.com");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Kakao 토큰 교환 응답에 access token이 없으면 인증 실패로 처리한다")
+  void verifyKakaoRejectsWhenTokenResponseHasNoAccessToken() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "KAKAO_REST_API_KEY",
+            "KAKAO_CLIENT_SECRET",
+            "http://localhost:3000/oauth/kakao/callback");
+
+    server
+        .expect(requestTo("https://kauth.kakao.com/oauth/token"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> verifier.verify("kakao", "code:auth-code", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Naver 토큰 교환 응답에 access token이 없으면 인증 실패로 처리한다")
+  void verifyNaverRejectsWhenTokenResponseHasNoAccessToken() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "",
+            "",
+            "",
+            "NAVER_CLIENT_ID",
+            "NAVER_CLIENT_SECRET",
+            "http://localhost:3000/oauth/naver/callback",
+            "",
+            "",
+            "");
+
+    server
+        .expect(requestTo("https://nid.naver.com/oauth2.0/token"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> verifier.verify("naver", "code:auth-code", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Google 토큰 교환 응답에 id token도 access token도 없으면 인증 실패로 처리한다")
+  void verifyGoogleRejectsWhenTokenResponseIsEmpty() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "http://localhost:3000/oauth/google/callback",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "");
+
+    server
+        .expect(requestTo("https://oauth2.googleapis.com/token"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> verifier.verify("google", "auth-code", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Google 토큰 교환 응답에 access token만 있으면 userinfo로 사용자 정보를 조회한다")
+  void verifyGoogleFallsBackToUserInfoEndpoint() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "http://localhost:3000/oauth/google/callback",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "");
+
+    server
+        .expect(requestTo("https://oauth2.googleapis.com/token"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(
+            withSuccess(
+                """
+                {"access_token":"google-access-token"}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(method(HttpMethod.GET))
+        .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer google-access-token"))
+        .andRespond(
+            withSuccess(
+                """
+                {"sub":"google-123","email":"google@example.com","name":"구글유저"}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    OAuth2UserInfo userInfo = verifier.verify("google", "auth-code", null, null);
+
+    assertThat(userInfo.email()).isEqualTo("google@example.com");
+    server.verify();
+  }
+
+  private RestClientOAuthProviderTokenVerifier verifier(RestClient restClient) {
+    return new RestClientOAuthProviderTokenVerifier(restClient, "", "", "", "", "", "", "", "", "");
+  }
 }
