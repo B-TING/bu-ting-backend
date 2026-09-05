@@ -914,4 +914,138 @@ class RestClientOAuthProviderTokenVerifierTest {
 
     verifier.verify("google", "GOOGLE.ID.TOKEN", null, null);
   }
+
+  @Test
+  @DisplayName("Google 토큰 교환 응답에 id_token이 있으면 id_token 검증 경로로 처리한다")
+  void verifyGoogleUsesIdTokenFromTokenResponse() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "http://localhost:3000/oauth/google/callback",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "");
+
+    server
+        .expect(requestTo("https://oauth2.googleapis.com/token"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(
+            withSuccess(
+                """
+                {"id_token":"GOOGLE.ID.TOKEN"}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(requestTo("https://oauth2.googleapis.com/tokeninfo?id_token=GOOGLE.ID.TOKEN"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"iss":"https://accounts.google.com","aud":"GOOGLE_CLIENT_ID","exp":"%d",
+                 "sub":"google-exchange","email":"exchange@example.com"}
+                """
+                    .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
+                MediaType.APPLICATION_JSON));
+
+    OAuth2UserInfo userInfo = verifier.verify("google", "auth-code", null, null);
+
+    assertThat(userInfo.providerId()).isEqualTo("google-exchange");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Kakao client 설정이 없으면 authorization code 교환을 시도하지 않는다")
+  void verifyKakaoRejectsWhenCodeExchangeConfigIsMissing() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier = verifier(builder.build());
+
+    assertThatThrownBy(() -> verifier.verify("kakao", "authorization-code", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("점이 두 개여도 세 조각이 아닌 토큰은 인증 실패로 처리한다")
+  void verifyKakaoRejectsMalformedJwtShape() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "KAKAO_REST_API_KEY",
+            "KAKAO_CLIENT_SECRET",
+            "http://localhost:3000/oauth/kakao/callback");
+
+    server
+        .expect(requestTo("https://kauth.kakao.com/oauth/tokeninfo"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(
+            withSuccess(
+                """
+                {"iss":"https://kauth.kakao.com","aud":"KAKAO_REST_API_KEY","exp":"%d"}
+                """
+                    .formatted(Instant.now().plusSeconds(600).getEpochSecond()),
+                MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> verifier.verify("kakao", "only.two.", null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("code 파라미터가 없는 쿼리 문자열은 토큰 전체를 code로 사용한다")
+  void fallsBackToWholeTokenWhenQueryHasNoCode() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    RestClientOAuthProviderTokenVerifier verifier =
+        new RestClientOAuthProviderTokenVerifier(
+            builder.build(),
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "KAKAO_REST_API_KEY",
+            "KAKAO_CLIENT_SECRET",
+            "http://localhost:3000/oauth/kakao/callback");
+
+    server
+        .expect(requestTo("https://kauth.kakao.com/oauth/token"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(
+            withSuccess(
+                """
+                {"access_token":"kakao-access-token"}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(requestTo("https://kapi.kakao.com/v2/user/me"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"id":12345,"kakao_account":{"email":"kakao@example.com",
+                 "profile":{"nickname":"카카오유저"}}}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    OAuth2UserInfo userInfo = verifier.verify("kakao", "state=xyz", null, null);
+
+    assertThat(userInfo.email()).isEqualTo("kakao@example.com");
+    server.verify();
+  }
 }
