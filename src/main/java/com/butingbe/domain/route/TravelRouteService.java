@@ -3,6 +3,7 @@ package com.butingbe.domain.route;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.route.dto.RouteLeg;
 import com.butingbe.domain.route.dto.RoutePoint;
+import com.butingbe.domain.route.dto.response.AlternativeRouteResDto;
 import com.butingbe.domain.route.dto.response.PlanRouteResDto;
 import com.butingbe.domain.route.dto.response.TravelRouteOptimizeResDto;
 import com.butingbe.domain.route.dto.response.VisitOrderResDto;
@@ -136,6 +137,40 @@ public class TravelRouteService {
         route.legs(),
         route.originalDurationMinutes(),
         skippedPlaceIds);
+  }
+
+  /**
+   * 못 가게 된 장소를 빼고 대체 경로를 만든다. 저장하지는 않고 제안만 돌려준다.
+   *
+   * <p>제외한 장소와 좌표가 없어 빠진 장소를 뺀 나머지를 다시 최적화한다. 기존 경로(아무것도 빼지 않은 입력 순서)의 시간을 함께 계산해, 대체 경로가 얼마나 짧아졌는지
+   * 견줄 수 있게 한다.
+   */
+  public AlternativeRouteResDto generateAlternativeRoute(
+      AuthenticatedUser authenticatedUser,
+      UUID planId,
+      List<UUID> excludePlaceIds,
+      RoutePoint start,
+      TransportType transportType) {
+    UUID userId = requireUserId(authenticatedUser);
+    Plan plan = findPlan(planId);
+    travelMemberAuthorization.validateMember(plan.getTravel().getId(), userId);
+
+    TransportType mode = transportType == null ? TransportType.PUBLIC_TRANSPORT : transportType;
+    List<UUID> excluded = excludePlaceIds == null ? List.of() : excludePlaceIds;
+    LocatedPlaces located = locatedPoints(planId);
+
+    // 기존 경로: 아무것도 빼지 않은 입력 순서 그대로의 이동 시간.
+    int originalDuration =
+        routeProvider.legs(located.points(), mode).stream()
+            .mapToInt(RouteLeg::durationMinutes)
+            .sum();
+
+    List<RoutePoint> remaining =
+        located.points().stream().filter(point -> !excluded.contains(point.placeId())).toList();
+
+    VisitOrderResDto alternative = visitOrderOptimizer.optimize(start, remaining, mode);
+    return AlternativeRouteResDto.of(
+        mode, alternative, originalDuration, excluded, located.skippedPlaceIds());
   }
 
   /**

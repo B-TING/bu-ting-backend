@@ -15,6 +15,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.route.TravelRouteService;
 import com.butingbe.domain.route.dto.RouteLeg;
 import com.butingbe.domain.route.dto.RoutePoint;
+import com.butingbe.domain.route.dto.response.AlternativeRouteResDto;
 import com.butingbe.domain.route.dto.response.PlanRouteResDto;
 import com.butingbe.domain.route.dto.response.VisitOrderResDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
@@ -246,6 +247,89 @@ class TravelRouteControllerTest {
                 .content(
                     """
                     {"planPlaceIds": []}
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("제외할 장소를 지정하면 대체 경로를 반환한다")
+  void returnsAlternativeRoute() throws Exception {
+    UUID excludedId = UUID.fromString("55555555-0000-0000-0000-000000000009");
+    RoutePoint nampo = RoutePoint.of("남포동", 35.0979, 129.0301);
+    RoutePoint gwangalli = RoutePoint.of("광안리", 35.1532, 129.1186);
+    VisitOrderResDto alternative =
+        VisitOrderResDto.of(
+            TransportType.PUBLIC_TRANSPORT,
+            List.of(nampo, gwangalli),
+            List.of(new RouteLeg(nampo, gwangalli, TransportType.PUBLIC_TRANSPORT, 12_000, 40)),
+            40,
+            List.of());
+    when(travelRouteService.generateAlternativeRoute(
+            any(AuthenticatedUser.class),
+            eq(PLAN_ID),
+            eq(List.of(excludedId)),
+            nullable(RoutePoint.class),
+            nullable(TransportType.class)))
+        .thenReturn(
+            AlternativeRouteResDto.of(
+                TransportType.PUBLIC_TRANSPORT, alternative, 95, List.of(excludedId), List.of()));
+
+    mockMvc
+        .perform(
+            post("/plans/{planId}/route/alternatives", PLAN_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"excludePlaceIds": ["%s"]}
+                    """
+                        .formatted(excludedId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.excludedPlaceIds[0]").value(excludedId.toString()))
+        .andExpect(jsonPath("$.alternative.orderedPoints[0].name").value("남포동"))
+        .andExpect(jsonPath("$.alternativeDurationMinutes").value(40))
+        .andExpect(jsonPath("$.originalDurationMinutes").value(95))
+        .andExpect(jsonPath("$.reducedMinutes").value(55));
+  }
+
+  @Test
+  @DisplayName("본문 없이 요청하면 아무 장소도 빼지 않고 대체 경로를 계산한다")
+  void generatesAlternativeWithoutABody() throws Exception {
+    when(travelRouteService.generateAlternativeRoute(
+            any(AuthenticatedUser.class),
+            eq(PLAN_ID),
+            eq(List.of()),
+            nullable(RoutePoint.class),
+            nullable(TransportType.class)))
+        .thenReturn(
+            AlternativeRouteResDto.of(
+                TransportType.PUBLIC_TRANSPORT,
+                VisitOrderResDto.of(
+                    TransportType.PUBLIC_TRANSPORT, List.of(), List.of(), 0, List.of()),
+                0,
+                List.of(),
+                List.of()));
+
+    mockMvc.perform(post("/plans/{planId}/route/alternatives", PLAN_ID)).andExpect(status().isOk());
+
+    verify(travelRouteService)
+        .generateAlternativeRoute(
+            any(AuthenticatedUser.class),
+            eq(PLAN_ID),
+            eq(List.of()),
+            nullable(RoutePoint.class),
+            nullable(TransportType.class));
+  }
+
+  @Test
+  @DisplayName("출발 좌표가 범위를 벗어나면 400을 반환한다")
+  void rejectsOutOfRangeStartInAlternative() throws Exception {
+    mockMvc
+        .perform(
+            post("/plans/{planId}/route/alternatives", PLAN_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"startLatitude": 200.0, "startLongitude": 129.0}
                     """))
         .andExpect(status().isBadRequest());
   }
