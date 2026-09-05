@@ -74,3 +74,14 @@ place:
 travel-team:
   invite:
     base-url: ${TRAVEL_INVITE_BASE_URL:https://yourdomain.com/invite}
+
+route:
+  google:
+    # Off by default: routes fall back to straight-line estimation.
+    # Google returns transit routes only inside South Korea, so enabling this
+    # improves transit times but not car or walking.
+    enabled: ${ROUTE_GOOGLE_ENABLED:false}
+    base-url: ${ROUTE_GOOGLE_BASE_URL:https://routes.googleapis.com/directions/v2}
+    api-key: ${ROUTE_GOOGLE_API_KEY:${GOOGLE_PLACES_API_KEY:}}
+    connect-timeout-seconds: ${ROUTE_GOOGLE_CONNECT_TIMEOUT_SECONDS:3}
+    read-timeout-seconds: ${ROUTE_GOOGLE_READ_TIMEOUT_SECONDS:5}
