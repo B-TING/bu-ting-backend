@@ -174,6 +174,7 @@ Environment variables referenced by `application.yaml`, by feature:
 | S3            | `S3_BUCKET`, `AWS_REGION`, `S3_KEY_PREFIX`, `S3_MAX_FILE_SIZE`, `S3_PRESIGNED_URL_EXPIRATION`     |
 | Upload limits | `FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE`                                                          |
 | Invitations   | `TRAVEL_INVITE_BASE_URL`                                                                          |
+| Routing       | `ROUTE_GOOGLE_ENABLED` (off by default), `ROUTE_GOOGLE_API_KEY` (falls back to `GOOGLE_PLACES_API_KEY`) |
 
 Run the application:
 
