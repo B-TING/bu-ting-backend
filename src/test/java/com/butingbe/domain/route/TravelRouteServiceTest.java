@@ -47,12 +47,14 @@ class TravelRouteServiceTest {
 
   @BeforeEach
   void setUp() {
+    HaversineRouteProvider routeProvider = new HaversineRouteProvider();
     travelRouteService =
         new TravelRouteService(
             planRepository,
             planPlaceRepository,
             travelMemberAuthorization,
-            new HaversineRouteProvider());
+            routeProvider,
+            new VisitOrderOptimizer(routeProvider));
     authenticatedUser = new AuthenticatedUser(USER_ID, "u@example.com", "u", List.of());
     plan = plan();
   }
@@ -157,6 +159,73 @@ class TravelRouteServiceTest {
     assertThat(leg.transportType()).isEqualTo(TransportType.CAR);
     assertThat(leg.distanceMeters()).isPositive();
     assertThat(leg.durationMinutes()).isPositive();
+  }
+
+  @Test
+  @DisplayName("일정의 방문 순서를 최적화해 제안한다")
+  void optimizesVisitOrder() {
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(
+            List.of(
+                place(1, "해운대", 35.1587, 129.1604),
+                place(2, "부산역", 35.1151, 129.0413),
+                place(3, "서면", 35.1580, 129.0596)));
+
+    var result =
+        travelRouteService.optimizeVisitOrder(
+            authenticatedUser, PLAN_ID, null, TransportType.PUBLIC_TRANSPORT);
+
+    assertThat(result.orderedPoints()).hasSize(3);
+    assertThat(result.totalDurationMinutes()).isLessThanOrEqualTo(result.originalDurationMinutes());
+    verify(travelMemberAuthorization).validateMember(TRAVEL_ID, USER_ID);
+  }
+
+  @Test
+  @DisplayName("출발 좌표를 주면 그 지점에서 시작하는 순서를 계산한다")
+  void optimizesFromAGivenStartingPoint() {
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(
+            List.of(place(1, "부산역", 35.1151, 129.0413), place(2, "해운대", 35.1587, 129.1604)));
+
+    var result =
+        travelRouteService.optimizeVisitOrder(
+            authenticatedUser,
+            PLAN_ID,
+            RoutePoint.of("현재 위치", 35.2444, 129.2222),
+            TransportType.PUBLIC_TRANSPORT);
+
+    assertThat(result.orderedPoints().get(0).name()).isEqualTo("현재 위치");
+    assertThat(result.orderedPoints()).hasSize(3);
+  }
+
+  @Test
+  @DisplayName("좌표 없는 장소는 최적화에서도 빠진다")
+  void optimizationSkipsPlacesWithoutCoordinates() {
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(
+            List.of(
+                place(1, "부산역", 35.1151, 129.0413),
+                place(2, "좌표 없음", null, null),
+                place(3, "해운대", 35.1587, 129.1604)));
+
+    var result = travelRouteService.optimizeVisitOrder(authenticatedUser, PLAN_ID, null, null);
+
+    assertThat(result.orderedPoints()).extracting(RoutePoint::name).containsExactly("부산역", "해운대");
+  }
+
+  @Test
+  @DisplayName("최적화도 인증과 일정 존재를 확인한다")
+  void optimizationChecksAuthenticationAndPlan() {
+    assertThatThrownBy(() -> travelRouteService.optimizeVisitOrder(null, PLAN_ID, null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.empty());
+    assertThatThrownBy(
+            () -> travelRouteService.optimizeVisitOrder(authenticatedUser, PLAN_ID, null, null))
+        .isInstanceOf(ResourceNotFoundException.class);
   }
 
   private Plan plan() {

@@ -24,4 +24,22 @@ public interface RouteProvider {
         .mapToObj(i -> leg(orderedPoints.get(i), orderedPoints.get(i + 1), transportType))
         .toList();
   }
+
+  /**
+   * 모든 지점 쌍 사이의 소요 시간(분) 행렬. {@code [i][j]}는 i에서 j로 갈 때의 시간이다.
+   *
+   * <p>기본 구현은 쌍마다 {@link #leg}를 호출한다. 외부 API 어댑터는 이 메서드를 재정의해 한 번의 행렬 조회로 대체할 수 있다. 순서 최적화는 O(n²)
+   * 쌍을 필요로 하므로, 재정의하지 않으면 지점 수의 제곱만큼 외부 호출이 나간다.
+   */
+  default int[][] durationMatrixMinutes(List<RoutePoint> points, TransportType transportType) {
+    int size = points.size();
+    int[][] matrix = new int[size][size];
+    for (int from = 0; from < size; from++) {
+      for (int to = 0; to < size; to++) {
+        matrix[from][to] =
+            from == to ? 0 : leg(points.get(from), points.get(to), transportType).durationMinutes();
+      }
+    }
+    return matrix;
+  }
 }
