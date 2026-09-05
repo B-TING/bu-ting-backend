@@ -2044,6 +2044,9 @@ paths:
               title: 부산 맛집 여행
               content: 여유롭게 다녀온 2일 부산 여행 코스입니다.
               coverImageUrl: https://example.com/cover.jpg
+              imageUrls:
+                - https://example.com/photo-1.jpg
+                - https://example.com/photo-2.jpg
               overallRating: 5
       responses:
         "201":
@@ -2133,6 +2136,9 @@ paths:
               title: 수정한 부산 여행
               content: 수정한 여행 기록 본문입니다.
               coverImageUrl: https://example.com/new-cover.jpg
+              imageUrls:
+                - https://example.com/new-photo-1.jpg
+                - https://example.com/new-photo-2.jpg
               overallRating: 4
       responses:
         "200":
@@ -2641,6 +2647,9 @@ paths:
               title: 수정한 부산 여행
               content: 수정한 여행 기록 본문입니다.
               coverImageUrl: https://example.com/new-cover.jpg
+              imageUrls:
+                - https://example.com/new-photo-1.jpg
+                - https://example.com/new-photo-2.jpg
               overallRating: 4
       responses:
         "200":
@@ -3597,7 +3606,19 @@ components:
           type: string
           maxLength: 1000
           nullable: true
+          description: 대표 이미지 URL입니다. 선택값이며 생략하고 imageUrls가 있으면 첫 번째 imageUrls 값을 대표 이미지로 자동 사용합니다.
           example: https://example.com/cover.jpg
+        imageUrls:
+          type: array
+          nullable: true
+          description: 여행기 사진 URL 목록입니다. 선택값이며 coverImageUrl이 없으면 첫 번째 사진이 대표 이미지로 사용됩니다.
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 1000
+          example:
+            - https://example.com/photo-1.jpg
+            - https://example.com/photo-2.jpg
         overallRating:
           type: integer
           minimum: 1
@@ -3622,7 +3643,19 @@ components:
           type: string
           maxLength: 1000
           nullable: true
+          description: 대표 이미지 URL입니다. 선택값이며 imageUrls와 함께 보내면 이 값이 우선 사용됩니다.
           example: https://example.com/new-cover.jpg
+        imageUrls:
+          type: array
+          nullable: true
+          description: 여행기 사진 URL 목록입니다. 선택값입니다. 값을 보내면 기존 사진 목록을 교체하고, coverImageUrl이 없으면 첫 번째 사진을 대표 이미지로 사용합니다.
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 1000
+          example:
+            - https://example.com/new-photo-1.jpg
+            - https://example.com/new-photo-2.jpg
         overallRating:
           type: integer
           minimum: 1
@@ -3734,7 +3767,16 @@ components:
         coverImageUrl:
           type: string
           nullable: true
+          description: 여행기 대표 이미지 URL입니다. 작성자가 직접 지정한 값이 있으면 그 값을 사용하고, 없으면 여행기 사진 목록의 첫 번째 사진이 자동 지정됩니다.
           example: https://example.com/cover.jpg
+        imageUrls:
+          type: array
+          description: 여행기 사진 URL 목록입니다.
+          items:
+            type: string
+          example:
+            - https://example.com/photo-1.jpg
+            - https://example.com/photo-2.jpg
         overallRating:
           type: integer
           minimum: 1

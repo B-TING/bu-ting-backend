@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface TravelRecordImageRepository extends JpaRepository<TravelRecordImage, UUID> {
 
   List<TravelRecordImage> findByTravelRecord_IdOrderBySequenceAsc(UUID travelRecordId);
+
+  void deleteByTravelRecord_Id(UUID travelRecordId);
 }
