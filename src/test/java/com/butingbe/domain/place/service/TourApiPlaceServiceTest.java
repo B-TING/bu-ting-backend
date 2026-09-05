@@ -943,4 +943,204 @@ class TourApiPlaceServiceTest {
     assertThat(response.googlePlace()).isNull();
     server.verify();
   }
+
+  @Test
+  @DisplayName("키워드 검색에도 지역·유형 필터를 쿼리 파라미터로 전달한다")
+  void searchPlacesByKeywordAppliesDistrictAndContentTypeFilters() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(
+            requestTo(
+                org.hamcrest.Matchers.allOf(
+                    org.hamcrest.Matchers.hasToString(
+                        org.hamcrest.Matchers.containsString("lDongSignguCd=230")),
+                    org.hamcrest.Matchers.hasToString(
+                        org.hamcrest.Matchers.containsString("contentTypeId=39")))))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"numOfRows":10,"pageNo":1,"totalCount":1,
+                  "items":{"item":[{"contentid":"1","contenttypeid":"39","title":"국밥"}]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    PlaceSearchResDto response =
+        placeService.searchPlacesByKeyword(
+            new PlaceKeywordSearchReqDto("국밥", null, null, "230", "39", null));
+
+    assertThat(response.places()).hasSize(1);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("지역기반 조회에도 지역·유형 필터를 전달한다")
+  void searchPlacesAppliesDistrictAndContentTypeFilters() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"numOfRows":10,"pageNo":1,"totalCount":0,"items":""}}}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    PlaceSearchResDto response =
+        placeService.searchPlaces(new PlaceSearchReqDto(null, null, "230", "39", null));
+
+    assertThat(response.places()).isEmpty();
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("축제 조회에 종료일과 지역 코드를 함께 전달한다")
+  void searchFestivalsAppliesEndDateAndDistrict() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"numOfRows":10,"pageNo":1,"totalCount":0,"items":{"item":[]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    FestivalSearchResDto response =
+        placeService.searchFestivals(
+            new FestivalSearchReqDto("20260901", "20260930", null, null, "230", null));
+
+    assertThat(response.festivals()).isEmpty();
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Google Places 호출이 네트워크 오류로 실패해도 상세 조회는 성공한다")
+  void getPlaceDetailSurvivesGooglePlacesNetworkFailure() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(
+            builder.build(),
+            "https://tour.example.com",
+            "SERVICE_KEY",
+            "https://places.example.com/v1/places",
+            "GOOGLE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":{"item":[{"contentid":"2651318","title":"파라다이스"}]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(method(HttpMethod.POST))
+        .andRespond(
+            request -> {
+              throw new java.io.IOException("connection reset");
+            });
+
+    PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", "파라다이스 호텔");
+
+    assertThat(response.googlePlace()).isNull();
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("detailCommon2 항목에 제목과 주소가 모두 없으면 Google 검색을 시도하지 않는다")
+  void getPlaceDetailSkipsGoogleSearchWhenQueryIsEmpty() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(
+            builder.build(),
+            "https://tour.example.com",
+            "SERVICE_KEY",
+            "https://places.example.com/v1/places",
+            "GOOGLE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":{"item":[{"contentid":"2651318"}]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":{"item":[{"contentid":"2651318"}]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", null);
+
+    assertThat(response.googlePlace()).isNull();
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("좌표가 없거나 숫자가 아니면 위치 편향 없이 Google을 검색한다")
+  void getPlaceDetailSearchesWithoutLocationBiasWhenCoordinatesAreUnusable() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(
+            builder.build(),
+            "https://tour.example.com",
+            "SERVICE_KEY",
+            "https://places.example.com/v1/places",
+            "GOOGLE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":{"item":[{"contentid":"2651318","title":"파라다이스"}]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":{"item":[{"contentid":"2651318","title":"파라다이스",
+                   "addr1":"부산 해운대구","mapx":"not-a-number","mapy":""}]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(method(HttpMethod.POST))
+        .andRespond(withSuccess("{\"places\":[]}", MediaType.APPLICATION_JSON));
+
+    PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", null);
+
+    assertThat(response.googlePlace()).isNull();
+    server.verify();
+  }
 }
