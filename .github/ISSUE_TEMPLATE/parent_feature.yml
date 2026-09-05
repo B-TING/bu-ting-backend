@@ -1,6 +1,5 @@
 name: Parent Feature
 description: 여러 하위 이슈로 나누어 진행할 큰 기능을 추적합니다.
-title: "feat: "
 type: Feature
 body:
   - type: markdown
@@ -9,6 +8,7 @@ body:
         **부모 이슈입니다.** Type은 `Feature`로 자동 지정됩니다.
         라벨은 아래에서 고른 **도메인/영역 라벨만** 붙여주세요.
         `feature`, `fix`, `refactor` 같은 git convention 라벨은 하위 이슈에만 붙입니다.
+        제목에는 `feat:` 같은 접두사를 붙이지 말고 무엇을 하는지 그대로 적어주세요.
 
   - type: textarea
     id: summary
