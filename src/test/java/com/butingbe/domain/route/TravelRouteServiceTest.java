@@ -397,6 +397,111 @@ class TravelRouteServiceTest {
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
+  @Test
+  @DisplayName("제외한 장소를 빼고 남은 장소로 대체 경로를 만든다")
+  void generatesAlternativeRouteWithoutExcludedPlaces() {
+    PlanPlace nampo = place(1, "남포동", 35.0979, 129.0301);
+    PlanPlace busanStation = place(2, "부산역", 35.1151, 129.0413);
+    PlanPlace gwangalli = place(3, "광안리", 35.1532, 129.1186);
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(List.of(nampo, busanStation, gwangalli));
+
+    var result =
+        travelRouteService.generateAlternativeRoute(
+            authenticatedUser,
+            PLAN_ID,
+            List.of(busanStation.getId()),
+            null,
+            TransportType.PUBLIC_TRANSPORT);
+
+    assertThat(result.excludedPlaceIds()).containsExactly(busanStation.getId());
+    assertThat(result.alternative().orderedPoints())
+        .extracting(RoutePoint::name)
+        .containsExactlyInAnyOrder("남포동", "광안리")
+        .doesNotContain("부산역");
+    assertThat(result.originalDurationMinutes()).isPositive();
+    assertThat(result.reducedMinutes())
+        .isEqualTo(
+            Math.max(0, result.originalDurationMinutes() - result.alternativeDurationMinutes()));
+  }
+
+  @Test
+  @DisplayName("장소를 뺐으니 대체 경로 이동 시간이 기존 경로보다 짧다")
+  void alternativeRouteIsShorterAfterRemovingAPlace() {
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(
+            List.of(
+                place(1, "남포동", 35.0979, 129.0301),
+                place(2, "부산역", 35.1151, 129.0413),
+                place(3, "광안리", 35.1532, 129.1186),
+                place(4, "기장", 35.2444, 129.2222)));
+    UUID gijangId = planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID).get(3).getId();
+
+    var result =
+        travelRouteService.generateAlternativeRoute(
+            authenticatedUser, PLAN_ID, List.of(gijangId), null, TransportType.PUBLIC_TRANSPORT);
+
+    assertThat(result.alternativeDurationMinutes()).isLessThan(result.originalDurationMinutes());
+    assertThat(result.reducedMinutes()).isPositive();
+  }
+
+  @Test
+  @DisplayName("출발 좌표를 주면 그 지점에서 시작하는 대체 경로를 만든다")
+  void generatesAlternativeRouteFromAGivenStart() {
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(
+            List.of(place(1, "남포동", 35.0979, 129.0301), place(2, "광안리", 35.1532, 129.1186)));
+
+    var result =
+        travelRouteService.generateAlternativeRoute(
+            authenticatedUser,
+            PLAN_ID,
+            List.of(),
+            RoutePoint.of("현재 위치", 35.2444, 129.2222),
+            TransportType.PUBLIC_TRANSPORT);
+
+    assertThat(result.alternative().orderedPoints().get(0).name()).isEqualTo("현재 위치");
+    assertThat(result.excludedPlaceIds()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("좌표 없는 장소는 대체 경로에서도 빠진 장소로 알려준다")
+  void alternativeRouteReportsSkippedPlaces() {
+    PlanPlace withoutCoordinates = place(2, "좌표 없음", null, null);
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(
+            List.of(
+                place(1, "남포동", 35.0979, 129.0301),
+                withoutCoordinates,
+                place(3, "광안리", 35.1532, 129.1186)));
+
+    var result =
+        travelRouteService.generateAlternativeRoute(
+            authenticatedUser, PLAN_ID, List.of(), null, null);
+
+    assertThat(result.skippedPlaceIds()).containsExactly(withoutCoordinates.getId());
+    assertThat(result.transportType()).isEqualTo(TransportType.PUBLIC_TRANSPORT);
+  }
+
+  @Test
+  @DisplayName("대체 경로도 인증과 일정 존재를 확인한다")
+  void alternativeRouteChecksAuthenticationAndPlan() {
+    assertThatThrownBy(
+            () -> travelRouteService.generateAlternativeRoute(null, PLAN_ID, List.of(), null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.empty());
+    assertThatThrownBy(
+            () ->
+                travelRouteService.generateAlternativeRoute(
+                    authenticatedUser, PLAN_ID, List.of(), null, null))
+        .isInstanceOf(ResourceNotFoundException.class);
+  }
+
   private Plan plan() {
     Travel travel =
         Travel.builder()

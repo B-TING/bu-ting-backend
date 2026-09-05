@@ -2,8 +2,10 @@ package com.butingbe.domain.route.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.route.TravelRouteService;
+import com.butingbe.domain.route.dto.request.AlternativeRouteReqDto;
 import com.butingbe.domain.route.dto.request.ApplyOptimizedOrderReqDto;
 import com.butingbe.domain.route.dto.request.VisitOrderOptimizeReqDto;
+import com.butingbe.domain.route.dto.response.AlternativeRouteResDto;
 import com.butingbe.domain.route.dto.response.PlanRouteResDto;
 import com.butingbe.domain.route.dto.response.VisitOrderResDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
@@ -48,6 +50,23 @@ public class TravelRouteController {
     return ResponseEntity.ok(
         travelRouteService.optimizeVisitOrder(
             user, planId, body.startPointOrNull(), body.transportType()));
+  }
+
+  /** 못 가게 된 장소를 빼고 대체 경로를 제안한다. 일정을 바꾸지는 않는다. */
+  @PostMapping("/alternatives")
+  public ResponseEntity<AlternativeRouteResDto> generateAlternativeRoute(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID planId,
+      @RequestBody(required = false) @Valid AlternativeRouteReqDto request) {
+    AlternativeRouteReqDto body =
+        request == null ? new AlternativeRouteReqDto(null, null, null, null, null) : request;
+    return ResponseEntity.ok(
+        travelRouteService.generateAlternativeRoute(
+            user,
+            planId,
+            body.excludePlaceIdsOrEmpty(),
+            body.startPointOrNull(),
+            body.transportType()));
   }
 
   /** 최적화한 순서를 일정에 반영한다. 요청에 빠진 장소는 기존 순서를 유지한 채 뒤에 붙는다. */
