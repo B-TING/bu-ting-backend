@@ -2903,6 +2903,30 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(cloned.days().get(0).places()).hasSize(2);
   }
 
+  @Test
+  @DisplayName("다른 여행의 장소로는 리뷰를 남길 수 없다")
+  void rejectsPlaceReviewForPlaceInAnotherTravel() {
+    User author = userRepository.save(createUser("cross-travel@example.com", "cross-travel"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto first = createCompletedTravel(authenticatedUser);
+    TravelResDto second = createCompletedTravel(authenticatedUser);
+    PlanResDto secondDay =
+        travelService.createPlan(
+            authenticatedUser, second.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto placeInSecond =
+        createPlace(authenticatedUser, secondDay.planId(), 1, "Other Place", "Busan");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    first.id(),
+                    placeInSecond.planPlaceId(),
+                    new PlaceReviewCreateReqDto(5, "다른 여행")))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Plan place not found.");
+  }
+
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {
     TravelResDto travel =
         travelService.createTravel(
