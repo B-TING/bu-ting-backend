@@ -47,6 +47,15 @@ public record TravelRecordResDto(
       List<TravelRecordDayResDto> days,
       List<String> imageUrls,
       boolean likedByMe) {
+    return of(travelRecord, days, travelRecord.getCoverImageUrl(), imageUrls, likedByMe);
+  }
+
+  public static TravelRecordResDto of(
+      TravelRecord travelRecord,
+      List<TravelRecordDayResDto> days,
+      String coverImageUrl,
+      List<String> imageUrls,
+      boolean likedByMe) {
     return new TravelRecordResDto(
         travelRecord.getId(),
         travelRecord.getOriginalTravel() == null ? null : travelRecord.getOriginalTravel().getId(),
@@ -54,7 +63,7 @@ public record TravelRecordResDto(
         travelRecord.getAuthor().getNickname(),
         travelRecord.getTitle(),
         travelRecord.getContent(),
-        travelRecord.getCoverImageUrl(),
+        coverImageUrl,
         List.copyOf(imageUrls),
         travelRecord.getOverallRating(),
         travelRecord.getTravelStartDate(),

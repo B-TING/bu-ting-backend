@@ -220,6 +220,33 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("travel record cover image and image list are returned as presigned URLs")
+  void createDraftReturnsPresignedCoverImageAndImageUrls() {
+    User user =
+        userRepository.save(createUser("record-presigned-images@example.com", "record-presigned"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+
+    TravelRecordResDto result =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto(
+                "Image Trip",
+                "Photos",
+                "https://bucket.s3.ap-northeast-2.amazonaws.com/uploads/images/cover.jpg",
+                List.of("uploads/images/first.jpg", "uploads/images/second.jpg"),
+                5));
+
+    assertThat(result.coverImageUrl())
+        .isEqualTo("https://signed.example.com/uploads/images/cover.jpg");
+    assertThat(result.imageUrls())
+        .containsExactly(
+            "https://signed.example.com/uploads/images/first.jpg",
+            "https://signed.example.com/uploads/images/second.jpg");
+  }
+
+  @Test
   @DisplayName("author can get draft travel record snapshot")
   void getDraftReturnsDraftSnapshot() {
     User user = userRepository.save(createUser("record-get@example.com", "record-get"));
@@ -511,6 +538,42 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.publishedAt()).isNotNull();
     assertThat(result.days()).hasSize(1);
     assertThat(result.days().getFirst().places().getFirst().placeName()).isEqualTo("Busan Station");
+  }
+
+  @Test
+  @DisplayName("published travel record detail returns presigned cover image and image list")
+  void getPublishedReturnsPresignedCoverImageAndImageUrls() {
+    User user =
+        userRepository.save(
+            createUser("record-public-presigned@example.com", "record-public-presigned"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto(
+                "Public Image Trip",
+                "Photos",
+                "uploads/images/cover.jpg",
+                List.of("uploads/images/first.jpg", "uploads/images/second.jpg"),
+                5));
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelRecordResDto result = travelRecordService.getPublished(published.travelRecordId());
+
+    assertThat(result.coverImageUrl())
+        .isEqualTo("https://signed.example.com/uploads/images/cover.jpg");
+    assertThat(result.imageUrls())
+        .containsExactly(
+            "https://signed.example.com/uploads/images/first.jpg",
+            "https://signed.example.com/uploads/images/second.jpg");
   }
 
   @Test

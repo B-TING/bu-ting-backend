@@ -26,6 +26,11 @@ public record TravelRecordFeedResDto(
   }
 
   public static TravelRecordFeedResDto from(TravelRecord travelRecord, boolean likedByMe) {
+    return from(travelRecord, travelRecord.getCoverImageUrl(), likedByMe);
+  }
+
+  public static TravelRecordFeedResDto from(
+      TravelRecord travelRecord, String coverImageUrl, boolean likedByMe) {
     return new TravelRecordFeedResDto(
         travelRecord.getId(),
         travelRecord.getOriginalTravel() == null ? null : travelRecord.getOriginalTravel().getId(),
@@ -33,7 +38,7 @@ public record TravelRecordFeedResDto(
         travelRecord.getAuthor().getNickname(),
         travelRecord.getTitle(),
         travelRecord.getContent(),
-        travelRecord.getCoverImageUrl(),
+        coverImageUrl,
         travelRecord.getOverallRating(),
         travelRecord.getTravelStartDate(),
         travelRecord.getTravelEndDate(),
