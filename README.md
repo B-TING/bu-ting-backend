@@ -34,7 +34,7 @@ src/main/java/com/butingbe
 │   ├── chat            # Regional chatrooms over STOMP/WebSocket
 │   ├── file            # S3 uploads and file metadata
 │   ├── place           # Place catalog backed by TourAPI and Google Places
-│   ├── route           # Travel-time and distance between points (provider port)
+│   ├── route           # Travel time, distance and visit-order optimisation
 │   ├── station         # Station reference data
 │   ├── storage         # Luggage storage locations
 │   ├── travel          # Travels, plans, and AI itinerary generation (ai package)
@@ -90,7 +90,7 @@ Request flow:
 | `/api/v1/storage-locations`                  | `StorageLocationController`     | Luggage storage lookup                             |
 | `/api/v1/travels`                            | `TravelController`              | Travel plans, AI plan generation, status           |
 | `/api/v1/plans`                              | `PlanController`                | Plan places: add, reorder, edit, visit, delete     |
-| `/api/v1/plans/{planId}/route`               | `TravelRouteController`         | Travel legs and totals for a day's itinerary       |
+| `/api/v1/plans/{planId}/route`               | `TravelRouteController`         | Travel legs and totals, and visit-order optimisation |
 | `/api/v1/travels/{travelId}/expenses`        | `TravelExpenseController`       | Expense CRUD and summary                           |
 | `/api/v1/travels/{travelId}/expenses/settlements` | `TravelSettlementController` | Settlement confirmation                          |
 | `/api/v1/travels/{travelId}/records`         | `TravelRecordController`        | Travel record read, edit, publish                  |
