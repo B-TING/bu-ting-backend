@@ -22,6 +22,7 @@ public record TravelRecordResDto(
     String title,
     String content,
     String coverImageUrl,
+    List<String> imageUrls,
     Integer overallRating,
     LocalDate travelStartDate,
     LocalDate travelEndDate,
@@ -33,11 +34,19 @@ public record TravelRecordResDto(
     List<TravelRecordDayResDto> days) {
 
   public static TravelRecordResDto of(TravelRecord travelRecord, List<TravelRecordDayResDto> days) {
-    return of(travelRecord, days, false);
+    return of(travelRecord, days, List.of(), false);
   }
 
   public static TravelRecordResDto of(
       TravelRecord travelRecord, List<TravelRecordDayResDto> days, boolean likedByMe) {
+    return of(travelRecord, days, List.of(), likedByMe);
+  }
+
+  public static TravelRecordResDto of(
+      TravelRecord travelRecord,
+      List<TravelRecordDayResDto> days,
+      List<String> imageUrls,
+      boolean likedByMe) {
     return new TravelRecordResDto(
         travelRecord.getId(),
         travelRecord.getOriginalTravel() == null ? null : travelRecord.getOriginalTravel().getId(),
@@ -46,6 +55,7 @@ public record TravelRecordResDto(
         travelRecord.getTitle(),
         travelRecord.getContent(),
         travelRecord.getCoverImageUrl(),
+        List.copyOf(imageUrls),
         travelRecord.getOverallRating(),
         travelRecord.getTravelStartDate(),
         travelRecord.getTravelEndDate(),
