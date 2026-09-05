@@ -1066,20 +1066,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .orElseThrow(() -> new ResourceNotFoundException("Travel record not found."));
   }
 
-  private TravelRecordPlace findTravelRecordPlaceInRecord(
-      UUID travelRecordPlaceId, UUID travelRecordId) {
-    TravelRecordPlace travelRecordPlace =
-        travelRecordPlaceRepository
-            .findById(travelRecordPlaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Travel record place not found."));
-
-    if (!travelRecordPlace.getTravelRecordDay().getTravelRecord().getId().equals(travelRecordId)) {
-      throw new ResourceNotFoundException("Travel record place not found.");
-    }
-
-    return travelRecordPlace;
-  }
-
   private PlanPlace findPlanPlaceInTravel(UUID planPlaceId, UUID travelId) {
     PlanPlace planPlace =
         planPlaceRepository
@@ -1096,12 +1082,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private PlaceReview findPlaceReviewByPlanPlaceId(UUID planPlaceId, UUID authorId) {
     return placeReviewRepository
         .findByPlanPlace_IdAndAuthor_Id(planPlaceId, authorId)
-        .orElseThrow(() -> new ResourceNotFoundException("Place review not found."));
-  }
-
-  private PlaceReview findPlaceReviewByTravelRecordPlaceId(UUID travelRecordPlaceId) {
-    return placeReviewRepository
-        .findByTravelRecordPlace_Id(travelRecordPlaceId)
         .orElseThrow(() -> new ResourceNotFoundException("Place review not found."));
   }
 
