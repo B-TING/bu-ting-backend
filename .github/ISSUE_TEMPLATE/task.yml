@@ -1,8 +1,15 @@
 name: Task / Sub-issue
 description: 부모 이슈에 연결할 구체적인 구현 작업을 작성합니다.
 title: "feat: "
-labels: ["feature"]
+type: Task
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **하위 이슈입니다.** Type은 `Task`로 자동 지정됩니다. 버그 수정이면 생성 후 Type을 `Bug`로 바꿔주세요.
+        라벨은 **도메인/영역 라벨 + git convention 라벨 1개**를 붙여주세요. (예: `storage`, `feature`)
+        제목의 `feat:` 접두사도 실제 작업 종류에 맞게 바꿔주세요.
+
   - type: textarea
     id: summary
     attributes:
@@ -27,18 +34,44 @@ body:
   - type: dropdown
     id: area
     attributes:
-      label: 작업 영역
-      description: 가장 가까운 영역을 하나만 선택해주세요.
+      label: 도메인 / 영역
+      description: 이 작업이 실제로 건드리는 영역만 선택하고, 같은 이름의 라벨을 이슈에 붙여주세요.
       options:
-        - Domain
-        - Backend
-        - API
-        - Security
-        - Database
-        - Test
-        - Infra
-        - Docs
-        - Other
+        - auth
+        - chat
+        - file
+        - place
+        - station
+        - storage
+        - travel
+        - travelexpense
+        - travelrecord
+        - travelsurvey
+        - travelteam
+        - user
+        - config
+        - ci
+        - db
+        - global
+        - i18n
+        - docs
+      multiple: true
+    validations:
+      required: true
+
+  - type: dropdown
+    id: convention
+    attributes:
+      label: 작업 종류
+      description: 커밋·브랜치 type과 같은 값을 하나만 선택하고, 같은 이름의 라벨을 이슈에 붙여주세요.
+      options:
+        - feature
+        - fix
+        - refactor
+        - test
+        - docs
+        - chore
+        - hotfix
       multiple: false
     validations:
       required: true
@@ -88,12 +121,21 @@ body:
     validations:
       required: true
 
-  - type: textarea
+  - type: input
     id: parent_issue
     attributes:
       label: 부모 이슈
-      description: 연결할 부모 이슈 번호가 있다면 적어주세요.
-      placeholder: "예) Parent: #12"
+      description: "연결할 부모 이슈가 있다면 `Parent: #<번호>` 형식으로 적어주세요. 브랜치 하나로 끝나는 작업이면 비워둬도 됩니다."
+      placeholder: "Parent: #12"
+
+  - type: input
+    id: schedule
+    attributes:
+      label: 작업 예정일
+      description: "YYYY-MM-DD 형식으로 적어주세요."
+      placeholder: "2026-09-05"
+    validations:
+      required: true
 
   - type: textarea
     id: notes
