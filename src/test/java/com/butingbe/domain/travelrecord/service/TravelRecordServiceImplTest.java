@@ -2490,6 +2490,335 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         .hasMessage("Place review rating must be between 1 and 5.");
   }
 
+  @Test
+  @DisplayName("장소 리뷰 태그와 미디어 키의 개수·길이 제한을 검증한다")
+  void rejectsOversizedPlaceReviewTagsAndMediaKeys() {
+    User author = userRepository.save(createUser("review-limits@example.com", "review-limits"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto place =
+        createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    place.planPlaceId(),
+                    new PlaceReviewCreateReqDto(5, "tag too long", List.of("a".repeat(31)))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Place review tag must be");
+
+    List<String> tooManyMediaKeys =
+        java.util.stream.IntStream.rangeClosed(1, 21).mapToObj(i -> "uploads/" + i).toList();
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    place.planPlaceId(),
+                    new PlaceReviewCreateReqDto(5, "too many media", null, 30, tooManyMediaKeys)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Place review media file keys must be");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    place.planPlaceId(),
+                    new PlaceReviewCreateReqDto(
+                        5, "media key too long", null, 30, List.of("a".repeat(501)))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Place review media file key must be");
+  }
+
+  @Test
+  @DisplayName("완료되지 않은 여행으로는 기록 초안을 만들 수 없다")
+  void rejectsDraftForIncompleteTravel() {
+    User author = userRepository.save(createUser("incomplete@example.com", "incomplete"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto travel =
+        travelService.createTravel(
+            authenticatedUser,
+            new TravelCreateReqDto(
+                "Busan",
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createDraft(
+                    authenticatedUser, travel.id(), new TravelRecordCreateReqDto("t", null, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Only completed travels can be recorded.");
+  }
+
+  @Test
+  @DisplayName("피드 size가 1~50 범위를 벗어나면 거부한다")
+  void rejectsFeedSizeOutOfRange() {
+    assertThatThrownBy(() -> travelRecordService.getLatestFeed(null, 0))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Feed size must be between 1 and 50.");
+    assertThatThrownBy(() -> travelRecordService.getLatestFeed(null, 51))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Feed size must be between 1 and 50.");
+  }
+
+  @Test
+  @DisplayName("발행 상태가 아닌 기록은 다시 공개할 수 없다")
+  void rejectsRepublishOfNonHiddenRecord() {
+    User author = userRepository.save(createUser("republish-bad@example.com", "republish-bad"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Republish");
+
+    assertThatThrownBy(
+            () -> travelRecordService.republishMyRecord(authenticatedUser, draft.travelRecordId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Only hidden travel records can be republished.");
+  }
+
+  @Test
+  @DisplayName("평점 없는 초안은 발행할 수 없다")
+  void rejectsPublishWithoutOverallRating() {
+    User author = userRepository.save(createUser("no-title@example.com", "no-title"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(authenticatedUser, travel.id(), null);
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.publish(authenticatedUser, travel.id(), draft.travelRecordId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record overall rating is required.");
+  }
+
+  @Test
+  @DisplayName("여행 멤버가 아니면 기록 초안을 만들 수 없다")
+  void rejectsDraftFromNonMember() {
+    User owner = userRepository.save(createUser("record-owner@example.com", "record-owner"));
+    User outsider = userRepository.save(createUser("record-out@example.com", "record-out"));
+    TravelResDto travel = createCompletedTravel(AuthenticatedUser.from(owner));
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createDraft(
+                    AuthenticatedUser.from(outsider),
+                    travel.id(),
+                    new TravelRecordCreateReqDto("t", null, null)))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not a travel member.");
+  }
+
+  @Test
+  @DisplayName("본문 없는 수정 요청은 기존 초안을 그대로 반환한다")
+  void updateDraftWithNullRequestReturnsUnchangedRecord() {
+    User author = userRepository.save(createUser("null-update@example.com", "null-update"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Unchanged");
+
+    TravelRecordResDto result =
+        travelRecordService.updateDraft(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId(), null);
+
+    assertThat(result.travelRecordId()).isEqualTo(draft.travelRecordId());
+    assertThat(result.title()).isEqualTo(draft.title());
+  }
+
+  @Test
+  @DisplayName("본문 없는 리뷰 수정 요청은 기존 리뷰를 그대로 반환한다")
+  void updatePlaceReviewWithNullRequestReturnsUnchangedReview() {
+    User author = userRepository.save(createUser("null-review@example.com", "null-review"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    DraftWithPlanPlace reviewed =
+        createDraftWithOneReviewedPlace(authenticatedUser, "Null Review", 4, "원본", null);
+
+    PlaceReviewResDto result =
+        travelRecordService.updatePlaceReview(
+            authenticatedUser,
+            reviewed.draft().originalTravelId(),
+            reviewed.planPlace().planPlaceId(),
+            null);
+
+    assertThat(result.rating()).isEqualTo(4);
+    assertThat(result.content()).isEqualTo("원본");
+  }
+
+  @Test
+  @DisplayName("미디어 키를 넘긴 리뷰 수정은 첨부를 교체한다")
+  void updatePlaceReviewReplacesMedia() {
+    User author = userRepository.save(createUser("media-review@example.com", "media-review"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    DraftWithPlanPlace reviewed =
+        createDraftWithOneReviewedPlace(authenticatedUser, "Media Review", 4, "원본", null);
+
+    PlaceReviewResDto result =
+        travelRecordService.updatePlaceReview(
+            authenticatedUser,
+            reviewed.draft().originalTravelId(),
+            reviewed.planPlace().planPlaceId(),
+            new PlaceReviewUpdateReqDto(5, "수정", null, 60, List.of("uploads/a.jpg")));
+
+    assertThat(result.rating()).isEqualTo(5);
+    assertThat(result.mediaUrls()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("사용자 없이도 정렬 옵션까지 포함해 피드를 조회할 수 있다")
+  void getLatestFeedWithoutUserSupportsAllFilters() {
+    User author = userRepository.save(createUser("anon-feed@example.com", "anon-feed"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Anon Feed");
+    travelRecordService.publish(
+        authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelRecordFeedPageResDto result =
+        travelRecordService.getLatestFeed(
+            null, null, null, null, null, null, null, TravelRecordFeedSort.LATEST);
+
+    assertThat(result.items()).isNotEmpty();
+  }
+
+  @Test
+  @DisplayName("provider 기반 장소별 기록 조회 오버로드도 같은 결과를 반환한다")
+  void getTravelRecordsByPlaceProviderOverloads() {
+    User author = userRepository.save(createUser("place-feed@example.com", "place-feed"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    DraftWithPlanPlace reviewed =
+        createDraftWithOneReviewedPlace(authenticatedUser, "Place Feed", 5, "좋아요", null);
+    travelRecordService.publish(
+        authenticatedUser, reviewed.draft().originalTravelId(), reviewed.draft().travelRecordId());
+
+    assertThat(travelRecordService.getTravelRecordsByPlace(PlaceProvider.GOOGLE, "Busan Station"))
+        .isNotEmpty();
+    assertThat(
+            travelRecordService
+                .getTravelRecordsByPlace(PlaceProvider.GOOGLE, "Busan Station", null, 10)
+                .items())
+        .isNotEmpty();
+  }
+
+  @Test
+  @DisplayName("형식이 잘못된 피드 커서는 거부한다")
+  void rejectsMalformedFeedCursor() {
+    String malformed =
+        java.util.Base64.getUrlEncoder()
+            .encodeToString("a|b|c".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+    assertThatThrownBy(() -> travelRecordService.getLatestFeed(malformed, 10))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Invalid feed cursor.");
+    assertThatThrownBy(() -> travelRecordService.getLatestFeed("not-base64!!", 10))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Invalid feed cursor.");
+  }
+
+  @Test
+  @DisplayName("정렬 정보 없는 예전 형식의 커서도 최신순으로 해석한다")
+  void acceptsLegacyTwoValueFeedCursor() {
+    User author = userRepository.save(createUser("legacy-cursor@example.com", "legacy-cursor"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Legacy Cursor");
+    travelRecordService.publish(
+        authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    String legacyCursor =
+        java.util.Base64.getUrlEncoder()
+            .encodeToString(
+                (java.time.LocalDateTime.now().plusDays(1)
+                        + "|"
+                        + java.time.LocalDateTime.now().plusDays(1))
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+    assertThat(travelRecordService.getLatestFeed(legacyCursor, 10).items()).isNotEmpty();
+  }
+
+  @Test
+  @DisplayName("provider를 포함한 피드 오버로드도 같은 결과를 반환한다")
+  void getLatestFeedWithProviderOverload() {
+    User author = userRepository.save(createUser("provider-feed@example.com", "provider-feed"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Provider Feed");
+    travelRecordService.publish(
+        authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelRecordFeedPageResDto result =
+        travelRecordService.getLatestFeed(
+            null,
+            10,
+            null,
+            PlaceProvider.GOOGLE,
+            null,
+            null,
+            null,
+            null,
+            null,
+            TravelRecordFeedSort.LATEST);
+
+    assertThat(result.items()).isNotEmpty();
+  }
+
+  @Test
+  @DisplayName("본문 없는 내 기록 수정 요청은 기존 기록을 그대로 반환한다")
+  void updateMyRecordWithNullRequestReturnsUnchangedRecord() {
+    User author = userRepository.save(createUser("my-null@example.com", "my-null"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "My Unchanged");
+
+    TravelRecordResDto result =
+        travelRecordService.updateMyRecord(authenticatedUser, draft.travelRecordId(), null);
+
+    assertThat(result.travelRecordId()).isEqualTo(draft.travelRecordId());
+    assertThat(result.title()).isEqualTo(draft.title());
+  }
+
+  @Test
+  @DisplayName("기록과 요청 모두 제목이 없으면 기본 제목으로 복제한다")
+  void cloneToTravelFallsBackToDefaultTitle() {
+    User author = userRepository.save(createUser("clone-title@example.com", "clone-title"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Clone Title");
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelPlansResDto cloned =
+        travelRecordService.cloneToTravel(
+            authenticatedUser,
+            published.travelRecordId(),
+            new TravelRecordCloneToTravelReqDto(
+                null,
+                LocalDate.of(2026, 10, 1),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+    assertThat(cloned.title()).isEqualTo(published.title());
+  }
+
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {
     TravelResDto travel =
         travelService.createTravel(

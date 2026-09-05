@@ -143,6 +143,52 @@ class TravelSurveyServiceImplTest {
         .isInstanceOf(UnauthenticatedException.class);
   }
 
+  @Test
+  @DisplayName("레거시 개발 관리자 계정은 지우고 새 계정으로 다시 만든다")
+  void replacesLegacyDevelopmentAdmin() {
+    UUID legacyId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    User legacyAdmin = user(legacyId, "admin@local.dev", "admin", UserRole.ADMIN);
+    AuthenticatedUser adminUser =
+        new AuthenticatedUser(
+            legacyId,
+            "admin@local.dev",
+            "admin",
+            List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+
+    when(userRepository.findByProviderAndProviderId("development", "admin-token"))
+        .thenReturn(Optional.of(legacyAdmin));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(travelSurveyRepository.findById(any())).thenReturn(Optional.empty());
+    when(travelSurveyRepository.save(any(TravelSurvey.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    travelSurveyService.upsertProfile(adminUser, request);
+
+    verify(opaqueTokenRepository).deleteByUserId(legacyId);
+    verify(userRepository).delete(legacyAdmin);
+    verify(userRepository).flush();
+    verify(userRepository).save(any(User.class));
+  }
+
+  @Test
+  @DisplayName("레거시가 아닌 개발 관리자 계정은 그대로 사용한다")
+  void keepsNonLegacyDevelopmentAdmin() {
+    User admin = user(USER_ID, "admin@local.dev", "admin", UserRole.ADMIN);
+    AuthenticatedUser adminUser =
+        new AuthenticatedUser(
+            USER_ID, "admin@local.dev", "admin", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+
+    when(userRepository.findByProviderAndProviderId("development", "admin-token"))
+        .thenReturn(Optional.of(admin));
+    when(travelSurveyRepository.findById(USER_ID)).thenReturn(Optional.empty());
+    when(travelSurveyRepository.save(any(TravelSurvey.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    travelSurveyService.upsertProfile(adminUser, request);
+
+    verify(userRepository, never()).delete(any(User.class));
+  }
+
   private AuthenticatedUser authenticatedUser(UserRole role) {
     return new AuthenticatedUser(
         USER_ID,
