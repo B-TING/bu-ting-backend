@@ -2,11 +2,14 @@ package com.butingbe.domain.route.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.route.TravelRouteService;
+import com.butingbe.domain.route.dto.request.ApplyOptimizedOrderReqDto;
 import com.butingbe.domain.route.dto.request.VisitOrderOptimizeReqDto;
 import com.butingbe.domain.route.dto.response.PlanRouteResDto;
 import com.butingbe.domain.route.dto.response.VisitOrderResDto;
+import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.entity.TransportType;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -45,5 +48,15 @@ public class TravelRouteController {
     return ResponseEntity.ok(
         travelRouteService.optimizeVisitOrder(
             user, planId, body.startPointOrNull(), body.transportType()));
+  }
+
+  /** 최적화한 순서를 일정에 반영한다. 요청에 빠진 장소는 기존 순서를 유지한 채 뒤에 붙는다. */
+  @PostMapping("/apply")
+  public ResponseEntity<List<PlanPlaceResDto>> applyOptimizedOrder(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID planId,
+      @RequestBody @Valid ApplyOptimizedOrderReqDto request) {
+    return ResponseEntity.ok(
+        travelRouteService.applyOptimizedOrder(user, planId, request.planPlaceIds()));
   }
 }

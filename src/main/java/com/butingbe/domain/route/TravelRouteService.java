@@ -6,6 +6,8 @@ import com.butingbe.domain.route.dto.RoutePoint;
 import com.butingbe.domain.route.dto.response.PlanRouteResDto;
 import com.butingbe.domain.route.dto.response.TravelRouteOptimizeResDto;
 import com.butingbe.domain.route.dto.response.VisitOrderResDto;
+import com.butingbe.domain.travel.dto.request.PlanPlaceSequenceUpdateReqDto;
+import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.entity.Plan;
 import com.butingbe.domain.travel.entity.PlanPlace;
 import com.butingbe.domain.travel.entity.TransportType;
@@ -13,12 +15,16 @@ import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
+import com.butingbe.domain.travel.service.TravelService;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +41,7 @@ public class TravelRouteService {
   private final TravelMemberAuthorization travelMemberAuthorization;
   private final RouteProvider routeProvider;
   private final VisitOrderOptimizer visitOrderOptimizer;
+  private final TravelService travelService;
 
   /** 일정에 담긴 순서대로 이동할 때의 구간과 합계를 반환한다. */
   public PlanRouteResDto getPlanRoute(
@@ -129,6 +136,48 @@ public class TravelRouteService {
         route.legs(),
         route.originalDurationMinutes(),
         skippedPlaceIds);
+  }
+
+  /**
+   * 최적화한 순서를 일정에 실제로 반영한다.
+   *
+   * <p>최적화는 좌표가 있는 장소만 다루므로 요청에 일정의 모든 장소가 들어오지는 않는다. 빠진 장소를 그대로 두면 일정에서 사라지므로, **기존 순서를 유지한 채 뒤에
+   * 붙여** 하나도 잃지 않게 한다.
+   *
+   * <p>실제 순서 쓰기는 {@link TravelService#updatePlanPlaceSequence}에 위임한다. 중복·소속 검증과 임시 순번을 거치는 갱신이 이미
+   * 거기 있고, 순서를 바꾸는 경로가 둘로 갈라지면 규칙이 어긋나기 쉽다.
+   */
+  @Transactional
+  public List<PlanPlaceResDto> applyOptimizedOrder(
+      AuthenticatedUser authenticatedUser, UUID planId, List<UUID> optimizedPlaceIds) {
+    UUID userId = requireUserId(authenticatedUser);
+    Plan plan = findPlan(planId);
+    travelMemberAuthorization.validateMember(plan.getTravel().getId(), userId);
+
+    List<PlanPlace> places = planPlaceRepository.findByPlan_IdOrderBySequenceAsc(planId);
+    List<UUID> requested = optimizedPlaceIds == null ? List.of() : optimizedPlaceIds;
+
+    validateBelongsToPlan(places, requested);
+
+    List<UUID> fullOrder = new ArrayList<>(requested);
+    places.stream()
+        .map(PlanPlace::getId)
+        .filter(id -> !fullOrder.contains(id))
+        .forEach(fullOrder::add);
+
+    return travelService.updatePlanPlaceSequence(
+        authenticatedUser, planId, new PlanPlaceSequenceUpdateReqDto(fullOrder));
+  }
+
+  /** 요청한 장소가 모두 이 일정의 것인지, 중복이 없는지 확인한다. 누락은 허용한다. */
+  private void validateBelongsToPlan(List<PlanPlace> places, List<UUID> requestedIds) {
+    if (new HashSet<>(requestedIds).size() != requestedIds.size()) {
+      throw new IllegalArgumentException("Duplicated plan place id exists.");
+    }
+    Set<UUID> planPlaceIds = places.stream().map(PlanPlace::getId).collect(Collectors.toSet());
+    if (!planPlaceIds.containsAll(requestedIds)) {
+      throw new IllegalArgumentException("Plan place ids do not match this plan.");
+    }
   }
 
   /** 임의의 두 지점 사이 구간. 현재 위치에서 다음 장소까지처럼 일정 밖의 조회에 쓴다. */
