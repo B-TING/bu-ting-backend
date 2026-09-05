@@ -22,12 +22,4 @@ public record ChatMessageResponse(
         entity.getCreatedAt(),
         isMine);
   }
-
-  public UUID id() {
-    return messageId;
-  }
-
-  public UUID userId() {
-    return senderId;
-  }
 }
