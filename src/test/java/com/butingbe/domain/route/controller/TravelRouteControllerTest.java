@@ -17,6 +17,8 @@ import com.butingbe.domain.route.dto.RouteLeg;
 import com.butingbe.domain.route.dto.RoutePoint;
 import com.butingbe.domain.route.dto.response.PlanRouteResDto;
 import com.butingbe.domain.route.dto.response.VisitOrderResDto;
+import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
+import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.TransportType;
 import java.util.List;
 import java.util.UUID;
@@ -207,6 +209,62 @@ class TravelRouteControllerTest {
                     {"startLatitude": 95.0, "startLongitude": 129.1604}
                     """))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("최적화한 순서를 반영하면 갱신된 장소 목록을 반환한다")
+  void appliesOptimizedOrder() throws Exception {
+    UUID firstId = UUID.fromString("55555555-0000-0000-0000-000000000001");
+    UUID secondId = UUID.fromString("55555555-0000-0000-0000-000000000002");
+    when(travelRouteService.applyOptimizedOrder(
+            any(AuthenticatedUser.class), eq(PLAN_ID), eq(List.of(secondId, firstId))))
+        .thenReturn(List.of(planPlace(secondId, 1, "부산역"), planPlace(firstId, 2, "해운대")));
+
+    mockMvc
+        .perform(
+            post("/plans/{planId}/route/apply", PLAN_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"planPlaceIds": ["%s", "%s"]}
+                    """
+                        .formatted(secondId, firstId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].placeName").value("부산역"))
+        .andExpect(jsonPath("$[0].sequence").value(1))
+        .andExpect(jsonPath("$[1].placeName").value("해운대"))
+        .andExpect(jsonPath("$[1].sequence").value(2));
+  }
+
+  @Test
+  @DisplayName("반영할 장소 목록이 비어 있으면 400을 반환한다")
+  void rejectsEmptyPlaceIds() throws Exception {
+    mockMvc
+        .perform(
+            post("/plans/{planId}/route/apply", PLAN_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"planPlaceIds": []}
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  private PlanPlaceResDto planPlace(UUID id, int sequence, String name) {
+    return new PlanPlaceResDto(
+        id,
+        PLAN_ID,
+        sequence,
+        name,
+        "부산",
+        35.1,
+        129.1,
+        PlaceProvider.GOOGLE,
+        name,
+        30,
+        null,
+        null,
+        false);
   }
 
   private LocalValidatorFactoryBean validator() {
