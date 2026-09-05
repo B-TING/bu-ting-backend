@@ -244,4 +244,22 @@ class TravelSettlementServiceTest extends AbstractContainerTest {
     assertThatThrownBy(() -> travelSettlementService.confirmSettlement(null, travelId))
         .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
   }
+
+  @Test
+  @DisplayName("멤버 잔액 합이 0이 아니면 정산 계산을 신뢰하지 않고 중단한다")
+  void rejectsUnbalancedMemberSummaries() {
+    var debtor =
+        new com.butingbe.domain.travelexpense.dto.response.TravelExpenseSummaryResponse
+            .MemberSummary(java.util.UUID.randomUUID(), "채무자", 0L, 100L, -100L);
+    var creditor =
+        new com.butingbe.domain.travelexpense.dto.response.TravelExpenseSummaryResponse
+            .MemberSummary(java.util.UUID.randomUUID(), "채권자", 50L, 0L, 50L);
+
+    assertThatThrownBy(
+            () ->
+                TravelSettlementService.calculateCurrencyTransfers(
+                    "KRW", java.util.List.of(debtor, creditor)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Settlement balances are inconsistent.");
+  }
 }
