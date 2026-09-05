@@ -1,6 +1,5 @@
 name: Task / Sub-issue
 description: 부모 이슈에 연결할 구체적인 구현 작업을 작성합니다.
-title: "feat: "
 type: Task
 body:
   - type: markdown
@@ -8,7 +7,7 @@ body:
       value: |
         **하위 이슈입니다.** Type은 `Task`로 자동 지정됩니다. 버그 수정이면 생성 후 Type을 `Bug`로 바꿔주세요.
         라벨은 **도메인/영역 라벨 + git convention 라벨 1개**를 붙여주세요. (예: `storage`, `feature`)
-        제목의 `feat:` 접두사도 실제 작업 종류에 맞게 바꿔주세요.
+        제목에는 `feat:`, `fix:` 같은 접두사를 붙이지 말고 무엇을 하는지 그대로 적어주세요. 작업 종류는 라벨과 Type이 이미 나타냅니다.
 
   - type: textarea
     id: summary
