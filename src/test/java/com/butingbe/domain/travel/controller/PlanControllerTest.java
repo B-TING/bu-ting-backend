@@ -1,6 +1,7 @@
 package com.butingbe.domain.travel.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -23,6 +24,7 @@ import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
 import com.butingbe.domain.travel.dto.response.TravelResDto;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.service.TravelService;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalTime;
 import java.util.List;
@@ -205,6 +207,28 @@ class PlanControllerTest {
         return new AuthenticatedUser(UUID.randomUUID(), "user@example.com", "tester", List.of());
       }
     };
+  }
+
+  @Test
+  @DisplayName("인증되지 않은 사용자의 요청은 모두 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    UUID planId = FakeTravelService.PLAN_ID;
+    UUID planPlaceId = FakeTravelService.PLACE_ID;
+
+    assertThatThrownBy(() -> planController.getPlanPlaces(null, planId))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> planController.createPlanPlace(null, planId, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> planController.updatePlanPlace(null, planPlaceId, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> planController.updatePlanPlacePlace(null, planPlaceId, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> planController.updatePlanPlaceVisited(null, planPlaceId, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> planController.updatePlanPlaceSequence(null, planId, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> planController.deletePlanPlace(null, planPlaceId))
+        .isInstanceOf(UnauthenticatedException.class);
   }
 
   private AuthenticatedUser authenticatedUser() {

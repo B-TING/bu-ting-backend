@@ -840,6 +840,85 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("조회수 순 정렬도 커서로 다음 페이지를 이어서 조회한다")
+  void getLatestFeedSortsByViewCountWithCursor() {
+    User lowViewAuthor =
+        userRepository.save(
+            createUser("record-cursor-view-low@example.com", "record-cursor-view-low"));
+    User highViewAuthor =
+        userRepository.save(
+            createUser("record-cursor-view-high@example.com", "record-cursor-view-high"));
+    AuthenticatedUser lowAuthorUser = AuthenticatedUser.from(lowViewAuthor);
+    AuthenticatedUser highAuthorUser = AuthenticatedUser.from(highViewAuthor);
+    TravelRecordResDto lowDraft = createDraftWithOnePlace(lowAuthorUser, "Cursor Low View");
+    TravelRecordResDto highDraft = createDraftWithOnePlace(highAuthorUser, "Cursor High View");
+    TravelRecordResDto lowPublished =
+        travelRecordService.publish(
+            lowAuthorUser, lowDraft.originalTravelId(), lowDraft.travelRecordId());
+    TravelRecordResDto highPublished =
+        travelRecordService.publish(
+            highAuthorUser, highDraft.originalTravelId(), highDraft.travelRecordId());
+    travelRecordService.getPublished(lowPublished.travelRecordId());
+    travelRecordService.getPublished(highPublished.travelRecordId());
+    travelRecordService.getPublished(highPublished.travelRecordId());
+
+    TravelRecordFeedPageResDto firstPage =
+        travelRecordService.getLatestFeed(
+            null, 1, null, null, null, null, null, TravelRecordFeedSort.MOST_VIEWED);
+    TravelRecordFeedPageResDto secondPage =
+        travelRecordService.getLatestFeed(
+            firstPage.nextCursor(),
+            1,
+            null,
+            null,
+            null,
+            null,
+            null,
+            TravelRecordFeedSort.MOST_VIEWED);
+
+    assertThat(firstPage.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(highPublished.travelRecordId());
+    assertThat(firstPage.hasNext()).isTrue();
+    assertThat(firstPage.nextCursor()).isNotBlank();
+    assertThat(secondPage.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .containsExactly(lowPublished.travelRecordId());
+    assertThat(secondPage.hasNext()).isFalse();
+  }
+
+  @Test
+  @DisplayName("provider와 providerPlaceId로도 장소 리뷰 요약을 집계한다")
+  void getPlaceReviewSummaryByProviderAggregatesReviews() {
+    User author =
+        userRepository.save(createUser("summary-provider@example.com", "summary-provider"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    DraftWithPlanPlace reviewed =
+        createDraftWithOneReviewedPlace(authenticatedUser, "Provider Summary", 4, "좋아요", null);
+    travelRecordService.publish(
+        authenticatedUser, reviewed.draft().originalTravelId(), reviewed.draft().travelRecordId());
+
+    PlaceReviewSummaryResDto summary =
+        travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "Busan Station");
+
+    assertThat(summary.placeId()).isEqualTo("Busan Station");
+    assertThat(summary.reviewCount()).isEqualTo(1);
+    assertThat(summary.averageRating()).isEqualTo(4.0);
+    assertThat(summary.ratingCounts()).containsEntry(4, 1L);
+    assertThat(summary.reviews()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("provider 기반 장소 리뷰 요약은 provider와 placeId를 모두 요구한다")
+  void getPlaceReviewSummaryByProviderRejectsInvalidRequest() {
+    assertThatThrownBy(() -> travelRecordService.getPlaceReviewSummary(null, "Busan Station"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Place provider is required.");
+    assertThatThrownBy(() -> travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "  "))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
   @DisplayName("latest feed rejects cursor when cursor sort does not match requested sort")
   void getLatestFeedRejectsMismatchedSortCursor() {
     User firstUser =

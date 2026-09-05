@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelteam.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -17,6 +18,7 @@ import com.butingbe.domain.travelteam.dto.TravelTeamTravelResponse;
 import com.butingbe.domain.travelteam.dto.request.TravelLeaderTransferRequest;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.service.TravelTeamService;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -38,14 +40,42 @@ class TravelTeamControllerTest {
 
   private MockMvc mockMvc;
   private FakeTravelTeamService travelTeamService;
+  private TravelTeamController travelTeamController;
 
   @BeforeEach
   void setUp() {
     travelTeamService = new FakeTravelTeamService();
+    travelTeamController = new TravelTeamController(travelTeamService);
     mockMvc =
-        MockMvcBuilders.standaloneSetup(new TravelTeamController(travelTeamService))
+        MockMvcBuilders.standaloneSetup(travelTeamController)
             .setCustomArgumentResolvers(authenticatedUserResolver())
             .build();
+  }
+
+  @Test
+  @DisplayName("인증되지 않은 사용자의 요청은 모두 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    UUID travelId = UUID.fromString("10000000-0000-0000-0000-000000000001");
+    UUID memberId = UUID.fromString("22222222-0000-0000-0000-000000000009");
+
+    assertThatThrownBy(() -> travelTeamController.getMyTravels(null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelTeamController.getTravelMembers(null, travelId))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelTeamController.transferLeader(null, travelId, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelTeamController.removeMember(null, travelId, memberId))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelTeamController.createInviteLink(null, travelId))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelTeamController.getInviteLink(null, travelId))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelTeamController.deleteInviteLink(null, travelId))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelTeamController.acceptInvite(null, "token"))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelTeamController.exitTravel(null, travelId))
+        .isInstanceOf(UnauthenticatedException.class);
   }
 
   @Test

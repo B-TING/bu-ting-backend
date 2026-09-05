@@ -146,6 +146,42 @@ class TravelTeamServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("리더 역할인 팀원은 내보낼 수 없다")
+  void removeMemberRejectsLeaderRole() {
+    User leader = userRepository.save(createUser("leader-keep@example.com", "leader-keep"));
+    User coLeader = userRepository.save(createUser("coleader-keep@example.com", "coleader-keep"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+    saveMember(travel, coLeader, TravelTeamRole.LEADER);
+
+    assertThatThrownBy(
+            () ->
+                travelTeamService.removeMember(
+                    AuthenticatedUser.from(leader), travel.getId(), coLeader.getId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Leader cannot be removed.");
+
+    assertThat(travelMemberRepository.existsByTravel_IdAndUser_Id(travel.getId(), coLeader.getId()))
+        .isTrue();
+  }
+
+  @Test
+  @DisplayName("팀원이 아닌 사용자는 내보낼 수 없다")
+  void removeMemberRejectsNonMember() {
+    User leader = userRepository.save(createUser("leader-nm@example.com", "leader-nm"));
+    User outsider = userRepository.save(createUser("outsider-nm@example.com", "outsider-nm"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+
+    assertThatThrownBy(
+            () ->
+                travelTeamService.removeMember(
+                    AuthenticatedUser.from(leader), travel.getId(), outsider.getId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Target user is not a travel member.");
+  }
+
+  @Test
   @DisplayName("member cannot remove member")
   void removeMemberByMemberThrowsForbiddenException() {
     User leader =

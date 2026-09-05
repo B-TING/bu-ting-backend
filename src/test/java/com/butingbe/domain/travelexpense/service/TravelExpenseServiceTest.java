@@ -26,13 +26,17 @@ import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -620,6 +624,35 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                     AuthenticatedUser.from(outsider), travel.getId(), null, null))
         .isInstanceOf(ForbiddenException.class)
         .hasMessage("User is not a travel member.");
+  }
+
+  @Test
+  @DisplayName("인증 정보가 없거나 id가 없으면 모든 경비 API가 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    UUID travelId = UUID.randomUUID();
+    UUID expenseId = UUID.randomUUID();
+    AuthenticatedUser withoutId =
+        new AuthenticatedUser(null, "user@example.com", "tester", List.of());
+
+    for (AuthenticatedUser invalid : new AuthenticatedUser[] {null, withoutId}) {
+      assertThatThrownBy(
+              () -> travelExpenseService.getExpenseSummary(invalid, travelId, null, null))
+          .isInstanceOf(UnauthenticatedException.class);
+      assertThatThrownBy(() -> travelExpenseService.deleteExpense(invalid, travelId, expenseId))
+          .isInstanceOf(UnauthenticatedException.class);
+      assertThatThrownBy(
+              () -> travelExpenseService.updateExpense(invalid, travelId, expenseId, null))
+          .isInstanceOf(UnauthenticatedException.class);
+      assertThatThrownBy(() -> travelExpenseService.getExpense(invalid, travelId, expenseId))
+          .isInstanceOf(UnauthenticatedException.class);
+      assertThatThrownBy(
+              () ->
+                  travelExpenseService.getExpenses(
+                      invalid, travelId, null, null, null, null, Pageable.unpaged()))
+          .isInstanceOf(UnauthenticatedException.class);
+      assertThatThrownBy(() -> travelExpenseService.createEqualExpense(invalid, travelId, null))
+          .isInstanceOf(UnauthenticatedException.class);
+    }
   }
 
   private TravelExpenseCreateRequest request(

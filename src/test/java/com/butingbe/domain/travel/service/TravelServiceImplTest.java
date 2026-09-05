@@ -14,6 +14,7 @@ import com.butingbe.domain.travel.dto.request.TravelCreateReqDto;
 import com.butingbe.domain.travel.dto.request.TravelStatusUpdateReqDto;
 import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
 import com.butingbe.domain.travel.dto.response.PlanResDto;
+import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
 import com.butingbe.domain.travel.dto.response.TravelResDto;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.PlanRoute;
@@ -289,6 +290,306 @@ class TravelServiceImplTest extends AbstractContainerTest {
     assertThat(result.provider()).isEqualTo(PlaceProvider.KAKAO);
     assertThat(result.providerPlaceId()).isEqualTo("kakao-gwangalli-id");
     assertThat(planRouteRepository.findByPlan_Id(plan.planId())).isEmpty();
+  }
+
+  @Test
+  @DisplayName("여행 멤버는 일자별 계획과 장소 목록을 조회할 수 있다")
+  void getTravelPlansReturnsDaysWithPlaces() {
+    User user = userRepository.save(createUser("plans-owner@example.com", "plans-owner"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, plan.planId(), 1, "Gwangalli");
+    createPlace(authenticatedUser, plan.planId(), 2, "Haeundae");
+
+    var response = travelService.getTravelPlans(authenticatedUser, travel.id());
+
+    assertThat(response.travelId()).isEqualTo(travel.id());
+    assertThat(response.title()).isEqualTo("Busan");
+    assertThat(response.days()).hasSize(1);
+    assertThat(response.days().get(0).dayNumber()).isEqualTo(1);
+    List<TravelPlansResDto.PlanPlaceResDto> places = response.days().get(0).places();
+    assertThat(places)
+        .extracting(TravelPlansResDto.PlanPlaceResDto::placeName)
+        .containsExactly("Gwangalli", "Haeundae");
+  }
+
+  @Test
+  @DisplayName("여행 멤버는 일자를 삭제할 수 있다")
+  void deletePlanRemovesPlan() {
+    User user = userRepository.save(createUser("delete-plan@example.com", "delete-plan"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+
+    travelService.deletePlan(authenticatedUser, travel.id(), plan.planId());
+
+    assertThat(travelService.getTravelPlans(authenticatedUser, travel.id()).days()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("장소의 소요 시간·예정 시각·메모를 수정한다")
+  void updatePlanPlaceUpdatesSchedule() {
+    User user = userRepository.save(createUser("update-schedule@example.com", "update-schedule"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    PlanPlaceResDto place = createPlaceInNewTravel(authenticatedUser, user);
+
+    PlanPlaceResDto updated =
+        travelService.updatePlanPlace(
+            authenticatedUser,
+            place.planPlaceId(),
+            new PlanPlaceUpdateReqDto(45, LocalTime.of(13, 30), "Lunch"));
+
+    assertThat(updated.durationMinutes()).isEqualTo(45);
+    assertThat(updated.scheduledTime()).isEqualTo(LocalTime.of(13, 30));
+    assertThat(updated.memo()).isEqualTo("Lunch");
+  }
+
+  @Test
+  @DisplayName("장소를 다른 장소로 교체하면 해당 일자의 경로를 지운다")
+  void updatePlanPlacePlaceReplacesPlaceAndClearsRoutes() {
+    User user = userRepository.save(createUser("replace-place@example.com", "replace-place"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    PlanPlaceResDto place = createPlaceInNewTravel(authenticatedUser, user);
+
+    PlanPlaceResDto updated =
+        travelService.updatePlanPlacePlace(
+            authenticatedUser,
+            place.planPlaceId(),
+            new PlanPlaceUpdatePlaceReqDto(
+                "Haeundae Beach",
+                "Busan Haeundae-gu",
+                35.158,
+                129.16,
+                PlaceProvider.GOOGLE,
+                "google-haeundae"));
+
+    assertThat(updated.placeName()).isEqualTo("Haeundae Beach");
+    assertThat(updated.address()).isEqualTo("Busan Haeundae-gu");
+    assertThat(updated.providerPlaceId()).isEqualTo("google-haeundae");
+    assertThat(planRouteRepository.findAll()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("장소 방문 여부를 수정한다")
+  void updatePlanPlaceVisitedUpdatesFlag() {
+    User user = userRepository.save(createUser("visited@example.com", "visited"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    PlanPlaceResDto place = createPlaceInNewTravel(authenticatedUser, user);
+
+    PlanPlaceResDto updated =
+        travelService.updatePlanPlaceVisited(
+            authenticatedUser, place.planPlaceId(), new PlanPlaceVisitedUpdateReqDto(true));
+
+    assertThat(updated.visited()).isTrue();
+  }
+
+  @Test
+  @DisplayName("장소 순서를 재정렬하면 요청한 순서대로 sequence가 다시 매겨진다")
+  void updatePlanPlaceSequenceReordersPlaces() {
+    User user = userRepository.save(createUser("reorder@example.com", "reorder"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto first = createPlace(authenticatedUser, plan.planId(), 1, "First");
+    PlanPlaceResDto second = createPlace(authenticatedUser, plan.planId(), 2, "Second");
+    PlanPlaceResDto third = createPlace(authenticatedUser, plan.planId(), 3, "Third");
+
+    List<PlanPlaceResDto> reordered =
+        travelService.updatePlanPlaceSequence(
+            authenticatedUser,
+            plan.planId(),
+            new PlanPlaceSequenceUpdateReqDto(
+                List.of(third.planPlaceId(), first.planPlaceId(), second.planPlaceId())));
+
+    assertThat(reordered)
+        .extracting(PlanPlaceResDto::placeName)
+        .containsExactly("Third", "First", "Second");
+    List<PlanPlaceResDto> stored = travelService.getPlanPlaces(authenticatedUser, plan.planId());
+    assertThat(stored).extracting(PlanPlaceResDto::sequence).containsExactly(1, 2, 3);
+  }
+
+  @Test
+  @DisplayName("장소를 삭제하면 뒤 장소들의 sequence가 앞으로 당겨진다")
+  void deletePlanPlaceCompactsSequences() {
+    User user = userRepository.save(createUser("delete-place@example.com", "delete-place"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto first = createPlace(authenticatedUser, plan.planId(), 1, "First");
+    createPlace(authenticatedUser, plan.planId(), 2, "Second");
+    createPlace(authenticatedUser, plan.planId(), 3, "Third");
+
+    travelService.deletePlanPlace(authenticatedUser, first.planPlaceId());
+
+    List<PlanPlaceResDto> remaining = travelService.getPlanPlaces(authenticatedUser, plan.planId());
+    assertThat(remaining).extracting(PlanPlaceResDto::placeName).containsExactly("Second", "Third");
+    assertThat(remaining).extracting(PlanPlaceResDto::sequence).containsExactly(1, 2);
+  }
+
+  @Test
+  @DisplayName("여행 기간을 벗어난 날짜로는 일자를 만들 수 없다")
+  void createPlanRejectsVisitDateOutsideTravelPeriod() {
+    User user = userRepository.save(createUser("plan-date@example.com", "plan-date"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+
+    assertThatThrownBy(
+            () ->
+                travelService.createPlan(
+                    authenticatedUser,
+                    travel.id(),
+                    new PlanCreateReqDto(1, LocalDate.of(2026, 7, 31))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Plan visit date must be within the travel period.");
+  }
+
+  @Test
+  @DisplayName("같은 dayNumber로 일자를 두 번 만들 수 없다")
+  void createPlanRejectsDuplicateDayNumber() {
+    User user = userRepository.save(createUser("plan-day@example.com", "plan-day"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    travelService.createPlan(
+        authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+
+    assertThatThrownBy(
+            () ->
+                travelService.createPlan(
+                    authenticatedUser,
+                    travel.id(),
+                    new PlanCreateReqDto(1, LocalDate.of(2026, 8, 2))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Plan day number already exists.");
+  }
+
+  @Test
+  @DisplayName("여행 상태는 PLANNED로 되돌릴 수 없고, 그 외 전이는 허용한다")
+  void updateTravelStatusEnforcesAllowedTransitions() {
+    User user = userRepository.save(createUser("status@example.com", "status"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+
+    assertThat(
+            travelService
+                .updateTravelStatus(
+                    authenticatedUser,
+                    travel.id(),
+                    new TravelStatusUpdateReqDto(TravelStatus.PLANNED))
+                .status())
+        .isEqualTo(TravelStatus.PLANNED);
+
+    travelService.updateTravelStatus(
+        authenticatedUser, travel.id(), new TravelStatusUpdateReqDto(TravelStatus.IN_PROGRESS));
+    travelService.updateTravelStatus(
+        authenticatedUser, travel.id(), new TravelStatusUpdateReqDto(TravelStatus.COMPLETED));
+    assertThat(
+            travelService
+                .updateTravelStatus(
+                    authenticatedUser,
+                    travel.id(),
+                    new TravelStatusUpdateReqDto(TravelStatus.IN_PROGRESS))
+                .status())
+        .isEqualTo(TravelStatus.IN_PROGRESS);
+
+    assertThatThrownBy(
+            () ->
+                travelService.updateTravelStatus(
+                    authenticatedUser,
+                    travel.id(),
+                    new TravelStatusUpdateReqDto(TravelStatus.PLANNED)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel status cannot be changed back to PLANNED.");
+  }
+
+  @Test
+  @DisplayName("이미 사용 중인 sequence로는 장소를 추가할 수 없다")
+  void createPlanPlaceRejectsDuplicateSequence() {
+    User user = userRepository.save(createUser("sequence@example.com", "sequence"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, plan.planId(), 1, "First");
+
+    assertThatThrownBy(() -> createPlace(authenticatedUser, plan.planId(), 1, "Duplicate"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Plan place sequence already exists.");
+  }
+
+  @Test
+  @DisplayName("sequence를 생략하면 마지막 장소 다음 번호가 자동으로 붙는다")
+  void createPlanPlaceAppendsWhenSequenceIsOmitted() {
+    User user = userRepository.save(createUser("auto-seq@example.com", "auto-seq"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, plan.planId(), 1, "First");
+
+    PlanPlaceResDto appended = createPlace(authenticatedUser, plan.planId(), null, "Second");
+
+    assertThat(appended.sequence()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("재정렬 요청의 장소 id 목록이 실제와 다르면 거부한다")
+  void updatePlanPlaceSequenceRejectsMismatchedIds() {
+    User user = userRepository.save(createUser("reorder-invalid@example.com", "reorder-invalid"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto first = createPlace(authenticatedUser, plan.planId(), 1, "First");
+    createPlace(authenticatedUser, plan.planId(), 2, "Second");
+
+    assertThatThrownBy(
+            () ->
+                travelService.updatePlanPlaceSequence(
+                    authenticatedUser,
+                    plan.planId(),
+                    new PlanPlaceSequenceUpdateReqDto(List.of(first.planPlaceId()))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("All plan place ids must be included.");
+
+    assertThatThrownBy(
+            () ->
+                travelService.updatePlanPlaceSequence(
+                    authenticatedUser,
+                    plan.planId(),
+                    new PlanPlaceSequenceUpdateReqDto(
+                        List.of(first.planPlaceId(), first.planPlaceId()))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Duplicated plan place id exists.");
+
+    assertThatThrownBy(
+            () ->
+                travelService.updatePlanPlaceSequence(
+                    authenticatedUser,
+                    plan.planId(),
+                    new PlanPlaceSequenceUpdateReqDto(
+                        List.of(first.planPlaceId(), java.util.UUID.randomUUID()))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Plan place ids do not match this plan.");
+  }
+
+  private PlanPlaceResDto createPlaceInNewTravel(AuthenticatedUser authenticatedUser, User user) {
+    TravelResDto travel = createTravel(user);
+    PlanResDto plan =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    return createPlace(authenticatedUser, plan.planId(), 1, "Gwangalli");
   }
 
   private TravelResDto createTravel(User user) {
