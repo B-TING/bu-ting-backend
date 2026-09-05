@@ -2490,6 +2490,143 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         .hasMessage("Place review rating must be between 1 and 5.");
   }
 
+  @Test
+  @DisplayName("장소 리뷰 태그와 미디어 키의 개수·길이 제한을 검증한다")
+  void rejectsOversizedPlaceReviewTagsAndMediaKeys() {
+    User author = userRepository.save(createUser("review-limits@example.com", "review-limits"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto place =
+        createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    place.planPlaceId(),
+                    new PlaceReviewCreateReqDto(5, "tag too long", List.of("a".repeat(31)))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Place review tag must be");
+
+    List<String> tooManyMediaKeys =
+        java.util.stream.IntStream.rangeClosed(1, 21).mapToObj(i -> "uploads/" + i).toList();
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    place.planPlaceId(),
+                    new PlaceReviewCreateReqDto(5, "too many media", null, 30, tooManyMediaKeys)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Place review media file keys must be");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    travel.id(),
+                    place.planPlaceId(),
+                    new PlaceReviewCreateReqDto(
+                        5, "media key too long", null, 30, List.of("a".repeat(501)))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Place review media file key must be");
+  }
+
+  @Test
+  @DisplayName("완료되지 않은 여행으로는 기록 초안을 만들 수 없다")
+  void rejectsDraftForIncompleteTravel() {
+    User author = userRepository.save(createUser("incomplete@example.com", "incomplete"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto travel =
+        travelService.createTravel(
+            authenticatedUser,
+            new TravelCreateReqDto(
+                "Busan",
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createDraft(
+                    authenticatedUser, travel.id(), new TravelRecordCreateReqDto("t", null, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Only completed travels can be recorded.");
+  }
+
+  @Test
+  @DisplayName("피드 size가 1~50 범위를 벗어나면 거부한다")
+  void rejectsFeedSizeOutOfRange() {
+    assertThatThrownBy(() -> travelRecordService.getLatestFeed(null, 0))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Feed size must be between 1 and 50.");
+    assertThatThrownBy(() -> travelRecordService.getLatestFeed(null, 51))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Feed size must be between 1 and 50.");
+  }
+
+  @Test
+  @DisplayName("발행 상태가 아닌 기록은 다시 공개할 수 없다")
+  void rejectsRepublishOfNonHiddenRecord() {
+    User author = userRepository.save(createUser("republish-bad@example.com", "republish-bad"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Republish");
+
+    assertThatThrownBy(
+            () -> travelRecordService.republishMyRecord(authenticatedUser, draft.travelRecordId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Only hidden travel records can be republished.");
+  }
+
+  @Test
+  @DisplayName("평점 없는 초안은 발행할 수 없다")
+  void rejectsPublishWithoutOverallRating() {
+    User author = userRepository.save(createUser("no-title@example.com", "no-title"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(authenticatedUser, travel.id(), null);
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.publish(authenticatedUser, travel.id(), draft.travelRecordId()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record overall rating is required.");
+  }
+
+  @Test
+  @DisplayName("여행 멤버가 아니면 기록 초안을 만들 수 없다")
+  void rejectsDraftFromNonMember() {
+    User owner = userRepository.save(createUser("record-owner@example.com", "record-owner"));
+    User outsider = userRepository.save(createUser("record-out@example.com", "record-out"));
+    TravelResDto travel = createCompletedTravel(AuthenticatedUser.from(owner));
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createDraft(
+                    AuthenticatedUser.from(outsider),
+                    travel.id(),
+                    new TravelRecordCreateReqDto("t", null, null)))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("User is not a travel member.");
+  }
+
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {
     TravelResDto travel =
         travelService.createTravel(
