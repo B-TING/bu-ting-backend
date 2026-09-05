@@ -15,6 +15,7 @@ import com.butingbe.domain.travel.entity.TransportType;
 import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRepository;
+import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
@@ -37,6 +38,7 @@ class TravelRouteServiceTest {
   private static final UUID TRAVEL_ID = UUID.fromString("11111111-0000-0000-0000-000000000001");
   private static final UUID PLAN_ID = UUID.fromString("33333333-0000-0000-0000-000000000001");
 
+  @Mock private TravelRepository travelRepository;
   @Mock private PlanRepository planRepository;
   @Mock private PlanPlaceRepository planPlaceRepository;
   @Mock private TravelMemberAuthorization travelMemberAuthorization;
@@ -50,6 +52,7 @@ class TravelRouteServiceTest {
     HaversineRouteProvider routeProvider = new HaversineRouteProvider();
     travelRouteService =
         new TravelRouteService(
+            travelRepository,
             planRepository,
             planPlaceRepository,
             travelMemberAuthorization,
@@ -228,6 +231,86 @@ class TravelRouteServiceTest {
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
+  @Test
+  @DisplayName("여행 전체를 일자별로 최적화하고 일자별·전체 합계를 낸다")
+  void optimizesEveryDayOfATravel() {
+    Plan secondDay = plan(UUID.fromString("33333333-0000-0000-0000-000000000002"), 2);
+    when(travelRepository.findById(TRAVEL_ID)).thenReturn(Optional.of(plan.getTravel()));
+    when(planRepository.findByTravel_IdOrderByDayNumberAsc(TRAVEL_ID))
+        .thenReturn(List.of(plan, secondDay));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(
+            List.of(
+                place(1, "해운대", 35.1587, 129.1604),
+                place(2, "부산역", 35.1151, 129.0413),
+                place(3, "서면", 35.1580, 129.0596)));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(secondDay.getId()))
+        .thenReturn(List.of(place(1, "광안리", 35.1532, 129.1186), place(2, "기장", 35.2444, 129.2222)));
+
+    var result =
+        travelRouteService.optimizeTravelVisitOrder(
+            authenticatedUser, TRAVEL_ID, TransportType.PUBLIC_TRANSPORT);
+
+    assertThat(result.travelId()).isEqualTo(TRAVEL_ID);
+    assertThat(result.days()).hasSize(2);
+    assertThat(result.days().get(0).dayNumber()).isEqualTo(1);
+    assertThat(result.days().get(1).dayNumber()).isEqualTo(2);
+    assertThat(result.totalDurationMinutes())
+        .isEqualTo(result.days().stream().mapToInt(day -> day.totalDurationMinutes()).sum());
+    assertThat(result.savedMinutes())
+        .isEqualTo(result.originalDurationMinutes() - result.totalDurationMinutes());
+    verify(travelMemberAuthorization).validateMember(TRAVEL_ID, USER_ID);
+  }
+
+  @Test
+  @DisplayName("일자가 없는 여행도 빈 결과로 응답한다")
+  void handlesATravelWithNoDays() {
+    when(travelRepository.findById(TRAVEL_ID)).thenReturn(Optional.of(plan.getTravel()));
+    when(planRepository.findByTravel_IdOrderByDayNumberAsc(TRAVEL_ID)).thenReturn(List.of());
+
+    var result = travelRouteService.optimizeTravelVisitOrder(authenticatedUser, TRAVEL_ID, null);
+
+    assertThat(result.days()).isEmpty();
+    assertThat(result.totalDurationMinutes()).isZero();
+    assertThat(result.savedMinutes()).isZero();
+    assertThat(result.transportType()).isEqualTo(TransportType.PUBLIC_TRANSPORT);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 여행은 최적화할 수 없다")
+  void rejectsMissingTravel() {
+    when(travelRepository.findById(TRAVEL_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> travelRouteService.optimizeTravelVisitOrder(authenticatedUser, TRAVEL_ID, null))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel not found.");
+  }
+
+  @Test
+  @DisplayName("여행 최적화도 인증을 확인한다")
+  void travelOptimizationRequiresAuthentication() {
+    assertThatThrownBy(() -> travelRouteService.optimizeTravelVisitOrder(null, TRAVEL_ID, null))
+        .isInstanceOf(UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("좌표 없는 장소는 최적화 결과에서도 빠진 장소로 알려준다")
+  void reportsSkippedPlacesInOptimizationResult() {
+    PlanPlace withoutCoordinates = place(2, "좌표 없음", null, null);
+    when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+    when(planPlaceRepository.findByPlan_IdOrderBySequenceAsc(PLAN_ID))
+        .thenReturn(
+            List.of(
+                place(1, "부산역", 35.1151, 129.0413),
+                withoutCoordinates,
+                place(3, "해운대", 35.1587, 129.1604)));
+
+    var result = travelRouteService.optimizeVisitOrder(authenticatedUser, PLAN_ID, null, null);
+
+    assertThat(result.skippedPlaceIds()).containsExactly(withoutCoordinates.getId());
+  }
+
   private Plan plan() {
     Travel travel =
         Travel.builder()
@@ -239,6 +322,17 @@ class TravelRouteServiceTest {
     Plan created =
         Plan.builder().travel(travel).dayNumber(1).visitDate(LocalDate.of(2026, 9, 1)).build();
     ReflectionTestUtils.setField(created, "id", PLAN_ID);
+    return created;
+  }
+
+  private Plan plan(UUID planId, int dayNumber) {
+    Plan created =
+        Plan.builder()
+            .travel(plan.getTravel())
+            .dayNumber(dayNumber)
+            .visitDate(LocalDate.of(2026, 9, dayNumber))
+            .build();
+    ReflectionTestUtils.setField(created, "id", planId);
     return created;
   }
 

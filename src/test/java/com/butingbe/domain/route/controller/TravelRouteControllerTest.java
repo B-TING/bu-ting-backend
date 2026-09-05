@@ -128,7 +128,8 @@ class TravelRouteControllerTest {
                 TransportType.PUBLIC_TRANSPORT,
                 List.of(first, second),
                 List.of(new RouteLeg(first, second, TransportType.PUBLIC_TRANSPORT, 10_800, 53)),
-                70));
+                70,
+                List.of()));
 
     mockMvc
         .perform(
@@ -154,7 +155,7 @@ class TravelRouteControllerTest {
             eq(PLAN_ID),
             nullable(RoutePoint.class),
             nullable(TransportType.class)))
-        .thenReturn(VisitOrderResDto.of(TransportType.WALK, List.of(), List.of(), 0));
+        .thenReturn(VisitOrderResDto.of(TransportType.WALK, List.of(), List.of(), 0, List.of()));
 
     mockMvc
         .perform(
@@ -183,7 +184,9 @@ class TravelRouteControllerTest {
             eq(PLAN_ID),
             nullable(RoutePoint.class),
             nullable(TransportType.class)))
-        .thenReturn(VisitOrderResDto.of(TransportType.PUBLIC_TRANSPORT, List.of(), List.of(), 0));
+        .thenReturn(
+            VisitOrderResDto.of(
+                TransportType.PUBLIC_TRANSPORT, List.of(), List.of(), 0, List.of()));
 
     mockMvc.perform(post("/plans/{planId}/route/optimize", PLAN_ID)).andExpect(status().isOk());
 
