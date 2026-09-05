@@ -64,7 +64,7 @@ class TravelSettlementServiceTest extends AbstractContainerTest {
         .extracting(TravelSettlementResponse.Transfer::amount)
         .containsExactly(4_000L, 3_000L);
     assertThat(transfers)
-        .extracting(TravelSettlementResponse.Transfer::toUserId)
+        .extracting(TravelSettlementResponse.Transfer::receiverId)
         .containsOnly(creditorId);
   }
 
@@ -83,7 +83,7 @@ class TravelSettlementServiceTest extends AbstractContainerTest {
     assertThat(preview.confirmed()).isFalse();
     assertThat(preview.transfers()).hasSize(2);
     assertThat(confirmed.confirmed()).isTrue();
-    assertThat(confirmed.confirmedByUserId()).isEqualTo(testTravel.leader.getId());
+    assertThat(confirmed.confirmedById()).isEqualTo(testTravel.leader.getId());
     assertThat(confirmed.confirmedAt()).isNotNull();
     assertThat(confirmed.transfers()).hasSize(2);
     assertThat(travelSettlementRepository.existsByTravel_Id(testTravel.travel.getId())).isTrue();
