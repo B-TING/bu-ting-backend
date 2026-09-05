@@ -99,4 +99,36 @@ class OAuth2AuthenticationSuccessHandlerTest {
         .contains("\"provider\":\"ka\\\\kao\"")
         .contains("\"accessToken\":\"opaque\\\"token\"");
   }
+
+  @Test
+  @DisplayName("닉네임 같은 값이 null이어도 JSON을 안전하게 작성한다")
+  void onAuthenticationSuccessHandlesNullValues() throws Exception {
+    UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440021");
+    OAuth2User principal =
+        new DefaultOAuth2User(
+            java.util.List.of(),
+            Map.of(CustomOAuth2UserService.USER_ID_ATTRIBUTE, userId.toString()),
+            CustomOAuth2UserService.USER_ID_ATTRIBUTE);
+    User user = mock(User.class);
+
+    given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(user.getId()).willReturn(userId);
+    given(user.getEmail()).willReturn(null);
+    given(user.getNickname()).willReturn(null);
+    given(user.getProvider()).willReturn("kakao");
+    given(opaqueTokenService.issue(user))
+        .willReturn(
+            new OpaqueTokenService.IssuedOpaqueToken(
+                "opaque-token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
+
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    handler.onAuthenticationSuccess(
+        new MockHttpServletRequest(), response, new TestingAuthenticationToken(principal, null));
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(response.getContentAsString())
+        .contains("\"email\":null")
+        .contains("\"nickname\":\"\"");
+  }
 }
