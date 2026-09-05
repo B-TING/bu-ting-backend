@@ -1,5 +1,6 @@
 package com.butingbe.domain.chat.controller;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -22,6 +23,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.chat.dto.ChatroomResponse;
 import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.chat.service.LocalChatroomService;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,6 +92,19 @@ class LocalChatroomControllerTest {
                 new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter())
             .apply(documentationConfiguration(restDocumentation))
             .build();
+  }
+
+  @Test
+  @DisplayName("인증되지 않은 사용자의 요청은 모두 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    UUID roomId = UUID.fromString("220e8400-e29b-41d4-a716-446655440000");
+
+    assertThatThrownBy(() -> localChatroomController.joinChatroom(roomId, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> localChatroomController.exitRoom(roomId, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> localChatroomController.getMessages(roomId, null, null))
+        .isInstanceOf(UnauthenticatedException.class);
   }
 
   // ==========================================

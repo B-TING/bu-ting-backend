@@ -2,7 +2,10 @@ package com.butingbe.domain.place.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.butingbe.domain.place.dto.request.FestivalSearchReqDto;
@@ -12,9 +15,11 @@ import com.butingbe.domain.place.dto.request.PlaceSearchReqDto;
 import com.butingbe.domain.place.dto.response.FestivalSearchResDto;
 import com.butingbe.domain.place.dto.response.PlaceDetailResDto;
 import com.butingbe.domain.place.dto.response.PlaceSearchResDto;
+import com.butingbe.domain.place.exception.PlaceKeywordNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -691,6 +696,251 @@ class TourApiPlaceServiceTest {
     assertThat(response.googlePlace().placeId()).isEqualTo("google-place-id");
     assertThat(response.googlePlace().rating()).isEqualTo(4.7);
     assertThat(response.googlePlace().reviewCount()).isEqualTo(300);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Tour API 서비스 키가 없으면 어떤 조회도 수행하지 않는다")
+  void rejectsEveryLookupWhenServiceKeyIsMissing() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "");
+
+    assertThatIllegalStateException()
+        .isThrownBy(
+            () -> placeService.searchPlaces(new PlaceSearchReqDto(null, null, null, null, null)))
+        .withMessage("Tour API service key is not configured.");
+    assertThatIllegalStateException()
+        .isThrownBy(
+            () ->
+                placeService.searchPlacesByLocation(
+                    new PlaceLocationSearchReqDto(null, null, 129.0, 35.0, 1000, null, null)))
+        .withMessage("Tour API service key is not configured.");
+    assertThatIllegalStateException()
+        .isThrownBy(
+            () ->
+                placeService.searchFestivals(
+                    new FestivalSearchReqDto("20260901", null, null, null, null, null)))
+        .withMessage("Tour API service key is not configured.");
+    assertThatIllegalStateException()
+        .isThrownBy(() -> placeService.getPlaceDetail("2651318", "32", null))
+        .withMessage("Tour API service key is not configured.");
+
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("contentId나 contentTypeId가 비어 있으면 상세 조회를 거부한다")
+  void getPlaceDetailRequiresContentIdAndContentTypeId() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> placeService.getPlaceDetail("", "32", null))
+        .withMessage("contentId and contentTypeId are required.");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> placeService.getPlaceDetail("2651318", "  ", null))
+        .withMessage("contentId and contentTypeId are required.");
+
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("키워드 검색 결과가 0건이면 PlaceKeywordNotFoundException을 던진다")
+  void searchPlacesByKeywordThrowsWhenNoResults() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"numOfRows":10,"pageNo":1,"totalCount":0,"items":{"item":[]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(
+            () ->
+                placeService.searchPlacesByKeyword(
+                    new PlaceKeywordSearchReqDto("없는장소", null, null, null, null, null)))
+        .isInstanceOf(PlaceKeywordNotFoundException.class);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Tour API가 body 없는 응답을 주면 빈 결과로 처리한다")
+  void searchPlacesTreatsMissingBodyAsEmptyResult() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server.expect(method(HttpMethod.GET)).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+    PlaceSearchResDto response =
+        placeService.searchPlaces(new PlaceSearchReqDto(null, null, null, null, null));
+
+    assertThat(response.totalCount()).isZero();
+    assertThat(response.places()).isEmpty();
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("상세 조회 응답에 item이 없으면 빈 details로 응답한다")
+  void getPlaceDetailTreatsMissingItemAsEmptyDetails() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server.expect(method(HttpMethod.GET)).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+    PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", null);
+
+    assertThat(response.contentId()).isEqualTo("2651318");
+    assertThat(response.contentTypeId()).isEqualTo("32");
+    assertThat(response.details()).isEmpty();
+    assertThat(response.googlePlace()).isNull();
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Google Places 검색 결과가 없으면 googlePlace 없이 상세를 반환한다")
+  void getPlaceDetailReturnsNullGooglePlaceWhenSearchFindsNothing() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(
+            builder.build(),
+            "https://tour.example.com",
+            "SERVICE_KEY",
+            "https://places.example.com/v1/places",
+            "GOOGLE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":{"item":[{"contentid":"2651318","title":"파라다이스"}]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(method(HttpMethod.POST))
+        .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+    PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", "파라다이스 호텔 부산");
+
+    assertThat(response.googlePlace()).isNull();
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Google Places 상세 응답이 비면 googlePlace 없이 상세를 반환한다")
+  void getPlaceDetailReturnsNullGooglePlaceWhenDetailsAreEmpty() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(
+            builder.build(),
+            "https://tour.example.com",
+            "SERVICE_KEY",
+            "https://places.example.com/v1/places",
+            "GOOGLE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":{"item":[{"contentid":"2651318","title":"파라다이스"}]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(method(HttpMethod.POST))
+        .andRespond(
+            withSuccess(
+                """
+                {"places":[{"id":"google-place-id"}]}
+                """,
+                MediaType.APPLICATION_JSON));
+    server.expect(method(HttpMethod.GET)).andRespond(withSuccess("", MediaType.APPLICATION_JSON));
+
+    PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", "파라다이스 호텔 부산");
+
+    assertThat(response.googlePlace()).isNull();
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("Google Places 호출이 4xx로 실패해도 상세 조회는 googlePlace 없이 성공한다")
+  void getPlaceDetailSurvivesGooglePlacesHttpError() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(
+            builder.build(),
+            "https://tour.example.com",
+            "SERVICE_KEY",
+            "https://places.example.com/v1/places",
+            "GOOGLE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":{"item":[{"contentid":"2651318","title":"파라다이스"}]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+    server
+        .expect(method(HttpMethod.POST))
+        .andRespond(withStatus(HttpStatus.FORBIDDEN).body("{\"error\":\"denied\"}"));
+
+    PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", "파라다이스 호텔 부산");
+
+    assertThat(response.googlePlace()).isNull();
+    assertThat(response.contentId()).isEqualTo("2651318");
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("googleSearchText가 없고 detailCommon2에 항목이 없으면 googlePlace를 채우지 않는다")
+  void getPlaceDetailSkipsGooglePlaceWhenCommonInfoIsEmpty() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(
+            builder.build(),
+            "https://tour.example.com",
+            "SERVICE_KEY",
+            "https://places.example.com/v1/places",
+            "GOOGLE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":{"item":[{"contentid":"2651318","title":"파라다이스"}]}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+    server.expect(method(HttpMethod.GET)).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+    PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", null);
+
+    assertThat(response.googlePlace()).isNull();
     server.verify();
   }
 }
