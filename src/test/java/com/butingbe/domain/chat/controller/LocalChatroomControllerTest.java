@@ -3,7 +3,9 @@ package com.butingbe.domain.chat.controller;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
@@ -20,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.dto.ChatroomResponse;
 import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.chat.service.LocalChatroomService;
@@ -92,6 +95,53 @@ class LocalChatroomControllerTest {
                 new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter())
             .apply(documentationConfiguration(restDocumentation))
             .build();
+  }
+
+  @Test
+  @DisplayName("채팅 메시지 목록을 조회하면 성공 규격으로 이력을 반환한다")
+  void getMessagesReturnsHistory() throws Exception {
+    UUID roomId = UUID.fromString("220e8400-e29b-41d4-a716-446655440000");
+    UUID messageId = UUID.fromString("330e8400-e29b-41d4-a716-446655440000");
+    UUID senderId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    when(localChatroomService.getChatRoom(eq(roomId), any(UUID.class), nullable(UUID.class)))
+        .thenReturn(
+            List.of(
+                new ChatMessageResponse(
+                    messageId,
+                    roomId,
+                    senderId,
+                    "수영구보안관",
+                    "안녕하세요",
+                    java.time.OffsetDateTime.parse("2026-09-05T12:00:00Z"),
+                    true)));
+
+    mockMvc
+        .perform(
+            get("/chat/rooms/{roomId}/messages", roomId).contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.message").value("채팅 메시지 목록 조회"))
+        .andExpect(jsonPath("$.data.messages[0].messageId").value(messageId.toString()))
+        .andExpect(jsonPath("$.data.messages[0].content").value("안녕하세요"))
+        .andExpect(jsonPath("$.data.messages[0].isMine").value(true));
+  }
+
+  @Test
+  @DisplayName("lastMessageId를 넘기면 서비스에 그대로 전달한다")
+  void getMessagesPassesLastMessageId() throws Exception {
+    UUID roomId = UUID.fromString("220e8400-e29b-41d4-a716-446655440000");
+    UUID lastMessageId = UUID.fromString("440e8400-e29b-41d4-a716-446655440000");
+    when(localChatroomService.getChatRoom(eq(roomId), any(UUID.class), eq(lastMessageId)))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(
+            get("/chat/rooms/{roomId}/messages", roomId)
+                .param("lastMessageId", lastMessageId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.messages").isEmpty());
+
+    verify(localChatroomService).getChatRoom(eq(roomId), any(UUID.class), eq(lastMessageId));
   }
 
   @Test

@@ -23,10 +23,12 @@ import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -470,6 +472,59 @@ class TravelTeamServiceTest extends AbstractContainerTest {
 
   private Travel createTravel(String title) {
     return createTravel(title, TravelStatus.PLANNED);
+  }
+
+  @Test
+  @DisplayName("리더는 자기 자신에게 리더를 위임할 수 없다")
+  void transferLeaderRejectsSelf() {
+    User leader = userRepository.save(createUser("leader-self@example.com", "leader-self"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+
+    assertThatThrownBy(
+            () ->
+                travelTeamService.transferLeader(
+                    AuthenticatedUser.from(leader),
+                    travel.getId(),
+                    new TravelLeaderTransferRequest(leader.getId())))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("New leader must be another travel member.");
+  }
+
+  @Test
+  @DisplayName("만료되었거나 이미 사용된 초대 링크는 거부한다")
+  void rejectsExpiredOrUsedInvite() {
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveInvite(travel, "expired-token", OffsetDateTime.now().minusMinutes(1));
+    TravelInvite used = saveInvite(travel, "used-token", OffsetDateTime.now().plusHours(1));
+    used.markUsed();
+    travelInviteRepository.save(used);
+
+    assertThatThrownBy(() -> travelTeamService.verifyToken("expired-token"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Invite link has expired.");
+    assertThatThrownBy(() -> travelTeamService.verifyToken("used-token"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Invite link has already been used.");
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 여행이나 인증되지 않은 사용자의 요청은 거부한다")
+  void rejectsMissingTravelAndUnauthenticatedUser() {
+    User user = userRepository.save(createUser("team-guard@example.com", "team-guard"));
+    UUID unknownTravelId = UUID.randomUUID();
+
+    assertThatThrownBy(
+            () -> travelTeamService.getTravelMembers(AuthenticatedUser.from(user), unknownTravelId))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel not found.");
+    assertThatThrownBy(() -> travelTeamService.getMyTravels(null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(
+            () ->
+                travelTeamService.getMyTravels(
+                    new AuthenticatedUser(null, "a@example.com", "a", List.of()), null))
+        .isInstanceOf(UnauthenticatedException.class);
   }
 
   private Travel createTravel(String title, TravelStatus status) {

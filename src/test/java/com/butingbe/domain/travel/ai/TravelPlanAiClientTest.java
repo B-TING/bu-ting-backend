@@ -1,11 +1,13 @@
 package com.butingbe.domain.travel.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -39,5 +41,38 @@ class TravelPlanAiClientTest {
     assertThat(TravelPlanAiResponse.Place.class.getRecordComponents())
         .extracting(c -> c.getName())
         .containsExactly("order", "provider", "providerPlaceId", "memo");
+  }
+
+  @Test
+  @DisplayName("AI 호출이 실패하면 원인을 감싸 IllegalStateException을 던진다")
+  void wrapsCallFailure() {
+    ChatModel model = mock(ChatModel.class);
+    when(model.getOptions())
+        .thenReturn(org.springframework.ai.chat.prompt.ChatOptions.builder().build());
+    when(model.call(any(Prompt.class))).thenThrow(new RuntimeException("upstream down"));
+
+    TravelPlanAiClient client = new TravelPlanAiClient(ChatClient.builder(model));
+
+    assertThatThrownBy(() -> client.generate("계획을 생성하세요"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("AI travel plan generation failed.")
+        .hasRootCauseMessage("upstream down");
+  }
+
+  @Test
+  @DisplayName("AI 응답을 일정으로 해석할 수 없으면 IllegalStateException을 던진다")
+  void wrapsUnparseableResponse() {
+    ChatModel model = mock(ChatModel.class);
+    when(model.getOptions())
+        .thenReturn(org.springframework.ai.chat.prompt.ChatOptions.builder().build());
+    when(model.call(any(Prompt.class)))
+        .thenReturn(
+            new ChatResponse(List.of(new Generation(new AssistantMessage("not json at all")))));
+
+    TravelPlanAiClient client = new TravelPlanAiClient(ChatClient.builder(model));
+
+    assertThatThrownBy(() -> client.generate("계획을 생성하세요"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("AI travel plan generation failed.");
   }
 }
