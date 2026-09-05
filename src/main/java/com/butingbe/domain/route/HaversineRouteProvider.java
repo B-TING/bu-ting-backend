@@ -37,21 +37,31 @@ public class HaversineRouteProvider implements RouteProvider {
     return EARTH_RADIUS_METERS * 2 * Math.asin(Math.sqrt(Math.min(1, haversine)));
   }
 
-  /** 직선 거리 대비 실제 이동 거리 비율. 도보는 골목을 돌아가고 차량은 도로를 따라간다. */
+  /**
+   * 직선 거리 대비 실제 이동 거리 비율.
+   *
+   * <p>대중교통 값은 부산 구간 6건(부산역-광안리, 부산역-해운대, 서면-남포동, 광안리-감천문화마을, 부산역-서면, 해운대-기장)의 Google Routes 실측에서
+   * 얻은 중앙값 1.32다. 도보와 차량은 한국에서 Google이 경로를 제공하지 않아 실측이 없고, 대중교통 값을 기준으로 잡은 추정치다.
+   */
   private double detourFactor(TransportType transportType) {
     return switch (transportType) {
-      case WALK -> 1.3;
-      case PUBLIC_TRANSPORT -> 1.4;
+      case WALK -> 1.25;
+      case PUBLIC_TRANSPORT -> 1.32;
       case CAR -> 1.35;
     };
   }
 
-  /** 정차와 신호를 포함한 도심 평균 속도(km/h). */
+  /**
+   * 출발지에서 목적지까지의 실효 속도(km/h).
+   *
+   * <p>대중교통은 위 실측 6건의 중앙값 12.2km/h다. 차량 주행 속도가 아니라 대기·환승·도보 접근을 모두 포함한 문전 속도이므로 순수 주행 속도보다 훨씬 낮다.
+   * 초기에 20km/h로 잡았을 때 실제보다 27% 짧게 나왔다.
+   */
   private double averageSpeedKmPerHour(TransportType transportType) {
     return switch (transportType) {
       case WALK -> 4.5;
-      case PUBLIC_TRANSPORT -> 20.0;
-      case CAR -> 30.0;
+      case PUBLIC_TRANSPORT -> 12.2;
+      case CAR -> 25.0;
     };
   }
 }

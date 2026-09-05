@@ -14,6 +14,9 @@ class HaversineRouteProviderTest {
   private static final RoutePoint BUSAN_STATION = RoutePoint.of("부산역", 35.1151, 129.0413);
   private static final RoutePoint GWANGALLI = RoutePoint.of("광안리", 35.1532, 129.1186);
   private static final RoutePoint HAEUNDAE = RoutePoint.of("해운대", 35.1587, 129.1604);
+  private static final RoutePoint SEOMYEON = RoutePoint.of("서면", 35.1580, 129.0596);
+  private static final RoutePoint NAMPO = RoutePoint.of("남포동", 35.0979, 129.0301);
+  private static final RoutePoint GIJANG = RoutePoint.of("기장", 35.2444, 129.2222);
 
   private final HaversineRouteProvider provider = new HaversineRouteProvider();
 
@@ -80,6 +83,32 @@ class HaversineRouteProviderTest {
     assertThat(legs.get(0).to().name()).isEqualTo("광안리");
     assertThat(legs.get(1).from().name()).isEqualTo("광안리");
     assertThat(legs.get(1).to().name()).isEqualTo("해운대");
+  }
+
+  @Test
+  @DisplayName("부산 실측 구간에 대해 대중교통 추정치가 실제와 크게 벌어지지 않는다")
+  void transitEstimateStaysCloseToMeasuredBusanRoutes() {
+    // Google Routes API(TRANSIT)로 측정한 실제 값. 한국에서는 Google이 대중교통 경로만 제공한다.
+    record Measured(RoutePoint from, RoutePoint to, int minutes) {}
+    List<Measured> measured =
+        List.of(
+            new Measured(BUSAN_STATION, GWANGALLI, 48),
+            new Measured(BUSAN_STATION, HAEUNDAE, 65),
+            new Measured(SEOMYEON, NAMPO, 58),
+            new Measured(BUSAN_STATION, SEOMYEON, 37),
+            new Measured(HAEUNDAE, GIJANG, 53));
+
+    for (Measured route : measured) {
+      int estimated =
+          provider.leg(route.from(), route.to(), TransportType.PUBLIC_TRANSPORT).durationMinutes();
+      double ratio = (double) estimated / route.minutes();
+
+      assertThat(ratio)
+          .as(
+              "%s -> %s: 추정 %d분 vs 실측 %d분",
+              route.from().name(), route.to().name(), estimated, route.minutes())
+          .isBetween(0.6, 1.5);
+    }
   }
 
   @Test
