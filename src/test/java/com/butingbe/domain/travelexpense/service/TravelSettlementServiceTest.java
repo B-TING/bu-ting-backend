@@ -30,6 +30,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -228,4 +229,19 @@ class TravelSettlementServiceTest extends AbstractContainerTest {
   }
 
   private record TestTravel(Travel travel, User leader, User firstMember, User secondMember) {}
+
+  @Test
+  @DisplayName("인증 정보가 없거나 id가 없으면 정산 API는 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    java.util.UUID travelId = java.util.UUID.randomUUID();
+    AuthenticatedUser withoutId =
+        new AuthenticatedUser(null, "user@example.com", "tester", java.util.List.of());
+
+    assertThatThrownBy(() -> travelSettlementService.getSettlement(null, travelId))
+        .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelSettlementService.getSettlement(withoutId, travelId))
+        .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelSettlementService.confirmSettlement(null, travelId))
+        .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
+  }
 }

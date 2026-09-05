@@ -42,6 +42,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
   @Autowired private TravelMemberRepository travelMemberRepository;
   @Autowired private TravelInviteRepository travelInviteRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private TravelMemberAuthorization travelMemberAuthorization;
 
   @Test
   @DisplayName("user can get my travels filtered by status")
@@ -525,6 +526,37 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                 travelTeamService.getMyTravels(
                     new AuthenticatedUser(null, "a@example.com", "a", List.of()), null))
         .isInstanceOf(UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("초대 링크 base URL이 비었거나 물음표로 끝나면 정규화한다")
+  void normalizesInviteBaseUrl() {
+    TravelTeamService blankBaseUrl =
+        new TravelTeamService(
+            travelInviteRepository,
+            travelMemberRepository,
+            travelRepository,
+            userRepository,
+            travelMemberAuthorization,
+            "  ");
+    TravelTeamService trailingQuestionMark =
+        new TravelTeamService(
+            travelInviteRepository,
+            travelMemberRepository,
+            travelRepository,
+            userRepository,
+            travelMemberAuthorization,
+            "https://buting.example.com/invite?");
+
+    User leader = userRepository.save(createUser("invite-url@example.com", "invite-url"));
+    Travel travel = travelRepository.save(createTravel("Busan"));
+    saveMember(travel, leader, TravelTeamRole.LEADER);
+
+    assertThat(blankBaseUrl.createInviteLink(AuthenticatedUser.from(leader), travel.getId()))
+        .startsWith("https://yourdomain.com/invite");
+    assertThat(
+            trailingQuestionMark.createInviteLink(AuthenticatedUser.from(leader), travel.getId()))
+        .startsWith("https://buting.example.com/invite");
   }
 
   private Travel createTravel(String title, TravelStatus status) {

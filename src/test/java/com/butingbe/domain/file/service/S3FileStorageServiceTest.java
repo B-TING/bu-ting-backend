@@ -3,6 +3,7 @@ package com.butingbe.domain.file.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -208,5 +210,20 @@ class S3FileStorageServiceTest {
     assertThatThrownBy(() -> service.getPresignedUrl(fileKey))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("등록되지 않은 파일입니다.");
+  }
+
+  @Test
+  @DisplayName("파일 스트림을 읽을 수 없으면 업로드를 중단한다")
+  void rejectsUnreadableFile() throws Exception {
+    MultipartFile file = mock(MultipartFile.class);
+    when(file.isEmpty()).thenReturn(false);
+    when(file.getSize()).thenReturn(3L);
+    when(file.getContentType()).thenReturn("image/png");
+    when(file.getOriginalFilename()).thenReturn("busan.png");
+    when(file.getInputStream()).thenThrow(new java.io.IOException("stream closed"));
+
+    assertThatThrownBy(() -> service.upload(file))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("파일을 읽을 수 없습니다.");
   }
 }

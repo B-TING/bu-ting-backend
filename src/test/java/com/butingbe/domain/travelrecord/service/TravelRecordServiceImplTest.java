@@ -2819,6 +2819,114 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(cloned.title()).isEqualTo(published.title());
   }
 
+  @Test
+  @DisplayName("제목 없는 여행에서 만든 초안은 기본 제목을 쓴다")
+  void createDraftFallsBackToDefaultTitle() {
+    User author = userRepository.save(createUser("blank-travel@example.com", "blank-travel"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto travel =
+        travelService.createTravel(
+            authenticatedUser,
+            new TravelCreateReqDto(
+                null,
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 3),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+    travelService.updateTravelStatus(
+        authenticatedUser, travel.id(), new TravelStatusUpdateReqDto(TravelStatus.COMPLETED));
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(authenticatedUser, travel.id(), null);
+
+    assertThat(draft.title()).isEqualTo("여행 기록");
+  }
+
+  @Test
+  @DisplayName("장소 리뷰 이미지가 있는 기록은 발행과 복제에서 첨부까지 함께 복사한다")
+  void publishAndCloneCopyPlaceReviewMedia() {
+    User author = userRepository.save(createUser("copy-media@example.com", "copy-media"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto first =
+        createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+    PlanPlaceResDto second =
+        createPlace(authenticatedUser, firstDay.planId(), 2, "Gwangalli", "Busan");
+    saveRoute(first, second);
+
+    travelRecordService.createPlaceReview(
+        authenticatedUser,
+        travel.id(),
+        first.planPlaceId(),
+        new PlaceReviewCreateReqDto(5, "사진 리뷰", null, 30, List.of("uploads/a.jpg")));
+
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto("Media Copy", null, null, 5));
+    TravelRecordResDto published =
+        travelRecordService.publish(authenticatedUser, travel.id(), draft.travelRecordId());
+
+    TravelPlansResDto cloned =
+        travelRecordService.cloneToTravel(
+            authenticatedUser,
+            published.travelRecordId(),
+            new TravelRecordCloneToTravelReqDto(
+                "Cloned",
+                LocalDate.of(2026, 10, 1),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+    assertThat(cloned.days()).isNotEmpty();
+    assertThat(cloned.days().get(0).places()).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("다른 여행의 장소로는 리뷰를 남길 수 없다")
+  void rejectsPlaceReviewForPlaceInAnotherTravel() {
+    User author = userRepository.save(createUser("cross-travel@example.com", "cross-travel"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(author);
+    TravelResDto first = createCompletedTravel(authenticatedUser);
+    TravelResDto second = createCompletedTravel(authenticatedUser);
+    PlanResDto secondDay =
+        travelService.createPlan(
+            authenticatedUser, second.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    PlanPlaceResDto placeInSecond =
+        createPlace(authenticatedUser, secondDay.planId(), 1, "Other Place", "Busan");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.createPlaceReview(
+                    authenticatedUser,
+                    first.id(),
+                    placeInSecond.planPlaceId(),
+                    new PlaceReviewCreateReqDto(5, "다른 여행")))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Plan place not found.");
+  }
+
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {
     TravelResDto travel =
         travelService.createTravel(

@@ -584,6 +584,19 @@ class TravelServiceImplTest extends AbstractContainerTest {
         .hasMessage("Plan place ids do not match this plan.");
   }
 
+  @Test
+  @DisplayName("인증 정보가 없거나 id가 없으면 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    java.util.UUID travelId = java.util.UUID.randomUUID();
+    AuthenticatedUser withoutId =
+        new AuthenticatedUser(null, "user@example.com", "tester", List.of());
+
+    assertThatThrownBy(() -> travelService.getTravelPlans(null, travelId))
+        .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelService.getTravelPlans(withoutId, travelId))
+        .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
+  }
+
   private PlanPlaceResDto createPlaceInNewTravel(AuthenticatedUser authenticatedUser, User user) {
     TravelResDto travel = createTravel(user);
     PlanResDto plan =
