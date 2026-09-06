@@ -120,4 +120,17 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.likeCount = 0L;
     this.commentCount = 0;
   }
+
+  /** 반경 검증을 통과한 참여를 JOINED 상태로 시작한다. */
+  public static ZoneEventParticipation join(
+      ZoneEvent event, UUID userId, double gpsLat, double gpsLng) {
+    return ZoneEventParticipation.builder()
+        .event(event)
+        .userId(userId)
+        .status(ParticipationStatus.JOINED)
+        .gpsLat(gpsLat)
+        .gpsLng(gpsLng)
+        .joinedAt(OffsetDateTime.now())
+        .build();
+  }
 }
