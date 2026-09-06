@@ -3,6 +3,7 @@ package com.butingbe.domain.zonetitle.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zonetitle.dto.response.CityGradeResDto;
 import com.butingbe.domain.zonetitle.dto.response.EquippedTitleResDto;
 import com.butingbe.domain.zonetitle.dto.response.MyZoneTitlesResDto;
 import com.butingbe.domain.zonetitle.dto.response.MyZoneTitlesResDto.TitleItem;
@@ -37,6 +38,7 @@ public class ZoneTitleService {
   private final ZoneTitleDefRepository titleDefRepository;
   private final UserZoneTitleRepository userZoneTitleRepository;
   private final ZoneEventParticipationRepository participationRepository;
+  private final CityGradeService cityGradeService;
 
   /** 구역 성공 누적으로 새로 도달한 칭호를 발급하고, 새로 얻은 칭호 목록을 돌려준다. */
   @Transactional
@@ -61,6 +63,9 @@ public class ZoneTitleService {
     if (autoEquip && !newlyEarned.isEmpty()) {
       // tier 오름차순으로 발급했으므로 마지막이 가장 높은 tier.
       newlyEarned.get(newlyEarned.size() - 1).equip();
+    }
+    if (!newlyEarned.isEmpty()) {
+      cityGradeService.recordIfRisen(userId);
     }
     return newlyEarned.stream().map(EquippedTitleResDto::from).toList();
   }
@@ -135,7 +140,8 @@ public class ZoneTitleService {
               .toList();
       zones.add(new ZoneProgress(zoneId, successCount, currentTier, nextTier, remaining, items));
     }
-    return new MyZoneTitlesResDto(equipped, null, zones);
+    CityGradeResDto cityGrade = cityGradeService.cityGradeOf(userId);
+    return new MyZoneTitlesResDto(equipped, cityGrade, zones);
   }
 
   /** 칭호 정의 전체(18개). */
