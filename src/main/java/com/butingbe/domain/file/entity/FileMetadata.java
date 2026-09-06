@@ -40,6 +40,9 @@ public class FileMetadata extends TimestampEntity {
   @Column(nullable = false, length = 100)
   private String bucket;
 
+  @Column(name = "uploader_id")
+  private UUID uploaderId;
+
   @Builder
   public FileMetadata(
       String objectKey,
@@ -47,12 +50,14 @@ public class FileMetadata extends TimestampEntity {
       String contentType,
       String mediaType,
       long fileSize,
-      String bucket) {
+      String bucket,
+      UUID uploaderId) {
     this.objectKey = objectKey;
     this.originalFileName = originalFileName;
     this.contentType = contentType;
     this.mediaType = mediaType;
     this.fileSize = fileSize;
     this.bucket = bucket;
+    this.uploaderId = uploaderId;
   }
 }

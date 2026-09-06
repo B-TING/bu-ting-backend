@@ -92,7 +92,7 @@ public class ZoneEventSubmitService {
       throw new ZoneEventOutOfRangeException(distance);
     }
 
-    validateMedia(request.mediaFileKey());
+    validateMedia(request.mediaFileKey(), userId);
 
     participation.submit(
         request.mediaFileKey(),
@@ -128,13 +128,17 @@ public class ZoneEventSubmitService {
   }
 
   /** fileKey가 등록된 이미지인지 확인한다. 업로더 검증은 FileMetadata가 업로더를 저장하지 않아 보류한다. */
-  private void validateMedia(String mediaFileKey) {
+  private void validateMedia(String mediaFileKey, UUID userId) {
     FileMetadata file =
         fileMetadataRepository
             .findByObjectKey(mediaFileKey)
             .orElseThrow(() -> new IllegalArgumentException("error.zone_event.media.invalid"));
     if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
       throw new IllegalArgumentException("error.zone_event.media.invalid");
+    }
+    // 업로더가 기록된 파일은 본인이 올린 것만 제출할 수 있다. 미상(레거시·비인증 업로드)은 통과.
+    if (file.getUploaderId() != null && !file.getUploaderId().equals(userId)) {
+      throw new ForbiddenException("error.zone_event.media.forbidden");
     }
   }
 
