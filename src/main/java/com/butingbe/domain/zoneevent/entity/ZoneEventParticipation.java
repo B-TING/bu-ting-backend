@@ -154,6 +154,31 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.cancelReason = reason;
   }
 
+  /** 운영자 검수 도장(승인·반려·회수 공통). */
+  public void stampReview(UUID reviewerId) {
+    this.reviewedBy = reviewerId;
+    this.reviewedAt = OffsetDateTime.now();
+  }
+
+  /** 검수 반려. */
+  public void markFail(String reason) {
+    this.status = ParticipationStatus.FAIL;
+    this.success = false;
+    this.failReason = reason;
+    this.completedAt = OffsetDateTime.now();
+  }
+
+  /** 어뷰징 회수. */
+  public void markRevoked() {
+    this.status = ParticipationStatus.REVOKED;
+    this.success = false;
+  }
+
+  /** 신고 자동 숨김을 해제한다. */
+  public void unhide() {
+    this.hidden = false;
+  }
+
   /** 공개 범위를 바꾼다(PUBLIC↔PRIVATE). */
   public void changeVisibility(ParticipationVisibility visibility) {
     this.visibility = visibility;
