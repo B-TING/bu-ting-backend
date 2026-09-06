@@ -13,14 +13,18 @@ public class OperatorAuthorization {
     if (user == null || user.id() == null) {
       throw new UnauthenticatedException();
     }
-    boolean operator =
-        user.authorities().stream()
+    if (!isOperator(user)) {
+      throw new ForbiddenException("error.operator.forbidden");
+    }
+  }
+
+  /** 운영자 여부만 확인한다(예외를 던지지 않음). */
+  public boolean isOperator(AuthenticatedUser user) {
+    return user != null
+        && user.authorities().stream()
             .anyMatch(
                 authority ->
                     "ROLE_ADMIN".equals(authority.getAuthority())
                         || "ROLE_MANAGER".equals(authority.getAuthority()));
-    if (!operator) {
-      throw new ForbiddenException("error.operator.forbidden");
-    }
   }
 }
