@@ -3596,6 +3596,283 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-events/{eventId}/participations:
+    post:
+      tags:
+        - Zone Event
+      summary: 참여 시작
+      description: |
+        현장 GPS 좌표로 이벤트 참여를 시작합니다. 타겟 반경 밖이면 400, 이미 열린 참여가 있으면 409입니다.
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParticipationJoinRequest"
+            example:
+              latitude: 35.1532
+              longitude: 129.1182
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParticipationEnvelope"
+        "400":
+          description: 좌표 유효성 실패 또는 타겟 반경 밖
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 이벤트를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: 이미 열린 참여가 있거나 이벤트가 활성 상태가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-events/{eventId}/participations/me:
+    get:
+      tags:
+        - Zone Event
+      summary: 이벤트별 내 참여 조회
+      description: 특정 이벤트에 대한 내 참여 목록을 조회합니다.
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParticipationListEnvelope"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-events/{eventId}/participations/{participationId}/submit:
+    post:
+      tags:
+        - Zone Event
+      summary: 인증 제출
+      description: |
+        참여에 미디어(fileKey)와 촬영 좌표를 제출합니다. AUTO 판정이면 즉시 성공 확정+기본 보상, 아니면 검수 대기입니다.
+        본인이 업로드한 미디어만 제출할 수 있습니다.
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParticipationSubmitRequest"
+            example:
+              mediaFileKey: uploads/images/photo.jpg
+              content: 광안대교 야경 미쳤다
+              latitude: 35.1532
+              longitude: 129.1182
+              capturedAt: 2026-09-06T21:30:00+09:00
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResultEnvelope"
+        "400":
+          description: 유효성 실패 또는 미디어 무효
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 본인 참여가 아니거나 타인이 업로드한 미디어
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 참여 또는 이벤트를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: 참여 상태가 제출 가능하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-events/{eventId}/participations/{participationId}:
+    delete:
+      tags:
+        - Zone Event
+      summary: 참여 취소
+      description: 아직 완료되지 않은(열린) 참여를 취소합니다.
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 본인 참여가 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 참여를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: 이미 완료·취소된 참여
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/me/zone-event-participations:
+    get:
+      tags:
+        - Zone Event
+      summary: 내 참여 이력 조회
+      description: |
+        내 구역 이벤트 참여 이력을 커서 페이징으로 조회합니다. 구역·타입·상태·기간으로 필터할 수 있습니다.
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: zone
+          in: query
+          required: false
+          description: 구역 코드
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          description: 이벤트 타입 코드
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: "참여 상태 필터(콤마 구분): JOINED, SUBMITTED, UNDER_REVIEW, SUCCESS, FAIL, CANCELLED, REVOKED"
+          schema:
+            type: string
+          example: SUCCESS,UNDER_REVIEW
+        - name: from
+          in: query
+          required: false
+          description: 조회 시작 시각(참여 시작 기준)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: cursor
+          in: query
+          required: false
+          description: 다음 페이지 커서
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            example: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParticipationHistoryPageEnvelope"
+        "400":
+          description: 잘못된 상태 필터
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
 components:
   parameters:
@@ -6448,3 +6725,291 @@ components:
           example: 회차 현황
         data:
           $ref: "#/components/schemas/RoundStatus"
+    ParticipationJoinRequest:
+      type: object
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          example: 35.1532
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          example: 129.1182
+    ParticipationSubmitRequest:
+      type: object
+      required:
+        - mediaFileKey
+      properties:
+        mediaFileKey:
+          type: string
+          description: /files 업로드로 받은 fileKey
+          example: uploads/images/photo.jpg
+        content:
+          type: string
+          nullable: true
+          maxLength: 300
+          example: 광안대교 야경 미쳤다
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          example: 35.1532
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          example: 129.1182
+        capturedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 촬영 시각. 서버 수신과 차이가 임계치를 넘으면 자동 성공 대신 검수로 보냅니다.
+    GrantedReward:
+      type: object
+      properties:
+        grantId:
+          type: string
+          format: uuid
+        rewardType:
+          type: string
+          example: POINT
+        code:
+          type: string
+          example: POINT_BASE
+        name:
+          type: string
+          example: 기본 포인트
+        pointAmount:
+          type: integer
+          nullable: true
+          example: 50
+        grantReason:
+          type: string
+          example: BASE
+        grantedAt:
+          type: string
+          format: date-time
+    Participation:
+      type: object
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        zoneId:
+          type: string
+          example: SUYEONG_NAMGU
+        typeCode:
+          type: string
+          example: PLACE_AUTH
+        status:
+          type: string
+          enum:
+            - JOINED
+            - SUBMITTED
+            - UNDER_REVIEW
+            - SUCCESS
+            - FAIL
+            - CANCELLED
+            - REVOKED
+          example: JOINED
+        success:
+          type: boolean
+          nullable: true
+        distanceM:
+          type: integer
+          nullable: true
+          description: 타겟 중심으로부터의 거리(m)
+          example: 42
+        mediaUrl:
+          type: string
+          nullable: true
+          description: presigned URL
+        content:
+          type: string
+          nullable: true
+        likeCount:
+          type: integer
+          format: int64
+          example: 0
+        visibility:
+          type: string
+          enum:
+            - PUBLIC
+            - PRIVATE
+          example: PUBLIC
+        joinedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        rewards:
+          type: array
+          items:
+            type: object
+          description: 참여 응답 시점 보상(일반적으로 비어 있음)
+    SubmitResult:
+      type: object
+      properties:
+        participation:
+          $ref: "#/components/schemas/Participation"
+        rewards:
+          type: array
+          items:
+            $ref: "#/components/schemas/GrantedReward"
+        pointBalance:
+          type: integer
+          example: 350
+        newlyEarnedTitles:
+          type: array
+          items:
+            type: object
+          description: 이번 제출로 새로 획득한 구역 칭호
+        titleProgress:
+          type: object
+          nullable: true
+          description: 칭호 진행도(향후 확장)
+    EventBrief:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        typeCode:
+          type: string
+          example: PLACE_AUTH
+        zone:
+          $ref: "#/components/schemas/ZoneRef"
+        roundId:
+          type: string
+          format: uuid
+          nullable: true
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+    ParticipationHistoryItem:
+      type: object
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - JOINED
+            - SUBMITTED
+            - UNDER_REVIEW
+            - SUCCESS
+            - FAIL
+            - CANCELLED
+            - REVOKED
+        event:
+          $ref: "#/components/schemas/EventBrief"
+        mediaUrl:
+          type: string
+          nullable: true
+        mediaUrlExpiresIn:
+          type: integer
+          nullable: true
+          description: presigned URL 만료까지 남은 초
+        content:
+          type: string
+          nullable: true
+        likeCount:
+          type: integer
+          format: int64
+        commentCount:
+          type: integer
+        visibility:
+          type: string
+          enum:
+            - PUBLIC
+            - PRIVATE
+        rewards:
+          type: array
+          items:
+            $ref: "#/components/schemas/GrantedReward"
+        joinedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+    ParticipationHistoryPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipationHistoryItem"
+        nextCursor:
+          type: string
+          nullable: true
+        hasNext:
+          type: boolean
+    ParticipationEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 이벤트 참여 시작
+        data:
+          $ref: "#/components/schemas/Participation"
+    ParticipationListEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 이벤트별 내 참여 조회
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Participation"
+    SubmitResultEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 인증 제출
+        data:
+          $ref: "#/components/schemas/SubmitResult"
+    ParticipationHistoryPageEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 내 참여 이력 조회
+        data:
+          $ref: "#/components/schemas/ParticipationHistoryPage"
