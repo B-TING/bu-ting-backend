@@ -42,7 +42,8 @@ src/main/java/com/butingbe
 │   ├── travelrecord    # Travel records, reviews, likes, bookmarks, comments
 │   ├── travelsurvey    # Travel preference survey
 │   ├── travelteam      # Team members and invitations
-│   └── user            # User profile
+│   ├── user            # User profile
+│   └── zoneevent       # Zone events: on-site GPS authentication missions (Phase 1)
 └── global
     ├── common          # ApiResponse, BaseEntity, TimestampEntity
     ├── config          # AppConfig, SecurityConfig, WebConfig, WebSocketConfig, S3Config, I18nConfig
