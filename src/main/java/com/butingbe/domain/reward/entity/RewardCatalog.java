@@ -75,4 +75,20 @@ public class RewardCatalog extends BaseEntity {
     this.validDays = validDays;
     this.active = active == null ? Boolean.TRUE : active;
   }
+
+  /** 이름·재고·월 캡·활성 여부를 수정한다. null은 건너뛴다. */
+  public void update(String name, Integer stock, Integer monthlyCap, Boolean active) {
+    if (name != null) {
+      this.name = name;
+    }
+    if (stock != null) {
+      this.stock = stock;
+    }
+    if (monthlyCap != null) {
+      this.monthlyCap = monthlyCap;
+    }
+    if (active != null) {
+      this.active = active;
+    }
+  }
 }

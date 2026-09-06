@@ -5,8 +5,10 @@ import com.butingbe.domain.reward.entity.RewardGrant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface RewardGrantRepository extends JpaRepository<RewardGrant, UUID> {
+public interface RewardGrantRepository
+    extends JpaRepository<RewardGrant, UUID>, JpaSpecificationExecutor<RewardGrant> {
 
   boolean existsByParticipationIdAndGrantReasonAndReward_Id(
       UUID participationId, GrantReason grantReason, UUID rewardId);
