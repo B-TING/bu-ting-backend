@@ -22,6 +22,14 @@ public interface ZoneEventRoundRepository extends JpaRepository<ZoneEventRound, 
 
   List<ZoneEventRound> findByStartsAtGreaterThanEqual(OffsetDateTime from);
 
+  List<ZoneEventRound> findByStartsAtBetweenOrderByStartsAtAsc(
+      OffsetDateTime from, OffsetDateTime to);
+
+  Optional<ZoneEventRound> findFirstByStatusOrderByStartsAtDesc(RoundStatus status);
+
+  Optional<ZoneEventRound> findFirstByStatusAndStartsAtGreaterThanEqualOrderByStartsAtAsc(
+      RoundStatus status, OffsetDateTime from);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT r FROM ZoneEventRound r WHERE r.id = :id")
   Optional<ZoneEventRound> findWithLockById(@Param("id") UUID id);
