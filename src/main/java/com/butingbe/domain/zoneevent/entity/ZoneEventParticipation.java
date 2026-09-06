@@ -154,6 +154,11 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.cancelReason = reason;
   }
 
+  /** 공개 범위를 바꾼다(PUBLIC↔PRIVATE). */
+  public void changeVisibility(ParticipationVisibility visibility) {
+    this.visibility = visibility;
+  }
+
   /** 반경 검증을 통과한 참여를 JOINED 상태로 시작한다. */
   public static ZoneEventParticipation join(
       ZoneEvent event, UUID userId, double gpsLat, double gpsLng) {
