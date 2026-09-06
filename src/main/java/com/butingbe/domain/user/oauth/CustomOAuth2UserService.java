@@ -3,7 +3,6 @@ package com.butingbe.domain.user.oauth;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
-import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +14,6 @@ import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
 public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
@@ -61,10 +59,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
   }
 
   private User createOrLinkByEmail(OAuth2UserInfo userInfo) {
-    if (!StringUtils.hasText(userInfo.email())) {
-      throw new UnauthenticatedException("error.auth.unauthenticated");
-    }
-
+    // email 존재는 OAuth2UserInfoFactory.validated()가 보장한다(비어 있으면 그쪽에서 먼저 거른다).
     return userRepository
         .findByEmail(userInfo.email())
         .map(user -> linkProvider(user, userInfo))

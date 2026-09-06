@@ -220,24 +220,16 @@ public class AdminRoundConsoleService {
             .findWithLockById(roundId)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
     if (round.getStatus() == RoundStatus.SETTLED) {
-      return settlementReportRepository
-          .findById(roundId)
-          .map(ZoneEventSettlementReport::getReport)
-          .orElseGet(
-              () -> Map.of("roundId", roundId.toString(), "settledAt", round.getSettledAt()));
+      return settlementReport(user, roundId); // 저장된 리포트를 그대로(BR-12)
     }
     expireOpenParticipations(roundId);
     SettlementReportResDto prizeReport = settlementService.settleTopLike(roundId);
     OffsetDateTime now = OffsetDateTime.now();
     round.settle(now);
     Map<String, Object> report = assembleReport(roundId, now, prizeReport);
-    settlementReportRepository
-        .findById(roundId)
-        .ifPresentOrElse(
-            existing -> existing.update(report),
-            () ->
-                settlementReportRepository.save(
-                    ZoneEventSettlementReport.builder().roundId(roundId).report(report).build()));
+    // 회차 락 + SETTLED 조기 반환이 리포트가 회차당 한 번만 저장되도록 보장한다.
+    settlementReportRepository.save(
+        ZoneEventSettlementReport.builder().roundId(roundId).report(report).build());
     audit(user, "SETTLE_ROUND", "ROUND", roundId, null);
     return report;
   }

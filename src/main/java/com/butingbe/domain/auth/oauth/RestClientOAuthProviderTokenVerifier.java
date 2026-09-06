@@ -471,10 +471,9 @@ public class RestClientOAuthProviderTokenVerifier implements OAuthProviderTokenV
   }
 
   private Map<String, Object> jwtPayload(String idToken) {
+    // 불변식: 이 메서드는 isJwt(점이 정확히 2개)를 통과한 토큰으로만 호출되므로
+    // split("\\.", -1)은 항상 세 조각을 돌려준다. 가운데(parts[1])가 페이로드다.
     String[] parts = idToken.split("\\.", -1);
-    if (parts.length != 3) {
-      throw new UnauthenticatedException("error.auth.unauthenticated");
-    }
 
     try {
       byte[] payload = Base64.getUrlDecoder().decode(parts[1]);

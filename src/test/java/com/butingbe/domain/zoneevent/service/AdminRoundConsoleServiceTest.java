@@ -243,6 +243,47 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("이벤트 미배정 슬롯만 있는 회차도 오픈된다(전환할 이벤트 없음)")
+  void openRoundWithUnassignedSlots() {
+    AdminRoundResDto created =
+        consoleService.createRound(
+            operator,
+            new RoundCreateReqDto(
+                null,
+                OffsetDateTime.now(),
+                OffsetDateTime.now().plusDays(1),
+                null,
+                List.of("YEONGDO")));
+    UUID roundId = UUID.fromString(created.roundId());
+
+    consoleService.open(operator, roundId);
+
+    assertThat(roundRepository.findById(roundId).orElseThrow().getStatus())
+        .isEqualTo(RoundStatus.OPEN);
+  }
+
+  @Test
+  @DisplayName("슬롯 이벤트가 이미 대상 상태면 건너뛰고 회차만 전환된다")
+  void openSkipsAlreadyTransitionedEvent() {
+    ZoneEventRound round = round(RoundStatus.SCHEDULED);
+    ZoneEvent event = event(round.getId(), ZoneEventStatus.ACTIVE); // from(SCHEDULED)과 불일치
+    slotRepository.save(
+        ZoneEventRoundSlot.builder()
+            .round(round)
+            .slotKind(SlotKind.AUTH)
+            .zoneId("SUYEONG_NAMGU")
+            .eventId(event.getId())
+            .build());
+
+    consoleService.open(operator, round.getId());
+
+    assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
+        .isEqualTo(RoundStatus.OPEN);
+    assertThat(zoneEventRepository.findById(event.getId()).orElseThrow().getStatus())
+        .isEqualTo(ZoneEventStatus.ACTIVE);
+  }
+
+  @Test
   @DisplayName("정산은 미완료 참여를 만료하고 TOP_LIKE 보상을 지급하며 리포트를 저장한다(멱등)")
   void settle() {
     ZoneEventRound round = round(RoundStatus.CLOSED);
