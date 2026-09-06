@@ -121,6 +121,33 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.commentCount = 0;
   }
 
+  /** 인증 미디어와 촬영 좌표를 제출한다. 상태는 SUBMITTED로 옮긴다. */
+  public void submit(
+      String mediaFileKey,
+      String content,
+      double submitGpsLat,
+      double submitGpsLng,
+      OffsetDateTime capturedAt) {
+    this.mediaFileKey = mediaFileKey;
+    this.content = content;
+    this.submitGpsLat = submitGpsLat;
+    this.submitGpsLng = submitGpsLng;
+    this.capturedAt = capturedAt;
+    this.status = ParticipationStatus.SUBMITTED;
+  }
+
+  /** 자동 판정 통과. SUCCESS로 확정한다. */
+  public void markSuccess() {
+    this.status = ParticipationStatus.SUCCESS;
+    this.success = true;
+    this.completedAt = OffsetDateTime.now();
+  }
+
+  /** 검수 대기로 보낸다(MANUAL/HYBRID 또는 촬영 시각 이상). */
+  public void markUnderReview() {
+    this.status = ParticipationStatus.UNDER_REVIEW;
+  }
+
   /** 반경 검증을 통과한 참여를 JOINED 상태로 시작한다. */
   public static ZoneEventParticipation join(
       ZoneEvent event, UUID userId, double gpsLat, double gpsLng) {

@@ -31,7 +31,7 @@ public class RewardCatalog extends BaseEntity {
   @Column(name = "reward_type", nullable = false, length = 20)
   private RewardType rewardType;
 
-  @Column(nullable = false, length = 100)
+  @Column(nullable = false, length = 100, unique = true)
   private String code;
 
   @Column(nullable = false)

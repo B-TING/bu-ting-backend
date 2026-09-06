@@ -47,6 +47,7 @@ class ZoneEventParticipationControllerTest {
   private static final UUID OPEN_ID = UUID.fromString("33333333-0000-0000-0000-000000000001");
 
   @Mock private ZoneEventParticipationService participationService;
+  @Mock private com.butingbe.domain.zoneevent.service.ZoneEventSubmitService submitService;
   @InjectMocks private ZoneEventParticipationController controller;
 
   private MockMvc mockMvc;
@@ -173,6 +174,67 @@ class ZoneEventParticipationControllerTest {
             post("/zone-events/{eventId}/participations", EVENT_ID)
                 .contentType("application/json")
                 .content("{\"latitude\":35.1532}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("인증 제출은 200과 SUCCESS 결과·보상·잔액을 반환한다")
+  void submitReturns200() throws Exception {
+    when(submitService.submit(any(), eq(EVENT_ID), eq(OPEN_ID), any()))
+        .thenReturn(
+            com.butingbe.domain.zoneevent.dto.response.SubmitResultResDto.of(
+                new com.butingbe.domain.zoneevent.dto.response.ParticipationResDto(
+                    OPEN_ID.toString(),
+                    EVENT_ID.toString(),
+                    "SUYEONG_NAMGU",
+                    "PLACE_AUTH",
+                    "SUCCESS",
+                    true,
+                    null,
+                    null,
+                    "야경 미쳤다",
+                    0,
+                    "PUBLIC",
+                    OffsetDateTime.now(),
+                    OffsetDateTime.now(),
+                    List.of()),
+                List.of(
+                    new com.butingbe.domain.reward.dto.response.GrantedRewardDto(
+                        UUID.randomUUID().toString(),
+                        "POINT",
+                        "POINT_BASE",
+                        "기본 포인트",
+                        50,
+                        "BASE",
+                        OffsetDateTime.now())),
+                350));
+
+    mockMvc
+        .perform(
+            post(
+                    "/zone-events/{eventId}/participations/{participationId}/submit",
+                    EVENT_ID,
+                    OPEN_ID)
+                .contentType("application/json")
+                .content(
+                    "{\"mediaFileKey\":\"uploads/p.jpg\",\"latitude\":35.1532,\"longitude\":129.1182}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.participation.status").value("SUCCESS"))
+        .andExpect(jsonPath("$.data.rewards[0].code").value("POINT_BASE"))
+        .andExpect(jsonPath("$.data.pointBalance").value(350));
+  }
+
+  @Test
+  @DisplayName("mediaFileKey가 없으면 400(검증 실패)이다")
+  void submitMissingMediaKeyReturns400() throws Exception {
+    mockMvc
+        .perform(
+            post(
+                    "/zone-events/{eventId}/participations/{participationId}/submit",
+                    EVENT_ID,
+                    OPEN_ID)
+                .contentType("application/json")
+                .content("{\"latitude\":35.1532,\"longitude\":129.1182}"))
         .andExpect(status().isBadRequest());
   }
 
