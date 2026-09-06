@@ -105,6 +105,7 @@ Request flow:
 | `/api/v1/zone-events`                        | `ZoneEventController`           | Active zone events and event detail (Phase 1)      |
 | `/api/v1/zone-events/{eventId}/participations` | `ZoneEventParticipationController` | Join, submit, cancel, and my participations for an event |
 | `/api/v1/users/me/zone-event-participations` | `ZoneEventMeController`         | My zone event participation history (cursor paging) |
+| `/api/v1/users/me/rewards`, `/point-ledger`  | `UserRewardController`          | My reward summary (badges by zone, balance) and point ledger |
 
 The generated OpenAPI specification lives at `src/main/resources/static/docs/openapi3.yaml`.
 
