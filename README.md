@@ -295,7 +295,13 @@ npm install
 ## CI
 
 Pull requests targeting `dev` or `main` run `.github/workflows/ci.yml`, which sets up Temurin Java 25 and runs
-`./gradlew check --no-daemon`.
+`./gradlew check --no-daemon`. The `check` status check is required on the `dev` branch (no review approval required).
+
+### Auto-merge
+
+Add the `automerge` label to a PR targeting `dev` and `.github/workflows/automerge.yml` enables GitHub native
+auto-merge (squash); GitHub merges it once the required `check` status check passes. Only `dev`-targeted,
+non-draft PRs are eligible — `main` release PRs are merged manually so the deploy workflow triggers.
 
 ## Production Deployment
 
