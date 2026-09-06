@@ -79,6 +79,7 @@ class ZoneEventSubmitServiceTest {
             userPointService,
             zoneTitleService);
     ReflectionTestUtils.setField(service, "reviewMode", "AUTO");
+    ReflectionTestUtils.setField(service, "capturedAtThresholdMinutes", 10L);
     user = new AuthenticatedUser(USER_ID, "u@example.com", "u", List.of());
     event = event(ZoneEventStatus.ACTIVE);
   }
@@ -127,6 +128,23 @@ class ZoneEventSubmitServiceTest {
     assertThat(participation.getStatus()).isEqualTo(ParticipationStatus.UNDER_REVIEW);
     assertThat(result.rewards()).isEmpty();
     assertThat(result.pointBalance()).isEqualTo(100);
+    verify(rewardService, never()).grantBaseReward(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("촬영 시각이 임계치보다 오래되면 AUTO여도 검수 대기로 강등한다")
+  void staleCapturedAtGoesUnderReview() {
+    ZoneEventParticipation participation = joined();
+    stubJoinedWithTargetAndMedia(participation, "image/jpeg");
+    when(userPointService.getBalance(USER_ID)).thenReturn(0);
+    ParticipationSubmitReqDto stale =
+        new ParticipationSubmitReqDto(
+            FILE_KEY, "후기", IN_LAT, IN_LNG, OffsetDateTime.now().minusMinutes(30));
+
+    SubmitResultResDto result = service.submit(user, EVENT_ID, PARTICIPATION_ID, stale);
+
+    assertThat(participation.getStatus()).isEqualTo(ParticipationStatus.UNDER_REVIEW);
+    assertThat(result.rewards()).isEmpty();
     verify(rewardService, never()).grantBaseReward(any(), any(), any(), any(), any());
   }
 

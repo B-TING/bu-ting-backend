@@ -107,6 +107,7 @@ Request flow:
 | `/api/v1/zone-events/{eventId}/participations` | `ZoneEventParticipationController` | Join, submit, cancel, and my participations for an event |
 | `/api/v1/zone-events/*/album`, `/zones/*/album`, `/zone-event-rounds/*/album` | `ZoneEventAlbumController`       | Public album feeds and participation visibility |
 | `/api/v1/zone-event-participations/{id}/likes`, `/comments`, `/reports` | `ZoneEventSocialController` | Likes, comments, and reports on public participations |
+| `/api/v1/admin/zone-event-participations`      | `AdminReviewController`         | Operator review queue: approve, reject, revoke, unhide |
 | `/api/v1/zone-titles`, `/users/me/zone-titles`   | `ZoneTitleController`           | Zone title definitions, ownership, equip (Phase 2) |
 | `/api/v1/users/me/zone-event-participations` | `ZoneEventMeController`         | My zone event participation history (cursor paging) |
 | `/api/v1/users/me/rewards`, `/point-ledger`  | `UserRewardController`          | My reward summary (badges by zone, balance) and point ledger |

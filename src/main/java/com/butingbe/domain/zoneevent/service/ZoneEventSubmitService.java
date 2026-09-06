@@ -51,6 +51,9 @@ public class ZoneEventSubmitService {
   @Value("${zone-event.review.mode:AUTO}")
   private String reviewMode;
 
+  @Value("${zone-event.review.captured-at-threshold-minutes:10}")
+  private long capturedAtThresholdMinutes;
+
   @Transactional
   public SubmitResultResDto submit(
       AuthenticatedUser user,
@@ -98,7 +101,7 @@ public class ZoneEventSubmitService {
         request.longitude(),
         request.capturedAt());
 
-    if (isAutoApprove()) {
+    if (isAutoApprove() && !capturedTooOld(request.capturedAt())) {
       participation.markSuccess();
       RewardSnapshot base = event.getBaseReward();
       BaseRewardResult reward =
@@ -133,6 +136,13 @@ public class ZoneEventSubmitService {
     if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
       throw new IllegalArgumentException("error.zone_event.media.invalid");
     }
+  }
+
+  /** 촬영 시각과 서버 수신 시각 차이가 임계치를 넘으면 자동 성공 대신 검수로 보낸다(FR-PTC-09). */
+  private boolean capturedTooOld(java.time.OffsetDateTime capturedAt) {
+    return capturedAt != null
+        && java.time.Duration.between(capturedAt, java.time.OffsetDateTime.now()).toMinutes()
+            > capturedAtThresholdMinutes;
   }
 
   private boolean isAutoApprove() {
