@@ -1,6 +1,8 @@
 package com.butingbe.domain.zoneevent.repository;
 
 import com.butingbe.domain.zoneevent.entity.ZoneEventLike;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,4 +12,7 @@ public interface ZoneEventLikeRepository extends JpaRepository<ZoneEventLike, UU
   boolean existsByParticipationIdAndUserId(UUID participationId, UUID userId);
 
   Optional<ZoneEventLike> findByParticipationIdAndUserId(UUID participationId, UUID userId);
+
+  List<ZoneEventLike> findByUserIdAndParticipationIdIn(
+      UUID userId, Collection<UUID> participationIds);
 }
