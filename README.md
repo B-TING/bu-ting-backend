@@ -34,6 +34,7 @@ src/main/java/com/butingbe
 │   ├── chat            # Regional chatrooms over STOMP/WebSocket
 │   ├── file            # S3 uploads and file metadata
 │   ├── place           # Place catalog backed by TourAPI and Google Places
+│   ├── reward          # Reward catalog, grants, point ledger and badges (Phase 1)
 │   ├── route           # Travel time, distance, visit-order and alternative routes
 │   ├── station         # Station reference data
 │   ├── storage         # Luggage storage locations
