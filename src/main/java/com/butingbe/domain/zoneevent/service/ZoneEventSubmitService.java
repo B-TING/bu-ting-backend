@@ -19,6 +19,7 @@ import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.support.GpsDistance;
+import com.butingbe.domain.zonetitle.service.ZoneTitleService;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
@@ -45,6 +46,7 @@ public class ZoneEventSubmitService {
   private final FileMetadataRepository fileMetadataRepository;
   private final RewardService rewardService;
   private final UserPointService userPointService;
+  private final ZoneTitleService zoneTitleService;
 
   @Value("${zone-event.review.mode:AUTO}")
   private String reviewMode;
@@ -106,8 +108,13 @@ public class ZoneEventSubmitService {
               eventId,
               base == null ? null : base.points(),
               base == null ? null : base.badgeCode());
+      List<Object> newlyEarnedTitles =
+          new java.util.ArrayList<>(zoneTitleService.awardTitles(userId, event.getZoneId()));
       return SubmitResultResDto.of(
-          ParticipationResDto.of(participation, null), reward.rewards(), reward.pointBalance());
+          ParticipationResDto.of(participation, null),
+          reward.rewards(),
+          reward.pointBalance(),
+          newlyEarnedTitles);
     }
 
     participation.markUnderReview();

@@ -8,6 +8,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ZoneEventParticipationRepository
     extends JpaRepository<ZoneEventParticipation, UUID>,
@@ -27,4 +29,10 @@ public interface ZoneEventParticipationRepository
 
   List<ZoneEventParticipation> findByEvent_IdAndStatusIn(
       UUID eventId, java.util.Collection<ParticipationStatus> statuses);
+
+  @Query(
+      "SELECT COUNT(p) FROM ZoneEventParticipation p "
+          + "WHERE p.userId = :userId AND p.event.zoneId = :zoneId "
+          + "AND p.status = com.butingbe.domain.zoneevent.entity.ParticipationStatus.SUCCESS")
+  long countSuccessByUserAndZone(@Param("userId") UUID userId, @Param("zoneId") String zoneId);
 }

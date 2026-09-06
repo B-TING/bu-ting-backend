@@ -17,6 +17,8 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventCommentRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventLikeRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
+import com.butingbe.domain.zonetitle.dto.response.EquippedTitleResDto;
+import com.butingbe.domain.zonetitle.service.ZoneTitleService;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
@@ -59,6 +61,7 @@ public class ZoneEventSocialService {
   private final ZoneEventReportRepository reportRepository;
   private final UserRepository userRepository;
   private final OperatorAuthorization operatorAuthorization;
+  private final ZoneTitleService zoneTitleService;
 
   @Value("${zone-event.report.auto-hide-threshold:3}")
   private long autoHideThreshold;
@@ -105,7 +108,10 @@ public class ZoneEventSocialService {
                 .content(content)
                 .build());
     participation.increaseCommentCount();
-    return CommentResDto.of(comment, userRepository.findById(userId).orElse(null));
+    return CommentResDto.of(
+        comment,
+        userRepository.findById(userId).orElse(null),
+        zoneTitleService.equippedTitlesByUsers(java.util.Set.of(userId)).get(userId));
   }
 
   @Transactional(readOnly = true)
@@ -137,8 +143,12 @@ public class ZoneEventSocialService {
     boolean hasNext = rows.size() > pageSize;
     List<ZoneEventComment> page = hasNext ? rows.subList(0, pageSize) : rows;
     Map<UUID, User> authors = authorsOf(page);
+    Map<UUID, EquippedTitleResDto> titles =
+        zoneTitleService.equippedTitlesByUsers(authors.keySet());
     List<CommentResDto> items =
-        page.stream().map(c -> CommentResDto.of(c, authors.get(c.getUserId()))).toList();
+        page.stream()
+            .map(c -> CommentResDto.of(c, authors.get(c.getUserId()), titles.get(c.getUserId())))
+            .toList();
     String nextCursor = hasNext ? encodeCursor(page.get(page.size() - 1)) : null;
     return new CommentPageResDto(items, nextCursor, hasNext);
   }
@@ -149,7 +159,12 @@ public class ZoneEventSocialService {
     ZoneEventComment comment = requireComment(commentId);
     requireAuthorOrOperator(user, userId, comment.getUserId());
     comment.edit(content);
-    return CommentResDto.of(comment, userRepository.findById(comment.getUserId()).orElse(null));
+    return CommentResDto.of(
+        comment,
+        userRepository.findById(comment.getUserId()).orElse(null),
+        zoneTitleService
+            .equippedTitlesByUsers(java.util.Set.of(comment.getUserId()))
+            .get(comment.getUserId()));
   }
 
   @Transactional

@@ -62,6 +62,7 @@ class ZoneEventSubmitServiceTest {
   @Mock private FileMetadataRepository fileMetadataRepository;
   @Mock private RewardService rewardService;
   @Mock private UserPointService userPointService;
+  @Mock private com.butingbe.domain.zonetitle.service.ZoneTitleService zoneTitleService;
 
   private ZoneEventSubmitService service;
   private AuthenticatedUser user;
@@ -75,7 +76,8 @@ class ZoneEventSubmitServiceTest {
             authTargetRepository,
             fileMetadataRepository,
             rewardService,
-            userPointService);
+            userPointService,
+            zoneTitleService);
     ReflectionTestUtils.setField(service, "reviewMode", "AUTO");
     user = new AuthenticatedUser(USER_ID, "u@example.com", "u", List.of());
     event = event(ZoneEventStatus.ACTIVE);

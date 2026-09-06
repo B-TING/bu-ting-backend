@@ -20,4 +20,12 @@ public record SubmitResultResDto(
       ParticipationResDto participation, List<GrantedRewardDto> rewards, int pointBalance) {
     return new SubmitResultResDto(participation, rewards, pointBalance, List.of(), null);
   }
+
+  public static SubmitResultResDto of(
+      ParticipationResDto participation,
+      List<GrantedRewardDto> rewards,
+      int pointBalance,
+      List<Object> newlyEarnedTitles) {
+    return new SubmitResultResDto(participation, rewards, pointBalance, newlyEarnedTitles, null);
+  }
 }
