@@ -21,5 +21,10 @@ public interface ZoneEventParticipationRepository
 
   long countByEvent_IdAndUserIdAndStatus(UUID eventId, UUID userId, ParticipationStatus status);
 
+  long countByEvent_Id(UUID eventId);
+
   long countByEvent_IdAndStatus(UUID eventId, ParticipationStatus status);
+
+  List<ZoneEventParticipation> findByEvent_IdAndStatusIn(
+      UUID eventId, java.util.Collection<ParticipationStatus> statuses);
 }
