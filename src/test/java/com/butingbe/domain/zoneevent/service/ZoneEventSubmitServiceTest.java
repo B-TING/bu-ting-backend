@@ -236,6 +236,21 @@ class ZoneEventSubmitServiceTest {
         .isInstanceOf(UnauthenticatedException.class);
   }
 
+  @Test
+  @DisplayName("타인이 업로드한 미디어로 제출하면 403이다")
+  void rejectsMediaUploadedByAnother() {
+    ZoneEventParticipation participation = joined();
+    when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
+    when(authTargetRepository.findByEvent_Id(EVENT_ID)).thenReturn(Optional.of(target()));
+    FileMetadata file = mock(FileMetadata.class);
+    when(file.getContentType()).thenReturn("image/jpeg");
+    when(file.getUploaderId()).thenReturn(UUID.randomUUID()); // 제출자(USER_ID)와 다른 업로더
+    when(fileMetadataRepository.findByObjectKey(FILE_KEY)).thenReturn(Optional.of(file));
+
+    assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
+        .isInstanceOf(ForbiddenException.class);
+  }
+
   private void stubJoinedWithTargetAndMedia(
       ZoneEventParticipation participation, String contentType) {
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));

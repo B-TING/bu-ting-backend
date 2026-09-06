@@ -80,7 +80,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     FileStorageService fileStorageService() {
       return new FileStorageService() {
         @Override
-        public FileUploadResDto upload(MultipartFile file) {
+        public FileUploadResDto upload(MultipartFile file, java.util.UUID uploaderId) {
           throw new UnsupportedOperationException();
         }
 

@@ -36,6 +36,9 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 @ExtendWith(MockitoExtension.class)
 class S3FileStorageServiceTest {
 
+  private static final java.util.UUID UPLOADER =
+      java.util.UUID.fromString("99999999-0000-0000-0000-000000000001");
+
   @Mock private S3Client s3Client;
   @Mock private FileMetadataRepository fileMetadataRepository;
   @Mock private S3Presigner s3Presigner;
@@ -63,7 +66,7 @@ class S3FileStorageServiceTest {
     when(presignedGetObjectRequest.url())
         .thenReturn(URI.create("https://signed.example.com/file?signature=value").toURL());
 
-    var response = service.upload(file);
+    var response = service.upload(file, UPLOADER);
 
     ArgumentCaptor<GetObjectPresignRequest> requestCaptor =
         ArgumentCaptor.forClass(GetObjectPresignRequest.class);
@@ -80,7 +83,7 @@ class S3FileStorageServiceTest {
     MockMultipartFile file =
         new MockMultipartFile("file", "busan.png", "image/png", new byte[] {1, 2, 3});
 
-    assertThatThrownBy(() -> service.upload(file))
+    assertThatThrownBy(() -> service.upload(file, UPLOADER))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("파일 크기 제한을 초과했습니다.");
 
@@ -115,11 +118,12 @@ class S3FileStorageServiceTest {
     when(presignedGetObjectRequest.url())
         .thenReturn(URI.create("https://signed.example.com/clip?signature=value").toURL());
 
-    var response = service.upload(file);
+    var response = service.upload(file, UPLOADER);
 
     ArgumentCaptor<FileMetadata> metadataCaptor = ArgumentCaptor.forClass(FileMetadata.class);
     verify(fileMetadataRepository).save(metadataCaptor.capture());
     assertThat(metadataCaptor.getValue().getMediaType()).isEqualTo("VIDEO");
+    assertThat(metadataCaptor.getValue().getUploaderId()).isEqualTo(UPLOADER);
     assertThat(response.fileKey()).startsWith("uploads/videos/").endsWith(".mp4");
     assertThat(response.contentType()).isEqualTo("video/mp4");
   }
@@ -132,7 +136,7 @@ class S3FileStorageServiceTest {
     when(fileMetadataRepository.save(any(FileMetadata.class)))
         .thenThrow(new IllegalStateException("db down"));
 
-    assertThatThrownBy(() -> service.upload(file))
+    assertThatThrownBy(() -> service.upload(file, UPLOADER))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("db down");
 
@@ -145,7 +149,7 @@ class S3FileStorageServiceTest {
   void rejectsEmptyFile() {
     MockMultipartFile file = new MockMultipartFile("file", "busan.png", "image/png", new byte[0]);
 
-    assertThatThrownBy(() -> service.upload(file))
+    assertThatThrownBy(() -> service.upload(file, UPLOADER))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("파일이 비어 있습니다.");
 
@@ -158,7 +162,7 @@ class S3FileStorageServiceTest {
     MockMultipartFile file =
         new MockMultipartFile("file", "malware.exe", "application/octet-stream", new byte[] {1});
 
-    assertThatThrownBy(() -> service.upload(file))
+    assertThatThrownBy(() -> service.upload(file, UPLOADER))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("지원하지 않는 파일 형식입니다.");
 
@@ -222,7 +226,7 @@ class S3FileStorageServiceTest {
     when(file.getOriginalFilename()).thenReturn("busan.png");
     when(file.getInputStream()).thenThrow(new java.io.IOException("stream closed"));
 
-    assertThatThrownBy(() -> service.upload(file))
+    assertThatThrownBy(() -> service.upload(file, UPLOADER))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("파일을 읽을 수 없습니다.");
   }

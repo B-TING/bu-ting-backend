@@ -8,8 +8,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.file.dto.FileUploadResDto;
 import com.butingbe.domain.file.service.FileStorageService;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,14 +20,22 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.support.WebDataBinderFactory;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.method.support.ModelAndViewContainer;
 
 @ExtendWith(MockitoExtension.class)
 class FileControllerTest {
+
+  private static final UUID UPLOADER = UUID.fromString("88888888-0000-0000-0000-000000000001");
 
   private MockMvc mockMvc;
 
@@ -36,8 +47,27 @@ class FileControllerTest {
   void setUp() {
     mockMvc =
         MockMvcBuilders.standaloneSetup(fileController)
+            .setCustomArgumentResolvers(uploaderResolver())
             .setMessageConverters(new MappingJackson2HttpMessageConverter())
             .build();
+  }
+
+  private HandlerMethodArgumentResolver uploaderResolver() {
+    return new HandlerMethodArgumentResolver() {
+      @Override
+      public boolean supportsParameter(MethodParameter parameter) {
+        return parameter.hasParameterAnnotation(AuthenticationPrincipal.class);
+      }
+
+      @Override
+      public Object resolveArgument(
+          MethodParameter parameter,
+          ModelAndViewContainer mavContainer,
+          NativeWebRequest webRequest,
+          WebDataBinderFactory binderFactory) {
+        return new AuthenticatedUser(UPLOADER, "up@example.com", "up", List.of());
+      }
+    };
   }
 
   @Test
@@ -46,7 +76,7 @@ class FileControllerTest {
     MockMultipartFile file =
         new MockMultipartFile(
             "file", "photo.jpg", MediaType.IMAGE_JPEG_VALUE, "binary-content".getBytes());
-    when(fileStorageService.upload(any()))
+    when(fileStorageService.upload(any(), any()))
         .thenReturn(
             new FileUploadResDto(
                 "uploads/photo.jpg",
@@ -63,6 +93,8 @@ class FileControllerTest {
         .andExpect(jsonPath("$.contentType").value(MediaType.IMAGE_JPEG_VALUE))
         .andExpect(jsonPath("$.fileSize").value(14))
         .andExpect(jsonPath("$.url").value("https://cdn.example.com/uploads/photo.jpg"));
+
+    verify(fileStorageService).upload(any(), org.mockito.ArgumentMatchers.eq(UPLOADER));
   }
 
   @Test
