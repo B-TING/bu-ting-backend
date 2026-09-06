@@ -12,4 +12,8 @@ public interface ZoneEventRoundRepository extends JpaRepository<ZoneEventRound, 
   List<ZoneEventRound> findByStatusAndStartsAtLessThanEqual(RoundStatus status, OffsetDateTime at);
 
   List<ZoneEventRound> findByStatusAndEndsAtLessThanEqual(RoundStatus status, OffsetDateTime at);
+
+  List<ZoneEventRound> findTop2ByStartsAtLessThanOrderByStartsAtDesc(OffsetDateTime before);
+
+  List<ZoneEventRound> findByStartsAtGreaterThanEqual(OffsetDateTime from);
 }
