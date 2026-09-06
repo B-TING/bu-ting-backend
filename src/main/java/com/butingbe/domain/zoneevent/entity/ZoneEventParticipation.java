@@ -159,6 +159,34 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.visibility = visibility;
   }
 
+  public void increaseLikeCount() {
+    this.likeCount += 1;
+  }
+
+  public void decreaseLikeCount() {
+    this.likeCount = Math.max(0, this.likeCount - 1);
+  }
+
+  public void increaseCommentCount() {
+    this.commentCount += 1;
+  }
+
+  public void decreaseCommentCount() {
+    this.commentCount = Math.max(0, this.commentCount - 1);
+  }
+
+  /** 신고 누적 등으로 앨범에서 숨긴다. */
+  public void hide() {
+    this.hidden = true;
+  }
+
+  /** 앨범 상호작용(좋아요·댓글·신고) 대상인지: 공개·미숨김·성공. */
+  public boolean isInteractable() {
+    return status == ParticipationStatus.SUCCESS
+        && visibility == ParticipationVisibility.PUBLIC
+        && !Boolean.TRUE.equals(hidden);
+  }
+
   /** 반경 검증을 통과한 참여를 JOINED 상태로 시작한다. */
   public static ZoneEventParticipation join(
       ZoneEvent event, UUID userId, double gpsLat, double gpsLng) {

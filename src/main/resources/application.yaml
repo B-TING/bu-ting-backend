@@ -90,6 +90,8 @@ zone-event:
   # AUTO: GPS 통과 즉시 성공. MANUAL/HYBRID: 제출 후 검수 대기(UNDER_REVIEW).
   review:
     mode: ${ZONE_EVENT_REVIEW_MODE:AUTO}
+  report:
+    auto-hide-threshold: ${ZONE_EVENT_REPORT_AUTO_HIDE_THRESHOLD:3}
   round:
     scheduler:
       delay-ms: ${ZONE_EVENT_ROUND_SCHEDULER_DELAY_MS:60000}
