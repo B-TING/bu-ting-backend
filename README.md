@@ -42,6 +42,7 @@ src/main/java/com/butingbe
 │   ├── travelexpense   # Expenses and settlements
 │   ├── travelrecord    # Travel records, reviews, likes, bookmarks, comments
 │   ├── travelsurvey    # Travel preference survey
+│   ├── notification    # Push: device tokens, subscriptions, settings (Phase 2)
 │   ├── travelteam      # Team members and invitations
 │   ├── user            # User profile
 │   ├── zonetitle       # Zone titles and city grade (Phase 2)
@@ -108,6 +109,8 @@ Request flow:
 | `/api/v1/zone-events/*/album`, `/zones/*/album`, `/zone-event-rounds/*/album` | `ZoneEventAlbumController`       | Public album feeds and participation visibility |
 | `/api/v1/zone-event-participations/{id}/likes`, `/comments`, `/reports` | `ZoneEventSocialController` | Likes, comments, and reports on public participations |
 | `/api/v1/admin/zone-event-participations`      | `AdminReviewController`         | Operator review queue: approve, reject, revoke, unhide |
+| `/api/v1/users/me/device-tokens`, `/zone-subscriptions`, `/notification-settings` | `UserNotificationController` | Push tokens, zone subscriptions, notification settings |
+| `/api/v1/admin/push`                          | `AdminPushController`           | Operator immediate push to a zone or everyone |
 | `/api/v1/zone-titles`, `/users/me/zone-titles`   | `ZoneTitleController`           | Zone title definitions, ownership, equip (Phase 2) |
 | `/api/v1/users/me/zone-event-participations` | `ZoneEventMeController`         | My zone event participation history (cursor paging) |
 | `/api/v1/users/me/rewards`, `/point-ledger`  | `UserRewardController`          | My reward summary (badges by zone, balance) and point ledger |
