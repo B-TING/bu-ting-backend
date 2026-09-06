@@ -38,9 +38,4 @@ public class ZoneEventSettlementReport {
     this.report = report;
     this.generatedAt = OffsetDateTime.now();
   }
-
-  public void update(Map<String, Object> report) {
-    this.report = report;
-    this.generatedAt = OffsetDateTime.now();
-  }
 }
