@@ -96,7 +96,7 @@ class GlobalExceptionHandlerTest {
   @DisplayName("충돌 예외는 409와 원본 메시지를 반환한다")
   void conflictReturnsConflict() {
     ResponseEntity<ApiResponse<Void>> response =
-        handler.handleConflictException(new ConflictException("상태가 충돌합니다."));
+        handler.handleConflictException(new ConflictException("상태가 충돌합니다."), request);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     assertThat(response.getBody().getMessage()).isEqualTo("상태가 충돌합니다.");
@@ -106,7 +106,7 @@ class GlobalExceptionHandlerTest {
   @DisplayName("잘못된 인자는 400과 원본 메시지를 반환한다")
   void illegalArgumentReturnsBadRequest() {
     ResponseEntity<ApiResponse<Void>> response =
-        handler.handleIllegalArgumentException(new IllegalArgumentException("잘못된 값입니다."));
+        handler.handleIllegalArgumentException(new IllegalArgumentException("잘못된 값입니다."), request);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody().getMessage()).isEqualTo("잘못된 값입니다.");
@@ -116,7 +116,7 @@ class GlobalExceptionHandlerTest {
   @DisplayName("권한 없음은 403을 반환한다")
   void forbiddenReturnsForbidden() {
     ResponseEntity<ApiResponse<Void>> response =
-        handler.handleForbiddenException(new ForbiddenException("권한이 없습니다."));
+        handler.handleForbiddenException(new ForbiddenException("권한이 없습니다."), request);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     assertThat(response.getBody().getMessage()).isEqualTo("권한이 없습니다.");
@@ -126,7 +126,8 @@ class GlobalExceptionHandlerTest {
   @DisplayName("리소스 없음은 404를 반환한다")
   void resourceNotFoundReturnsNotFound() {
     ResponseEntity<ApiResponse<Void>> response =
-        handler.handleResourceNotFoundException(new ResourceNotFoundException("찾을 수 없습니다."));
+        handler.handleResourceNotFoundException(
+            new ResourceNotFoundException("찾을 수 없습니다."), request);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     assertThat(response.getBody().getMessage()).isEqualTo("찾을 수 없습니다.");

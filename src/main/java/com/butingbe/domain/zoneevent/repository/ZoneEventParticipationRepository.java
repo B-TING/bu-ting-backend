@@ -14,4 +14,6 @@ public interface ZoneEventParticipationRepository
       UUID eventId, UUID userId, Collection<ParticipationStatus> statuses);
 
   long countByEvent_IdAndUserIdAndStatus(UUID eventId, UUID userId, ParticipationStatus status);
+
+  long countByEvent_IdAndStatus(UUID eventId, ParticipationStatus status);
 }

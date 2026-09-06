@@ -62,19 +62,21 @@ public class GlobalExceptionHandler {
 
   /** ❌ 2. 잘못된 비즈니스 요청 예외 (400 Bad Request) IllegalArgumentException 등이 터졌을 때 처리합니다. */
   @ExceptionHandler(ConflictException.class)
-  public ResponseEntity<ApiResponse<Void>> handleConflictException(ConflictException e) {
+  public ResponseEntity<ApiResponse<Void>> handleConflictException(
+      ConflictException e, HttpServletRequest request) {
     log.warn("Conflict Exception: {}", e.getMessage());
 
-    return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.fail(e.getMessage()));
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(
-      IllegalArgumentException e) {
+      IllegalArgumentException e, HttpServletRequest request) {
     log.warn("Bad Request Exception 발생: {}", e.getMessage());
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST) // HTTP 상태코드 400 세팅
-        .body(ApiResponse.fail(e.getMessage()));
+        .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
   /**
@@ -82,18 +84,21 @@ public class GlobalExceptionHandler {
    * 작동합니다.
    */
   @ExceptionHandler(ForbiddenException.class)
-  public ResponseEntity<ApiResponse<Void>> handleForbiddenException(ForbiddenException e) {
+  public ResponseEntity<ApiResponse<Void>> handleForbiddenException(
+      ForbiddenException e, HttpServletRequest request) {
     log.warn("Forbidden Exception: {}", e.getMessage());
 
-    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail(e.getMessage()));
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
   @ExceptionHandler(ResourceNotFoundException.class)
   public ResponseEntity<ApiResponse<Void>> handleResourceNotFoundException(
-      ResourceNotFoundException e) {
+      ResourceNotFoundException e, HttpServletRequest request) {
     log.warn("Resource Not Found Exception: {}", e.getMessage());
 
-    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
   @ExceptionHandler(PlaceKeywordNotFoundException.class)
