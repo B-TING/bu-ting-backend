@@ -14,6 +14,8 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventLike;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.repository.ZoneEventLikeRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zonetitle.dto.response.EquippedTitleResDto;
+import com.butingbe.domain.zonetitle.service.ZoneTitleService;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
@@ -53,6 +55,7 @@ public class ZoneEventAlbumService {
   private final ZoneEventLikeRepository likeRepository;
   private final UserRepository userRepository;
   private final FileStorageService fileStorageService;
+  private final ZoneTitleService zoneTitleService;
 
   @Value("${file-storage.s3.presigned-url-expiration:3600}")
   private int presignedUrlExpiration;
@@ -131,9 +134,11 @@ public class ZoneEventAlbumService {
 
     Map<UUID, User> authors = authorsOf(page);
     Set<UUID> likedByViewer = likedParticipationIds(page, viewerId);
+    Map<UUID, EquippedTitleResDto> titles =
+        zoneTitleService.equippedTitlesByUsers(authors.keySet());
 
     List<AlbumItemResDto> items =
-        page.stream().map(p -> toItem(p, authors, likedByViewer, viewerId)).toList();
+        page.stream().map(p -> toItem(p, authors, likedByViewer, titles, viewerId)).toList();
     String nextCursor = hasNext ? encodeCursor(page.get(page.size() - 1), sort) : null;
     return new AlbumPageResDto(items, nextCursor, hasNext);
   }
@@ -198,7 +203,11 @@ public class ZoneEventAlbumService {
   }
 
   private AlbumItemResDto toItem(
-      ZoneEventParticipation p, Map<UUID, User> authors, Set<UUID> liked, UUID viewerId) {
+      ZoneEventParticipation p,
+      Map<UUID, User> authors,
+      Set<UUID> liked,
+      Map<UUID, EquippedTitleResDto> titles,
+      UUID viewerId) {
     User author = authors.get(p.getUserId());
     return new AlbumItemResDto(
         p.getId().toString(),
@@ -208,7 +217,7 @@ public class ZoneEventAlbumService {
         p.getUserId().toString(),
         author == null ? null : author.getNickname(),
         author == null ? null : author.getProfileImageUrl(),
-        null,
+        titles.get(p.getUserId()),
         p.getContent(),
         p.getMediaFileKey() == null
             ? null
