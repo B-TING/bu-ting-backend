@@ -1,0 +1,28 @@
+name: Auto-merge
+
+# `automerge` 라벨이 붙은 dev 대상 PR에 GitHub 네이티브 auto-merge(squash)를 활성화한다.
+# 실제 병합은 dev 브랜치 보호의 필수 상태체크(check, CI)가 통과한 뒤에 GitHub가 수행한다.
+# main 대상 PR은 제외한다 — GITHUB_TOKEN 병합은 배포 워크플로를 트리거하지 않으므로,
+# 운영 배포는 릴리스 PR을 수동 병합해 deploy.yml을 트리거한다.
+
+on:
+  pull_request:
+    types: [labeled, opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable-automerge:
+    if: >-
+      github.event.pull_request.base.ref == 'dev' &&
+      github.event.pull_request.draft == false &&
+      contains(github.event.pull_request.labels.*.name, 'automerge')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge (squash)
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
