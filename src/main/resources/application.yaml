@@ -85,3 +85,8 @@ route:
     api-key: ${ROUTE_GOOGLE_API_KEY:${GOOGLE_PLACES_API_KEY:}}
     connect-timeout-seconds: ${ROUTE_GOOGLE_CONNECT_TIMEOUT_SECONDS:3}
     read-timeout-seconds: ${ROUTE_GOOGLE_READ_TIMEOUT_SECONDS:5}
+
+zone-event:
+  # AUTO: GPS 통과 즉시 성공. MANUAL/HYBRID: 제출 후 검수 대기(UNDER_REVIEW).
+  review:
+    mode: ${ZONE_EVENT_REVIEW_MODE:AUTO}
