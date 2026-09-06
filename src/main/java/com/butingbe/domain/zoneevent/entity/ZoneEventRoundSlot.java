@@ -67,4 +67,13 @@ public class ZoneEventRoundSlot {
   public void assignEvent(UUID eventId) {
     this.eventId = eventId;
   }
+
+  /** 슬롯의 구역을 바꾼다. 이벤트가 이미 배정됐으면 바꿀 수 없다. */
+  public void reassignZone(String zoneId) {
+    if (this.eventId != null) {
+      throw new com.butingbe.global.error.exception.ConflictException(
+          "error.zone_event.invalid_state");
+    }
+    this.zoneId = zoneId;
+  }
 }
