@@ -3874,6 +3874,1851 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/zone-events/{eventId}/album:
+    get:
+      tags:
+        - Zone Event
+      summary: "이벤트 공개 앨범 조회"
+      description: "이벤트의 공개 성공 인증을 앨범으로 조회합니다. 로그인 시 likedByMe·isMine이 채워집니다."
+      security:
+        - opaqueToken: [ ]
+        - { }
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: sort
+          in: query
+          required: false
+          description: "정렬: LATEST(기본) 또는 LIKE"
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlbumPageEnvelope"
+        "404":
+          description: "이벤트를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zones/{zoneId}/album:
+    get:
+      tags:
+        - Zone Event
+      summary: "구역 공개 앨범 조회"
+      description: "구역 전체의 공개 성공 인증을 앨범으로 조회합니다."
+      security:
+        - opaqueToken: [ ]
+        - { }
+      parameters:
+        - name: zoneId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          description: "정렬: LATEST(기본) 또는 LIKE"
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlbumPageEnvelope"
+        "400":
+          description: "잘못된 구역 코드"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-event-rounds/{roundId}/album:
+    get:
+      tags:
+        - Zone Event
+      summary: "회차 공개 앨범 조회"
+      description: "회차 전체의 공개 성공 인증을 앨범으로 조회합니다."
+      security:
+        - opaqueToken: [ ]
+        - { }
+      parameters:
+        - name: roundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: sort
+          in: query
+          required: false
+          description: "정렬: LATEST(기본) 또는 LIKE"
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlbumPageEnvelope"
+  /api/v1/zone-event-participations/{participationId}/visibility:
+    patch:
+      tags:
+        - Zone Event
+      summary: "참여 공개 설정 변경"
+      description: "내 참여의 공개/비공개를 변경합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisibilityUpdateRequest"
+            example:
+              visibility: PUBLIC
+      responses:
+        "200":
+          description: "OK"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "본인 참여가 아님"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "참여를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-event-participations/{participationId}/likes:
+    post:
+      tags:
+        - Zone Event
+      summary: "좋아요"
+      description: "공개 참여에 좋아요를 누릅니다. 멱등(이미 눌렀으면 그대로)."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikeEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "참여를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - Zone Event
+      summary: "좋아요 취소"
+      description: "좋아요를 취소합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: "No Content"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-event-participations/{participationId}/comments:
+    post:
+      tags:
+        - Zone Event
+      summary: "댓글 작성"
+      description: "공개 참여에 댓글을 작성합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentRequest"
+            example:
+              content: 사진 멋지네요!
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "참여를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    get:
+      tags:
+        - Zone Event
+      summary: "댓글 목록 조회"
+      description: "댓글을 커서 페이징으로 조회합니다."
+      security:
+        - opaqueToken: [ ]
+        - { }
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentPageEnvelope"
+  /api/v1/zone-event-participations/{participationId}/comments/{commentId}:
+    patch:
+      tags:
+        - Zone Event
+      summary: "댓글 수정"
+      description: "내 댓글을 수정합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentRequest"
+            example:
+              content: 수정한 댓글
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "본인 댓글이 아님"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "댓글을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - Zone Event
+      summary: "댓글 삭제"
+      description: "내 댓글을 삭제합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: "No Content"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "본인 댓글이 아님"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-event-participations/{participationId}/reports:
+    post:
+      tags:
+        - Zone Event
+      summary: "신고"
+      description: "공개 참여를 신고합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+            example:
+              reasonCode: SPAM
+              memo: 도배성 게시물
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "참여를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/me/zone-titles:
+    get:
+      tags:
+        - Zone Event
+      summary: "내 구역 칭호 조회"
+      description: "구역별 칭호 진행도와 장착 칭호, 도시 등급을 조회합니다."
+      security:
+        - opaqueToken: [ ]
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyZoneTitlesEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/me/zone-titles/{userTitleId}/equip:
+    patch:
+      tags:
+        - Zone Event
+      summary: "칭호 장착"
+      description: "보유한 칭호 하나를 장착합니다. 장착은 한 개만 유지됩니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: userTitleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EquippedTitleEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "칭호를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/me/zone-titles/equipped:
+    delete:
+      tags:
+        - Zone Event
+      summary: "칭호 해제"
+      description: "현재 장착 칭호를 해제합니다."
+      security:
+        - opaqueToken: [ ]
+      responses:
+        "204":
+          description: "No Content"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-titles:
+    get:
+      tags:
+        - Zone Event
+      summary: "칭호 정의 목록"
+      description: "전체 구역 칭호 정의(6구역 × 3티어)를 조회합니다."
+      security:
+        - opaqueToken: [ ]
+        - { }
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZoneTitleDefListEnvelope"
+  /api/v1/users/me/rewards:
+    get:
+      tags:
+        - Zone Event
+      summary: "내 보상 요약"
+      description: "포인트 잔액, 구역별 배지, 쿠폰함을 조회합니다."
+      security:
+        - opaqueToken: [ ]
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserRewardsEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/me/point-ledger:
+    get:
+      tags:
+        - Zone Event
+      summary: "내 포인트 원장"
+      description: "포인트 적립·차감 내역을 커서 페이징으로 조회합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointLedgerPageEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/reward-catalog:
+    post:
+      tags:
+        - Zone Event
+      summary: "보상 카탈로그 생성"
+      description: "ROLE_ADMIN/MANAGER. 실물/포인트 보상 항목을 등록합니다."
+      security:
+        - opaqueToken: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRewardCatalogCreateRequest"
+            example:
+              rewardType: COUPON
+              code: COUPON_CAFE
+              name: 카페 쿠폰
+              stock: 100
+              validDays: 30
+              active: true
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RewardCatalogEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "코드 중복"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    get:
+      tags:
+        - Zone Event
+      summary: "보상 카탈로그 목록"
+      description: "ROLE_ADMIN/MANAGER. rewardType·active로 필터합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: rewardType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RewardCatalogListEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/reward-catalog/{rewardId}:
+    patch:
+      tags:
+        - Zone Event
+      summary: "보상 카탈로그 수정"
+      description: "ROLE_ADMIN/MANAGER. 이름·재고·월캡·활성 여부를 수정합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: rewardId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRewardCatalogUpdateRequest"
+            example:
+              stock: 50
+              active: false
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RewardCatalogEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "보상을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/reward-catalog/{rewardId}/grants:
+    get:
+      tags:
+        - Zone Event
+      summary: "보상 지급 이력"
+      description: "ROLE_ADMIN/MANAGER. 해당 보상의 지급 이력을 커서 페이징으로 조회합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: rewardId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardGrantPageEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-events:
+    post:
+      tags:
+        - Zone Event
+      summary: "이벤트 생성"
+      description: "ROLE_ADMIN/MANAGER. 이벤트와 인증 타겟을 생성합니다(SCHEDULED)."
+      security:
+        - opaqueToken: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminZoneEventCreateRequest"
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    get:
+      tags:
+        - Zone Event
+      summary: "이벤트 목록"
+      description: "ROLE_ADMIN/MANAGER. 구역·상태·기간으로 필터하고 커서 페이징합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: zone
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventPageEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-events/{eventId}:
+    get:
+      tags:
+        - Zone Event
+      summary: "이벤트 상세(운영)"
+      description: "ROLE_ADMIN/MANAGER."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "이벤트를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    patch:
+      tags:
+        - Zone Event
+      summary: "이벤트 수정"
+      description: "ROLE_ADMIN/MANAGER. 상태별 수정 가능 항목이 다릅니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminZoneEventUpdateRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "이벤트를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "상태 전이 불가"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-events/{eventId}/activate:
+    post:
+      tags:
+        - Zone Event
+      summary: "이벤트 활성화"
+      description: "ROLE_ADMIN/MANAGER."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "이벤트를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "상태 전이 불가"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-events/{eventId}/close:
+    post:
+      tags:
+        - Zone Event
+      summary: "이벤트 종료"
+      description: "ROLE_ADMIN/MANAGER."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "이벤트를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "상태 전이 불가"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-events/{eventId}/cancel:
+    post:
+      tags:
+        - Zone Event
+      summary: "이벤트 취소"
+      description: "ROLE_ADMIN/MANAGER."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "이벤트를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "상태 전이 불가"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-participations/review-queue:
+    get:
+      tags:
+        - Zone Event
+      summary: "검수 큐 조회"
+      description: "ROLE_ADMIN/MANAGER. UNDER_REVIEW·숨김 참여를 신고 수와 함께 조회합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewQueuePageEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-participations/{participationId}/approve:
+    post:
+      tags:
+        - Zone Event
+      summary: "검수 승인"
+      description: "ROLE_ADMIN/MANAGER. SUCCESS로 확정하고 기본 보상·칭호를 지급합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResultEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "참여를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "상태 불가"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-participations/{participationId}/reject:
+    post:
+      tags:
+        - Zone Event
+      summary: "검수 반려"
+      description: "ROLE_ADMIN/MANAGER. FAIL로 처리하고 사유를 남깁니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectRequest"
+            example:
+              failReason: NOT_ON_SITE
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "사유 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "상태 불가"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-participations/{participationId}/revoke:
+    post:
+      tags:
+        - Zone Event
+      summary: "보상 회수"
+      description: "ROLE_ADMIN/MANAGER. REVOKED로 처리하고 지급 보상을 회수합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "상태 불가"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-participations/{participationId}/unhide:
+    post:
+      tags:
+        - Zone Event
+      summary: "숨김 해제"
+      description: "ROLE_ADMIN/MANAGER. 숨김을 풀고 신고를 기각 처리합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: participationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "참여를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds:
+    post:
+      tags:
+        - Zone Event
+      summary: "회차 생성"
+      description: "ROLE_ADMIN/MANAGER. 회차와 구역별 AUTH 슬롯을 생성합니다."
+      security:
+        - opaqueToken: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoundCreateRequest"
+            example:
+              startsAt: 2026-09-06T10:00:00+09:00
+              endsAt: 2026-09-07T10:00:00+09:00
+              zoneIds:
+                - SUYEONG_NAMGU
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRoundEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    get:
+      tags:
+        - Zone Event
+      summary: "회차 캘린더 조회"
+      description: "ROLE_ADMIN/MANAGER. 기간 내 회차 목록을 조회합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRoundListEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds/suggest-slots:
+    get:
+      tags:
+        - Zone Event
+      summary: "슬롯 배정 제안"
+      description: "ROLE_ADMIN/MANAGER. 공정 로테이션 기반 구역 배정을 제안합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: authSlots
+          in: query
+          required: false
+          description: "기본 6"
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlotSuggestionEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds/{roundId}:
+    get:
+      tags:
+        - Zone Event
+      summary: "회차 상세"
+      description: "ROLE_ADMIN/MANAGER."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRoundEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "회차를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds/{roundId}/slots:
+    patch:
+      tags:
+        - Zone Event
+      summary: "슬롯 구역 교체"
+      description: "ROLE_ADMIN/MANAGER. 이벤트 미배정 슬롯의 구역을 교체합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlotReassignRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRoundEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "회차·슬롯 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "이미 이벤트 배정됨"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds/{roundId}/backup-targets:
+    post:
+      tags:
+        - Zone Event
+      summary: "예비 타겟 등록"
+      description: "ROLE_ADMIN/MANAGER. 우천 대체용 예비 타겟을 등록합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BackupTargetRequest"
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRoundEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "회차를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds/{roundId}/swap-target:
+    post:
+      tags:
+        - Zone Event
+      summary: "우천 타겟 교체"
+      description: "ROLE_ADMIN/MANAGER. 예비 타겟으로 이벤트 인증 타겟을 즉시 교체합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwapTargetRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRoundEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "회차·타겟 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds/{roundId}/open:
+    post:
+      tags:
+        - Zone Event
+      summary: "회차 오픈"
+      description: "ROLE_ADMIN/MANAGER. 슬롯 이벤트도 함께 전환합니다(멱등)."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRoundEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "회차를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds/{roundId}/close:
+    post:
+      tags:
+        - Zone Event
+      summary: "회차 종료"
+      description: "ROLE_ADMIN/MANAGER. 슬롯 이벤트도 함께 전환합니다(멱등)."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRoundEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "회차를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds/{roundId}/settle:
+    post:
+      tags:
+        - Zone Event
+      summary: "회차 정산"
+      description: "ROLE_ADMIN/MANAGER. 미완료 참여 만료 → TOP_LIKE 정산 → 리포트 저장(멱등)."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementReportEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "회차를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds/{roundId}/settlement-report:
+    get:
+      tags:
+        - Zone Event
+      summary: "정산 리포트 조회"
+      description: "ROLE_ADMIN/MANAGER. 저장된 정산 리포트를 조회합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementReportEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "리포트 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/me/device-tokens:
+    put:
+      tags:
+        - Zone Event
+      summary: "디바이스 토큰 등록"
+      description: "FCM 디바이스 토큰을 등록/갱신합니다(멱등)."
+      security:
+        - opaqueToken: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceTokenRequest"
+            example:
+              fcmToken: fcm-abc123
+              platform: ANDROID
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/me/device-tokens/{fcmToken}:
+    delete:
+      tags:
+        - Zone Event
+      summary: "디바이스 토큰 삭제"
+      description: "디바이스 토큰을 삭제합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: fcmToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "No Content"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/me/zone-subscriptions:
+    get:
+      tags:
+        - Zone Event
+      summary: "구역 구독 조회"
+      description: "푸시를 받을 구독 구역 목록을 조회합니다."
+      security:
+        - opaqueToken: [ ]
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZoneSubscriptionsEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    put:
+      tags:
+        - Zone Event
+      summary: "구역 구독 설정"
+      description: "구독 구역을 전체 교체합니다."
+      security:
+        - opaqueToken: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZoneSubscriptionRequest"
+            example:
+              zoneIds:
+                - SUYEONG_NAMGU
+                - YEONGDO
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZoneSubscriptionsEnvelope"
+        "400":
+          description: "잘못된 구역"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/users/me/notification-settings:
+    get:
+      tags:
+        - Zone Event
+      summary: "알림 설정 조회"
+      description: "알림 유형별 on/off를 조회합니다(미설정은 on)."
+      security:
+        - opaqueToken: [ ]
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSettingsEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    patch:
+      tags:
+        - Zone Event
+      summary: "알림 설정 변경"
+      description: "알림 유형별 on/off를 부분 수정합니다."
+      security:
+        - opaqueToken: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationSettingsRequest"
+            example:
+              settings:
+                ROUND_OPEN: true
+                LIKE_DEADLINE: false
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSettingsEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/push:
+    post:
+      tags:
+        - Zone Event
+      summary: "운영 푸시 발송"
+      description: "ROLE_ADMIN/MANAGER. 특정 구역 구독자(ZONE_TOPIC) 또는 전체(ALL)에 즉시 푸시합니다."
+      security:
+        - opaqueToken: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminPushRequest"
+            example:
+              targetType: ZONE_TOPIC
+              zoneId: SUYEONG_NAMGU
+              title: 회차 오픈
+              body: 지금 참여하세요
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushLogEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 components:
   parameters:
     TravelId:
@@ -7013,3 +8858,1456 @@ components:
           example: 내 참여 이력 조회
         data:
           $ref: "#/components/schemas/ParticipationHistoryPage"
+    EquippedTitle:
+      type: object
+      properties:
+        titleCode:
+          type: string
+
+        titleName:
+          type: string
+          example: "수영·남구 탐험가"
+
+        zoneId:
+          type: string
+          example: "SUYEONG_NAMGU"
+
+        tier:
+          type: integer
+          example: 2
+
+        style:
+          type: string
+          example: "chip"
+
+        color:
+          type: string
+          example: "#3366FF"
+
+    AlbumItem:
+      type: object
+      properties:
+        participationId:
+          type: string
+          format: uuid
+
+        eventId:
+          type: string
+          format: uuid
+
+        eventTitle:
+          type: string
+
+        zoneId:
+          type: string
+          example: "SUYEONG_NAMGU"
+
+        authorId:
+          type: string
+          format: uuid
+
+        authorNickname:
+          type: string
+
+        authorProfileImageUrl:
+          type: string
+          nullable: true
+
+        equippedTitle:
+          allOf:
+            - $ref: "#/components/schemas/EquippedTitle"
+          nullable: true
+
+        content:
+          type: string
+          nullable: true
+
+        mediaUrl:
+          type: string
+          nullable: true
+          description: "presigned URL"
+
+        mediaUrlExpiresIn:
+          type: integer
+          nullable: true
+
+        likeCount:
+          type: integer
+          format: int64
+
+        likedByMe:
+          type: boolean
+
+        commentCount:
+          type: integer
+
+        isMine:
+          type: boolean
+
+        completedAt:
+          type: string
+          format: date-time
+
+    AlbumPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlbumItem"
+
+        nextCursor:
+          type: string
+          nullable: true
+
+        hasNext:
+          type: boolean
+
+    AlbumPageEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "앨범 조회"
+        data:
+          $ref: "#/components/schemas/AlbumPage"
+    VisibilityUpdateRequest:
+      type: object
+      properties:
+        visibility:
+          type: string
+          enum:
+            - PUBLIC
+            - PRIVATE
+          example: "PUBLIC"
+
+    CommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          description: "최대 200자"
+          example: "사진 멋지네요!"
+
+    ReportRequest:
+      type: object
+      properties:
+        reasonCode:
+          type: string
+          description: "SPAM, ABUSE, INAPPROPRIATE 등"
+          example: "SPAM"
+
+        memo:
+          type: string
+          nullable: true
+          description: "최대 500자"
+
+    Comment:
+      type: object
+      properties:
+        commentId:
+          type: string
+          format: uuid
+
+        participationId:
+          type: string
+          format: uuid
+
+        authorId:
+          type: string
+          format: uuid
+
+        authorNickname:
+          type: string
+
+        authorProfileImageUrl:
+          type: string
+          nullable: true
+
+        equippedTitle:
+          allOf:
+            - $ref: "#/components/schemas/EquippedTitle"
+          nullable: true
+
+        content:
+          type: string
+
+        createdAt:
+          type: string
+          format: date-time
+
+        updatedAt:
+          type: string
+          format: date-time
+
+    CommentPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+
+        nextCursor:
+          type: string
+          nullable: true
+
+        hasNext:
+          type: boolean
+
+    CommentEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "댓글"
+        data:
+          $ref: "#/components/schemas/Comment"
+    CommentPageEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "댓글 목록 조회"
+        data:
+          $ref: "#/components/schemas/CommentPage"
+    Like:
+      type: object
+      properties:
+        likeId:
+          type: string
+          format: uuid
+
+        participationId:
+          type: string
+          format: uuid
+
+        likedAt:
+          type: string
+          format: date-time
+
+        likeCount:
+          type: integer
+          format: int64
+
+    LikeEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "좋아요"
+        data:
+          $ref: "#/components/schemas/Like"
+    Report:
+      type: object
+      properties:
+        reportId:
+          type: string
+          format: uuid
+
+        participationId:
+          type: string
+          format: uuid
+
+        createdAt:
+          type: string
+          format: date-time
+
+    ReportEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "신고 접수"
+        data:
+          $ref: "#/components/schemas/Report"
+    ZoneTitleItem:
+      type: object
+      properties:
+        userTitleId:
+          type: string
+          format: uuid
+
+        titleCode:
+          type: string
+
+        titleName:
+          type: string
+
+        tier:
+          type: integer
+
+        style:
+          type: string
+
+        color:
+          type: string
+
+        earnedAt:
+          type: string
+          format: date-time
+
+        equipped:
+          type: boolean
+
+    ZoneTitleProgress:
+      type: object
+      properties:
+        zoneId:
+          type: string
+          example: "SUYEONG_NAMGU"
+
+        successCount:
+          type: integer
+          format: int64
+
+        currentTier:
+          type: integer
+
+        nextTier:
+          type: integer
+          nullable: true
+
+        remainingToNext:
+          type: integer
+          nullable: true
+
+        titles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZoneTitleItem"
+
+    MyZoneTitles:
+      type: object
+      properties:
+        equipped:
+          allOf:
+            - $ref: "#/components/schemas/EquippedTitle"
+          nullable: true
+
+        cityGrade:
+          type: string
+          nullable: true
+          description: "도시 등급(BEGINNER/EXPLORER/MASTER/TRUE_BUSAN)"
+
+        zones:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZoneTitleProgress"
+
+    MyZoneTitlesEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "내 구역 칭호 조회"
+        data:
+          $ref: "#/components/schemas/MyZoneTitles"
+    EquippedTitleEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "칭호 장착"
+        data:
+          $ref: "#/components/schemas/EquippedTitle"
+    ZoneTitleDef:
+      type: object
+      properties:
+        zoneId:
+          type: string
+          example: "SUYEONG_NAMGU"
+
+        tier:
+          type: integer
+
+        requiredSuccessCount:
+          type: integer
+
+        titleCode:
+          type: string
+
+        titleName:
+          type: string
+
+        style:
+          type: string
+
+        color:
+          type: string
+
+    ZoneTitleDefListEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "칭호 정의 목록"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZoneTitleDef"
+    BadgeItem:
+      type: object
+      properties:
+        code:
+          type: string
+
+        name:
+          type: string
+
+        imageUrl:
+          type: string
+          nullable: true
+
+        earnedAt:
+          type: string
+          format: date-time
+
+    BadgeGroup:
+      type: object
+      properties:
+        zoneId:
+          type: string
+          example: "SUYEONG_NAMGU"
+
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BadgeItem"
+
+    UserRewards:
+      type: object
+      properties:
+        pointBalance:
+          type: integer
+          example: 350
+
+        badges:
+          type: array
+          items:
+            $ref: "#/components/schemas/BadgeGroup"
+
+        coupons:
+          type: array
+          items:
+            type: object
+          description: "보유 쿠폰"
+
+    UserRewardsEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "내 보상 요약"
+        data:
+          $ref: "#/components/schemas/UserRewards"
+    PointLedgerItem:
+      type: object
+      properties:
+        ledgerId:
+          type: string
+          format: uuid
+
+        amount:
+          type: integer
+          example: 50
+
+        reason:
+          type: string
+          example: "BASE"
+
+        grantId:
+          type: string
+          format: uuid
+          nullable: true
+
+        createdAt:
+          type: string
+          format: date-time
+
+    PointLedgerPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PointLedgerItem"
+
+        nextCursor:
+          type: string
+          nullable: true
+
+        hasNext:
+          type: boolean
+
+    PointLedgerPageEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "포인트 원장 조회"
+        data:
+          $ref: "#/components/schemas/PointLedgerPage"
+    RewardCatalog:
+      type: object
+      properties:
+        rewardId:
+          type: string
+          format: uuid
+
+        rewardType:
+          type: string
+          enum:
+            - POINT
+            - BADGE
+            - COUPON
+            - GIFTICON
+          example: "COUPON"
+
+        code:
+          type: string
+          example: "COUPON_CAFE"
+
+        name:
+          type: string
+
+        pointAmount:
+          type: integer
+          nullable: true
+
+        imageFileKey:
+          type: string
+          nullable: true
+
+        stock:
+          type: integer
+          nullable: true
+
+        monthlyCap:
+          type: integer
+          nullable: true
+
+        validDays:
+          type: integer
+          nullable: true
+
+        active:
+          type: boolean
+
+    RewardCatalogEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "보상 카탈로그"
+        data:
+          $ref: "#/components/schemas/RewardCatalog"
+    RewardCatalogListEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "보상 카탈로그 목록"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RewardCatalog"
+    AdminRewardCatalogCreateRequest:
+      type: object
+      properties:
+        rewardType:
+          type: string
+          enum:
+            - POINT
+            - BADGE
+            - COUPON
+            - GIFTICON
+
+        code:
+          type: string
+
+        name:
+          type: string
+
+        pointAmount:
+          type: integer
+          nullable: true
+
+        imageFileKey:
+          type: string
+          nullable: true
+
+        stock:
+          type: integer
+          nullable: true
+
+        monthlyCap:
+          type: integer
+          nullable: true
+
+        validDays:
+          type: integer
+          nullable: true
+
+        active:
+          type: boolean
+          nullable: true
+
+    AdminRewardCatalogUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+
+        stock:
+          type: integer
+          nullable: true
+
+        monthlyCap:
+          type: integer
+          nullable: true
+
+        active:
+          type: boolean
+          nullable: true
+
+    AdminRewardGrant:
+      type: object
+      properties:
+        grantId:
+          type: string
+          format: uuid
+
+        userId:
+          type: string
+          format: uuid
+
+        participationId:
+          type: string
+          format: uuid
+          nullable: true
+
+        eventId:
+          type: string
+          format: uuid
+          nullable: true
+
+        grantReason:
+          type: string
+          example: "TOP_LIKE"
+
+        grantedAt:
+          type: string
+          format: date-time
+
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    AdminRewardGrantPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminRewardGrant"
+
+        nextCursor:
+          type: string
+          nullable: true
+
+        hasNext:
+          type: boolean
+
+    AdminRewardGrantPageEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "보상 지급 이력"
+        data:
+          $ref: "#/components/schemas/AdminRewardGrantPage"
+    AdminAuthTarget:
+      type: object
+      properties:
+        targetId:
+          type: string
+          format: uuid
+
+        targetKind:
+          type: string
+          enum:
+            - PLACE
+            - OBJECT
+
+        landmarkId:
+          type: string
+          nullable: true
+
+        placeName:
+          type: string
+
+        guideText:
+          type: string
+          nullable: true
+
+        exampleFileKey:
+          type: string
+          nullable: true
+
+        latitude:
+          type: number
+          format: double
+
+        longitude:
+          type: number
+          format: double
+
+        radiusM:
+          type: integer
+
+    AdminZoneEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+
+        zoneId:
+          type: string
+          example: "SUYEONG_NAMGU"
+
+        typeCode:
+          type: string
+          example: "PLACE_AUTH"
+
+        title:
+          type: string
+
+        description:
+          type: string
+          nullable: true
+
+        startsAt:
+          type: string
+          format: date-time
+
+        endsAt:
+          type: string
+          format: date-time
+
+        durationMinutes:
+          type: integer
+
+        status:
+          type: string
+          enum:
+            - SCHEDULED
+            - ACTIVE
+            - CLOSED
+            - CANCELLED
+
+        roundId:
+          type: string
+          format: uuid
+          nullable: true
+
+        successLimitPerUser:
+          type: integer
+
+        baseReward:
+          $ref: "#/components/schemas/RewardSummary"
+
+        excellenceReward:
+          allOf:
+            - $ref: "#/components/schemas/RewardSummary"
+          nullable: true
+
+        authTarget:
+          allOf:
+            - $ref: "#/components/schemas/AdminAuthTarget"
+          nullable: true
+
+        joinedCount:
+          type: integer
+          format: int64
+
+        successCount:
+          type: integer
+          format: int64
+
+    AdminZoneEventPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminZoneEvent"
+
+        nextCursor:
+          type: string
+          nullable: true
+
+        hasNext:
+          type: boolean
+
+    AdminZoneEventEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "이벤트"
+        data:
+          $ref: "#/components/schemas/AdminZoneEvent"
+    AdminZoneEventPageEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "이벤트 목록 조회"
+        data:
+          $ref: "#/components/schemas/AdminZoneEventPage"
+    AuthTargetInput:
+      type: object
+      properties:
+        targetKind:
+          type: string
+          enum:
+            - PLACE
+            - OBJECT
+
+        landmarkId:
+          type: string
+          nullable: true
+
+        placeName:
+          type: string
+
+        guideText:
+          type: string
+          nullable: true
+
+        exampleFileKey:
+          type: string
+          nullable: true
+
+        latitude:
+          type: number
+          format: double
+
+        longitude:
+          type: number
+          format: double
+
+        radiusM:
+          type: integer
+          description: "30~500"
+
+    AdminZoneEventCreateRequest:
+      type: object
+      properties:
+        zoneId:
+          type: string
+          example: "SUYEONG_NAMGU"
+
+        typeCode:
+          type: string
+          example: "PLACE_AUTH"
+
+        title:
+          type: string
+
+        description:
+          type: string
+          nullable: true
+
+        startsAt:
+          type: string
+          format: date-time
+
+        durationMinutes:
+          type: integer
+          example: 120
+
+        roundId:
+          type: string
+          format: uuid
+          nullable: true
+
+        successLimitPerUser:
+          type: integer
+          nullable: true
+          example: 1
+
+        baseReward:
+          $ref: "#/components/schemas/RewardSummary"
+
+        excellenceReward:
+          allOf:
+            - $ref: "#/components/schemas/RewardSummary"
+          nullable: true
+
+        authTarget:
+          allOf:
+            - $ref: "#/components/schemas/AuthTargetInput"
+          nullable: true
+
+    AuthTargetPatch:
+      type: object
+      properties:
+        placeName:
+          type: string
+          nullable: true
+
+        guideText:
+          type: string
+          nullable: true
+
+        exampleFileKey:
+          type: string
+          nullable: true
+
+        latitude:
+          type: number
+          format: double
+          nullable: true
+
+        longitude:
+          type: number
+          format: double
+          nullable: true
+
+        radiusM:
+          type: integer
+          nullable: true
+
+    AdminZoneEventUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          nullable: true
+
+        description:
+          type: string
+          nullable: true
+
+        durationMinutes:
+          type: integer
+          nullable: true
+
+        successLimitPerUser:
+          type: integer
+          nullable: true
+
+        excellenceReward:
+          allOf:
+            - $ref: "#/components/schemas/RewardSummary"
+          nullable: true
+
+        zoneId:
+          type: string
+          nullable: true
+
+        typeCode:
+          type: string
+          nullable: true
+
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+
+        baseReward:
+          allOf:
+            - $ref: "#/components/schemas/RewardSummary"
+          nullable: true
+
+        authTarget:
+          allOf:
+            - $ref: "#/components/schemas/AuthTargetPatch"
+          nullable: true
+
+    RejectRequest:
+      type: object
+      properties:
+        failReason:
+          type: string
+          example: "NOT_ON_SITE"
+
+    ReviewQueueItem:
+      type: object
+      properties:
+        participationId:
+          type: string
+          format: uuid
+
+        eventId:
+          type: string
+          format: uuid
+
+        zoneId:
+          type: string
+          example: "SUYEONG_NAMGU"
+
+        userId:
+          type: string
+          format: uuid
+
+        status:
+          type: string
+          enum:
+            - JOINED
+            - SUBMITTED
+            - UNDER_REVIEW
+            - SUCCESS
+            - FAIL
+            - CANCELLED
+            - REVOKED
+
+        gpsLat:
+          type: number
+          format: double
+          nullable: true
+
+        gpsLng:
+          type: number
+          format: double
+          nullable: true
+
+        capturedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+        hidden:
+          type: boolean
+
+        reportCount:
+          type: integer
+          format: int64
+
+        mediaFileKey:
+          type: string
+          nullable: true
+
+        joinedAt:
+          type: string
+          format: date-time
+
+    ReviewQueuePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewQueueItem"
+
+        nextCursor:
+          type: string
+          nullable: true
+
+        hasNext:
+          type: boolean
+
+    ReviewQueuePageEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "검수 큐 조회"
+        data:
+          $ref: "#/components/schemas/ReviewQueuePage"
+    RoundSlot:
+      type: object
+      properties:
+        slotId:
+          type: string
+          format: uuid
+
+        slotKind:
+          type: string
+          enum:
+            - AUTH
+            - MUKJJIPPA
+
+        zoneId:
+          type: string
+          example: "SUYEONG_NAMGU"
+
+        eventId:
+          type: string
+          format: uuid
+          nullable: true
+
+    RoundBackup:
+      type: object
+      properties:
+        targetId:
+          type: string
+          format: uuid
+
+        placeName:
+          type: string
+
+        latitude:
+          type: number
+          format: double
+
+        longitude:
+          type: number
+          format: double
+
+    AdminRound:
+      type: object
+      properties:
+        roundId:
+          type: string
+          format: uuid
+
+        roundType:
+          type: string
+          enum:
+            - REGULAR
+            - GUERRILLA
+
+        status:
+          type: string
+          enum:
+            - SCHEDULED
+            - OPEN
+            - CLOSED
+            - SETTLED
+
+        startsAt:
+          type: string
+          format: date-time
+
+        endsAt:
+          type: string
+          format: date-time
+
+        timezone:
+          type: string
+          example: "Asia/Seoul"
+
+        settledAt:
+          type: string
+          format: date-time
+          nullable: true
+
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoundSlot"
+
+        backups:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoundBackup"
+
+    AdminRoundEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "회차"
+        data:
+          $ref: "#/components/schemas/AdminRound"
+    AdminRoundListEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "회차 캘린더 조회"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminRound"
+    RoundCreateRequest:
+      type: object
+      properties:
+        roundType:
+          type: string
+          enum:
+            - REGULAR
+            - GUERRILLA
+          nullable: true
+
+        startsAt:
+          type: string
+          format: date-time
+
+        endsAt:
+          type: string
+          format: date-time
+
+        timezone:
+          type: string
+          nullable: true
+          example: "Asia/Seoul"
+
+        zoneIds:
+          type: array
+          items:
+            type: string
+
+    SlotReassignRequest:
+      type: object
+      properties:
+        slotId:
+          type: string
+          format: uuid
+
+        zoneId:
+          type: string
+          example: "YEONGDO"
+
+    BackupTargetRequest:
+      type: object
+      properties:
+        targetKind:
+          type: string
+          enum:
+            - PLACE
+            - OBJECT
+
+        landmarkId:
+          type: string
+          nullable: true
+
+        placeName:
+          type: string
+
+        guideText:
+          type: string
+          nullable: true
+
+        exampleFileKey:
+          type: string
+          nullable: true
+
+        latitude:
+          type: number
+          format: double
+
+        longitude:
+          type: number
+          format: double
+
+        radiusM:
+          type: integer
+
+    SwapTargetRequest:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+
+        backupTargetId:
+          type: string
+          format: uuid
+
+    SlotSuggestion:
+      type: object
+      properties:
+        slots:
+          type: array
+          items:
+            type: string
+          description: "배정 제안 구역"
+
+        rationale:
+          type: array
+          items:
+            type: string
+          description: "근거"
+
+    SlotSuggestionEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "슬롯 배정 제안"
+        data:
+          $ref: "#/components/schemas/SlotSuggestion"
+    SettlementReportEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "정산 리포트"
+        data:
+          type: object
+          description: 자유 형식 리포트(구역별 참여·성공·Top·실물 지급 등)
+    DeviceTokenRequest:
+      type: object
+      properties:
+        fcmToken:
+          type: string
+
+        platform:
+          type: string
+          enum:
+            - IOS
+            - ANDROID
+          example: "ANDROID"
+
+    ZoneSubscriptions:
+      type: object
+      properties:
+        zoneIds:
+          type: array
+          items:
+            type: string
+
+    ZoneSubscriptionsEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "구역 구독 조회"
+        data:
+          $ref: "#/components/schemas/ZoneSubscriptions"
+    ZoneSubscriptionRequest:
+      type: object
+      properties:
+        zoneIds:
+          type: array
+          items:
+            type: string
+
+    NotificationSettings:
+      type: object
+      properties:
+        settings:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: 알림 유형별 on/off (ROUND_OPEN, ROUND_PREVIEW, LIKE_DEADLINE, SETTLEMENT, TITLE_PROGRESS, OPERATOR)
+    NotificationSettingsEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "알림 설정"
+        data:
+          $ref: "#/components/schemas/NotificationSettings"
+    NotificationSettingsRequest:
+      type: object
+      properties:
+        settings:
+          type: object
+          additionalProperties:
+            type: boolean
+    AdminPushRequest:
+      type: object
+      properties:
+        targetType:
+          type: string
+          enum:
+            - ZONE_TOPIC
+            - ALL
+
+        zoneId:
+          type: string
+          nullable: true
+          description: "ZONE_TOPIC일 때 필수"
+
+        title:
+          type: string
+
+        body:
+          type: string
+
+    PushLog:
+      type: object
+      properties:
+        pushLogId:
+          type: string
+          format: uuid
+
+        recipientCount:
+          type: integer
+          example: 128
+
+    PushLogEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "운영 푸시 발송"
+        data:
+          $ref: "#/components/schemas/PushLog"
