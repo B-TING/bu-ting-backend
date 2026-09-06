@@ -2,6 +2,8 @@ package com.butingbe.global.error;
 
 import com.butingbe.domain.place.exception.PlaceKeywordNotFoundException;
 import com.butingbe.domain.travel.ai.TravelPlanValidationException;
+import com.butingbe.domain.zoneevent.exception.OpenParticipationExistsException;
+import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
 import com.butingbe.global.common.ApiResponse;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
@@ -10,6 +12,7 @@ import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
@@ -106,6 +109,30 @@ public class GlobalExceptionHandler {
       PlaceKeywordNotFoundException e, HttpServletRequest request) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(ApiResponse.fail(message(e.getMessage(), request)));
+  }
+
+  @ExceptionHandler(ZoneEventOutOfRangeException.class)
+  public ResponseEntity<ApiResponse<Map<String, Object>>> handleZoneEventOutOfRange(
+      ZoneEventOutOfRangeException e, HttpServletRequest request) {
+    log.warn("Zone event out of range: distance={}m", e.getDistanceMeters());
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(
+            ApiResponse.fail(
+                message(e.getMessage(), request), Map.of("distanceMeters", e.getDistanceMeters())));
+  }
+
+  @ExceptionHandler(OpenParticipationExistsException.class)
+  public ResponseEntity<ApiResponse<Map<String, Object>>> handleOpenParticipationExists(
+      OpenParticipationExistsException e, HttpServletRequest request) {
+    log.warn("Open participation exists: participationId={}", e.getParticipationId());
+
+    Map<String, Object> data =
+        e.getParticipationId() == null
+            ? Map.of()
+            : Map.of("participationId", e.getParticipationId().toString());
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(ApiResponse.fail(message(e.getMessage(), request), data));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
