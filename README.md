@@ -169,31 +169,39 @@ at startup.
 
 ## Run The Application
 
-Create a `.env` file in the project root. The Gradle `bootRun` task loads it and injects the values as environment
-variables before starting Spring Boot. `.env` is git-ignored — never commit it or place real keys anywhere tracked.
+Copy `.env.example` to `.env` in the project root and fill in the values (`cp .env.example .env`). The Gradle `bootRun`
+task loads `.env` and injects the values as environment variables before starting Spring Boot. `.env` is git-ignored —
+never commit it or place real keys anywhere tracked. `.env.example` documents every key with dummy values and marks
+which are required.
 
-Minimum values for a local run:
+Minimum values for a local run (everything else has a default and only disables its feature when unset):
 
 ```dotenv
-DB_URL=jdbc:postgresql://localhost:5433/mydb
-DB_USERNAME=myuser
-DB_PASSWORD=mypassword
+DB_URL=jdbc:postgresql://localhost:5433/buting
+DB_USERNAME=buting
+DB_PASSWORD=changeme
 ```
 
-Environment variables referenced by `application.yaml`, by feature:
+Environment variables referenced by `application.yaml` (and the AWS default credential chain), by feature:
 
 | Feature       | Variables                                                                                        |
 |---------------|--------------------------------------------------------------------------------------------------|
-| Database      | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`                                                            |
+| Database      | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (required)                                                 |
 | AI            | `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`                                                           |
 | Google OAuth  | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_ALLOWED_AUDIENCES`, `GOOGLE_AND_DEBUG_CLIENT_ID`, `GOOGLE_AND_RELEASE_CLIENT_ID` |
 | Naver OAuth   | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `NAVER_REDIRECT_URI`                                    |
 | Kakao OAuth   | `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI`, `KAKAO_ALLOWED_AUDIENCES`, `KAKAO_AND_DEBUG_CLIENT_ID` |
 | Place APIs    | `TOUR_API_BASE_URL`, `TOURISM_API_KEY`, `GOOGLE_PLACES_BASE_URL`, `GOOGLE_PLACES_API_KEY`         |
 | S3            | `S3_BUCKET`, `AWS_REGION`, `S3_KEY_PREFIX`, `S3_MAX_FILE_SIZE`, `S3_PRESIGNED_URL_EXPIRATION`     |
+| AWS creds     | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (local only; on EC2 use the instance IAM role)       |
 | Upload limits | `FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE`                                                          |
 | Invitations   | `TRAVEL_INVITE_BASE_URL`                                                                          |
 | Routing       | `ROUTE_GOOGLE_ENABLED` (off by default), `ROUTE_GOOGLE_API_KEY` (falls back to `GOOGLE_PLACES_API_KEY`) |
+| Admin         | `ADMIN_TOKEN` (optional operator bootstrap token; unset disables it)                              |
+| Zone Event    | `ZONE_EVENT_REVIEW_MODE`, `ZONE_EVENT_REPORT_AUTO_HIDE_THRESHOLD`, `ZONE_EVENT_REVIEW_CAPTURED_AT_THRESHOLD_MINUTES`, `ZONE_EVENT_ROUND_SCHEDULER_DELAY_MS`, `ZONE_EVENT_ROUND_SCHEDULER_INITIAL_DELAY_MS` (all optional, sensible defaults) |
+
+Push notifications currently use a logging stub (`LoggingPushSender`); do not set `push.fcm.enabled` until a real
+`FcmPushSender` is added.
 
 Run the application:
 
