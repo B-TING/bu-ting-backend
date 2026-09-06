@@ -33,6 +33,8 @@ tags:
     description: Chat APIs
   - name: WebSocket STOMP
     description: 웹소켓 연결 및 실시간 메시지 송수신 명세 가이드 (REST API가 아님)
+  - name: Zone Event
+    description: 구역 이벤트 (부산 6구역 현장 GPS 인증 라이브 이벤트) 조회·참여·정산 APIs
 
 paths:
   /api/v1/auth/oauth/login:
@@ -3509,6 +3511,91 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-events/active:
+    get:
+      tags:
+        - Zone Event
+      summary: 활성 이벤트 목록 조회
+      description: |
+        지정한 구역에서 현재 진행 중(ACTIVE)인 이벤트 목록을 조회합니다.
+        비로그인도 허용하며, 개인화 필드(myParticipationStatus, myOpenParticipationId)는 로그인한 경우에만 채워집니다.
+      security:
+        - opaqueToken: [ ]
+        - { }
+      parameters:
+        - name: zone
+          in: query
+          required: true
+          description: "구역 코드: HAEUNDAE_GIJANG, SUYEONG_NAMGU, CENTRAL_NORTH, OLD_DOWNTOWN, YEONGDO, WESTERN_BUSAN"
+          schema:
+            type: string
+          example: SUYEONG_NAMGU
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZoneEventSummaryListEnvelope"
+        "400":
+          description: 잘못된 구역 코드
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-events/{eventId}:
+    get:
+      tags:
+        - Zone Event
+      summary: 이벤트 상세 조회
+      description: |
+        이벤트 상세를 조회합니다. 촬영 가이드·예시 이미지·우수 보상·성공 참여자 수·남은 참여 가능 횟수를 포함합니다.
+        비로그인도 허용하며, myRemainingAttempts는 로그인한 경우에만 채워집니다.
+      security:
+        - opaqueToken: [ ]
+        - { }
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          description: 이벤트 ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZoneEventDetailEnvelope"
+        "404":
+          description: 이벤트를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/zone-event-rounds/current:
+    get:
+      tags:
+        - Zone Event
+      summary: 회차 현황 조회
+      description: |
+        지금 열린 회차가 있으면 6구역을 OPEN/REST로, 없으면 다음 예정 회차의 구역을 UPCOMING으로 보여줍니다.
+        열린 회차도 다음 회차도 없으면 404입니다.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoundStatusEnvelope"
+        "404":
+          description: 열린·예정 회차 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
 components:
   parameters:
@@ -6070,3 +6157,294 @@ components:
           example: 채팅 메시지 목록 조회
         data:
           $ref: "#/components/schemas/ChatMessageListResponse"
+    ZoneRef:
+      type: object
+      properties:
+        zoneId:
+          type: string
+          example: SUYEONG_NAMGU
+        zoneName:
+          type: string
+          example: 수영·남구
+    RewardSummary:
+      type: object
+      properties:
+        points:
+          type: integer
+          nullable: true
+          example: 50
+        badgeCode:
+          type: string
+          nullable: true
+          example: SPOT_GWANGAN_BRIDGE
+        topN:
+          type: integer
+          nullable: true
+          description: 우수 보상 상위 N명
+          example: 3
+        prizeRewardCode:
+          type: string
+          nullable: true
+          example: COUPON_CAFE
+    AuthTargetBrief:
+      type: object
+      properties:
+        placeName:
+          type: string
+          example: 광안대교 전망 포인트
+        latitude:
+          type: number
+          format: double
+          example: 35.1532
+        longitude:
+          type: number
+          format: double
+          example: 129.1182
+        radiusM:
+          type: integer
+          example: 100
+    AuthTargetDetail:
+      type: object
+      properties:
+        targetId:
+          type: string
+          format: uuid
+        targetKind:
+          type: string
+          enum:
+            - PLACE
+            - OBJECT
+          example: PLACE
+        landmarkId:
+          type: string
+          nullable: true
+        placeName:
+          type: string
+          example: 광안대교 전망 포인트
+        guideText:
+          type: string
+          nullable: true
+          example: 다리 전체가 보이도록 촬영하세요.
+        exampleImageUrl:
+          type: string
+          nullable: true
+          description: 예시 이미지 presigned URL
+        latitude:
+          type: number
+          format: double
+          example: 35.1532
+        longitude:
+          type: number
+          format: double
+          example: 129.1182
+        radiusM:
+          type: integer
+          example: 100
+    ZoneEventSummary:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        zone:
+          $ref: "#/components/schemas/ZoneRef"
+        typeCode:
+          type: string
+          example: PLACE_AUTH
+        typeName:
+          type: string
+          example: 장소 인증
+        requiresUpload:
+          type: boolean
+          example: true
+        title:
+          type: string
+          example: 광안대교 야경 담기
+        description:
+          type: string
+          nullable: true
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+          example: 120
+        remainingSeconds:
+          type: integer
+          format: int64
+          example: 5400
+        status:
+          type: string
+          enum:
+            - SCHEDULED
+            - ACTIVE
+            - CLOSED
+            - CANCELLED
+          example: ACTIVE
+        roundId:
+          type: string
+          format: uuid
+          nullable: true
+        baseReward:
+          $ref: "#/components/schemas/RewardSummary"
+        authTarget:
+          allOf:
+            - $ref: "#/components/schemas/AuthTargetBrief"
+          nullable: true
+        successCount:
+          type: integer
+          format: int64
+          example: 12
+        myParticipationStatus:
+          type: string
+          nullable: true
+          description: 로그인·참여 시에만 채워집니다. JOINED/SUBMITTED/UNDER_REVIEW/SUCCESS 등
+          example: SUCCESS
+        myOpenParticipationId:
+          type: string
+          format: uuid
+          nullable: true
+    ZoneEventDetail:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        zone:
+          $ref: "#/components/schemas/ZoneRef"
+        typeCode:
+          type: string
+          example: PLACE_AUTH
+        typeName:
+          type: string
+          example: 장소 인증
+        requiresUpload:
+          type: boolean
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+        remainingSeconds:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+            - SCHEDULED
+            - ACTIVE
+            - CLOSED
+            - CANCELLED
+        roundId:
+          type: string
+          format: uuid
+          nullable: true
+        baseReward:
+          $ref: "#/components/schemas/RewardSummary"
+        excellenceReward:
+          allOf:
+            - $ref: "#/components/schemas/RewardSummary"
+          nullable: true
+        authTarget:
+          allOf:
+            - $ref: "#/components/schemas/AuthTargetDetail"
+          nullable: true
+        successCount:
+          type: integer
+          format: int64
+        successLimitPerUser:
+          type: integer
+          example: 1
+        myRemainingAttempts:
+          type: integer
+          nullable: true
+          description: 로그인 시에만 채워집니다.
+        round:
+          nullable: true
+          description: 회차 정보(향후 확장). 현재는 null.
+    RoundStatusZoneSlot:
+      type: object
+      properties:
+        zoneId:
+          type: string
+          example: SUYEONG_NAMGU
+        slotStatus:
+          type: string
+          enum:
+            - OPEN
+            - REST
+            - UPCOMING
+          example: OPEN
+        eventId:
+          type: string
+          format: uuid
+          nullable: true
+    RoundStatus:
+      type: object
+      properties:
+        roundId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - SCHEDULED
+            - OPEN
+            - CLOSED
+            - SETTLED
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        zones:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoundStatusZoneSlot"
+    ZoneEventSummaryListEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 구역 활성 이벤트 조회
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZoneEventSummary"
+    ZoneEventDetailEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 이벤트 상세 조회
+        data:
+          $ref: "#/components/schemas/ZoneEventDetail"
+    RoundStatusEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 회차 현황
+        data:
+          $ref: "#/components/schemas/RoundStatus"
