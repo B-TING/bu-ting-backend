@@ -12,4 +12,7 @@ public interface RewardGrantRepository extends JpaRepository<RewardGrant, UUID> 
       UUID participationId, GrantReason grantReason, UUID rewardId);
 
   List<RewardGrant> findByUserIdOrderByGrantedAtDesc(UUID userId);
+
+  List<RewardGrant> findByParticipationIdInAndRevokedAtIsNull(
+      java.util.Collection<UUID> participationIds);
 }
