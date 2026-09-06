@@ -1,6 +1,7 @@
 package com.butingbe.domain.zoneevent.entity;
 
 import com.butingbe.global.common.BaseEntity;
+import com.butingbe.global.error.exception.ConflictException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -103,5 +104,73 @@ public class ZoneEvent extends BaseEntity {
   /** 이벤트 종료 시각. starts_at + duration. */
   public OffsetDateTime endsAt() {
     return startsAt.plusMinutes(durationMinutes);
+  }
+
+  /** SCHEDULED → ACTIVE. 다른 상태에서 호출하면 409. */
+  public void activate() {
+    requireStatus(ZoneEventStatus.SCHEDULED);
+    this.status = ZoneEventStatus.ACTIVE;
+  }
+
+  /** ACTIVE → CLOSED. */
+  public void close() {
+    requireStatus(ZoneEventStatus.ACTIVE);
+    this.status = ZoneEventStatus.CLOSED;
+  }
+
+  /** SCHEDULED/ACTIVE → CANCELLED. 이미 종료·취소된 이벤트는 취소할 수 없다. */
+  public void markCancelled() {
+    if (status != ZoneEventStatus.SCHEDULED && status != ZoneEventStatus.ACTIVE) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
+    this.status = ZoneEventStatus.CANCELLED;
+  }
+
+  /** 상태와 무관하게 수정 가능한 항목(제목·설명·기간·성공 상한·우수 보상). null은 건너뛴다. */
+  public void applyEditable(
+      String title,
+      String description,
+      Integer durationMinutes,
+      Integer successLimitPerUser,
+      RewardSnapshot excellenceReward,
+      boolean excellenceRewardPresent) {
+    if (title != null) {
+      this.title = title;
+    }
+    if (description != null) {
+      this.description = description;
+    }
+    if (durationMinutes != null) {
+      this.durationMinutes = durationMinutes;
+    }
+    if (successLimitPerUser != null) {
+      this.successLimitPerUser = successLimitPerUser;
+    }
+    if (excellenceRewardPresent) {
+      this.excellenceReward = excellenceReward;
+    }
+  }
+
+  /** SCHEDULED 상태에서만 바꿀 수 있는 항목(구역·타입·시작 시각·기본 보상). null은 건너뛴다. */
+  public void applyScheduledOnly(
+      String zoneId, ZoneEventType type, OffsetDateTime startsAt, RewardSnapshot baseReward) {
+    if (zoneId != null) {
+      this.zoneId = zoneId;
+    }
+    if (type != null) {
+      this.type = type;
+    }
+    if (startsAt != null) {
+      this.startsAt = startsAt;
+    }
+    if (baseReward != null) {
+      this.baseReward = baseReward;
+    }
+  }
+
+  private void requireStatus(ZoneEventStatus expected) {
+    if (status != expected) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
   }
 }

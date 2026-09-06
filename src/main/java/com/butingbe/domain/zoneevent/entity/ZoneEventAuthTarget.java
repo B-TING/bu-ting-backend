@@ -80,4 +80,32 @@ public class ZoneEventAuthTarget extends BaseEntity {
     this.longitude = longitude;
     this.radiusM = radiusM;
   }
+
+  /** 타겟 좌표·반경·가이드·예시 이미지를 수정한다(우천 대체 등). null은 건너뛴다. */
+  public void update(
+      String placeName,
+      String guideText,
+      String exampleFileKey,
+      Double latitude,
+      Double longitude,
+      Integer radiusM) {
+    if (placeName != null) {
+      this.placeName = placeName;
+    }
+    if (guideText != null) {
+      this.guideText = guideText;
+    }
+    if (exampleFileKey != null) {
+      this.exampleFileKey = exampleFileKey;
+    }
+    if (latitude != null) {
+      this.latitude = latitude;
+    }
+    if (longitude != null) {
+      this.longitude = longitude;
+    }
+    if (radiusM != null) {
+      this.radiusM = radiusM;
+    }
+  }
 }
