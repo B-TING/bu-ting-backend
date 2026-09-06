@@ -107,6 +107,7 @@ Request flow:
 | `/api/v1/users/me/zone-event-participations` | `ZoneEventMeController`         | My zone event participation history (cursor paging) |
 | `/api/v1/users/me/rewards`, `/point-ledger`  | `UserRewardController`          | My reward summary (badges by zone, balance) and point ledger |
 | `/api/v1/admin/zone-events`                  | `AdminZoneEventController`      | Operator event CRUD and state transitions (ADMIN/MANAGER) |
+| `/api/v1/admin/reward-catalog`               | `AdminRewardCatalogController`  | Operator reward catalog CRUD and grant history (ADMIN/MANAGER) |
 
 The generated OpenAPI specification lives at `src/main/resources/static/docs/openapi3.yaml`.
 
