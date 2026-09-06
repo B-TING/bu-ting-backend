@@ -1,28 +1,55 @@
-name: Auto-merge
+name: Auto Merge
 
-# `automerge` 라벨이 붙은 dev 대상 PR에 GitHub 네이티브 auto-merge(squash)를 활성화한다.
-# 실제 병합은 dev 브랜치 보호의 필수 상태체크(check, CI)가 통과한 뒤에 GitHub가 수행한다.
-# main 대상 PR은 제외한다 — GITHUB_TOKEN 병합은 배포 워크플로를 트리거하지 않으므로,
-# 운영 배포는 릴리스 PR을 수동 병합해 deploy.yml을 트리거한다.
+# CI가 성공한 PR을 자동으로 squash 머지한다. workflow_run 은 기본 브랜치(dev)의 워크플로
+# 파일로 돈다 -- 이 파일이 dev 에 머지된 뒤부터 이후 PR 에 적용된다.
+# buting 적응: base=dev 인 PR 만 대상으로 한다. main 릴리스 PR 은 수동 머지한다 --
+# GITHUB_TOKEN 으로 한 머지는 deploy.yml 을 트리거하지 않으므로 운영 배포가 돌지 않기 때문이다.
 
 on:
-  pull_request:
-    types: [labeled, opened, reopened, synchronize, ready_for_review]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  enable-automerge:
+  automerge:
+    # PR 이벤트로 돈 CI 가 성공했을 때만.
     if: >-
-      github.event.pull_request.base.ref == 'dev' &&
-      github.event.pull_request.draft == false &&
-      contains(github.event.pull_request.labels.*.name, 'automerge')
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Enable auto-merge (squash)
-        run: gh pr merge --auto --squash "$PR_URL"
+      - name: Squash-merge the PR whose CI passed
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          # CI 가 돈 커밋(head_sha)에 해당하는 열린 PR 을 찾는다.
+          pr=$(gh pr list --repo "$REPO" --state open \
+                 --json number,headRefOid,isDraft,baseRefName,mergeStateStatus \
+                 --jq "map(select(.headRefOid == \"$HEAD_SHA\" and .isDraft == false)) | .[0]")
+          if [ -z "$pr" ] || [ "$pr" = "null" ]; then
+            echo "이 커밋($HEAD_SHA)에 열린 PR 이 없다. 건너뛴다."
+            exit 0
+          fi
+          number=$(echo "$pr" | jq -r '.number')
+          base=$(echo "$pr" | jq -r '.baseRefName')
+          state=$(echo "$pr" | jq -r '.mergeStateStatus')
+          # base=dev 만 자동 머지한다. main 릴리스 PR 은 배포 트리거를 위해 수동으로 머지한다.
+          if [ "$base" != "dev" ]; then
+            echo "PR #$number 의 base 가 $base 라 자동 머지 대상이 아니다(main 릴리스는 수동)."
+            exit 0
+          fi
+          # CLEAN 만 머지한다. BEHIND(dev 보다 뒤처짐)·DIRTY(충돌)·BLOCKED 는 자동 머지하지 않는다
+          # -- 낡은 초록불 머지를 막는다. 뒤처진 PR 은 최신 dev 를 반영해 CI 가 새로 돌면 그때 머지된다.
+          if [ "$state" != "CLEAN" ]; then
+            echo "PR #$number 의 mergeStateStatus 가 $state 라 자동 머지하지 않는다."
+            exit 0
+          fi
+          echo "PR #$number 를 squash 머지한다."
+          gh pr merge "$number" --repo "$REPO" --squash --delete-branch

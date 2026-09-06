@@ -307,9 +307,12 @@ Pull requests targeting `dev` or `main` run `.github/workflows/ci.yml`, which se
 
 ### Auto-merge
 
-Add the `automerge` label to a PR targeting `dev` and `.github/workflows/automerge.yml` enables GitHub native
-auto-merge (squash); GitHub merges it once the required `check` status check passes. Only `dev`-targeted,
-non-draft PRs are eligible — `main` release PRs are merged manually so the deploy workflow triggers.
+`.github/workflows/automerge.yml` squash-merges a PR once its CI passes. It runs on `workflow_run` when the `CI`
+workflow completes for a `pull_request`, finds the open PR for that commit, and merges it (with branch delete) only
+when `mergeStateStatus == CLEAN` — a PR that is `BEHIND` dev, has conflicts (`DIRTY`), or is otherwise `BLOCKED` is
+skipped, so a stale green check never merges an out-of-date branch. Only `dev`-targeted, non-draft PRs are eligible;
+`main` release PRs are merged manually so the deploy workflow triggers. The workflow grants itself `contents` and
+`pull-requests` write via its own `permissions:` block and merges with the built-in `GITHUB_TOKEN`.
 
 ## Production Deployment
 
