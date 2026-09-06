@@ -11,4 +11,6 @@ public interface ZoneEventRepository
     extends JpaRepository<ZoneEvent, UUID>, JpaSpecificationExecutor<ZoneEvent> {
 
   List<ZoneEvent> findByZoneIdAndStatusOrderByStartsAtAsc(String zoneId, ZoneEventStatus status);
+
+  List<ZoneEvent> findByRoundId(UUID roundId);
 }

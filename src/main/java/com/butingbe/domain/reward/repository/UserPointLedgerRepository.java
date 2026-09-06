@@ -12,4 +12,7 @@ public interface UserPointLedgerRepository
 
   @Query("SELECT COALESCE(SUM(l.amount), 0) FROM UserPointLedger l WHERE l.userId = :userId")
   long sumAmountByUserId(@Param("userId") UUID userId);
+
+  @Query("SELECT COALESCE(SUM(l.amount), 0) FROM UserPointLedger l WHERE l.grantId = :grantId")
+  long sumAmountByGrantId(@Param("grantId") UUID grantId);
 }

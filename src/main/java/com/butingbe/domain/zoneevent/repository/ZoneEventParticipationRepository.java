@@ -35,4 +35,12 @@ public interface ZoneEventParticipationRepository
           + "WHERE p.userId = :userId AND p.event.zoneId = :zoneId "
           + "AND p.status = com.butingbe.domain.zoneevent.entity.ParticipationStatus.SUCCESS")
   long countSuccessByUserAndZone(@Param("userId") UUID userId, @Param("zoneId") String zoneId);
+
+  @Query(
+      "SELECT p FROM ZoneEventParticipation p WHERE p.event.id = :eventId "
+          + "AND p.status = com.butingbe.domain.zoneevent.entity.ParticipationStatus.SUCCESS "
+          + "AND p.visibility = com.butingbe.domain.zoneevent.entity.ParticipationVisibility.PUBLIC "
+          + "AND p.hidden = false ORDER BY p.likeCount DESC, p.completedAt ASC")
+  List<ZoneEventParticipation> findTopPublicSuccessByEvent(
+      @Param("eventId") UUID eventId, org.springframework.data.domain.Pageable pageable);
 }
