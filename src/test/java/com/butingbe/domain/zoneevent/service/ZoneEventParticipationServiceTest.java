@@ -23,6 +23,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.OffsetDateTime;
@@ -44,6 +45,7 @@ class ZoneEventParticipationServiceTest {
   private static final UUID EVENT_ID = UUID.fromString("11111111-0000-0000-0000-000000000001");
   private static final UUID USER_ID = UUID.fromString("22222222-0000-0000-0000-000000000001");
   private static final UUID OPEN_ID = UUID.fromString("33333333-0000-0000-0000-000000000001");
+  private static final UUID OTHER_ID = UUID.fromString("22222222-0000-0000-0000-000000000009");
   private static final double IN_LAT = 35.1532;
   private static final double IN_LNG = 129.1182;
   private static final double OUT_LAT = 35.16;
@@ -203,6 +205,52 @@ class ZoneEventParticipationServiceTest {
     lenient()
         .when(authTargetRepository.findByEvent_Id(EVENT_ID))
         .thenReturn(Optional.of(target(event)));
+  }
+
+  @Test
+  @DisplayName("열린 참여를 취소하면 CANCELLED가 된다")
+  void cancelOpenParticipation() {
+    ZoneEventParticipation joined = ZoneEventParticipation.join(event, USER_ID, IN_LAT, IN_LNG);
+    ReflectionTestUtils.setField(joined, "id", OPEN_ID);
+    when(participationRepository.findById(OPEN_ID)).thenReturn(Optional.of(joined));
+
+    service.cancel(user, EVENT_ID, OPEN_ID);
+
+    assertThat(joined.getStatus()).isEqualTo(ParticipationStatus.CANCELLED);
+    assertThat(joined.getCancelReason()).isEqualTo("USER");
+  }
+
+  @Test
+  @DisplayName("SUCCESS 참여는 취소할 수 없다(409)")
+  void cancelSuccessRejected() {
+    ZoneEventParticipation success = ZoneEventParticipation.join(event, USER_ID, IN_LAT, IN_LNG);
+    ReflectionTestUtils.setField(success, "id", OPEN_ID);
+    ReflectionTestUtils.setField(success, "status", ParticipationStatus.SUCCESS);
+    when(participationRepository.findById(OPEN_ID)).thenReturn(Optional.of(success));
+
+    assertThatThrownBy(() -> service.cancel(user, EVENT_ID, OPEN_ID))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_event.participation.invalid_state");
+  }
+
+  @Test
+  @DisplayName("타인의 참여는 취소할 수 없다(403)")
+  void cancelOthersForbidden() {
+    ZoneEventParticipation joined = ZoneEventParticipation.join(event, OTHER_ID, IN_LAT, IN_LNG);
+    ReflectionTestUtils.setField(joined, "id", OPEN_ID);
+    when(participationRepository.findById(OPEN_ID)).thenReturn(Optional.of(joined));
+
+    assertThatThrownBy(() -> service.cancel(user, EVENT_ID, OPEN_ID))
+        .isInstanceOf(ForbiddenException.class);
+  }
+
+  @Test
+  @DisplayName("없는 참여 취소는 404다")
+  void cancelNotFound() {
+    when(participationRepository.findById(OPEN_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.cancel(user, EVENT_ID, OPEN_ID))
+        .isInstanceOf(ResourceNotFoundException.class);
   }
 
   private ZoneEvent event(ZoneEventStatus status, int successLimit) {

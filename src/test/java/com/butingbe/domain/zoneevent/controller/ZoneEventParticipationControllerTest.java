@@ -4,6 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,6 +50,11 @@ class ZoneEventParticipationControllerTest {
 
   @Mock private ZoneEventParticipationService participationService;
   @Mock private com.butingbe.domain.zoneevent.service.ZoneEventSubmitService submitService;
+
+  @Mock
+  private com.butingbe.domain.zoneevent.service.ZoneEventParticipationQueryService
+      participationQueryService;
+
   @InjectMocks private ZoneEventParticipationController controller;
 
   private MockMvc mockMvc;
@@ -236,6 +243,47 @@ class ZoneEventParticipationControllerTest {
                 .contentType("application/json")
                 .content("{\"latitude\":35.1532,\"longitude\":129.1182}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("참여 취소는 204다")
+  void cancelReturns204() throws Exception {
+    org.mockito.Mockito.doNothing()
+        .when(participationService)
+        .cancel(any(), eq(EVENT_ID), eq(OPEN_ID));
+
+    mockMvc
+        .perform(
+            delete("/zone-events/{eventId}/participations/{participationId}", EVENT_ID, OPEN_ID))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  @DisplayName("이벤트별 내 참여 목록을 200으로 반환한다")
+  void myParticipationsReturns200() throws Exception {
+    when(participationQueryService.myEventParticipations(any(), eq(EVENT_ID)))
+        .thenReturn(
+            List.of(
+                new ParticipationResDto(
+                    OPEN_ID.toString(),
+                    EVENT_ID.toString(),
+                    "SUYEONG_NAMGU",
+                    "PLACE_AUTH",
+                    "CANCELLED",
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    "PUBLIC",
+                    OffsetDateTime.now(),
+                    null,
+                    List.of())));
+
+    mockMvc
+        .perform(get("/zone-events/{eventId}/participations/me", EVENT_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].status").value("CANCELLED"));
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {

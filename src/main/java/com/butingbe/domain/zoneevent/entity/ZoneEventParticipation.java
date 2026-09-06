@@ -148,6 +148,12 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.status = ParticipationStatus.UNDER_REVIEW;
   }
 
+  /** 열린 참여를 취소한다. */
+  public void cancel(String reason) {
+    this.status = ParticipationStatus.CANCELLED;
+    this.cancelReason = reason;
+  }
+
   /** 반경 검증을 통과한 참여를 JOINED 상태로 시작한다. */
   public static ZoneEventParticipation join(
       ZoneEvent event, UUID userId, double gpsLat, double gpsLng) {

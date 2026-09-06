@@ -14,6 +14,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.support.GpsDistance;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.List;
@@ -95,6 +96,25 @@ public class ZoneEventParticipationService {
     }
 
     return ParticipationResDto.of(saved, distance);
+  }
+
+  /** 열린 참여를 취소한다. SUCCESS/FAIL/REVOKED/이미 취소된 참여는 취소할 수 없다. */
+  @Transactional
+  public void cancel(AuthenticatedUser user, UUID eventId, UUID participationId) {
+    UUID userId = requireUserId(user);
+    ZoneEventParticipation participation =
+        participationRepository
+            .findById(participationId)
+            .filter(p -> p.getEvent().getId().equals(eventId))
+            .orElseThrow(
+                () -> new ResourceNotFoundException("error.zone_event.participation.not_found"));
+    if (!participation.getUserId().equals(userId)) {
+      throw new ForbiddenException("error.zone_event.participation.forbidden");
+    }
+    if (!participation.getStatus().isOpen()) {
+      throw new ConflictException("error.zone_event.participation.invalid_state");
+    }
+    participation.cancel("USER");
   }
 
   private UUID requireUserId(AuthenticatedUser user) {
