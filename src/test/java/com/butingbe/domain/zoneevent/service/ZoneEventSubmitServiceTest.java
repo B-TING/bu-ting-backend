@@ -25,6 +25,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
@@ -164,7 +165,9 @@ class ZoneEventSubmitServiceTest {
   void unknownMediaRejected() {
     ZoneEventParticipation participation = joined();
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
-    when(authTargetRepository.findByEvent_Id(EVENT_ID)).thenReturn(Optional.of(target()));
+    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(Optional.of(target()));
     when(fileMetadataRepository.findByObjectKey(FILE_KEY)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
@@ -177,7 +180,9 @@ class ZoneEventSubmitServiceTest {
   void submitOutOfRange() {
     ZoneEventParticipation participation = joined();
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
-    when(authTargetRepository.findByEvent_Id(EVENT_ID)).thenReturn(Optional.of(target()));
+    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(Optional.of(target()));
 
     ParticipationSubmitReqDto far =
         new ParticipationSubmitReqDto(FILE_KEY, "후기", 35.16, 129.13, null);
@@ -241,7 +246,9 @@ class ZoneEventSubmitServiceTest {
   void rejectsMediaUploadedByAnother() {
     ZoneEventParticipation participation = joined();
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
-    when(authTargetRepository.findByEvent_Id(EVENT_ID)).thenReturn(Optional.of(target()));
+    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(Optional.of(target()));
     FileMetadata file = mock(FileMetadata.class);
     when(file.getContentType()).thenReturn("image/jpeg");
     when(file.getUploaderId()).thenReturn(UUID.randomUUID()); // 제출자(USER_ID)와 다른 업로더
@@ -254,7 +261,9 @@ class ZoneEventSubmitServiceTest {
   private void stubJoinedWithTargetAndMedia(
       ZoneEventParticipation participation, String contentType) {
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
-    when(authTargetRepository.findByEvent_Id(EVENT_ID)).thenReturn(Optional.of(target()));
+    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(Optional.of(target()));
     FileMetadata file = mock(FileMetadata.class);
     lenient().when(file.getContentType()).thenReturn(contentType);
     when(fileMetadataRepository.findByObjectKey(FILE_KEY)).thenReturn(Optional.of(file));

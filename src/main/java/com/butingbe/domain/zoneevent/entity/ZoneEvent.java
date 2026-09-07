@@ -13,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -75,11 +76,20 @@ public class ZoneEvent extends BaseEntity {
   @Column(name = "success_limit_per_user", nullable = false)
   private Integer successLimitPerUser;
 
+  /** 회차 내 슬롯 식별자(예: "1-A"). 회차·타겟 API가 배정한다. */
+  @Column(name = "slot_code", length = 10)
+  private String slotCode;
+
+  @Version
+  @Column(nullable = false)
+  private Long revision;
+
   @Builder
   private ZoneEvent(
       String zoneId,
       ZoneEventType type,
       UUID roundId,
+      String slotCode,
       String title,
       String description,
       OffsetDateTime startsAt,
@@ -91,6 +101,7 @@ public class ZoneEvent extends BaseEntity {
     this.zoneId = zoneId;
     this.type = type;
     this.roundId = roundId;
+    this.slotCode = slotCode;
     this.title = title;
     this.description = description;
     this.startsAt = startsAt;

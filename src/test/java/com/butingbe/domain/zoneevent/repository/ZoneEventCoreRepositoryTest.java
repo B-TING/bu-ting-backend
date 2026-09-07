@@ -14,6 +14,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
@@ -78,7 +79,10 @@ class ZoneEventCoreRepositoryTest extends AbstractContainerTest {
             .build());
 
     ZoneEventAuthTarget target =
-        zoneEventAuthTargetRepository.findByEvent_Id(event.getId()).orElseThrow();
+        zoneEventAuthTargetRepository
+            .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+                event.getId(), ZoneEventTargetStatus.ACTIVE)
+            .orElseThrow();
     assertThat(target.getRadiusM()).isEqualTo(100);
     assertThat(target.getTargetKind()).isEqualTo(ZoneEventTargetKind.PLACE);
   }

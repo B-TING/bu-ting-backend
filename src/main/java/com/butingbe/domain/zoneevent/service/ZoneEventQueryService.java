@@ -9,6 +9,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
@@ -59,7 +60,10 @@ public class ZoneEventQueryService {
         zoneEventRepository
             .findById(eventId)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
-    ZoneEventAuthTarget target = authTargetRepository.findByEvent_Id(eventId).orElse(null);
+    ZoneEventAuthTarget target =
+        authTargetRepository
+            .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(eventId, ZoneEventTargetStatus.ACTIVE)
+            .orElse(null);
     OffsetDateTime now = OffsetDateTime.now();
 
     long successCount =
@@ -80,7 +84,11 @@ public class ZoneEventQueryService {
   }
 
   private ZoneEventSummaryResDto toSummary(ZoneEvent event, OffsetDateTime now, UUID userId) {
-    ZoneEventAuthTarget target = authTargetRepository.findByEvent_Id(event.getId()).orElse(null);
+    ZoneEventAuthTarget target =
+        authTargetRepository
+            .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+                event.getId(), ZoneEventTargetStatus.ACTIVE)
+            .orElse(null);
     long successCount =
         participationRepository.countByEvent_IdAndStatus(
             event.getId(), ParticipationStatus.SUCCESS);

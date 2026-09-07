@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -45,6 +46,10 @@ public class ZoneTitleDef extends TimestampEntity {
 
   @Column(nullable = false, length = 20)
   private String color;
+
+  @Version
+  @Column(nullable = false)
+  private Long revision;
 
   @Builder
   private ZoneTitleDef(

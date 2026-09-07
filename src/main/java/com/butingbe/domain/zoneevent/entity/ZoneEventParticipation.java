@@ -100,6 +100,10 @@ public class ZoneEventParticipation extends TimestampEntity {
   @Column(name = "reviewed_at")
   private OffsetDateTime reviewedAt;
 
+  /** 최신 제출 이력({@link ZoneEventSubmission})의 id. 조회 편의용 projection이며 원본 이력은 제출 테이블이 기준이다. */
+  @Column(name = "current_submission_id")
+  private UUID currentSubmissionId;
+
   @Builder
   private ZoneEventParticipation(
       ZoneEvent event,
@@ -158,6 +162,11 @@ public class ZoneEventParticipation extends TimestampEntity {
   public void stampReview(UUID reviewerId) {
     this.reviewedBy = reviewerId;
     this.reviewedAt = OffsetDateTime.now();
+  }
+
+  /** 최신 제출 이력을 가리키도록 갱신한다. */
+  public void linkSubmission(UUID submissionId) {
+    this.currentSubmissionId = submissionId;
   }
 
   /** 검수 반려. */

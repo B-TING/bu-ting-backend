@@ -23,6 +23,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRoundSlot;
 import com.butingbe.domain.zoneevent.entity.ZoneEventSettlementReport;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventBackupTargetRepository;
@@ -164,7 +165,8 @@ public class AdminRoundConsoleService {
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
     ZoneEventAuthTarget target =
         authTargetRepository
-            .findByEvent_Id(request.eventId())
+            .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+                request.eventId(), ZoneEventTargetStatus.ACTIVE)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.target_not_found"));
     target.update(
         backup.getPlaceName(),

@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -32,6 +33,13 @@ public class ZoneEventRound extends BaseEntity {
   @Column(name = "round_type", nullable = false, length = 20)
   private RoundType roundType;
 
+  /** 관리자 페이지에 노출할 회차 번호. 서버가 발급한다. 배정 전에는 비어 있을 수 있다. */
+  @Column(name = "round_no")
+  private Integer roundNo;
+
+  @Column(length = 255)
+  private String name;
+
   @Column(name = "starts_at", nullable = false)
   private OffsetDateTime startsAt;
 
@@ -45,17 +53,28 @@ public class ZoneEventRound extends BaseEntity {
   @Column(nullable = false, length = 20)
   private RoundStatus status;
 
+  @Column(name = "closed_at")
+  private OffsetDateTime closedAt;
+
   @Column(name = "settled_at")
   private OffsetDateTime settledAt;
+
+  @Version
+  @Column(nullable = false)
+  private Long revision;
 
   @Builder
   private ZoneEventRound(
       RoundType roundType,
+      Integer roundNo,
+      String name,
       OffsetDateTime startsAt,
       OffsetDateTime endsAt,
       String timezone,
       RoundStatus status) {
     this.roundType = roundType == null ? RoundType.REGULAR : roundType;
+    this.roundNo = roundNo;
+    this.name = name;
     this.startsAt = startsAt;
     this.endsAt = endsAt;
     this.timezone = timezone == null ? "Asia/Seoul" : timezone;
@@ -70,6 +89,14 @@ public class ZoneEventRound extends BaseEntity {
   /** OPEN → CLOSED. */
   public void close() {
     this.status = RoundStatus.CLOSED;
+    this.closedAt = OffsetDateTime.now();
+  }
+
+  /** 관리자가 회차 번호를 배정한다(서버 발급). 이미 배정된 번호는 바꾸지 않는다. */
+  public void assignRoundNo(int roundNo) {
+    if (this.roundNo == null) {
+      this.roundNo = roundNo;
+    }
   }
 
   /** 정산 완료 표식. 멱등: 이미 SETTLED면 그대로 둔다. */
