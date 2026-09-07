@@ -51,6 +51,7 @@ class ZoneEventRoundRepositoryTest extends AbstractContainerTest {
   void findsRoundsByStatusAndTime() {
     roundRepository.save(
         ZoneEventRound.builder()
+            .roundNo(2)
             .startsAt(OffsetDateTime.now().minusMinutes(1))
             .endsAt(OffsetDateTime.now().plusDays(1))
             .status(RoundStatus.SCHEDULED)
@@ -72,6 +73,7 @@ class ZoneEventRoundRepositoryTest extends AbstractContainerTest {
     ZoneEventRound round =
         roundRepository.save(
             ZoneEventRound.builder()
+                .roundNo(3)
                 .startsAt(OffsetDateTime.now())
                 .endsAt(OffsetDateTime.now().plusDays(1))
                 .status(RoundStatus.ACTIVE)

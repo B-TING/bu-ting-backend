@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class ZoneEventRoundSchedulerTest extends AbstractContainerTest {
 
+  private static int roundNoSeq = 200;
+
   @Autowired private ZoneEventRoundScheduler scheduler;
   @Autowired private ZoneEventRoundRepository roundRepository;
   @Autowired private ZoneEventRoundSlotRepository slotRepository;
@@ -135,6 +137,7 @@ class ZoneEventRoundSchedulerTest extends AbstractContainerTest {
   private ZoneEventRound savedRound(RoundStatus status, int startsDaysOffset, int endsDaysOffset) {
     return roundRepository.save(
         ZoneEventRound.builder()
+            .roundNo(roundNoSeq++)
             .startsAt(OffsetDateTime.now().plusDays(startsDaysOffset))
             .endsAt(OffsetDateTime.now().plusDays(endsDaysOffset))
             .status(status)

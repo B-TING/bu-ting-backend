@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class RoundStatusQueryServiceTest extends AbstractContainerTest {
 
+  private static int roundNoSeq = 300;
+
   @Autowired private RoundStatusQueryService queryService;
   @Autowired private ZoneEventRoundRepository roundRepository;
   @Autowired private ZoneEventRoundSlotRepository slotRepository;
@@ -61,6 +63,7 @@ class RoundStatusQueryServiceTest extends AbstractContainerTest {
   private ZoneEventRound round(RoundStatus status, OffsetDateTime startsAt) {
     return roundRepository.save(
         ZoneEventRound.builder()
+            .roundNo(roundNoSeq++)
             .startsAt(startsAt)
             .endsAt(startsAt.plusDays(1))
             .status(status)

@@ -57,6 +57,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class AdminRoundConsoleServiceTest extends AbstractContainerTest {
 
+  private static int roundNoSeq = 100;
+
   @Autowired private AdminRoundConsoleService consoleService;
   @Autowired private ZoneEventRoundRepository roundRepository;
   @Autowired private ZoneEventRoundSlotRepository slotRepository;
@@ -331,6 +333,7 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   private ZoneEventRound round(RoundStatus status) {
     return roundRepository.save(
         ZoneEventRound.builder()
+            .roundNo(roundNoSeq++)
             .startsAt(OffsetDateTime.now().minusHours(1))
             .endsAt(OffsetDateTime.now().plusHours(1))
             .status(status)

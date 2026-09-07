@@ -34,7 +34,7 @@ public class RoundStatusQueryService {
   public RoundStatusResDto current() {
     return roundRepository
         .findFirstByStatusOrderByStartsAtDesc(RoundStatus.ACTIVE)
-        .map(round -> statusOf(round, "ACTIVE"))
+        .map(round -> statusOf(round, "OPEN"))
         .or(
             () ->
                 roundRepository
