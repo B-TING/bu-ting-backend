@@ -11,9 +11,14 @@ import com.butingbe.domain.zoneevent.dto.request.RewardSnapshotReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
+import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
+import com.butingbe.domain.zoneevent.entity.RoundStatus;
+import com.butingbe.domain.zoneevent.entity.SlotKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
+import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
+import com.butingbe.domain.zoneevent.entity.ZoneEventRoundSlot;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
@@ -21,6 +26,8 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
@@ -45,12 +52,15 @@ public class AdminZoneEventService {
 
   private static final int DEFAULT_SIZE = 20;
   private static final int MAX_SIZE = 50;
+  private static final List<Character> SLOT_LETTERS = List.of('A', 'B', 'C', 'D');
 
   private final ZoneEventRepository zoneEventRepository;
   private final ZoneEventAuthTargetRepository authTargetRepository;
   private final ZoneEventTypeRepository zoneEventTypeRepository;
   private final ZoneEventParticipationRepository participationRepository;
   private final RewardCatalogRepository rewardCatalogRepository;
+  private final ZoneEventRoundRepository roundRepository;
+  private final ZoneEventRoundSlotRepository slotRepository;
   private final OperatorAuthorization operatorAuthorization;
 
   @Transactional
@@ -60,24 +70,63 @@ public class AdminZoneEventService {
     ZoneEventType type = requireType(request.typeCode());
     validateRewardCodes(request.baseReward(), request.excellenceReward());
 
+    OffsetDateTime endsAt = request.startsAt().plusMinutes(request.durationMinutes());
+    requireNoOverlap(zoneId, request.startsAt(), endsAt, null);
+
+    ZoneEventRound round = null;
+    String slotCode = null;
+    if (request.roundId() != null) {
+      round =
+          roundRepository
+              .findById(request.roundId())
+              .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
+      if (round.getStatus() != RoundStatus.DRAFT) {
+        throw new ConflictException("error.zone_event.invalid_state");
+      }
+      if (slotRepository.findByRound_IdAndZoneId(round.getId(), zoneId).isPresent()) {
+        throw new ConflictException("error.zone_event.invalid_state");
+      }
+      List<ZoneEvent> existing = zoneEventRepository.findByRoundId(round.getId());
+      if (existing.size() >= 4) {
+        throw new ConflictException("error.zone_event.invalid_state");
+      }
+      slotCode = round.getRoundNo() + "-" + SLOT_LETTERS.get(existing.size());
+    }
+
+    RewardSnapshotReqDto excellence =
+        request.excellenceReward() != null
+            ? request.excellenceReward()
+            : (round != null && round.getExcellenceReward() != null
+                ? toReqDto(round.getExcellenceReward())
+                : null);
+
     ZoneEvent event =
         zoneEventRepository.save(
             ZoneEvent.builder()
                 .zoneId(zoneId)
                 .type(type)
                 .roundId(request.roundId())
+                .slotCode(slotCode)
                 .title(request.title())
                 .description(request.description())
                 .startsAt(request.startsAt())
                 .durationMinutes(request.durationMinutes())
                 .status(ZoneEventStatus.SCHEDULED)
                 .baseReward(request.baseReward().toSnapshot())
-                .excellenceReward(
-                    request.excellenceReward() == null
-                        ? null
-                        : request.excellenceReward().toSnapshot())
+                .excellenceReward(excellence == null ? null : excellence.toSnapshot())
                 .successLimitPerUser(request.successLimitPerUser())
                 .build());
+
+    if (round != null) {
+      slotRepository
+          .save(
+              ZoneEventRoundSlot.builder()
+                  .round(round)
+                  .slotKind(SlotKind.AUTH)
+                  .zoneId(zoneId)
+                  .build())
+          .assignEvent(event.getId());
+    }
 
     ZoneEventAuthTarget target = null;
     if (Boolean.TRUE.equals(type.getRequiresUpload())) {
@@ -89,6 +138,26 @@ public class AdminZoneEventService {
       target = authTargetRepository.save(buildTarget(event, request.authTarget()));
     }
     return AdminZoneEventResDto.of(event, target, 0, 0);
+  }
+
+  private RewardSnapshotReqDto toReqDto(RewardSnapshot snapshot) {
+    return new RewardSnapshotReqDto(
+        snapshot.points(), snapshot.badgeCode(), snapshot.topN(), snapshot.prizeRewardCode());
+  }
+
+  private void requireNoOverlap(
+      String zoneId, OffsetDateTime startsAt, OffsetDateTime endsAt, UUID excludeEventId) {
+    List<ZoneEventStatus> blocking = List.of(ZoneEventStatus.SCHEDULED, ZoneEventStatus.ACTIVE);
+    for (ZoneEvent existing : zoneEventRepository.findByZoneIdAndStatusIn(zoneId, blocking)) {
+      if (excludeEventId != null && existing.getId().equals(excludeEventId)) {
+        continue;
+      }
+      boolean overlaps =
+          existing.getStartsAt().isBefore(endsAt) && startsAt.isBefore(existing.endsAt());
+      if (overlaps) {
+        throw new ConflictException("error.zone_event.invalid_state");
+      }
+    }
   }
 
   @Transactional(readOnly = true)
@@ -134,8 +203,26 @@ public class AdminZoneEventService {
     operatorAuthorization.requireOperator(user);
     ZoneEvent event = findEvent(eventId);
 
+    if (!event.getRevision().equals(request.expectedRevision())) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
     if (event.getStatus() == ZoneEventStatus.ACTIVE && request.touchesScheduledOnlyFields()) {
       throw new ConflictException("error.zone_event.invalid_state");
+    }
+    if (request.touchesTimeOrZone()) {
+      String overlapZoneId =
+          request.zoneId() == null ? event.getZoneId() : parseZone(request.zoneId());
+      OffsetDateTime overlapStartsAt =
+          request.startsAt() == null ? event.getStartsAt() : request.startsAt();
+      int overlapDuration =
+          request.durationMinutes() == null
+              ? event.getDurationMinutes()
+              : request.durationMinutes();
+      requireNoOverlap(
+          overlapZoneId,
+          overlapStartsAt,
+          overlapStartsAt.plusMinutes(overlapDuration),
+          event.getId());
     }
 
     RewardSnapshotReqDto base = request.baseReward();

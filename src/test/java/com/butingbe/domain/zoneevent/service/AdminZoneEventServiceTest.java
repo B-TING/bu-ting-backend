@@ -18,9 +18,13 @@ import com.butingbe.domain.zoneevent.dto.request.RewardSnapshotReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
+import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
+import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
@@ -41,14 +45,20 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private RewardCatalogRepository rewardCatalogRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private ZoneEventRoundRepository roundRepository;
+  @Autowired private ZoneEventRoundSlotRepository slotRepository;
 
   private AuthenticatedUser operator;
   private AuthenticatedUser normalUser;
+  private ZoneEventType type;
 
   @BeforeEach
   void setUp() {
     zoneEventTypeRepository.save(
         ZoneEventType.builder().typeCode("PLACE_AUTH").name("장소 인증").requiresUpload(true).build());
+    type =
+        zoneEventTypeRepository.save(
+            ZoneEventType.builder().typeCode("MISSION").name("미션").requiresUpload(false).build());
     rewardCatalogRepository.save(
         RewardCatalog.builder()
             .rewardType(RewardType.BADGE)
@@ -57,6 +67,113 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
             .build());
     operator = AuthenticatedUser.from(savedUser("admin", UserRole.ADMIN));
     normalUser = AuthenticatedUser.from(savedUser("user", UserRole.USER));
+  }
+
+  private ZoneEventRound draftRound(int roundNo) {
+    return roundRepository.save(
+        ZoneEventRound.builder()
+            .roundNo(roundNo)
+            .startsAt(OffsetDateTime.now())
+            .endsAt(OffsetDateTime.now().plusDays(1))
+            .excellenceReward(new RewardSnapshot(null, null, 3, "COUPON_CAFE"))
+            .build());
+  }
+
+  @Test
+  @DisplayName("회차에 슬롯을 만들면 slotCode가 {roundNo}-A부터 순서대로 발급되고 슬롯이 연결된다")
+  void createAssignsSlotCodeAndLinksSlot() {
+    ZoneEventRound round = draftRound(11);
+
+    AdminZoneEventResDto first = adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
+    AdminZoneEventResDto second =
+        adminZoneEventService.create(operator, createReq(round.getId(), "OLD_DOWNTOWN"));
+
+    assertThat(first.slotCode()).isEqualTo("11-A");
+    assertThat(second.slotCode()).isEqualTo("11-B");
+    assertThat(slotRepository.findByRound_IdAndZoneId(round.getId(), "YEONGDO"))
+        .isPresent()
+        .get()
+        .extracting(s -> s.getEventId().toString())
+        .isEqualTo(first.eventId());
+  }
+
+  @Test
+  @DisplayName("같은 회차에 같은 구역을 두 번 넣으면 409")
+  void duplicateZoneInRoundConflicts() {
+    ZoneEventRound round = draftRound(12);
+    adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
+
+    assertThatThrownBy(
+            () -> adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO")))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("한 회차에 5번째 구역을 넣으면 409")
+  void fifthZoneInRoundConflicts() {
+    ZoneEventRound round = draftRound(13);
+    adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
+    adminZoneEventService.create(operator, createReq(round.getId(), "OLD_DOWNTOWN"));
+    adminZoneEventService.create(operator, createReq(round.getId(), "SUYEONG_NAMGU"));
+    adminZoneEventService.create(operator, createReq(round.getId(), "WESTERN_BUSAN"));
+
+    assertThatThrownBy(
+            () -> adminZoneEventService.create(operator, createReq(round.getId(), "CENTRAL_NORTH")))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("같은 구역·겹치는 시간대에 SCHEDULED/ACTIVE 이벤트가 있으면 409")
+  void overlappingZoneTimeConflicts() {
+    OffsetDateTime start = OffsetDateTime.now().plusDays(5);
+    adminZoneEventService.create(
+        operator,
+        new AdminZoneEventCreateReqDto(
+            "YEONGDO", type.getTypeCode(), "1차", null, start, 120, null, 1,
+            new RewardSnapshotReqDto(50, null, null, null), null, null));
+
+    AdminZoneEventCreateReqDto overlapping =
+        new AdminZoneEventCreateReqDto(
+            "YEONGDO", type.getTypeCode(), "2차", null, start.plusMinutes(60), 120, null, 1,
+            new RewardSnapshotReqDto(50, null, null, null), null, null);
+
+    assertThatThrownBy(() -> adminZoneEventService.create(operator, overlapping))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("excellenceReward를 안 넘기면 회차 기본값을 물려받는다")
+  void inheritsRoundExcellenceReward() {
+    ZoneEventRound round = draftRound(14);
+
+    AdminZoneEventResDto created =
+        adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
+
+    assertThat(created.excellenceReward().topN()).isEqualTo(3);
+    assertThat(created.excellenceReward().prizeRewardCode()).isEqualTo("COUPON_CAFE");
+  }
+
+  @Test
+  @DisplayName("expectedRevision이 다르면 수정 시 409")
+  void updateWithStaleRevisionConflicts() {
+    ZoneEventRound round = draftRound(15);
+    AdminZoneEventResDto created =
+        adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
+
+    AdminZoneEventUpdateReqDto staleUpdate =
+        new AdminZoneEventUpdateReqDto(
+            "새 제목", null, null, null, null, null, null, null, null, null, "사유",
+            created.revision() + 1);
+
+    assertThatThrownBy(
+            () -> adminZoneEventService.update(operator, UUID.fromString(created.eventId()), staleUpdate))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  private AdminZoneEventCreateReqDto createReq(UUID roundId, String zoneId) {
+    return new AdminZoneEventCreateReqDto(
+        zoneId, type.getTypeCode(), "미션", null, OffsetDateTime.now().plusDays(1), 120, roundId, 1,
+        new RewardSnapshotReqDto(50, null, null, null), null, null);
   }
 
   @Test
@@ -178,16 +295,17 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   @Test
   @DisplayName("ACTIVE 이벤트는 제목은 바꿀 수 있지만 구역 변경은 409다")
   void updateRestrictionsOnActive() {
-    UUID eventId =
-        UUID.fromString(adminZoneEventService.create(operator, createRequest()).eventId());
-    adminZoneEventService.activate(operator, eventId);
+    AdminZoneEventResDto created = adminZoneEventService.create(operator, createRequest());
+    UUID eventId = UUID.fromString(created.eventId());
+    AdminZoneEventResDto activated = adminZoneEventService.activate(operator, eventId);
 
     AdminZoneEventResDto updated =
         adminZoneEventService.update(
             operator,
             eventId,
             new AdminZoneEventUpdateReqDto(
-                "새 제목", null, null, null, null, null, null, null, null, null));
+                "새 제목", null, null, null, null, null, null, null, null, null, null,
+                activated.revision()));
     assertThat(updated.title()).isEqualTo("새 제목");
 
     assertThatThrownBy(
@@ -196,15 +314,16 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
                     operator,
                     eventId,
                     new AdminZoneEventUpdateReqDto(
-                        null, null, null, null, null, "YEONGDO", null, null, null, null)))
+                        null, null, null, null, null, "YEONGDO", null, null, null, null, null,
+                        updated.revision())))
         .isInstanceOf(ConflictException.class);
   }
 
   @Test
   @DisplayName("SCHEDULED 이벤트는 구역·타겟을 수정할 수 있다")
   void updateScheduledFieldsAndTarget() {
-    UUID eventId =
-        UUID.fromString(adminZoneEventService.create(operator, createRequest()).eventId());
+    AdminZoneEventResDto created = adminZoneEventService.create(operator, createRequest());
+    UUID eventId = UUID.fromString(created.eventId());
 
     AdminZoneEventResDto updated =
         adminZoneEventService.update(
@@ -221,7 +340,9 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
                 null,
                 null,
                 new AdminZoneEventUpdateReqDto.AuthTargetPatchReqDto(
-                    null, "새 가이드", null, null, null, 200)));
+                    null, "새 가이드", null, null, null, 200),
+                null,
+                created.revision()));
 
     assertThat(updated.zoneId()).isEqualTo("YEONGDO");
     assertThat(updated.authTarget().radiusM()).isEqualTo(200);
@@ -232,7 +353,7 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   @DisplayName("목록을 구역·상태 필터와 커서 페이징으로 조회한다")
   void listWithFiltersAndCursor() {
     for (int i = 0; i < 3; i++) {
-      adminZoneEventService.create(operator, createRequest());
+      adminZoneEventService.create(operator, createRequest(OffsetDateTime.now().plusDays(2L * i)));
     }
 
     AdminZoneEventPageResDto first =
@@ -287,8 +408,8 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   @Test
   @DisplayName("모든 수정 필드와 타겟 좌표까지 반영한다")
   void updateAllFields() {
-    UUID eventId =
-        UUID.fromString(adminZoneEventService.create(operator, createRequest()).eventId());
+    AdminZoneEventResDto created = adminZoneEventService.create(operator, createRequest());
+    UUID eventId = UUID.fromString(created.eventId());
 
     AdminZoneEventResDto updated =
         adminZoneEventService.update(
@@ -305,7 +426,9 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
                 OffsetDateTime.now().plusDays(1),
                 new RewardSnapshotReqDto(100, "SPOT_GWANGAN_BRIDGE", null, null),
                 new AdminZoneEventUpdateReqDto.AuthTargetPatchReqDto(
-                    "새 장소", "새 가이드", "uploads/new.jpg", 35.2, 129.2, 300)));
+                    "새 장소", "새 가이드", "uploads/new.jpg", 35.2, 129.2, 300),
+                null,
+                created.revision()));
 
     assertThat(updated.title()).isEqualTo("새 제목");
     assertThat(updated.description()).isEqualTo("새 설명");
@@ -427,12 +550,16 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   }
 
   private AdminZoneEventCreateReqDto createRequest() {
+    return createRequest(OffsetDateTime.now());
+  }
+
+  private AdminZoneEventCreateReqDto createRequest(OffsetDateTime startsAt) {
     return new AdminZoneEventCreateReqDto(
         "SUYEONG_NAMGU",
         "PLACE_AUTH",
         "광안대교 야경 담기",
         "야경 촬영",
-        OffsetDateTime.now(),
+        startsAt,
         1440,
         null,
         1,

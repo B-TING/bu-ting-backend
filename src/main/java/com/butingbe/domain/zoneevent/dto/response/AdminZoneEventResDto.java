@@ -23,7 +23,9 @@ public record AdminZoneEventResDto(
     RewardSnapshot excellenceReward,
     AdminAuthTarget authTarget,
     long joinedCount,
-    long successCount) {
+    long successCount,
+    String slotCode,
+    Long revision) {
 
   public record AdminAuthTarget(
       String targetId,
@@ -71,6 +73,8 @@ public record AdminZoneEventResDto(
         event.getExcellenceReward(),
         AdminAuthTarget.from(target),
         joinedCount,
-        successCount);
+        successCount,
+        event.getSlotCode(),
+        event.getRevision());
   }
 }
