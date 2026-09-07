@@ -2,16 +2,18 @@ package com.butingbe.domain.zoneevent.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.zoneevent.dto.request.BackupTargetReqDto;
+import com.butingbe.domain.zoneevent.dto.request.RoundCancelReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
+import com.butingbe.domain.zoneevent.dto.request.RoundPatchReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SlotReassignReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SwapTargetReqDto;
+import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
 import com.butingbe.domain.zoneevent.dto.response.SlotSuggestionResDto;
 import com.butingbe.domain.zoneevent.service.AdminRoundConsoleService;
 import com.butingbe.global.common.ApiResponse;
 import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -40,16 +42,21 @@ public class AdminRoundController {
       @AuthenticationPrincipal AuthenticatedUser user,
       @RequestBody @Valid RoundCreateReqDto request) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(ApiResponse.success("회차 생성", consoleService.createRound(user, request)));
+        .body(ApiResponse.success("회차 초안 생성", consoleService.createRound(user, request)));
   }
 
   @GetMapping
-  public ResponseEntity<ApiResponse<List<AdminRoundResDto>>> list(
+  public ResponseEntity<ApiResponse<AdminRoundPageResDto>> list(
       @AuthenticationPrincipal AuthenticatedUser user,
-      @RequestParam OffsetDateTime from,
-      @RequestParam OffsetDateTime to) {
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) OffsetDateTime from,
+      @RequestParam(required = false) OffsetDateTime to,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size) {
     return ResponseEntity.ok(
-        ApiResponse.success("회차 캘린더 조회", consoleService.listRounds(user, from, to)));
+        ApiResponse.success(
+            "회차 목록 조회", consoleService.listRounds(user, status, from, to, keyword, page, size)));
   }
 
   @GetMapping("/suggest-slots")
@@ -65,6 +72,30 @@ public class AdminRoundController {
       @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID roundId) {
     return ResponseEntity.ok(
         ApiResponse.success("회차 상세 조회", consoleService.roundDetail(user, roundId)));
+  }
+
+  @PatchMapping("/{roundId}")
+  public ResponseEntity<ApiResponse<AdminRoundResDto>> patch(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID roundId,
+      @RequestBody @Valid RoundPatchReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success("회차 수정", consoleService.patch(user, roundId, request)));
+  }
+
+  @PostMapping("/{roundId}/schedule")
+  public ResponseEntity<ApiResponse<AdminRoundResDto>> schedule(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID roundId) {
+    return ResponseEntity.ok(ApiResponse.success("회차 확정", consoleService.schedule(user, roundId)));
+  }
+
+  @PostMapping("/{roundId}/cancel")
+  public ResponseEntity<ApiResponse<AdminRoundResDto>> cancel(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID roundId,
+      @RequestBody @Valid RoundCancelReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success("회차 긴급 취소", consoleService.cancel(user, roundId, request)));
   }
 
   @PatchMapping("/{roundId}/slots")
@@ -94,18 +125,6 @@ public class AdminRoundController {
       @RequestBody @Valid SwapTargetReqDto request) {
     return ResponseEntity.ok(
         ApiResponse.success("우천 타겟 교체", consoleService.swapTarget(user, roundId, request)));
-  }
-
-  @PostMapping("/{roundId}/open")
-  public ResponseEntity<ApiResponse<AdminRoundResDto>> open(
-      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID roundId) {
-    return ResponseEntity.ok(ApiResponse.success("회차 오픈", consoleService.open(user, roundId)));
-  }
-
-  @PostMapping("/{roundId}/close")
-  public ResponseEntity<ApiResponse<AdminRoundResDto>> close(
-      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID roundId) {
-    return ResponseEntity.ok(ApiResponse.success("회차 종료", consoleService.close(user, roundId)));
   }
 
   @PostMapping("/{roundId}/settle")
