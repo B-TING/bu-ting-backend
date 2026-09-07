@@ -20,6 +20,7 @@ import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundPatchReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SlotReassignReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SwapTargetReqDto;
+import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
@@ -87,10 +88,17 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     // ACTIVE 인증 타겟을 추가하는 방식(예: scheduleFailsWithoutActiveTarget)에 의존하므로 false로 둔다.
     type =
         zoneEventTypeRepository.save(
-            ZoneEventType.builder().typeCode("PLACE_AUTH").name("장소 인증").requiresUpload(false).build());
+            ZoneEventType.builder()
+                .typeCode("PLACE_AUTH")
+                .name("장소 인증")
+                .requiresUpload(false)
+                .build());
     operator =
         new AuthenticatedUser(
-            savedUser().getId(), "op@example.com", "op", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+            savedUser().getId(),
+            "op@example.com",
+            "op",
+            List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
     normalUser = AuthenticatedUser.from(savedUser());
   }
 
@@ -101,11 +109,19 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
         consoleService.createRound(
             operator,
             new RoundCreateReqDto(
-                null, nextRoundNo(), "부산 바다 인증의 날", OffsetDateTime.now(), OffsetDateTime.now().plusDays(1), "Asia/Seoul", null));
+                null,
+                nextRoundNo(),
+                "부산 바다 인증의 날",
+                OffsetDateTime.now(),
+                OffsetDateTime.now().plusDays(1),
+                "Asia/Seoul",
+                null));
 
     assertThat(round.status()).isEqualTo(RoundStatus.DRAFT);
     assertThat(round.slots()).isEmpty();
-    assertThat(auditLogRepository.findByTargetTypeAndTargetId("ROUND", UUID.fromString(round.roundId())))
+    assertThat(
+            auditLogRepository.findByTargetTypeAndTargetId(
+                "ROUND", UUID.fromString(round.roundId())))
         .anyMatch(a -> a.getAction().equals("CREATE_ROUND"));
   }
 
@@ -114,13 +130,28 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   void duplicateRoundNoConflicts() {
     int roundNo = nextRoundNo();
     consoleService.createRound(
-        operator, new RoundCreateReqDto(null, roundNo, "1회차", OffsetDateTime.now(), OffsetDateTime.now().plusDays(1), null, null));
+        operator,
+        new RoundCreateReqDto(
+            null,
+            roundNo,
+            "1회차",
+            OffsetDateTime.now(),
+            OffsetDateTime.now().plusDays(1),
+            null,
+            null));
 
     assertThatThrownBy(
             () ->
                 consoleService.createRound(
                     operator,
-                    new RoundCreateReqDto(null, roundNo, "중복", OffsetDateTime.now(), OffsetDateTime.now().plusDays(1), null, null)))
+                    new RoundCreateReqDto(
+                        null,
+                        roundNo,
+                        "중복",
+                        OffsetDateTime.now(),
+                        OffsetDateTime.now().plusDays(1),
+                        null,
+                        null)))
         .isInstanceOf(ConflictException.class);
   }
 
@@ -128,8 +159,16 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   @DisplayName("운영자가 아니면 생성·조회는 403이다")
   void forbidden() {
     RoundCreateReqDto req =
-        new RoundCreateReqDto(null, nextRoundNo(), null, OffsetDateTime.now(), OffsetDateTime.now().plusDays(1), null, null);
-    assertThatThrownBy(() -> consoleService.createRound(normalUser, req)).isInstanceOf(ForbiddenException.class);
+        new RoundCreateReqDto(
+            null,
+            nextRoundNo(),
+            null,
+            OffsetDateTime.now(),
+            OffsetDateTime.now().plusDays(1),
+            null,
+            null);
+    assertThatThrownBy(() -> consoleService.createRound(normalUser, req))
+        .isInstanceOf(ForbiddenException.class);
   }
 
   @Test
@@ -146,13 +185,17 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
             .build());
     createDraft();
 
-    List<AdminRoundResDto> draftOnly =
+    AdminRoundPageResDto draftOnly =
         consoleService.listRounds(operator, "DRAFT", null, null, null, 0, 20);
-    assertThat(draftOnly).allMatch(r -> r.status() == RoundStatus.DRAFT);
+    assertThat(draftOnly.items()).allMatch(r -> r.status() == RoundStatus.DRAFT);
+    assertThat(draftOnly.totalElements()).isEqualTo(draftOnly.items().size());
+    assertThat(draftOnly.totalPages()).isGreaterThanOrEqualTo(1);
 
-    List<AdminRoundResDto> keywordMatch =
+    AdminRoundPageResDto keywordMatch =
         consoleService.listRounds(operator, null, null, null, "자동전환", 0, 20);
-    assertThat(keywordMatch).hasSize(1);
+    assertThat(keywordMatch.items()).hasSize(1);
+    assertThat(keywordMatch.totalElements()).isEqualTo(1);
+    assertThat(keywordMatch.totalPages()).isEqualTo(1);
     assertThat(roundRepository.findAll())
         .filteredOn(r -> r.getRoundNo().equals(dueRoundNo))
         .extracting(ZoneEventRound::getStatus)
@@ -189,8 +232,12 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     UUID roundId = UUID.fromString(created.roundId());
     for (String zone : List.of("YEONGDO", "OLD_DOWNTOWN", "SUYEONG_NAMGU")) {
       ZoneEvent event =
-          zoneEventRepository.findById(
-                  UUID.fromString(adminZoneEventService.create(operator, zoneEventReq(roundId, zone)).eventId()))
+          zoneEventRepository
+              .findById(
+                  UUID.fromString(
+                      adminZoneEventService
+                          .create(operator, zoneEventReq(roundId, zone))
+                          .eventId()))
               .orElseThrow();
       authTargetRepository.save(
           ZoneEventAuthTarget.builder()
@@ -217,31 +264,54 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     assertThatThrownBy(
             () ->
                 consoleService.patch(
-                    operator, roundId, new RoundPatchReqDto(created.revision() + 1, "새 이름", null, null, null, null)))
+                    operator,
+                    roundId,
+                    new RoundPatchReqDto(created.revision() + 1, "새 이름", null, null, null, null)))
         .isInstanceOf(ConflictException.class);
 
     AdminRoundResDto patched =
-        consoleService.patch(operator, roundId, new RoundPatchReqDto(created.revision(), "새 이름", null, null, null, null));
+        consoleService.patch(
+            operator,
+            roundId,
+            new RoundPatchReqDto(created.revision(), "새 이름", null, null, null, null));
     assertThat(patched.name()).isEqualTo("새 이름");
+
+    ZoneEventRound round = roundRepository.findById(roundId).orElseThrow();
+    round.confirmSchedule();
+    round.activate();
+    Long activeRevision = roundRepository.saveAndFlush(round).getRevision();
+
+    assertThatThrownBy(
+            () ->
+                consoleService.patch(
+                    operator,
+                    roundId,
+                    new RoundPatchReqDto(activeRevision, "다른 이름", null, null, null, null)))
+        .isInstanceOf(ConflictException.class);
   }
 
   @Test
-  @DisplayName("cancel은 이력을 유지한 채 회차와 슬롯을 CANCELLED로 만든다")
+  @DisplayName("cancel은 이력을 유지한 채 회차와 슬롯을 CANCELLED로 만들고, 이미 종료된 이벤트는 건드리지 않는다")
   void cancelPreservesHistory() {
     AdminRoundResDto created = createDraft();
     UUID roundId = UUID.fromString(created.roundId());
     AdminRoundResDto afterCreate = adminZoneEventServiceCreateAndReturnRound(roundId, "YEONGDO");
     UUID eventId = UUID.fromString(afterCreate.slots().get(0).eventId());
     ZoneEventParticipation joined = joined(zoneEventRepository.findById(eventId).orElseThrow());
+    ZoneEvent alreadyClosed = closedZoneEvent(roundId, "OLD_DOWNTOWN");
 
     AdminRoundResDto cancelled =
         consoleService.cancel(operator, roundId, new RoundCancelReqDto("우천", created.revision()));
 
     assertThat(cancelled.status()).isEqualTo(RoundStatus.CANCELLED);
     assertThat(cancelled.cancelReason()).isEqualTo("우천");
-    assertThat(zoneEventRepository.findById(eventId).orElseThrow().getStatus()).isEqualTo(ZoneEventStatus.CANCELLED);
+    assertThat(zoneEventRepository.findById(eventId).orElseThrow().getStatus())
+        .isEqualTo(ZoneEventStatus.CANCELLED);
     assertThat(participationRepository.findById(joined.getId()).orElseThrow().getStatus())
         .isEqualTo(ParticipationStatus.CANCELLED);
+    // 이미 종료(CLOSED)된 이벤트는 markCancelled()가 던지므로 건드리지 않고 그대로 CLOSED여야 한다.
+    assertThat(zoneEventRepository.findById(alreadyClosed.getId()).orElseThrow().getStatus())
+        .isEqualTo(ZoneEventStatus.CLOSED);
   }
 
   @Test
@@ -249,7 +319,21 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   void cancelClosedRoundConflicts() {
     ZoneEventRound round = closedRound();
     assertThatThrownBy(
-            () -> consoleService.cancel(operator, round.getId(), new RoundCancelReqDto("사유", round.getRevision())))
+            () ->
+                consoleService.cancel(
+                    operator, round.getId(), new RoundCancelReqDto("사유", round.getRevision())))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("cancel도 expectedRevision이 다르면 409")
+  void cancelWithStaleRevisionConflicts() {
+    AdminRoundResDto created = createDraft();
+    UUID roundId = UUID.fromString(created.roundId());
+    assertThatThrownBy(
+            () ->
+                consoleService.cancel(
+                    operator, roundId, new RoundCancelReqDto("사유", created.revision() + 1)))
         .isInstanceOf(ConflictException.class);
   }
 
@@ -266,14 +350,21 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   void settle() {
     ZoneEventRound round = closedRound();
     rewardCatalogRepository.save(
-        RewardCatalog.builder().rewardType(RewardType.COUPON).code("COUPON_CAFE").name("카페 쿠폰").stock(5).validDays(30).build());
+        RewardCatalog.builder()
+            .rewardType(RewardType.COUPON)
+            .code("COUPON_CAFE")
+            .name("카페 쿠폰")
+            .stock(5)
+            .validDays(30)
+            .build());
     ZoneEvent event = eventWithExcellence(round.getId());
     ZoneEventParticipation winner = success(event, 10);
     ZoneEventParticipation joinedP = joined(event);
 
     Map<String, Object> report = consoleService.settle(operator, round.getId());
 
-    assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus()).isEqualTo(RoundStatus.SETTLED);
+    assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
+        .isEqualTo(RoundStatus.SETTLED);
     assertThat(participationRepository.findById(joinedP.getId()).orElseThrow().getStatus())
         .isEqualTo(ParticipationStatus.CANCELLED);
     assertThat(userCouponRepository.findAll()).hasSize(1);
@@ -292,7 +383,8 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     assertThatThrownBy(() -> consoleService.settlementReport(operator, round.getId()))
         .isInstanceOf(ResourceNotFoundException.class);
     consoleService.settle(operator, round.getId());
-    assertThat(consoleService.settlementReport(operator, round.getId()).get("roundId")).isEqualTo(round.getId().toString());
+    assertThat(consoleService.settlementReport(operator, round.getId()).get("roundId"))
+        .isEqualTo(round.getId().toString());
   }
 
   @Test
@@ -303,10 +395,15 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     ZoneEventRound round = roundRepository.findById(roundId).orElseThrow();
     ZoneEventRoundSlot slot =
         slotRepository.save(
-            ZoneEventRoundSlot.builder().round(round).slotKind(SlotKind.AUTH).zoneId("YEONGDO").build());
+            ZoneEventRoundSlot.builder()
+                .round(round)
+                .slotKind(SlotKind.AUTH)
+                .zoneId("YEONGDO")
+                .build());
 
     AdminRoundResDto after =
-        consoleService.reassignSlot(operator, roundId, new SlotReassignReqDto(slot.getId(), "WESTERN_BUSAN"));
+        consoleService.reassignSlot(
+            operator, roundId, new SlotReassignReqDto(slot.getId(), "WESTERN_BUSAN"));
     assertThat(after.slots())
         .filteredOn(s -> s.slotId().equals(slot.getId().toString()))
         .extracting(AdminRoundResDto.Slot::zoneId)
@@ -329,7 +426,9 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
         zoneEventRepository
             .findById(
                 UUID.fromString(
-                    adminZoneEventService.create(operator, zoneEventReq(roundId, "YEONGDO")).eventId()))
+                    adminZoneEventService
+                        .create(operator, zoneEventReq(roundId, "YEONGDO"))
+                        .eventId()))
             .orElseThrow();
     ZoneEventAuthTarget original =
         authTargetRepository.save(
@@ -345,7 +444,8 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     consoleService.addBackupTarget(
         operator,
         roundId,
-        new BackupTargetReqDto(ZoneEventTargetKind.PLACE, null, "실내 대체지", "안내", null, 35.2, 129.2, 80));
+        new BackupTargetReqDto(
+            ZoneEventTargetKind.PLACE, null, "실내 대체지", "안내", null, 35.2, 129.2, 80));
     UUID backupId =
         UUID.fromString(consoleService.roundDetail(operator, roundId).backups().get(0).targetId());
 
@@ -363,7 +463,11 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     UUID roundId = UUID.fromString(created.roundId());
     ZoneEventRound round = roundRepository.findById(roundId).orElseThrow();
     slotRepository.save(
-        ZoneEventRoundSlot.builder().round(round).slotKind(SlotKind.AUTH).zoneId("YEONGDO").build());
+        ZoneEventRoundSlot.builder()
+            .round(round)
+            .slotKind(SlotKind.AUTH)
+            .zoneId("YEONGDO")
+            .build());
 
     AdminRoundResDto detail = consoleService.roundDetail(operator, roundId);
 
@@ -380,15 +484,24 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     return consoleService.createRound(
         operator,
         new RoundCreateReqDto(
-            null, nextRoundNo(), "테스트 회차", OffsetDateTime.now(), OffsetDateTime.now().plusDays(1), null,
+            null,
+            nextRoundNo(),
+            "테스트 회차",
+            OffsetDateTime.now(),
+            OffsetDateTime.now().plusDays(1),
+            null,
             new RewardSnapshotReqDto(null, null, 3, "COUPON_CAFE")));
   }
 
   private void createFourZoneEventsWithTargets(UUID roundId) {
     for (String zone : List.of("YEONGDO", "OLD_DOWNTOWN", "SUYEONG_NAMGU", "WESTERN_BUSAN")) {
       ZoneEvent event =
-          zoneEventRepository.findById(
-                  UUID.fromString(adminZoneEventService.create(operator, zoneEventReq(roundId, zone)).eventId()))
+          zoneEventRepository
+              .findById(
+                  UUID.fromString(
+                      adminZoneEventService
+                          .create(operator, zoneEventReq(roundId, zone))
+                          .eventId()))
               .orElseThrow();
       authTargetRepository.save(
           ZoneEventAuthTarget.builder()
@@ -409,8 +522,17 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
 
   private AdminZoneEventCreateReqDto zoneEventReq(UUID roundId, String zoneId) {
     return new AdminZoneEventCreateReqDto(
-        zoneId, type.getTypeCode(), "미션", null, OffsetDateTime.now().plusDays(1), 120, roundId, 1,
-        new RewardSnapshotReqDto(50, null, null, null), null, null);
+        zoneId,
+        type.getTypeCode(),
+        "미션",
+        null,
+        OffsetDateTime.now().plusDays(1),
+        120,
+        roundId,
+        1,
+        new RewardSnapshotReqDto(50, null, null, null),
+        null,
+        null);
   }
 
   private ZoneEventRound closedRound() {
@@ -420,6 +542,21 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
             .startsAt(OffsetDateTime.now().minusHours(2))
             .endsAt(OffsetDateTime.now().minusHours(1))
             .status(RoundStatus.CLOSED)
+            .build());
+  }
+
+  private ZoneEvent closedZoneEvent(UUID roundId, String zoneId) {
+    return zoneEventRepository.save(
+        ZoneEvent.builder()
+            .zoneId(zoneId)
+            .type(type)
+            .roundId(roundId)
+            .title("이미 종료된 이벤트")
+            .startsAt(OffsetDateTime.now().minusHours(2))
+            .durationMinutes(60)
+            .status(ZoneEventStatus.CLOSED)
+            .baseReward(new RewardSnapshot(50, null, null, null))
+            .successLimitPerUser(1)
             .build());
   }
 

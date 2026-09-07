@@ -11,11 +11,11 @@ import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundPatchReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SlotReassignReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SwapTargetReqDto;
+import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
 import com.butingbe.domain.zoneevent.dto.response.SlotSuggestionResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.RoundStatus;
-import com.butingbe.domain.zoneevent.entity.SlotKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
@@ -94,29 +94,46 @@ public class AdminRoundConsoleService {
                 .startsAt(request.startsAt())
                 .endsAt(request.endsAt())
                 .timezone(request.timezone())
-                .excellenceReward(request.excellenceReward() == null ? null : request.excellenceReward().toSnapshot())
+                .excellenceReward(
+                    request.excellenceReward() == null
+                        ? null
+                        : request.excellenceReward().toSnapshot())
                 .build());
     audit(user, "CREATE_ROUND", "ROUND", round.getId(), Map.of("roundNo", round.getRoundNo()));
     return detailOf(round);
   }
 
   @Transactional
-  public List<AdminRoundResDto> listRounds(
-      AuthenticatedUser user, String status, OffsetDateTime from, OffsetDateTime to, String keyword, Integer page, Integer size) {
+  public AdminRoundPageResDto listRounds(
+      AuthenticatedUser user,
+      String status,
+      OffsetDateTime from,
+      OffsetDateTime to,
+      String keyword,
+      Integer page,
+      Integer size) {
     operatorAuthorization.requireOperator(user);
-    RoundStatus statusFilter = status == null || status.isBlank() ? null : RoundStatus.valueOf(status.trim());
+    RoundStatus statusFilter =
+        status == null || status.isBlank() ? null : RoundStatus.valueOf(status.trim());
     int pageSize = size == null || size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
     int pageNumber = page == null || page < 0 ? 0 : page;
 
     Specification<ZoneEventRound> spec = buildRoundSpec(statusFilter, from, to, keyword);
     Page<ZoneEventRound> result =
-        roundRepository.findAll(spec, PageRequest.of(pageNumber, pageSize, org.springframework.data.domain.Sort.by("startsAt").descending()));
+        roundRepository.findAll(
+            spec,
+            PageRequest.of(
+                pageNumber,
+                pageSize,
+                org.springframework.data.domain.Sort.by("startsAt").descending()));
 
     OffsetDateTime now = OffsetDateTime.now();
     for (ZoneEventRound round : result.getContent()) {
       transitionService.sync(round, now);
     }
-    return result.getContent().stream().map(this::detailOf).toList();
+    List<AdminRoundResDto> items = result.getContent().stream().map(this::detailOf).toList();
+    return new AdminRoundPageResDto(
+        items, pageNumber, pageSize, result.getTotalElements(), result.getTotalPages());
   }
 
   @Transactional
@@ -130,7 +147,8 @@ public class AdminRoundConsoleService {
   @Transactional(readOnly = true)
   public SlotSuggestionResDto suggestSlots(AuthenticatedUser user, int authSlots) {
     operatorAuthorization.requireOperator(user);
-    return suggestionService.suggest(OffsetDateTime.now(java.time.ZoneId.of("Asia/Seoul")), authSlots);
+    return suggestionService.suggest(
+        OffsetDateTime.now(java.time.ZoneId.of("Asia/Seoul")), authSlots);
   }
 
   @Transactional
@@ -138,7 +156,12 @@ public class AdminRoundConsoleService {
     operatorAuthorization.requireOperator(user);
     ZoneEventRound round = requireRound(roundId);
     requireMatchingRevision(round.getRevision(), request.expectedRevision());
-    round.applyEditable(request.name(), request.startsAt(), request.endsAt(), request.timezone(), request.roundType());
+    round.applyEditable(
+        request.name(),
+        request.startsAt(),
+        request.endsAt(),
+        request.timezone(),
+        request.roundType());
     audit(user, "PATCH_ROUND", "ROUND", roundId, null);
     return detailOf(round);
   }
@@ -158,7 +181,10 @@ public class AdminRoundConsoleService {
     }
     for (ZoneEvent event : events) {
       boolean hasActiveTarget =
-          authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(event.getId(), ZoneEventTargetStatus.ACTIVE).isPresent();
+          authTargetRepository
+              .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+                  event.getId(), ZoneEventTargetStatus.ACTIVE)
+              .isPresent();
       if (!hasActiveTarget) {
         throw new IllegalArgumentException("error.zone_event.round_target_missing");
       }
@@ -176,11 +202,16 @@ public class AdminRoundConsoleService {
     requireMatchingRevision(round.getRevision(), request.expectedRevision());
     round.cancel(request.reason());
     for (ZoneEvent event : zoneEventRepository.findByRoundId(roundId)) {
-      if (event.getStatus() == ZoneEventStatus.SCHEDULED || event.getStatus() == ZoneEventStatus.ACTIVE) {
+      if (event.getStatus() == ZoneEventStatus.SCHEDULED
+          || event.getStatus() == ZoneEventStatus.ACTIVE) {
         event.markCancelled();
         for (ZoneEventParticipation open :
             participationRepository.findByEvent_IdAndStatusIn(
-                event.getId(), List.of(ParticipationStatus.JOINED, ParticipationStatus.SUBMITTED, ParticipationStatus.UNDER_REVIEW))) {
+                event.getId(),
+                List.of(
+                    ParticipationStatus.JOINED,
+                    ParticipationStatus.SUBMITTED,
+                    ParticipationStatus.UNDER_REVIEW))) {
           open.cancel("ROUND_CANCELLED");
         }
       }
@@ -190,7 +221,8 @@ public class AdminRoundConsoleService {
   }
 
   @Transactional
-  public AdminRoundResDto reassignSlot(AuthenticatedUser user, UUID roundId, SlotReassignReqDto request) {
+  public AdminRoundResDto reassignSlot(
+      AuthenticatedUser user, UUID roundId, SlotReassignReqDto request) {
     operatorAuthorization.requireOperator(user);
     ZoneEventRound round = requireRound(roundId);
     ZoneEventRoundSlot slot =
@@ -204,7 +236,8 @@ public class AdminRoundConsoleService {
   }
 
   @Transactional
-  public AdminRoundResDto addBackupTarget(AuthenticatedUser user, UUID roundId, BackupTargetReqDto request) {
+  public AdminRoundResDto addBackupTarget(
+      AuthenticatedUser user, UUID roundId, BackupTargetReqDto request) {
     operatorAuthorization.requireOperator(user);
     ZoneEventRound round = requireRound(roundId);
     ZoneEventBackupTarget target =
@@ -220,12 +253,14 @@ public class AdminRoundConsoleService {
                 .longitude(request.longitude())
                 .radiusM(request.radiusM())
                 .build());
-    audit(user, "ADD_BACKUP_TARGET", "ROUND", roundId, Map.of("targetId", target.getId().toString()));
+    audit(
+        user, "ADD_BACKUP_TARGET", "ROUND", roundId, Map.of("targetId", target.getId().toString()));
     return detailOf(round);
   }
 
   @Transactional
-  public AdminRoundResDto swapTarget(AuthenticatedUser user, UUID roundId, SwapTargetReqDto request) {
+  public AdminRoundResDto swapTarget(
+      AuthenticatedUser user, UUID roundId, SwapTargetReqDto request) {
     operatorAuthorization.requireOperator(user);
     ZoneEventRound round = requireRound(roundId);
     ZoneEventBackupTarget backup =
@@ -235,17 +270,32 @@ public class AdminRoundConsoleService {
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
     ZoneEventAuthTarget target =
         authTargetRepository
-            .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(request.eventId(), ZoneEventTargetStatus.ACTIVE)
+            .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+                request.eventId(), ZoneEventTargetStatus.ACTIVE)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.target_not_found"));
-    target.update(backup.getPlaceName(), backup.getGuideText(), backup.getExampleFileKey(), backup.getLatitude(), backup.getLongitude(), backup.getRadiusM());
-    audit(user, "SWAP_TARGET", "EVENT", request.eventId(), Map.of("backupTargetId", request.backupTargetId().toString()));
+    target.update(
+        backup.getPlaceName(),
+        backup.getGuideText(),
+        backup.getExampleFileKey(),
+        backup.getLatitude(),
+        backup.getLongitude(),
+        backup.getRadiusM());
+    audit(
+        user,
+        "SWAP_TARGET",
+        "EVENT",
+        request.eventId(),
+        Map.of("backupTargetId", request.backupTargetId().toString()));
     return detailOf(round);
   }
 
   @Transactional
   public Map<String, Object> settle(AuthenticatedUser user, UUID roundId) {
     operatorAuthorization.requireOperator(user);
-    ZoneEventRound round = roundRepository.findWithLockById(roundId).orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
+    ZoneEventRound round =
+        roundRepository
+            .findWithLockById(roundId)
+            .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
     if (round.getStatus() == RoundStatus.SETTLED) {
       return settlementReport(user, roundId);
     }
@@ -254,7 +304,8 @@ public class AdminRoundConsoleService {
     OffsetDateTime now = OffsetDateTime.now();
     round.settle(now);
     Map<String, Object> report = assembleReport(roundId, now, prizeReport);
-    settlementReportRepository.save(ZoneEventSettlementReport.builder().roundId(roundId).report(report).build());
+    settlementReportRepository.save(
+        ZoneEventSettlementReport.builder().roundId(roundId).report(report).build());
     audit(user, "SETTLE_ROUND", "ROUND", roundId, null);
     return report;
   }
@@ -262,7 +313,9 @@ public class AdminRoundConsoleService {
   @Transactional(readOnly = true)
   public Map<String, Object> settlementReport(AuthenticatedUser user, UUID roundId) {
     operatorAuthorization.requireOperator(user);
-    return settlementReportRepository.findById(roundId).map(ZoneEventSettlementReport::getReport)
+    return settlementReportRepository
+        .findById(roundId)
+        .map(ZoneEventSettlementReport::getReport)
         .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
   }
 
@@ -274,18 +327,30 @@ public class AdminRoundConsoleService {
 
   private void expireOpenParticipations(UUID roundId) {
     for (ZoneEvent event : zoneEventRepository.findByRoundId(roundId)) {
-      for (ZoneEventParticipation p : participationRepository.findByEvent_IdAndStatusIn(event.getId(), List.of(ParticipationStatus.JOINED))) {
+      for (ZoneEventParticipation p :
+          participationRepository.findByEvent_IdAndStatusIn(
+              event.getId(), List.of(ParticipationStatus.JOINED))) {
         p.cancel("EXPIRED");
       }
     }
   }
 
-  private Map<String, Object> assembleReport(UUID roundId, OffsetDateTime settledAt, SettlementReportResDto prizeReport) {
+  private Map<String, Object> assembleReport(
+      UUID roundId, OffsetDateTime settledAt, SettlementReportResDto prizeReport) {
     Map<String, List<Map<String, Object>>> prizesByEvent = new LinkedHashMap<>();
     for (SettlementReportResDto.EventPrizes ep : prizeReport.events()) {
       List<Map<String, Object>> prizes = new ArrayList<>();
       for (SettlementReportResDto.Prize prize : ep.prizes()) {
-        prizes.add(Map.of("userId", prize.userId(), "participationId", prize.participationId(), "rewardCode", prize.rewardCode(), "status", prize.status()));
+        prizes.add(
+            Map.of(
+                "userId",
+                prize.userId(),
+                "participationId",
+                prize.participationId(),
+                "rewardCode",
+                prize.rewardCode(),
+                "status",
+                prize.status()));
       }
       prizesByEvent.put(ep.eventId(), prizes);
     }
@@ -293,15 +358,19 @@ public class AdminRoundConsoleService {
     List<Map<String, Object>> events = new ArrayList<>();
     for (ZoneEvent event : zoneEventRepository.findByRoundId(roundId)) {
       long participants = participationRepository.countByEvent_Id(event.getId());
-      long success = participationRepository.countByEvent_IdAndStatus(event.getId(), ParticipationStatus.SUCCESS);
-      List<ZoneEventParticipation> top = participationRepository.findTopPublicSuccessByEvent(event.getId(), PageRequest.of(0, 1));
+      long success =
+          participationRepository.countByEvent_IdAndStatus(
+              event.getId(), ParticipationStatus.SUCCESS);
+      List<ZoneEventParticipation> top =
+          participationRepository.findTopPublicSuccessByEvent(event.getId(), PageRequest.of(0, 1));
       Map<String, Object> eventReport = new LinkedHashMap<>();
       eventReport.put("eventId", event.getId().toString());
       eventReport.put("zoneId", event.getZoneId());
       eventReport.put("participants", participants);
       eventReport.put("success", success);
       eventReport.put("successRate", participants == 0 ? 0.0 : (double) success / participants);
-      eventReport.put("topContentParticipationId", top.isEmpty() ? null : top.get(0).getId().toString());
+      eventReport.put(
+          "topContentParticipationId", top.isEmpty() ? null : top.get(0).getId().toString());
       eventReport.put("prizes", prizesByEvent.getOrDefault(event.getId().toString(), List.of()));
       events.add(eventReport);
     }
@@ -322,14 +391,20 @@ public class AdminRoundConsoleService {
       }
       String eventId = slot.getEventId().toString();
       long participants = participationRepository.countByEvent_Id(slot.getEventId());
-      long success = participationRepository.countByEvent_IdAndStatus(slot.getEventId(), ParticipationStatus.SUCCESS);
-      long underReview = participationRepository.countByEvent_IdAndStatus(slot.getEventId(), ParticipationStatus.UNDER_REVIEW);
+      long success =
+          participationRepository.countByEvent_IdAndStatus(
+              slot.getEventId(), ParticipationStatus.SUCCESS);
+      long underReview =
+          participationRepository.countByEvent_IdAndStatus(
+              slot.getEventId(), ParticipationStatus.UNDER_REVIEW);
       countsByEventId.put(eventId, new long[] {participants, success, underReview});
     }
-    return AdminRoundResDto.of(round, slots, backupTargetRepository.findByRound_Id(round.getId()), countsByEventId);
+    return AdminRoundResDto.of(
+        round, slots, backupTargetRepository.findByRound_Id(round.getId()), countsByEventId);
   }
 
-  private Specification<ZoneEventRound> buildRoundSpec(RoundStatus status, OffsetDateTime from, OffsetDateTime to, String keyword) {
+  private Specification<ZoneEventRound> buildRoundSpec(
+      RoundStatus status, OffsetDateTime from, OffsetDateTime to, String keyword) {
     return (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
       if (status != null) {
@@ -349,7 +424,9 @@ public class AdminRoundConsoleService {
   }
 
   private ZoneEventRound requireRound(UUID roundId) {
-    return roundRepository.findById(roundId).orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
+    return roundRepository
+        .findById(roundId)
+        .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
   }
 
   private String parseZone(String zone) {
@@ -360,7 +437,19 @@ public class AdminRoundConsoleService {
     }
   }
 
-  private void audit(AuthenticatedUser user, String action, String targetType, UUID targetId, Map<String, Object> detail) {
-    auditLogRepository.save(ZoneEventAuditLog.builder().actorId(user.id()).action(action).targetType(targetType).targetId(targetId).detail(detail).build());
+  private void audit(
+      AuthenticatedUser user,
+      String action,
+      String targetType,
+      UUID targetId,
+      Map<String, Object> detail) {
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action(action)
+            .targetType(targetType)
+            .targetId(targetId)
+            .detail(detail)
+            .build());
   }
 }
