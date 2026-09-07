@@ -41,6 +41,7 @@ import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
 import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
+import com.butingbe.domain.travelrecord.repository.TravelRecordImageRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRouteRepository;
@@ -58,6 +59,7 @@ import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -102,6 +104,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   @Autowired private PlanRouteRepository planRouteRepository;
   @Autowired private TravelRecordRepository travelRecordRepository;
   @Autowired private TravelRecordDayRepository travelRecordDayRepository;
+  @Autowired private TravelRecordImageRepository travelRecordImageRepository;
   @Autowired private TravelRecordPlaceRepository travelRecordPlaceRepository;
   @Autowired private TravelRecordRouteRepository travelRecordRouteRepository;
   @Autowired private PlaceReviewRepository placeReviewRepository;
@@ -163,6 +166,86 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThatThrownBy(() -> travelRecordService.createDraft(authenticatedUser, travel.id(), null))
         .isInstanceOf(DuplicateResourceException.class)
         .hasMessage("Travel record already exists.");
+  }
+
+  @Test
+  @DisplayName(
+      "cover image falls back to the first travel record image when explicit cover is missing")
+  void createDraftUsesFirstImageAsCoverWhenCoverImageIsMissing() {
+    User user =
+        userRepository.save(createUser("record-cover-fallback@example.com", "record-cover"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+
+    TravelRecordResDto result =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto(
+                "Image Trip",
+                "Photos",
+                null,
+                List.of("https://image.test/first.jpg", "https://image.test/second.jpg"),
+                5));
+
+    assertThat(result.coverImageUrl()).isEqualTo("https://image.test/first.jpg");
+    assertThat(result.imageUrls())
+        .containsExactly("https://image.test/first.jpg", "https://image.test/second.jpg");
+    assertThat(
+            travelRecordImageRepository.findByTravelRecord_IdOrderBySequenceAsc(
+                result.travelRecordId()))
+        .extracting("url")
+        .containsExactly("https://image.test/first.jpg", "https://image.test/second.jpg");
+  }
+
+  @Test
+  @DisplayName("explicit cover image has priority over travel record image list")
+  void createDraftKeepsExplicitCoverImageWhenImagesExist() {
+    User user =
+        userRepository.save(createUser("record-cover-explicit@example.com", "record-cover2"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+
+    TravelRecordResDto result =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto(
+                "Image Trip",
+                "Photos",
+                "https://image.test/cover.jpg",
+                List.of("https://image.test/first.jpg"),
+                5));
+
+    assertThat(result.coverImageUrl()).isEqualTo("https://image.test/cover.jpg");
+    assertThat(result.imageUrls()).containsExactly("https://image.test/first.jpg");
+  }
+
+  @Test
+  @DisplayName("travel record cover image and image list are returned as presigned URLs")
+  void createDraftReturnsPresignedCoverImageAndImageUrls() {
+    User user =
+        userRepository.save(createUser("record-presigned-images@example.com", "record-presigned"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+
+    TravelRecordResDto result =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto(
+                "Image Trip",
+                "Photos",
+                "https://bucket.s3.ap-northeast-2.amazonaws.com/uploads/images/cover.jpg",
+                List.of("uploads/images/first.jpg", "uploads/images/second.jpg"),
+                5));
+
+    assertThat(result.coverImageUrl())
+        .isEqualTo("https://signed.example.com/uploads/images/cover.jpg");
+    assertThat(result.imageUrls())
+        .containsExactly(
+            "https://signed.example.com/uploads/images/first.jpg",
+            "https://signed.example.com/uploads/images/second.jpg");
   }
 
   @Test
@@ -253,6 +336,64 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.title()).isEqualTo("Before");
     assertThat(result.content()).isEqualTo("Only content changed");
     assertThat(result.coverImageUrl()).isEqualTo("https://image.test/before");
+  }
+
+  @Test
+  @DisplayName("draft update uses the first updated image as cover when explicit cover is missing")
+  void updateDraftUsesFirstImageAsCoverWhenCoverImageIsMissing() {
+    User user =
+        userRepository.save(createUser("record-update-image@example.com", "record-update-image"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto(
+                "Before", "Before content", null, List.of("https://image.test/before.jpg"), 5));
+
+    TravelRecordResDto result =
+        travelRecordService.updateDraft(
+            authenticatedUser,
+            travel.id(),
+            draft.travelRecordId(),
+            new TravelRecordUpdateReqDto(
+                null,
+                "After content",
+                null,
+                List.of("https://image.test/after-1.jpg", "https://image.test/after-2.jpg"),
+                null));
+
+    assertThat(result.content()).isEqualTo("After content");
+    assertThat(result.coverImageUrl()).isEqualTo("https://image.test/after-1.jpg");
+    assertThat(result.imageUrls())
+        .containsExactly("https://image.test/after-1.jpg", "https://image.test/after-2.jpg");
+  }
+
+  @Test
+  @DisplayName(
+      "draft update clears cover image when updated image list is empty and cover is missing")
+  void updateDraftClearsCoverImageWhenUpdatedImageListIsEmptyAndCoverImageIsMissing() {
+    User user =
+        userRepository.save(createUser("record-update-image-empty@example.com", "record-empty"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto(
+                "Before", "Before content", null, List.of("https://image.test/before.jpg"), 5));
+
+    TravelRecordResDto result =
+        travelRecordService.updateDraft(
+            authenticatedUser,
+            travel.id(),
+            draft.travelRecordId(),
+            new TravelRecordUpdateReqDto(null, "After content", null, List.of(), null));
+
+    assertThat(result.coverImageUrl()).isNull();
+    assertThat(result.imageUrls()).isEmpty();
   }
 
   @Test
@@ -399,6 +540,42 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.publishedAt()).isNotNull();
     assertThat(result.days()).hasSize(1);
     assertThat(result.days().getFirst().places().getFirst().placeName()).isEqualTo("Busan Station");
+  }
+
+  @Test
+  @DisplayName("published travel record detail returns presigned cover image and image list")
+  void getPublishedReturnsPresignedCoverImageAndImageUrls() {
+    User user =
+        userRepository.save(
+            createUser("record-public-presigned@example.com", "record-public-presigned"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelResDto travel = createCompletedTravel(authenticatedUser);
+    PlanResDto firstDay =
+        travelService.createPlan(
+            authenticatedUser, travel.id(), new PlanCreateReqDto(1, LocalDate.of(2026, 8, 1)));
+    createPlace(authenticatedUser, firstDay.planId(), 1, "Busan Station", "Busan");
+    TravelRecordResDto draft =
+        travelRecordService.createDraft(
+            authenticatedUser,
+            travel.id(),
+            new TravelRecordCreateReqDto(
+                "Public Image Trip",
+                "Photos",
+                "uploads/images/cover.jpg",
+                List.of("uploads/images/first.jpg", "uploads/images/second.jpg"),
+                5));
+    TravelRecordResDto published =
+        travelRecordService.publish(
+            authenticatedUser, draft.originalTravelId(), draft.travelRecordId());
+
+    TravelRecordResDto result = travelRecordService.getPublished(published.travelRecordId());
+
+    assertThat(result.coverImageUrl())
+        .isEqualTo("https://signed.example.com/uploads/images/cover.jpg");
+    assertThat(result.imageUrls())
+        .containsExactly(
+            "https://signed.example.com/uploads/images/first.jpg",
+            "https://signed.example.com/uploads/images/second.jpg");
   }
 
   @Test
@@ -1105,6 +1282,75 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(result.title()).isEqualTo("Keep Title");
     assertThat(result.content()).isEqualTo("Only content changed");
     assertThat(result.coverImageUrl()).isEqualTo("https://image.test/keep");
+  }
+
+  @Test
+  @DisplayName("my record update replaces image list and uses first image as cover")
+  void updateMyRecordReplacesImageListAndUsesFirstImageAsCover() {
+    User user =
+        userRepository.save(
+            createUser("record-my-update-images@example.com", "record-my-update-images"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Images Before");
+
+    TravelRecordResDto result =
+        travelRecordService.updateMyRecord(
+            authenticatedUser,
+            draft.travelRecordId(),
+            new TravelRecordUpdateReqDto(
+                "Images After",
+                "Images content",
+                null,
+                List.of("https://bucket.s3.ap-northeast-2.amazonaws.com", "http://[invalid"),
+                null));
+
+    assertThat(result.coverImageUrl()).isEqualTo("https://bucket.s3.ap-northeast-2.amazonaws.com");
+    assertThat(result.imageUrls())
+        .containsExactly("https://bucket.s3.ap-northeast-2.amazonaws.com", "http://[invalid");
+  }
+
+  @Test
+  @DisplayName("my record update rejects too many image URLs")
+  void updateMyRecordRejectsTooManyImageUrls() {
+    User user =
+        userRepository.save(
+            createUser("record-my-update-too-many-images@example.com", "record-too-many"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Too Many Images");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateMyRecord(
+                    authenticatedUser,
+                    draft.travelRecordId(),
+                    new TravelRecordUpdateReqDto(
+                        null,
+                        null,
+                        null,
+                        IntStream.rangeClosed(1, 21).mapToObj(String::valueOf).toList(),
+                        null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record image URLs must be 20 or fewer.");
+  }
+
+  @Test
+  @DisplayName("my record update rejects too long image URL")
+  void updateMyRecordRejectsTooLongImageUrl() {
+    User user =
+        userRepository.save(
+            createUser("record-my-update-too-long-image@example.com", "record-too-long"));
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Too Long Image");
+
+    assertThatThrownBy(
+            () ->
+                travelRecordService.updateMyRecord(
+                    authenticatedUser,
+                    draft.travelRecordId(),
+                    new TravelRecordUpdateReqDto(
+                        null, null, null, List.of("https://image.test/" + "a".repeat(1001)), null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Travel record image URL must be 1000 characters or less.");
   }
 
   @Test

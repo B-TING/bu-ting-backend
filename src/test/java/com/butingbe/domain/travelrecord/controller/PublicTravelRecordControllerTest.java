@@ -499,6 +499,7 @@ class PublicTravelRecordControllerTest {
         "부산 3일",
         "즐거웠다",
         "https://cdn.example.com/cover.jpg",
+        List.of(),
         5,
         LocalDate.of(2026, 9, 1),
         LocalDate.of(2026, 9, 3),

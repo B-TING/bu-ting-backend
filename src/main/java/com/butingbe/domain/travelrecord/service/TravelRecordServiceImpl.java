@@ -38,6 +38,7 @@ import com.butingbe.domain.travelrecord.entity.TravelRecord;
 import com.butingbe.domain.travelrecord.entity.TravelRecordBookmark;
 import com.butingbe.domain.travelrecord.entity.TravelRecordComment;
 import com.butingbe.domain.travelrecord.entity.TravelRecordDay;
+import com.butingbe.domain.travelrecord.entity.TravelRecordImage;
 import com.butingbe.domain.travelrecord.entity.TravelRecordLike;
 import com.butingbe.domain.travelrecord.entity.TravelRecordPlace;
 import com.butingbe.domain.travelrecord.entity.TravelRecordRoute;
@@ -47,6 +48,7 @@ import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordBookmarkRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordCommentRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
+import com.butingbe.domain.travelrecord.repository.TravelRecordImageRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordLikeRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRepository;
@@ -60,6 +62,8 @@ import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -91,6 +95,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private static final int MAX_PLACE_REVIEW_TAG_LENGTH = 30;
   private static final int MAX_PLACE_REVIEW_MEDIA_COUNT = 20;
   private static final int MAX_PLACE_REVIEW_MEDIA_FILE_KEY_LENGTH = 500;
+  private static final int MAX_TRAVEL_RECORD_IMAGE_COUNT = 20;
+  private static final int MAX_TRAVEL_RECORD_IMAGE_URL_LENGTH = 1000;
 
   private final TravelRepository travelRepository;
   private final PlanRepository planRepository;
@@ -100,6 +106,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private final UserRepository userRepository;
   private final TravelRecordRepository travelRecordRepository;
   private final TravelRecordDayRepository travelRecordDayRepository;
+  private final TravelRecordImageRepository travelRecordImageRepository;
   private final TravelRecordPlaceRepository travelRecordPlaceRepository;
   private final TravelRecordRouteRepository travelRecordRouteRepository;
   private final FileStorageService fileStorageService;
@@ -119,6 +126,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     validateCompletedTravel(travel);
     validateCreateRequest(request);
     validateNotDuplicated(travelId, author.getId());
+    List<String> imageUrls =
+        request == null ? List.of() : normalizeTravelRecordImageUrls(request.imageUrls());
+    String coverImageUrl =
+        resolveCoverImageUrl(request == null ? null : request.coverImageUrl(), imageUrls);
 
     TravelRecord travelRecord =
         travelRecordRepository.save(
@@ -127,12 +138,14 @@ public class TravelRecordServiceImpl implements TravelRecordService {
                 .author(author)
                 .title(resolveTitle(travel, request))
                 .content(request == null ? null : request.content())
-                .coverImageUrl(request == null ? null : request.coverImageUrl())
+                .coverImageUrl(coverImageUrl)
                 .overallRating(request == null ? null : request.overallRating())
                 .travelStartDate(travel.getStartDate())
                 .travelEndDate(travel.getEndDate())
                 .status(TravelRecordStatus.DRAFT)
                 .build());
+
+    saveTravelRecordImages(travelRecord, imageUrls);
 
     copyItinerarySnapshot(travelId, travelRecord);
 
@@ -169,8 +182,14 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       return toResponse(travelRecord);
     }
 
+    List<String> imageUrls =
+        request.imageUrls() == null ? null : normalizeTravelRecordImageUrls(request.imageUrls());
     travelRecord.updateContent(
         request.title(), request.content(), request.coverImageUrl(), request.overallRating());
+    if (imageUrls != null) {
+      travelRecord.updateCoverImageUrl(resolveCoverImageUrl(request.coverImageUrl(), imageUrls));
+      saveTravelRecordImages(travelRecord, imageUrls);
+    }
 
     return toResponse(travelRecord);
   }
@@ -382,7 +401,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     User author = findAuthenticatedUser(authenticatedUser);
 
     return travelRecordRepository.findByAuthor_IdOrderByCreatedAtDesc(author.getId()).stream()
-        .map(TravelRecordManageResDto::from)
+        .map(
+            travelRecord ->
+                TravelRecordManageResDto.from(
+                    travelRecord, toTravelRecordImageUrl(travelRecord.getCoverImageUrl())))
         .toList();
   }
 
@@ -408,8 +430,14 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       return toResponse(travelRecord);
     }
 
+    List<String> imageUrls =
+        request.imageUrls() == null ? null : normalizeTravelRecordImageUrls(request.imageUrls());
     travelRecord.updateContent(
         request.title(), request.content(), request.coverImageUrl(), request.overallRating());
+    if (imageUrls != null) {
+      travelRecord.updateCoverImageUrl(resolveCoverImageUrl(request.coverImageUrl(), imageUrls));
+      saveTravelRecordImages(travelRecord, imageUrls);
+    }
 
     return toResponse(travelRecord);
   }
@@ -453,7 +481,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         travelRecordBookmarkRepository.saveAndFlush(
             TravelRecordBookmark.builder().user(user).travelRecord(travelRecord).build());
 
-    return TravelRecordBookmarkResDto.from(bookmark);
+    return TravelRecordBookmarkResDto.from(
+        bookmark, toTravelRecordImageUrl(bookmark.getTravelRecord().getCoverImageUrl()));
   }
 
   @Override
@@ -475,7 +504,11 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .findByUser_IdAndTravelRecord_StatusOrderByCreatedAtDesc(
             user.getId(), TravelRecordStatus.PUBLISHED)
         .stream()
-        .map(TravelRecordBookmarkResDto::from)
+        .map(
+            bookmark ->
+                TravelRecordBookmarkResDto.from(
+                    bookmark,
+                    toTravelRecordImageUrl(bookmark.getTravelRecord().getCoverImageUrl())))
         .toList();
   }
 
@@ -934,7 +967,12 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             .map(this::toDayResponse)
             .toList();
 
-    return TravelRecordResDto.of(travelRecord, days, likedByMe);
+    return TravelRecordResDto.of(
+        travelRecord,
+        days,
+        toTravelRecordImageUrl(travelRecord.getCoverImageUrl()),
+        findTravelRecordImageUrls(travelRecord.getId()),
+        likedByMe);
   }
 
   private boolean isLikedBy(AuthenticatedUser authenticatedUser, UUID travelRecordId) {
@@ -953,7 +991,9 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     UUID authenticatedUserId =
         authenticatedUser == null || authenticatedUser.id() == null ? null : authenticatedUser.id();
     if (authenticatedUserId == null) {
-      return travelRecords.stream().map(TravelRecordFeedResDto::from).toList();
+      return travelRecords.stream()
+          .map(travelRecord -> toFeedResponse(travelRecord, false))
+          .toList();
     }
 
     Set<UUID> likedTravelRecordIds =
@@ -964,9 +1004,13 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     return travelRecords.stream()
         .map(
             travelRecord ->
-                TravelRecordFeedResDto.from(
-                    travelRecord, likedTravelRecordIds.contains(travelRecord.getId())))
+                toFeedResponse(travelRecord, likedTravelRecordIds.contains(travelRecord.getId())))
         .toList();
+  }
+
+  private TravelRecordFeedResDto toFeedResponse(TravelRecord travelRecord, boolean likedByMe) {
+    return TravelRecordFeedResDto.from(
+        travelRecord, toTravelRecordImageUrl(travelRecord.getCoverImageUrl()), likedByMe);
   }
 
   private TravelRecordDayResDto toDayResponse(TravelRecordDay day) {
@@ -982,6 +1026,15 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   private PlaceReviewResDto toPlaceReviewResponse(PlaceReview placeReview) {
     return PlaceReviewResDto.from(placeReview, findPlaceReviewMediaUrls(placeReview.getId()));
+  }
+
+  private List<String> findTravelRecordImageUrls(UUID travelRecordId) {
+    return travelRecordImageRepository
+        .findByTravelRecord_IdOrderBySequenceAsc(travelRecordId)
+        .stream()
+        .map(TravelRecordImage::getUrl)
+        .map(this::toTravelRecordImageUrl)
+        .toList();
   }
 
   private PlaceReviewSummaryResDto.PlaceReviewItemResDto toPlaceReviewSummaryItem(
@@ -1018,6 +1071,45 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         : fileStorageService.getPresignedUrl(image.getFileKey());
   }
 
+  private String toTravelRecordImageUrl(String storedUrl) {
+    if (storedUrl == null || storedUrl.isBlank()) {
+      return storedUrl;
+    }
+
+    String trimmedUrl = storedUrl.trim();
+    String fileKey = extractS3FileKey(trimmedUrl);
+    if (fileKey == null) {
+      return trimmedUrl;
+    }
+
+    return fileStorageService.getPresignedUrl(fileKey);
+  }
+
+  private String extractS3FileKey(String imageUrl) {
+    if (imageUrl.startsWith("uploads/")) {
+      return imageUrl;
+    }
+
+    try {
+      URI uri = new URI(imageUrl);
+      String host = uri.getHost();
+      if (host == null || !host.contains("amazonaws.com")) {
+        return null;
+      }
+
+      String path = uri.getPath();
+      if (path == null || path.isBlank()) {
+        return null;
+      }
+
+      String normalizedPath = path.startsWith("/") ? path.substring(1) : path;
+      int uploadPrefixIndex = normalizedPath.indexOf("uploads/");
+      return uploadPrefixIndex < 0 ? null : normalizedPath.substring(uploadPrefixIndex);
+    } catch (URISyntaxException exception) {
+      return null;
+    }
+  }
+
   private void savePlaceReviewMedia(PlaceReview placeReview, List<String> mediaFileKeys) {
     placeReviewImageRepository.deleteByPlaceReview_Id(placeReview.getId());
     for (int index = 0; index < mediaFileKeys.size(); index++) {
@@ -1042,6 +1134,31 @@ public class TravelRecordServiceImpl implements TravelRecordService {
                     .sequence(image.getSequence())
                     .build())
         .forEach(placeReviewImageRepository::save);
+  }
+
+  private void saveTravelRecordImages(TravelRecord travelRecord, List<String> imageUrls) {
+    travelRecordImageRepository.deleteByTravelRecord_Id(travelRecord.getId());
+    travelRecordImageRepository.flush();
+    for (int index = 0; index < imageUrls.size(); index++) {
+      travelRecordImageRepository.save(
+          TravelRecordImage.builder()
+              .travelRecord(travelRecord)
+              .url(imageUrls.get(index))
+              .sequence(index + 1)
+              .build());
+    }
+  }
+
+  private String resolveCoverImageUrl(String coverImageUrl, List<String> imageUrls) {
+    if (coverImageUrl != null && !coverImageUrl.isBlank()) {
+      return coverImageUrl.trim();
+    }
+
+    if (imageUrls != null && !imageUrls.isEmpty()) {
+      return imageUrls.getFirst();
+    }
+
+    return null;
   }
 
   private User findAuthenticatedUser(AuthenticatedUser authenticatedUser) {
@@ -1165,6 +1282,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     validateTravelRecordOverallRating(request.overallRating());
+    normalizeTravelRecordImageUrls(request.imageUrls());
   }
 
   private void validateCreateRequest(TravelRecordCreateReqDto request) {
@@ -1177,6 +1295,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     validateTravelRecordOverallRating(request.overallRating());
+    normalizeTravelRecordImageUrls(request.imageUrls());
   }
 
   private void validateCloneToTravelRequest(TravelRecordCloneToTravelReqDto request) {
@@ -1328,6 +1447,36 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     return normalizedMediaFileKeys;
+  }
+
+  private List<String> normalizeTravelRecordImageUrls(List<String> imageUrls) {
+    if (imageUrls == null || imageUrls.isEmpty()) {
+      return List.of();
+    }
+
+    List<String> normalizedImageUrls =
+        imageUrls.stream()
+            .filter(imageUrl -> imageUrl != null && !imageUrl.isBlank())
+            .map(String::trim)
+            .distinct()
+            .toList();
+
+    if (normalizedImageUrls.size() > MAX_TRAVEL_RECORD_IMAGE_COUNT) {
+      throw new IllegalArgumentException(
+          "Travel record image URLs must be " + MAX_TRAVEL_RECORD_IMAGE_COUNT + " or fewer.");
+    }
+
+    boolean hasTooLongImageUrl =
+        normalizedImageUrls.stream()
+            .anyMatch(imageUrl -> imageUrl.length() > MAX_TRAVEL_RECORD_IMAGE_URL_LENGTH);
+    if (hasTooLongImageUrl) {
+      throw new IllegalArgumentException(
+          "Travel record image URL must be "
+              + MAX_TRAVEL_RECORD_IMAGE_URL_LENGTH
+              + " characters or less.");
+    }
+
+    return normalizedImageUrls;
   }
 
   private void validatePlaceReviewSummaryRequest(PlaceProvider provider, String providerPlaceId) {

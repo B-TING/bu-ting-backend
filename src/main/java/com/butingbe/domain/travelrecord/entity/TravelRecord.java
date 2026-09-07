@@ -136,6 +136,10 @@ public class TravelRecord {
     }
   }
 
+  public void updateCoverImageUrl(String coverImageUrl) {
+    this.coverImageUrl = coverImageUrl;
+  }
+
   public void publish(LocalDateTime publishedAt) {
     this.status = TravelRecordStatus.PUBLISHED;
     this.publishedAt = publishedAt;

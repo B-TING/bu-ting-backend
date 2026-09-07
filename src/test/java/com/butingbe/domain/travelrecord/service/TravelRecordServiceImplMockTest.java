@@ -24,6 +24,7 @@ import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordBookmarkRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordCommentRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
+import com.butingbe.domain.travelrecord.repository.TravelRecordImageRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordLikeRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordRepository;
@@ -64,6 +65,7 @@ class TravelRecordServiceImplMockTest {
   @Mock private UserRepository userRepository;
   @Mock private TravelRecordRepository travelRecordRepository;
   @Mock private TravelRecordDayRepository travelRecordDayRepository;
+  @Mock private TravelRecordImageRepository travelRecordImageRepository;
   @Mock private TravelRecordPlaceRepository travelRecordPlaceRepository;
   @Mock private TravelRecordRouteRepository travelRecordRouteRepository;
   @Mock private FileStorageService fileStorageService;
