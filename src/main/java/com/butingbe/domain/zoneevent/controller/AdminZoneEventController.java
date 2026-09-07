@@ -42,15 +42,17 @@ public class AdminZoneEventController {
   @GetMapping
   public ResponseEntity<ApiResponse<AdminZoneEventPageResDto>> list(
       @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestParam(required = false) UUID roundId,
       @RequestParam(required = false) String zone,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) OffsetDateTime from,
       @RequestParam(required = false) OffsetDateTime to,
-      @RequestParam(required = false) String cursor,
+      @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size) {
     return ResponseEntity.ok(
         ApiResponse.success(
-            "이벤트 목록 조회", adminZoneEventService.list(user, zone, status, from, to, cursor, size)));
+            "이벤트 목록 조회",
+            adminZoneEventService.list(user, roundId, zone, status, from, to, page, size)));
   }
 
   @GetMapping("/{eventId}")
@@ -67,20 +69,6 @@ public class AdminZoneEventController {
       @RequestBody AdminZoneEventUpdateReqDto request) {
     return ResponseEntity.ok(
         ApiResponse.success("이벤트 수정", adminZoneEventService.update(user, eventId, request)));
-  }
-
-  @PostMapping("/{eventId}/activate")
-  public ResponseEntity<ApiResponse<AdminZoneEventResDto>> activate(
-      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID eventId) {
-    return ResponseEntity.ok(
-        ApiResponse.success("이벤트 활성화", adminZoneEventService.activate(user, eventId)));
-  }
-
-  @PostMapping("/{eventId}/close")
-  public ResponseEntity<ApiResponse<AdminZoneEventResDto>> close(
-      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID eventId) {
-    return ResponseEntity.ok(
-        ApiResponse.success("이벤트 종료", adminZoneEventService.close(user, eventId)));
   }
 
   @PostMapping("/{eventId}/cancel")

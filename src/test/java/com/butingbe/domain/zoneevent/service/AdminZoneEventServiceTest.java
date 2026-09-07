@@ -267,24 +267,11 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("활성화·종료 상태 전이와 잘못된 전이(409)를 처리한다")
-  void stateTransitions() {
-    UUID eventId =
-        UUID.fromString(adminZoneEventService.create(operator, createRequest()).eventId());
-
-    assertThat(adminZoneEventService.activate(operator, eventId).status()).isEqualTo("ACTIVE");
-    // 이미 ACTIVE인데 다시 activate → 409
-    assertThatThrownBy(() -> adminZoneEventService.activate(operator, eventId))
-        .isInstanceOf(ConflictException.class);
-    assertThat(adminZoneEventService.close(operator, eventId).status()).isEqualTo("CLOSED");
-  }
-
-  @Test
   @DisplayName("취소 시 열린 참여는 EVENT_CANCELLED로 정리되고 성공 참여는 유지된다(BR-13)")
   void cancelClosesOpenParticipations() {
     UUID eventId =
         UUID.fromString(adminZoneEventService.create(operator, createRequest()).eventId());
-    adminZoneEventService.activate(operator, eventId);
+    activateEntity(eventId);
     UUID joinerId = savedUser("joiner", UserRole.USER).getId();
     UUID winnerId = savedUser("winner", UserRole.USER).getId();
     ZoneEventParticipation open = saveParticipation(eventId, joinerId, ParticipationStatus.JOINED);
@@ -306,7 +293,8 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   void updateRestrictionsOnActive() {
     AdminZoneEventResDto created = adminZoneEventService.create(operator, createRequest());
     UUID eventId = UUID.fromString(created.eventId());
-    AdminZoneEventResDto activated = adminZoneEventService.activate(operator, eventId);
+    activateEntity(eventId);
+    AdminZoneEventResDto activated = adminZoneEventService.detail(operator, eventId);
 
     AdminZoneEventResDto updated =
         adminZoneEventService.update(
@@ -359,22 +347,39 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("목록을 구역·상태 필터와 커서 페이징으로 조회한다")
-  void listWithFiltersAndCursor() {
+  @DisplayName("목록을 구역·상태 필터와 page/size 페이징으로 조회한다")
+  void listWithFiltersAndPaging() {
     for (int i = 0; i < 3; i++) {
       adminZoneEventService.create(operator, createRequest(OffsetDateTime.now().plusDays(2L * i)));
     }
 
     AdminZoneEventPageResDto first =
-        adminZoneEventService.list(operator, "SUYEONG_NAMGU", "SCHEDULED", null, null, null, 2);
+        adminZoneEventService.list(operator, null, "SUYEONG_NAMGU", "SCHEDULED", null, null, 0, 2);
     assertThat(first.items()).hasSize(2);
-    assertThat(first.hasNext()).isTrue();
+    assertThat(first.page()).isZero();
+    assertThat(first.size()).isEqualTo(2);
+    assertThat(first.totalElements()).isEqualTo(3);
+    assertThat(first.totalPages()).isEqualTo(2);
 
     AdminZoneEventPageResDto second =
-        adminZoneEventService.list(
-            operator, "SUYEONG_NAMGU", "SCHEDULED", null, null, first.nextCursor(), 2);
+        adminZoneEventService.list(operator, null, "SUYEONG_NAMGU", "SCHEDULED", null, null, 1, 2);
     assertThat(second.items()).hasSize(1);
-    assertThat(second.hasNext()).isFalse();
+    assertThat(second.page()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("roundId로 목록을 필터링한다")
+  void listFiltersByRoundId() {
+    ZoneEventRound round = draftRound(21);
+    AdminZoneEventResDto inRound =
+        adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
+    adminZoneEventService.create(operator, createRequest());
+
+    AdminZoneEventPageResDto result =
+        adminZoneEventService.list(operator, round.getId(), null, null, null, null, 0, 20);
+
+    assertThat(result.items()).hasSize(1);
+    assertThat(result.items().get(0).eventId()).isEqualTo(inRound.eventId());
   }
 
   @Test
@@ -451,18 +456,27 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("목록 기본 크기·잘못된 상태·잘못된 커서를 처리한다")
+  @DisplayName("목록 기본 크기·잘못된 상태·비정상 page/size를 처리한다")
   void listEdgeCases() {
     adminZoneEventService.create(operator, createRequest());
 
-    assertThat(adminZoneEventService.list(operator, null, null, null, null, null, null).items())
-        .isNotEmpty();
+    AdminZoneEventPageResDto defaults =
+        adminZoneEventService.list(operator, null, null, null, null, null, null, null);
+    assertThat(defaults.items()).isNotEmpty();
+    assertThat(defaults.page()).isZero();
+    assertThat(defaults.size()).isEqualTo(20);
+
     assertThatThrownBy(
-            () -> adminZoneEventService.list(operator, null, "GHOST", null, null, null, 20))
+            () -> adminZoneEventService.list(operator, null, null, "GHOST", null, null, null, 20))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(
-            () -> adminZoneEventService.list(operator, null, null, null, null, "!!bad!!", 20))
-        .isInstanceOf(IllegalArgumentException.class);
+
+    AdminZoneEventPageResDto negativePage =
+        adminZoneEventService.list(operator, null, null, null, null, null, -1, 20);
+    assertThat(negativePage.page()).isZero();
+
+    AdminZoneEventPageResDto oversizedPage =
+        adminZoneEventService.list(operator, null, null, null, null, null, 0, 999);
+    assertThat(oversizedPage.size()).isEqualTo(50);
   }
 
   @Test
@@ -520,8 +534,8 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("기간 필터와 형식 오류 커서를 처리한다")
-  void listPeriodAndMalformedCursor() {
+  @DisplayName("기간 필터로 목록을 조회한다")
+  void listPeriodFilter() {
     adminZoneEventService.create(operator, createRequest());
 
     assertThat(
@@ -530,20 +544,13 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
                     operator,
                     null,
                     null,
+                    null,
                     OffsetDateTime.now().minusDays(1),
                     OffsetDateTime.now().plusDays(1),
-                    null,
+                    0,
                     20)
                 .items())
         .isNotEmpty();
-
-    String noPipe =
-        java.util.Base64.getUrlEncoder()
-            .withoutPadding()
-            .encodeToString("nopipe".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-    assertThatThrownBy(
-            () -> adminZoneEventService.list(operator, null, null, null, null, noPipe, 20))
-        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
@@ -551,8 +558,8 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   void cancelClosedEventRejected() {
     UUID eventId =
         UUID.fromString(adminZoneEventService.create(operator, createRequest()).eventId());
-    adminZoneEventService.activate(operator, eventId);
-    adminZoneEventService.close(operator, eventId);
+    activateEntity(eventId);
+    closeEntity(eventId);
 
     assertThatThrownBy(() -> adminZoneEventService.cancel(operator, eventId))
         .isInstanceOf(ConflictException.class);
@@ -601,6 +608,20 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
 
   private com.butingbe.domain.zoneevent.entity.ZoneEvent zoneEventRef(UUID eventId) {
     return zoneEventRepository.findById(eventId).orElseThrow();
+  }
+
+  // AdminZoneEventService에서 activate()/close() API가 제거되어, 다른 테스트의 사전 상태 준비를 위해
+  // 엔티티를 직접 전이시킨다(#238 Task 8).
+  private void activateEntity(UUID eventId) {
+    com.butingbe.domain.zoneevent.entity.ZoneEvent event = zoneEventRef(eventId);
+    event.activate();
+    zoneEventRepository.saveAndFlush(event);
+  }
+
+  private void closeEntity(UUID eventId) {
+    com.butingbe.domain.zoneevent.entity.ZoneEvent event = zoneEventRef(eventId);
+    event.close();
+    zoneEventRepository.saveAndFlush(event);
   }
 
   private User savedUser(String nickname, UserRole role) {

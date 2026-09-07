@@ -32,10 +32,8 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
-import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -163,32 +161,29 @@ public class AdminZoneEventService {
   @Transactional(readOnly = true)
   public AdminZoneEventPageResDto list(
       AuthenticatedUser user,
+      UUID roundId,
       String zone,
       String status,
       OffsetDateTime from,
       OffsetDateTime to,
-      String cursor,
+      Integer page,
       Integer size) {
     operatorAuthorization.requireOperator(user);
     String zoneId = zone == null || zone.isBlank() ? null : parseZone(zone);
     ZoneEventStatus statusFilter = status == null || status.isBlank() ? null : parseStatus(status);
-    int pageSize = resolveSize(size);
-    Cursor decoded = decodeCursor(cursor);
+    int pageSize = size == null || size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+    int pageNumber = page == null || page < 0 ? 0 : page;
 
-    Specification<ZoneEvent> spec = buildListSpec(zoneId, statusFilter, from, to, decoded);
-    List<ZoneEvent> rows =
-        zoneEventRepository
-            .findAll(
-                spec,
-                PageRequest.of(
-                    0, pageSize + 1, Sort.by(Sort.Order.desc("startsAt"), Sort.Order.desc("id"))))
-            .getContent();
+    Specification<ZoneEvent> spec = buildListSpec(roundId, zoneId, statusFilter, from, to);
+    org.springframework.data.domain.Page<ZoneEvent> result =
+        zoneEventRepository.findAll(
+            spec,
+            PageRequest.of(
+                pageNumber, pageSize, Sort.by(Sort.Order.desc("startsAt"), Sort.Order.desc("id"))));
 
-    boolean hasNext = rows.size() > pageSize;
-    List<ZoneEvent> page = hasNext ? rows.subList(0, pageSize) : rows;
-    List<AdminZoneEventResDto> items = page.stream().map(this::toDetail).toList();
-    String nextCursor = hasNext ? encodeCursor(page.get(page.size() - 1)) : null;
-    return new AdminZoneEventPageResDto(items, nextCursor, hasNext);
+    List<AdminZoneEventResDto> items = result.getContent().stream().map(this::toDetail).toList();
+    return new AdminZoneEventPageResDto(
+        items, pageNumber, pageSize, result.getTotalElements(), result.getTotalPages());
   }
 
   @Transactional(readOnly = true)
@@ -259,22 +254,6 @@ public class AdminZoneEventService {
   }
 
   @Transactional
-  public AdminZoneEventResDto activate(AuthenticatedUser user, UUID eventId) {
-    operatorAuthorization.requireOperator(user);
-    ZoneEvent event = findEvent(eventId);
-    event.activate();
-    return toDetail(event);
-  }
-
-  @Transactional
-  public AdminZoneEventResDto close(AuthenticatedUser user, UUID eventId) {
-    operatorAuthorization.requireOperator(user);
-    ZoneEvent event = findEvent(eventId);
-    event.close();
-    return toDetail(event);
-  }
-
-  @Transactional
   public AdminZoneEventResDto cancel(AuthenticatedUser user, UUID eventId) {
     operatorAuthorization.requireOperator(user);
     ZoneEvent event = findEvent(eventId);
@@ -306,13 +285,12 @@ public class AdminZoneEventService {
   }
 
   private Specification<ZoneEvent> buildListSpec(
-      String zoneId,
-      ZoneEventStatus status,
-      OffsetDateTime from,
-      OffsetDateTime to,
-      Cursor cursor) {
+      UUID roundId, String zoneId, ZoneEventStatus status, OffsetDateTime from, OffsetDateTime to) {
     return (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
+      if (roundId != null) {
+        predicates.add(cb.equal(root.get("roundId"), roundId));
+      }
       if (zoneId != null) {
         predicates.add(cb.equal(root.get("zoneId"), zoneId));
       }
@@ -324,14 +302,6 @@ public class AdminZoneEventService {
       }
       if (to != null) {
         predicates.add(cb.lessThanOrEqualTo(root.get("startsAt"), to));
-      }
-      if (cursor != null) {
-        Predicate earlier = cb.lessThan(root.get("startsAt"), cursor.startsAt());
-        Predicate sameTimeLowerId =
-            cb.and(
-                cb.equal(root.get("startsAt"), cursor.startsAt()),
-                cb.lessThan(root.get("id"), cursor.id()));
-        predicates.add(cb.or(earlier, sameTimeLowerId));
       }
       return cb.and(predicates.toArray(new Predicate[0]));
     };
@@ -399,36 +369,4 @@ public class AdminZoneEventService {
       throw new IllegalArgumentException("error.zone_event.media.invalid");
     }
   }
-
-  private int resolveSize(Integer size) {
-    if (size == null || size <= 0) {
-      return DEFAULT_SIZE;
-    }
-    return Math.min(size, MAX_SIZE);
-  }
-
-  private String encodeCursor(ZoneEvent event) {
-    String raw = event.getStartsAt() + "|" + event.getId();
-    return Base64.getUrlEncoder()
-        .withoutPadding()
-        .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
-  }
-
-  private Cursor decodeCursor(String cursor) {
-    if (cursor == null || cursor.isBlank()) {
-      return null;
-    }
-    try {
-      String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
-      String[] parts = raw.split("\\|");
-      if (parts.length != 2) {
-        throw new IllegalArgumentException("Invalid admin event cursor.");
-      }
-      return new Cursor(OffsetDateTime.parse(parts[0]), UUID.fromString(parts[1]));
-    } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
-      throw new IllegalArgumentException("Invalid admin event cursor.");
-    }
-  }
-
-  private record Cursor(OffsetDateTime startsAt, UUID id) {}
 }
