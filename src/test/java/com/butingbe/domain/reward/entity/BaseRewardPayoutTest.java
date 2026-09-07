@@ -26,4 +26,15 @@ class BaseRewardPayoutTest {
 
     assertThat(payout.getHoldStatus()).isEqualTo(PayoutHoldStatus.HELD_REPORT);
   }
+
+  @Test
+  @DisplayName("보류 해제하면 NONE으로 돌아간다")
+  void releaseHoldMarksNone() {
+    BaseRewardPayout payout = BaseRewardPayout.builder().participationId(UUID.randomUUID()).build();
+    payout.hold();
+
+    payout.releaseHold();
+
+    assertThat(payout.getHoldStatus()).isEqualTo(PayoutHoldStatus.NONE);
+  }
 }
