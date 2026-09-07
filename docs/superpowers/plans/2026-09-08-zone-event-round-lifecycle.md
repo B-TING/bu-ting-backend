@@ -839,7 +839,7 @@ public class RoundStatusQueryService {
 
     return roundRepository
         .findFirstByStatusOrderByStartsAtDesc(RoundStatus.ACTIVE)
-        .map(round -> statusOf(round, "ACTIVE"))
+        .map(round -> statusOf(round, "OPEN"))
         .or(
             () ->
                 roundRepository
@@ -891,7 +891,7 @@ public class RoundStatusQueryService {
 
     return roundRepository
         .findFirstByStatusOrderByStartsAtDesc(RoundStatus.ACTIVE)
-        .map(round -> statusOf(round, "ACTIVE"))
+        .map(round -> statusOf(round, "OPEN"))
         .or(
             () ->
                 roundRepository
@@ -902,6 +902,8 @@ public class RoundStatusQueryService {
 ```
 
 (위의 "주의" 블록이 최종 구현이다 — Step 3의 첫 코드 블록 대신 이 버전을 적용한다.)
+
+주의: `statusOf(round, "OPEN")`의 `"OPEN"`은 `RoundStatus` enum이 아니라 API 응답의 구역별 `slotStatus` 표시 라벨이다(`"OPEN"`/`"REST"`/`"UPCOMING"`). `RoundStatus.OPEN`이 `RoundStatus.ACTIVE`로 이름이 바뀐 것과는 무관하니 이 문자열 리터럴은 그대로 `"OPEN"`으로 둔다.
 
 - [ ] **Step 4: 테스트 통과 확인**
 
