@@ -2421,7 +2421,7 @@ git commit -m "feat(zoneevent): 회차 콘솔에 DRAFT 생성·PATCH·schedule·
 - Modify: `src/test/java/com/butingbe/domain/zoneevent/controller/AdminRoundControllerTest.java`
 
 **Interfaces:**
-- Consumes: `AdminRoundConsoleService.createRound/listRounds/roundDetail/patch/schedule/cancel/reassignSlot/addBackupTarget/swapTarget/settle/settlementReport` (Task 9)
+- Consumes: `AdminRoundConsoleService.createRound/listRounds/roundDetail/patch/schedule/cancel/reassignSlot/addBackupTarget/swapTarget/settle/settlementReport` (Task 9). `listRounds`가 반환하는 타입은 `AdminRoundPageResDto(List<AdminRoundResDto> items, int page, int size, long totalElements, int totalPages)`다(Task 9의 fix round에서 `List` 대신 이 페이지 응답으로 확정됨 — 이슈 체크리스트의 "page/size" 목록 요구사항과 Task 8의 `AdminZoneEventPageResDto` 패턴에 맞춘 것).
 
 - [ ] **Step 1: 컨트롤러 테스트를 새 계약에 맞춰 전체 교체**
 
@@ -2439,6 +2439,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
 import com.butingbe.domain.zoneevent.dto.response.SlotSuggestionResDto;
 import com.butingbe.domain.zoneevent.entity.RoundStatus;
@@ -2532,7 +2533,8 @@ class AdminRoundControllerTest {
   @Test
   @DisplayName("목록·상세·제안 200")
   void reads() throws Exception {
-    when(consoleService.listRounds(any(), any(), any(), any(), any(), any(), any())).thenReturn(List.of(round()));
+    when(consoleService.listRounds(any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(new AdminRoundPageResDto(List.of(round()), 0, 20, 1, 1));
     when(consoleService.roundDetail(any(), eq(ROUND))).thenReturn(round());
     when(consoleService.suggestSlots(any(), anyInt()))
         .thenReturn(new SlotSuggestionResDto(List.of("YEONGDO"), List.of("YEONGDO: 직전 2회차 미오픈")));
@@ -2540,7 +2542,8 @@ class AdminRoundControllerTest {
     mockMvc
         .perform(get("/admin/zone-event-rounds").param("status", "DRAFT").param("page", "0").param("size", "20"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[0].roundId").value(ROUND.toString()));
+        .andExpect(jsonPath("$.data.items[0].roundId").value(ROUND.toString()))
+        .andExpect(jsonPath("$.data.totalElements").value(1));
     mockMvc.perform(get("/admin/zone-event-rounds/{id}", ROUND)).andExpect(status().isOk());
     mockMvc
         .perform(get("/admin/zone-event-rounds/suggest-slots").param("authSlots", "1"))
@@ -2655,13 +2658,13 @@ import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundPatchReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SlotReassignReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SwapTargetReqDto;
+import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
 import com.butingbe.domain.zoneevent.dto.response.SlotSuggestionResDto;
 import com.butingbe.domain.zoneevent.service.AdminRoundConsoleService;
 import com.butingbe.global.common.ApiResponse;
 import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -2692,7 +2695,7 @@ public class AdminRoundController {
   }
 
   @GetMapping
-  public ResponseEntity<ApiResponse<List<AdminRoundResDto>>> list(
+  public ResponseEntity<ApiResponse<AdminRoundPageResDto>> list(
       @AuthenticationPrincipal AuthenticatedUser user,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) OffsetDateTime from,
