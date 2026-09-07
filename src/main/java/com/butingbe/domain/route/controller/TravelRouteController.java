@@ -1,0 +1,81 @@
+package com.butingbe.domain.route.controller;
+
+import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.route.TravelRouteService;
+import com.butingbe.domain.route.dto.request.AlternativeRouteReqDto;
+import com.butingbe.domain.route.dto.request.ApplyOptimizedOrderReqDto;
+import com.butingbe.domain.route.dto.request.VisitOrderOptimizeReqDto;
+import com.butingbe.domain.route.dto.response.AlternativeRouteResDto;
+import com.butingbe.domain.route.dto.response.PlanRouteResDto;
+import com.butingbe.domain.route.dto.response.VisitOrderResDto;
+import com.butingbe.domain.travel.dto.response.PlanPlaceResDto;
+import com.butingbe.domain.travel.entity.TransportType;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/plans/{planId}/route")
+@RequiredArgsConstructor
+public class TravelRouteController {
+
+  private final TravelRouteService travelRouteService;
+
+  @GetMapping
+  public ResponseEntity<PlanRouteResDto> getPlanRoute(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID planId,
+      @RequestParam(required = false) TransportType transportType) {
+    return ResponseEntity.ok(travelRouteService.getPlanRoute(user, planId, transportType));
+  }
+
+  /** 방문 순서 최적화 결과를 제안한다. 일정을 바꾸지는 않는다. */
+  @PostMapping("/optimize")
+  public ResponseEntity<VisitOrderResDto> optimizeVisitOrder(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID planId,
+      @RequestBody(required = false) @Valid VisitOrderOptimizeReqDto request) {
+    VisitOrderOptimizeReqDto body =
+        request == null ? new VisitOrderOptimizeReqDto(null, null, null, null) : request;
+    return ResponseEntity.ok(
+        travelRouteService.optimizeVisitOrder(
+            user, planId, body.startPointOrNull(), body.transportType()));
+  }
+
+  /** 못 가게 된 장소를 빼고 대체 경로를 제안한다. 일정을 바꾸지는 않는다. */
+  @PostMapping("/alternatives")
+  public ResponseEntity<AlternativeRouteResDto> generateAlternativeRoute(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID planId,
+      @RequestBody(required = false) @Valid AlternativeRouteReqDto request) {
+    AlternativeRouteReqDto body =
+        request == null ? new AlternativeRouteReqDto(null, null, null, null, null) : request;
+    return ResponseEntity.ok(
+        travelRouteService.generateAlternativeRoute(
+            user,
+            planId,
+            body.excludePlaceIdsOrEmpty(),
+            body.startPointOrNull(),
+            body.transportType()));
+  }
+
+  /** 최적화한 순서를 일정에 반영한다. 요청에 빠진 장소는 기존 순서를 유지한 채 뒤에 붙는다. */
+  @PostMapping("/apply")
+  public ResponseEntity<List<PlanPlaceResDto>> applyOptimizedOrder(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID planId,
+      @RequestBody @Valid ApplyOptimizedOrderReqDto request) {
+    return ResponseEntity.ok(
+        travelRouteService.applyOptimizedOrder(user, planId, request.planPlaceIds()));
+  }
+}

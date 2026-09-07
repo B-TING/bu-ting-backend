@@ -26,13 +26,17 @@ import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -622,6 +626,35 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
         .hasMessage("User is not a travel member.");
   }
 
+  @Test
+  @DisplayName("인증 정보가 없거나 id가 없으면 모든 경비 API가 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    UUID travelId = UUID.randomUUID();
+    UUID expenseId = UUID.randomUUID();
+    AuthenticatedUser withoutId =
+        new AuthenticatedUser(null, "user@example.com", "tester", List.of());
+
+    for (AuthenticatedUser invalid : new AuthenticatedUser[] {null, withoutId}) {
+      assertThatThrownBy(
+              () -> travelExpenseService.getExpenseSummary(invalid, travelId, null, null))
+          .isInstanceOf(UnauthenticatedException.class);
+      assertThatThrownBy(() -> travelExpenseService.deleteExpense(invalid, travelId, expenseId))
+          .isInstanceOf(UnauthenticatedException.class);
+      assertThatThrownBy(
+              () -> travelExpenseService.updateExpense(invalid, travelId, expenseId, null))
+          .isInstanceOf(UnauthenticatedException.class);
+      assertThatThrownBy(() -> travelExpenseService.getExpense(invalid, travelId, expenseId))
+          .isInstanceOf(UnauthenticatedException.class);
+      assertThatThrownBy(
+              () ->
+                  travelExpenseService.getExpenses(
+                      invalid, travelId, null, null, null, null, Pageable.unpaged()))
+          .isInstanceOf(UnauthenticatedException.class);
+      assertThatThrownBy(() -> travelExpenseService.createEqualExpense(invalid, travelId, null))
+          .isInstanceOf(UnauthenticatedException.class);
+    }
+  }
+
   private TravelExpenseCreateRequest request(
       long amount, User payer, List<java.util.UUID> participants) {
     return new TravelExpenseCreateRequest(
@@ -633,6 +666,82 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
         participants,
         LocalDateTime.of(2026, 7, 12, 18, 30),
         "Team dinner");
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 여행을 가리키면 ResourceNotFoundException을 던진다")
+  void rejectsMissingTravel() {
+    User user = saveUser("nf-expense");
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    UUID unknownTravelId = UUID.randomUUID();
+    UUID expenseId = UUID.randomUUID();
+
+    assertThatThrownBy(
+            () -> travelExpenseService.getExpense(authenticatedUser, unknownTravelId, expenseId))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel not found.");
+    assertThatThrownBy(
+            () ->
+                travelExpenseService.getExpenses(
+                    authenticatedUser, unknownTravelId, null, null, null, null, Pageable.unpaged()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel not found.");
+    assertThatThrownBy(
+            () ->
+                travelExpenseService.getExpenseSummary(
+                    authenticatedUser, unknownTravelId, null, null))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("Travel not found.");
+  }
+
+  @Test
+  @DisplayName("조회 시작 시각이 종료 시각보다 늦으면 거부한다")
+  void rejectsInvertedSearchPeriod() {
+    Travel travel = saveTravel();
+    User user = saveUser("period");
+    saveMember(travel, user, TravelTeamRole.LEADER);
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+    LocalDateTime from = LocalDateTime.of(2026, 9, 30, 0, 0);
+    LocalDateTime to = LocalDateTime.of(2026, 9, 1, 0, 0);
+
+    assertThatThrownBy(
+            () ->
+                travelExpenseService.getExpenses(
+                    authenticatedUser, travel.getId(), null, from, to, null, Pageable.unpaged()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Expense search start time must not be after end time.");
+  }
+
+  @Test
+  @DisplayName("경비가 없는 여행의 목록과 요약도 빈 결과로 응답한다")
+  void returnsEmptyResultsWhenNoExpenses() {
+    Travel travel = saveTravel();
+    User user = saveUser("empty");
+    saveMember(travel, user, TravelTeamRole.LEADER);
+    AuthenticatedUser authenticatedUser = AuthenticatedUser.from(user);
+
+    assertThat(
+            travelExpenseService
+                .getExpenses(
+                    authenticatedUser, travel.getId(), null, null, null, null, Pageable.unpaged())
+                .content())
+        .isEmpty();
+    assertThat(
+            travelExpenseService
+                .getExpenseSummary(authenticatedUser, travel.getId(), null, null)
+                .currencySummaries())
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("금액이 0 이하이거나 참여자가 없으면 균등 분배를 계산하지 않는다")
+  void calculateEqualSharesRejectsInvalidInput() {
+    assertThatThrownBy(() -> TravelExpenseService.calculateEqualShares(0L, 3))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Expense amount must be positive.");
+    assertThatThrownBy(() -> TravelExpenseService.calculateEqualShares(1000L, 0))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("At least one participant is required.");
   }
 
   private TravelExpenseUpdateRequest updateRequest(

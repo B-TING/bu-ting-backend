@@ -30,6 +30,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,7 +65,7 @@ class TravelSettlementServiceTest extends AbstractContainerTest {
         .extracting(TravelSettlementResponse.Transfer::amount)
         .containsExactly(4_000L, 3_000L);
     assertThat(transfers)
-        .extracting(TravelSettlementResponse.Transfer::toUserId)
+        .extracting(TravelSettlementResponse.Transfer::receiverId)
         .containsOnly(creditorId);
   }
 
@@ -83,7 +84,7 @@ class TravelSettlementServiceTest extends AbstractContainerTest {
     assertThat(preview.confirmed()).isFalse();
     assertThat(preview.transfers()).hasSize(2);
     assertThat(confirmed.confirmed()).isTrue();
-    assertThat(confirmed.confirmedByUserId()).isEqualTo(testTravel.leader.getId());
+    assertThat(confirmed.confirmedById()).isEqualTo(testTravel.leader.getId());
     assertThat(confirmed.confirmedAt()).isNotNull();
     assertThat(confirmed.transfers()).hasSize(2);
     assertThat(travelSettlementRepository.existsByTravel_Id(testTravel.travel.getId())).isTrue();
@@ -228,4 +229,37 @@ class TravelSettlementServiceTest extends AbstractContainerTest {
   }
 
   private record TestTravel(Travel travel, User leader, User firstMember, User secondMember) {}
+
+  @Test
+  @DisplayName("인증 정보가 없거나 id가 없으면 정산 API는 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    java.util.UUID travelId = java.util.UUID.randomUUID();
+    AuthenticatedUser withoutId =
+        new AuthenticatedUser(null, "user@example.com", "tester", java.util.List.of());
+
+    assertThatThrownBy(() -> travelSettlementService.getSettlement(null, travelId))
+        .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelSettlementService.getSettlement(withoutId, travelId))
+        .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelSettlementService.confirmSettlement(null, travelId))
+        .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("멤버 잔액 합이 0이 아니면 정산 계산을 신뢰하지 않고 중단한다")
+  void rejectsUnbalancedMemberSummaries() {
+    var debtor =
+        new com.butingbe.domain.travelexpense.dto.response.TravelExpenseSummaryResponse
+            .MemberSummary(java.util.UUID.randomUUID(), "채무자", 0L, 100L, -100L);
+    var creditor =
+        new com.butingbe.domain.travelexpense.dto.response.TravelExpenseSummaryResponse
+            .MemberSummary(java.util.UUID.randomUUID(), "채권자", 50L, 0L, 50L);
+
+    assertThatThrownBy(
+            () ->
+                TravelSettlementService.calculateCurrencyTransfers(
+                    "KRW", java.util.List.of(debtor, creditor)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Settlement balances are inconsistent.");
+  }
 }

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.butingbe.domain.user.entity.User;
+import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -25,6 +27,7 @@ import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class CustomOAuth2UserServiceTest {
 
@@ -88,6 +91,46 @@ class CustomOAuth2UserServiceTest {
         .isInstanceOf(OAuth2AuthenticationException.class);
     verify(userRepository, never()).findByEmail("kakao@example.com");
     verify(userRepository, never()).save(any(User.class));
+  }
+
+  @Test
+  @DisplayName("연결된 회원도 같은 이메일 회원도 없으면 OAuth2 정보로 새 회원을 생성한다")
+  void loadUserCreatesNewUserWhenNoneMatches() {
+    OAuth2UserRequest request = userRequest("kakao");
+    OAuth2User oauth2User =
+        new DefaultOAuth2User(
+            List.of(new SimpleGrantedAuthority("ROLE_USER")),
+            Map.of(
+                "id",
+                12345,
+                "kakao_account",
+                Map.of("email", "new@example.com", "profile", Map.of("nickname", "신규유저"))),
+            "id");
+    UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440011");
+
+    given(delegate.loadUser(request)).willReturn(oauth2User);
+    given(userRepository.findByProviderAndProviderId("kakao", "12345"))
+        .willReturn(Optional.empty());
+    given(userRepository.findByEmail("new@example.com")).willReturn(Optional.empty());
+    given(userRepository.save(any(User.class)))
+        .willAnswer(
+            invocation -> {
+              User saved = invocation.getArgument(0);
+              ReflectionTestUtils.setField(saved, "id", userId);
+              return saved;
+            });
+
+    OAuth2User principal = service.loadUser(request);
+
+    ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(captor.capture());
+    User created = captor.getValue();
+    assertThat(created.getEmail()).isEqualTo("new@example.com");
+    assertThat(created.getProvider()).isEqualTo("kakao");
+    assertThat(created.getProviderId()).isEqualTo("12345");
+    assertThat(created.getNickname()).isEqualTo("신규유저");
+    assertThat(created.getRole()).isEqualTo(UserRole.USER);
+    assertThat(principal.getName()).isEqualTo(userId.toString());
   }
 
   private OAuth2UserRequest userRequest(String registrationId) {

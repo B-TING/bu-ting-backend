@@ -1,9 +1,11 @@
 package com.butingbe.domain.file.controller;
 
+import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.file.dto.FileUploadResDto;
 import com.butingbe.domain.file.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,8 +21,9 @@ public class FileController {
   private final FileStorageService fileStorageService;
 
   @PostMapping(consumes = "multipart/form-data")
-  public ResponseEntity<FileUploadResDto> upload(@RequestPart("file") MultipartFile file) {
-    return ResponseEntity.ok(fileStorageService.upload(file));
+  public ResponseEntity<FileUploadResDto> upload(
+      @AuthenticationPrincipal AuthenticatedUser user, @RequestPart("file") MultipartFile file) {
+    return ResponseEntity.ok(fileStorageService.upload(file, user == null ? null : user.id()));
   }
 
   @DeleteMapping

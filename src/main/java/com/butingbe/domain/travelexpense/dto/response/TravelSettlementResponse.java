@@ -2,7 +2,6 @@ package com.butingbe.domain.travelexpense.dto.response;
 
 import com.butingbe.domain.travelexpense.entity.TravelSettlement;
 import com.butingbe.domain.travelexpense.entity.TravelSettlementTransfer;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -45,30 +44,5 @@ public record TravelSettlementResponse(
           transfer.getToUser().getNickname(),
           transfer.getAmount());
     }
-
-    @JsonIgnore
-    public UUID fromUserId() {
-      return senderId;
-    }
-
-    @JsonIgnore
-    public String fromNickname() {
-      return senderNickname;
-    }
-
-    @JsonIgnore
-    public UUID toUserId() {
-      return receiverId;
-    }
-
-    @JsonIgnore
-    public String toNickname() {
-      return receiverNickname;
-    }
-  }
-
-  @JsonIgnore
-  public UUID confirmedByUserId() {
-    return confirmedById;
   }
 }

@@ -158,6 +158,27 @@ class TravelSurveyControllerTest extends AbstractContainerTest {
         .andExpect(jsonPath("$.purposes[0]").value("culture"));
   }
 
+  @Test
+  @DisplayName("인증 없이 설문 API를 호출하면 401을 반환한다")
+  void rejectsUnauthenticatedRequests() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/travel-surveys")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "preferredLanguage": "ko",
+                      "purposes": [],
+                      "skippedSteps": [],
+                      "skippedAll": false
+                    }
+                    """))
+        .andExpect(status().isUnauthorized());
+
+    mockMvc.perform(get("/api/v1/travel-surveys")).andExpect(status().isUnauthorized());
+  }
+
   private User createUser(String email, String nickname) {
     return User.builder()
         .email(email)
