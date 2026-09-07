@@ -29,12 +29,12 @@ class RoundStatusQueryServiceTest extends AbstractContainerTest {
   @Test
   @DisplayName("열린 회차가 있으면 슬롯 구역은 OPEN, 나머지는 REST다")
   void openRoundShowsOpenAndRest() {
-    ZoneEventRound round = round(RoundStatus.OPEN, OffsetDateTime.now().minusHours(1));
+    ZoneEventRound round = round(RoundStatus.ACTIVE, OffsetDateTime.now().minusHours(1));
     slot(round, "SUYEONG_NAMGU", UUID.randomUUID());
 
     RoundStatusResDto status = queryService.current();
 
-    assertThat(status.status()).isEqualTo(RoundStatus.OPEN);
+    assertThat(status.status()).isEqualTo(RoundStatus.ACTIVE);
     assertThat(status.zones()).hasSize(6);
     assertThat(status.zones()).anyMatch(z -> z.slotStatus().equals("OPEN"));
     assertThat(status.zones()).anyMatch(z -> z.slotStatus().equals("REST"));

@@ -184,25 +184,25 @@ public class AdminRoundConsoleService {
     return detailOf(round);
   }
 
-  /** SCHEDULED → OPEN. 슬롯에 연결된 이벤트도 활성화한다. 이미 OPEN 이후면 아무것도 하지 않는다(멱등). */
+  /** SCHEDULED → ACTIVE. 슬롯에 연결된 이벤트도 활성화한다. 이미 ACTIVE 이후면 아무것도 하지 않는다(멱등). */
   @Transactional
   public AdminRoundResDto open(AuthenticatedUser user, UUID roundId) {
     operatorAuthorization.requireOperator(user);
     ZoneEventRound round = requireRound(roundId);
     if (round.getStatus() == RoundStatus.SCHEDULED) {
-      round.open();
+      round.activate();
       transitionSlotEvents(round, ZoneEventStatus.SCHEDULED, ZoneEventStatus.ACTIVE);
       audit(user, "OPEN_ROUND", "ROUND", roundId, null);
     }
     return detailOf(round);
   }
 
-  /** OPEN → CLOSED. 슬롯에 연결된 이벤트도 종료한다(멱등). */
+  /** ACTIVE → CLOSED. 슬롯에 연결된 이벤트도 종료한다(멱등). */
   @Transactional
   public AdminRoundResDto close(AuthenticatedUser user, UUID roundId) {
     operatorAuthorization.requireOperator(user);
     ZoneEventRound round = requireRound(roundId);
-    if (round.getStatus() == RoundStatus.OPEN) {
+    if (round.getStatus() == RoundStatus.ACTIVE) {
       round.close();
       transitionSlotEvents(round, ZoneEventStatus.ACTIVE, ZoneEventStatus.CLOSED);
       audit(user, "CLOSE_ROUND", "ROUND", roundId, null);

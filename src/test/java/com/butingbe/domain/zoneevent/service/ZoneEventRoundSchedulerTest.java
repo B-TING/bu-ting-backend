@@ -54,7 +54,7 @@ class ZoneEventRoundSchedulerTest extends AbstractContainerTest {
     scheduler.advance(OffsetDateTime.now());
 
     assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
-        .isEqualTo(RoundStatus.OPEN);
+        .isEqualTo(RoundStatus.ACTIVE);
     assertThat(zoneEventRepository.findById(event.getId()).orElseThrow().getStatus())
         .isEqualTo(ZoneEventStatus.ACTIVE);
   }
@@ -62,7 +62,7 @@ class ZoneEventRoundSchedulerTest extends AbstractContainerTest {
   @Test
   @DisplayName("종료 시각이 지난 OPEN 회차를 CLOSED하고 슬롯 이벤트를 CLOSED로 바꾼다")
   void closesEndedRoundsAndEvents() {
-    ZoneEventRound round = savedRound(RoundStatus.OPEN, -2, -1);
+    ZoneEventRound round = savedRound(RoundStatus.ACTIVE, -2, -1);
     ZoneEvent event = savedEvent(ZoneEventStatus.ACTIVE);
     savedSlot(round, "YEONGDO", event.getId());
 
@@ -85,7 +85,7 @@ class ZoneEventRoundSchedulerTest extends AbstractContainerTest {
     scheduler.advance(OffsetDateTime.now()); // 재실행
 
     assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
-        .isEqualTo(RoundStatus.OPEN);
+        .isEqualTo(RoundStatus.ACTIVE);
     assertThat(zoneEventRepository.findById(event.getId()).orElseThrow().getStatus())
         .isEqualTo(ZoneEventStatus.ACTIVE);
   }
@@ -110,7 +110,7 @@ class ZoneEventRoundSchedulerTest extends AbstractContainerTest {
     scheduler.advance(OffsetDateTime.now());
 
     assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
-        .isEqualTo(RoundStatus.OPEN);
+        .isEqualTo(RoundStatus.ACTIVE);
   }
 
   @Test

@@ -53,7 +53,7 @@ class ZoneEventRoundControllerTest {
         .thenReturn(
             new RoundStatusResDto(
                 "r1",
-                RoundStatus.OPEN,
+                RoundStatus.ACTIVE,
                 OffsetDateTime.now(),
                 OffsetDateTime.now().plusDays(1),
                 List.of(new RoundStatusResDto.ZoneSlot("SUYEONG_NAMGU", "OPEN", "e1"))));

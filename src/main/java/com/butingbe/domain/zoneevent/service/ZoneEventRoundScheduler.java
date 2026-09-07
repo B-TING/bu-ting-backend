@@ -46,11 +46,11 @@ public class ZoneEventRoundScheduler {
   public void advance(OffsetDateTime now) {
     for (ZoneEventRound round :
         roundRepository.findByStatusAndStartsAtLessThanEqual(RoundStatus.SCHEDULED, now)) {
-      round.open();
+      round.activate();
       transitionSlotEvents(round, ZoneEventStatus.SCHEDULED, ZoneEventStatus.ACTIVE);
     }
     for (ZoneEventRound round :
-        roundRepository.findByStatusAndEndsAtLessThanEqual(RoundStatus.OPEN, now)) {
+        roundRepository.findByStatusAndEndsAtLessThanEqual(RoundStatus.ACTIVE, now)) {
       round.close();
       transitionSlotEvents(round, ZoneEventStatus.ACTIVE, ZoneEventStatus.CLOSED);
     }

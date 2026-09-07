@@ -33,8 +33,8 @@ public class RoundStatusQueryService {
   @Transactional(readOnly = true)
   public RoundStatusResDto current() {
     return roundRepository
-        .findFirstByStatusOrderByStartsAtDesc(RoundStatus.OPEN)
-        .map(round -> statusOf(round, "OPEN"))
+        .findFirstByStatusOrderByStartsAtDesc(RoundStatus.ACTIVE)
+        .map(round -> statusOf(round, "ACTIVE"))
         .or(
             () ->
                 roundRepository

@@ -191,7 +191,7 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   @Test
   @DisplayName("예비 타겟을 등록하고 이벤트 인증 타겟을 우천 교체한다")
   void backupAndSwapTarget() {
-    ZoneEventRound round = round(RoundStatus.OPEN);
+    ZoneEventRound round = round(RoundStatus.ACTIVE);
     ZoneEvent event = event(round.getId(), ZoneEventStatus.ACTIVE);
     ZoneEventAuthTarget original = authTarget(event, 35.1, 129.1);
 
@@ -229,7 +229,7 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
 
     consoleService.open(operator, round.getId());
     assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
-        .isEqualTo(RoundStatus.OPEN);
+        .isEqualTo(RoundStatus.ACTIVE);
     assertThat(zoneEventRepository.findById(event.getId()).orElseThrow().getStatus())
         .isEqualTo(ZoneEventStatus.ACTIVE);
     consoleService.open(operator, round.getId()); // 멱등
@@ -259,7 +259,7 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     consoleService.open(operator, roundId);
 
     assertThat(roundRepository.findById(roundId).orElseThrow().getStatus())
-        .isEqualTo(RoundStatus.OPEN);
+        .isEqualTo(RoundStatus.ACTIVE);
   }
 
   @Test
@@ -278,7 +278,7 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     consoleService.open(operator, round.getId());
 
     assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
-        .isEqualTo(RoundStatus.OPEN);
+        .isEqualTo(RoundStatus.ACTIVE);
     assertThat(zoneEventRepository.findById(event.getId()).orElseThrow().getStatus())
         .isEqualTo(ZoneEventStatus.ACTIVE);
   }

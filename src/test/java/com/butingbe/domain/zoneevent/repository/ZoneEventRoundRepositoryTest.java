@@ -29,11 +29,12 @@ class ZoneEventRoundRepositoryTest extends AbstractContainerTest {
     ZoneEventRound round =
         roundRepository.save(
             ZoneEventRound.builder()
+                .roundNo(1)
                 .startsAt(OffsetDateTime.now())
                 .endsAt(OffsetDateTime.now().plusDays(1))
                 .status(RoundStatus.SCHEDULED)
                 .build());
-    round.open();
+    round.activate();
     round.close();
     round.settle(OffsetDateTime.now());
     OffsetDateTime settledAt = round.getSettledAt();
@@ -61,7 +62,7 @@ class ZoneEventRoundRepositoryTest extends AbstractContainerTest {
         .hasSize(1);
     assertThat(
             roundRepository.findByStatusAndEndsAtLessThanEqual(
-                RoundStatus.OPEN, OffsetDateTime.now()))
+                RoundStatus.ACTIVE, OffsetDateTime.now()))
         .isEmpty();
   }
 
@@ -73,7 +74,7 @@ class ZoneEventRoundRepositoryTest extends AbstractContainerTest {
             ZoneEventRound.builder()
                 .startsAt(OffsetDateTime.now())
                 .endsAt(OffsetDateTime.now().plusDays(1))
-                .status(RoundStatus.OPEN)
+                .status(RoundStatus.ACTIVE)
                 .build());
     ZoneEventRoundSlot slot =
         slotRepository.save(
