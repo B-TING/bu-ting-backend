@@ -103,8 +103,12 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
     ZoneEventRound round = draftRound(12);
     adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
 
+    // 시간대를 충분히 띄워서(10일 뒤) 겹침 검증이 아니라 "회차 내 중복 구역" 검증에서 막히는지 검증한다.
     assertThatThrownBy(
-            () -> adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO")))
+            () ->
+                adminZoneEventService.create(
+                    operator,
+                    createReq(round.getId(), "YEONGDO", OffsetDateTime.now().plusDays(10))))
         .isInstanceOf(ConflictException.class);
   }
 
@@ -171,8 +175,13 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   }
 
   private AdminZoneEventCreateReqDto createReq(UUID roundId, String zoneId) {
+    return createReq(roundId, zoneId, OffsetDateTime.now().plusDays(1));
+  }
+
+  private AdminZoneEventCreateReqDto createReq(
+      UUID roundId, String zoneId, OffsetDateTime startsAt) {
     return new AdminZoneEventCreateReqDto(
-        zoneId, type.getTypeCode(), "미션", null, OffsetDateTime.now().plusDays(1), 120, roundId, 1,
+        zoneId, type.getTypeCode(), "미션", null, startsAt, 120, roundId, 1,
         new RewardSnapshotReqDto(50, null, null, null), null, null);
   }
 
