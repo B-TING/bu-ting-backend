@@ -20,8 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 유저 회차 현황(FR-EVT-03). 지금 열린 회차가 있으면 6구역을 OPEN/REST로, 없으면 다음 예정 회차의 구역을 UPCOMING으로 보여준다. 열린 회차도 다음
- * 회차도 없으면 404다.
+ * 유저 회차 현황(FR-EVT-03). 지금 열린 회차가 있으면 6구역을 ACTIVE/REST로, 없으면 다음 예정 회차의 구역을 UPCOMING으로 보여준다. 조회 전에
+ * 후보 회차를 {@link RoundTransitionService}로 동기화해 스케줄러 지연에도 최신 상태를 반영한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,17 +29,25 @@ public class RoundStatusQueryService {
 
   private final ZoneEventRoundRepository roundRepository;
   private final ZoneEventRoundSlotRepository slotRepository;
+  private final RoundTransitionService transitionService;
 
-  @Transactional(readOnly = true)
+  @Transactional
   public RoundStatusResDto current() {
+    OffsetDateTime now = OffsetDateTime.now(ZoneId.of("Asia/Seoul"));
+    for (ZoneEventRound due : roundRepository.findByStatusAndStartsAtLessThanEqual(RoundStatus.SCHEDULED, now)) {
+      transitionService.sync(due, now);
+    }
+    for (ZoneEventRound due : roundRepository.findByStatusAndEndsAtLessThanEqual(RoundStatus.ACTIVE, now)) {
+      transitionService.sync(due, now);
+    }
+
     return roundRepository
         .findFirstByStatusOrderByStartsAtDesc(RoundStatus.ACTIVE)
         .map(round -> statusOf(round, "OPEN"))
         .or(
             () ->
                 roundRepository
-                    .findFirstByStatusAndStartsAtGreaterThanEqualOrderByStartsAtAsc(
-                        RoundStatus.SCHEDULED, OffsetDateTime.now(ZoneId.of("Asia/Seoul")))
+                    .findFirstByStatusAndStartsAtGreaterThanEqualOrderByStartsAtAsc(RoundStatus.SCHEDULED, now)
                     .map(round -> statusOf(round, "UPCOMING")))
         .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
   }

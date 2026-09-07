@@ -60,6 +60,25 @@ class RoundStatusQueryServiceTest extends AbstractContainerTest {
     assertThatThrownBy(() -> queryService.current()).isInstanceOf(ResourceNotFoundException.class);
   }
 
+  @Test
+  @DisplayName("시작 시각이 지났지만 아직 SCHEDULED인 회차도 조회 시점에 ACTIVE로 동기화된다")
+  void syncsOnRead() {
+    ZoneEventRound round =
+        roundRepository.save(
+            ZoneEventRound.builder()
+                .roundNo(999)
+                .startsAt(OffsetDateTime.now().minusMinutes(5))
+                .endsAt(OffsetDateTime.now().plusHours(1))
+                .status(RoundStatus.SCHEDULED)
+                .build());
+
+    RoundStatusResDto result = queryService.current();
+
+    assertThat(result.roundId()).isEqualTo(round.getId().toString());
+    assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
+        .isEqualTo(RoundStatus.ACTIVE);
+  }
+
   private ZoneEventRound round(RoundStatus status, OffsetDateTime startsAt) {
     return roundRepository.save(
         ZoneEventRound.builder()
