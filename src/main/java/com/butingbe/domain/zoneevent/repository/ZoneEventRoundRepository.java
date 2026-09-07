@@ -8,11 +8,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface ZoneEventRoundRepository extends JpaRepository<ZoneEventRound, UUID> {
+public interface ZoneEventRoundRepository
+    extends JpaRepository<ZoneEventRound, UUID>,
+        JpaSpecificationExecutor<ZoneEventRound> {
 
   List<ZoneEventRound> findByStatusAndStartsAtLessThanEqual(RoundStatus status, OffsetDateTime at);
 
@@ -33,4 +36,6 @@ public interface ZoneEventRoundRepository extends JpaRepository<ZoneEventRound, 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT r FROM ZoneEventRound r WHERE r.id = :id")
   Optional<ZoneEventRound> findWithLockById(@Param("id") UUID id);
+
+  boolean existsByRoundNo(Integer roundNo);
 }

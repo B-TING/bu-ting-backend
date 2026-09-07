@@ -13,4 +13,6 @@ public interface ZoneEventRepository
   List<ZoneEvent> findByZoneIdAndStatusOrderByStartsAtAsc(String zoneId, ZoneEventStatus status);
 
   List<ZoneEvent> findByRoundId(UUID roundId);
+
+  List<ZoneEvent> findByZoneIdAndStatusIn(String zoneId, List<ZoneEventStatus> statuses);
 }

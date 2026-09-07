@@ -100,4 +100,17 @@ class ZoneEventRoundRepositoryTest extends AbstractContainerTest {
     assertThat(slotRepository.findByRound_Id(round.getId()).get(0).getEventId()).isNotNull();
     assertThat(backupTargetRepository.findByRound_Id(round.getId())).hasSize(1);
   }
+
+  @Test
+  void 회차번호_존재여부를_확인한다() {
+    roundRepository.save(
+        ZoneEventRound.builder()
+            .roundNo(7)
+            .startsAt(OffsetDateTime.now())
+            .endsAt(OffsetDateTime.now().plusDays(1))
+            .build());
+
+    assertThat(roundRepository.existsByRoundNo(7)).isTrue();
+    assertThat(roundRepository.existsByRoundNo(8)).isFalse();
+  }
 }
