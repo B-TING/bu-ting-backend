@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -54,6 +55,19 @@ public class ZoneEventReport {
   @Column(name = "created_at", nullable = false)
   private OffsetDateTime createdAt;
 
+  @Column(name = "reviewed_by")
+  private UUID reviewedBy;
+
+  @Column(name = "reviewed_at")
+  private OffsetDateTime reviewedAt;
+
+  @Column(name = "decision_note", length = 500)
+  private String decisionNote;
+
+  @Version
+  @Column(nullable = false)
+  private Long revision;
+
   @Builder
   private ZoneEventReport(
       UUID participationId, UUID reporterId, ReportReasonCode reasonCode, String memo) {
@@ -68,5 +82,12 @@ public class ZoneEventReport {
   /** 검수 결과로 처리 상태를 바꾼다. */
   public void resolveAs(ReportStatus status) {
     this.status = status;
+  }
+
+  /** 운영자 검수 도장(인정·기각 공통). 사유는 검수 상세에 남긴다. */
+  public void stampDecision(UUID reviewerId, String decisionNote) {
+    this.reviewedBy = reviewerId;
+    this.reviewedAt = OffsetDateTime.now();
+    this.decisionNote = decisionNote;
   }
 }

@@ -15,6 +15,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
@@ -83,7 +84,7 @@ public class ZoneEventSubmitService {
 
     ZoneEventAuthTarget target =
         authTargetRepository
-            .findByEvent_Id(eventId)
+            .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(eventId, ZoneEventTargetStatus.ACTIVE)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
     int distance =
         GpsDistance.meters(

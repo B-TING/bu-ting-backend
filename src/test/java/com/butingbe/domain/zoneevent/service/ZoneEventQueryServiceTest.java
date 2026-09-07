@@ -16,6 +16,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
@@ -65,7 +66,9 @@ class ZoneEventQueryServiceTest {
     when(zoneEventRepository.findByZoneIdAndStatusOrderByStartsAtAsc(
             "SUYEONG_NAMGU", ZoneEventStatus.ACTIVE))
         .thenReturn(List.of(event));
-    when(authTargetRepository.findByEvent_Id(EVENT_ID)).thenReturn(Optional.of(target));
+    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(Optional.of(target));
     when(participationRepository.countByEvent_IdAndStatus(EVENT_ID, ParticipationStatus.SUCCESS))
         .thenReturn(27L);
 
@@ -98,7 +101,9 @@ class ZoneEventQueryServiceTest {
     ReflectionTestUtils.setField(open, "id", PARTICIPATION_ID);
     when(zoneEventRepository.findByZoneIdAndStatusOrderByStartsAtAsc(any(), any()))
         .thenReturn(List.of(event));
-    when(authTargetRepository.findByEvent_Id(EVENT_ID)).thenReturn(Optional.of(target));
+    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(Optional.of(target));
     when(participationRepository.countByEvent_IdAndStatus(any(), any())).thenReturn(0L);
     when(participationRepository.findByEvent_IdAndUserIdAndStatusIn(
             eq(EVENT_ID), eq(USER_ID), any()))
@@ -122,7 +127,9 @@ class ZoneEventQueryServiceTest {
   @DisplayName("상세는 예시 이미지 presigned URL·우수 보상·남은 참여 횟수를 채운다")
   void detailFillsExampleUrlAndRemainingAttempts() {
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-    when(authTargetRepository.findByEvent_Id(EVENT_ID)).thenReturn(Optional.of(target));
+    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(Optional.of(target));
     when(participationRepository.countByEvent_IdAndStatus(EVENT_ID, ParticipationStatus.SUCCESS))
         .thenReturn(3L);
     when(participationRepository.countByEvent_IdAndUserIdAndStatus(
@@ -147,7 +154,9 @@ class ZoneEventQueryServiceTest {
     ZoneEventAuthTarget noImage = target(event);
     ReflectionTestUtils.setField(noImage, "exampleFileKey", null);
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-    when(authTargetRepository.findByEvent_Id(EVENT_ID)).thenReturn(Optional.of(noImage));
+    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(Optional.of(noImage));
     when(participationRepository.countByEvent_IdAndStatus(any(), any())).thenReturn(0L);
 
     ZoneEventDetailResDto detail = service.getEventDetail(EVENT_ID, null);

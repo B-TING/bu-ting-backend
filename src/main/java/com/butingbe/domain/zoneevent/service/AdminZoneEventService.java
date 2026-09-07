@@ -16,6 +16,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
@@ -156,7 +157,7 @@ public class AdminZoneEventService {
 
     if (request.authTarget() != null) {
       authTargetRepository
-          .findByEvent_Id(eventId)
+          .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(eventId, ZoneEventTargetStatus.ACTIVE)
           .ifPresent(
               target ->
                   target.update(
@@ -205,7 +206,11 @@ public class AdminZoneEventService {
   }
 
   private AdminZoneEventResDto toDetail(ZoneEvent event) {
-    ZoneEventAuthTarget target = authTargetRepository.findByEvent_Id(event.getId()).orElse(null);
+    ZoneEventAuthTarget target =
+        authTargetRepository
+            .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+                event.getId(), ZoneEventTargetStatus.ACTIVE)
+            .orElse(null);
     long joined = participationRepository.countByEvent_Id(event.getId());
     long success =
         participationRepository.countByEvent_IdAndStatus(

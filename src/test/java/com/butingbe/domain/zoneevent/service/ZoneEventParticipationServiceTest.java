@@ -16,6 +16,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.exception.OpenParticipationExistsException;
 import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
@@ -187,7 +188,9 @@ class ZoneEventParticipationServiceTest {
   @DisplayName("타겟이 없는 이벤트는 404다")
   void joinWhenTargetMissing() {
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-    when(authTargetRepository.findByEvent_Id(EVENT_ID)).thenReturn(Optional.empty());
+    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.join(user, EVENT_ID, IN_LAT, IN_LNG))
         .isInstanceOf(ResourceNotFoundException.class);
@@ -203,7 +206,9 @@ class ZoneEventParticipationServiceTest {
   private void stubActiveEventWithTarget() {
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
     lenient()
-        .when(authTargetRepository.findByEvent_Id(EVENT_ID))
+        .when(
+            authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+                EVENT_ID, ZoneEventTargetStatus.ACTIVE))
         .thenReturn(Optional.of(target(event)));
   }
 
