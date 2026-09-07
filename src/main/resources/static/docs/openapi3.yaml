@@ -4471,6 +4471,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/me:
+    get:
+      tags:
+        - Zone Event
+      summary: "관리자 자기 정보 조회"
+      description: "ROLE_ADMIN/MANAGER. 관리자 페이지 진입 시 로그인한 운영자의 식별 정보(닉네임·역할·권한)를 조회합니다."
+      security:
+        - opaqueToken: [ ]
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMeEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/admin/reward-catalog:
     post:
       tags:
@@ -9734,6 +9761,34 @@ components:
         hasNext:
           type: boolean
 
+    AdminMe:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: "11111111-0000-0000-0000-000000000001"
+        nickname:
+          type: string
+          example: "운영자"
+        role:
+          type: string
+          example: "ADMIN"
+        permissions:
+          type: array
+          items:
+            type: string
+          example: [ "ROLE_ADMIN" ]
+    AdminMeEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "관리자 정보 조회"
+        data:
+          $ref: "#/components/schemas/AdminMe"
     AdminZoneEventEnvelope:
       type: object
       properties:
