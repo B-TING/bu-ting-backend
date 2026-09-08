@@ -189,6 +189,58 @@ class AdminReviewServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("keyword에 일치하는 사용자가 없으면 빈 페이지를 돌려준다")
+  void listWithKeywordNoMatchReturnsEmptyPage() {
+    participationRepository.save(participation(ParticipationStatus.SUCCESS, false));
+
+    AdminParticipationPageResDto page =
+        reviewService.list(operator, null, null, null, null, null, "존재하지않는닉네임", 1, 20);
+
+    assertThat(page.items()).isEmpty();
+    assertThat(page.totalElements()).isZero();
+    assertThat(page.totalPages()).isZero();
+    assertThat(page.hasNext()).isFalse();
+  }
+
+  @Test
+  @DisplayName("roundId·userId로도 필터링한다")
+  void listFiltersByRoundIdAndUserId() {
+    UUID roundId = UUID.randomUUID();
+    ZoneEvent roundEvent =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("SUYEONG_NAMGU")
+                .type(event.getType())
+                .roundId(roundId)
+                .title("회차 이벤트")
+                .startsAt(OffsetDateTime.now().minusHours(1))
+                .durationMinutes(1440)
+                .status(ZoneEventStatus.ACTIVE)
+                .baseReward(new RewardSnapshot(50, null, null, null))
+                .successLimitPerUser(1)
+                .build());
+    User target = savedUser("roundUser");
+    ZoneEventParticipation match =
+        ZoneEventParticipation.builder()
+            .event(roundEvent)
+            .userId(target.getId())
+            .status(ParticipationStatus.SUCCESS)
+            .gpsLat(35.1)
+            .gpsLng(129.1)
+            .joinedAt(OffsetDateTime.now())
+            .visibility(ParticipationVisibility.PUBLIC)
+            .build();
+    participationRepository.save(match);
+    participationRepository.save(participation(ParticipationStatus.SUCCESS, false)); // 다른 이벤트·사용자
+
+    AdminParticipationPageResDto page =
+        reviewService.list(operator, roundId, null, null, target.getId(), null, null, 1, 20);
+
+    assertThat(page.items()).hasSize(1);
+    assertThat(page.items().get(0).participationId()).isEqualTo(match.getId().toString());
+  }
+
+  @Test
   @DisplayName("운영자가 아니면 목록 조회는 403이다")
   void listForbidden() {
     AuthenticatedUser normalUser = AuthenticatedUser.from(savedUser("normal"));
