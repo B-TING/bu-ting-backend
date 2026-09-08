@@ -168,19 +168,11 @@ class AdminRoundControllerTest {
   }
 
   @Test
-  @DisplayName("슬롯 교체·예비 타겟·우천 교체")
+  @DisplayName("예비 타겟·우천 교체")
   void slotMutations() throws Exception {
-    when(consoleService.reassignSlot(any(), eq(ROUND), any())).thenReturn(round());
     when(consoleService.addBackupTarget(any(), eq(ROUND), any())).thenReturn(round());
     when(consoleService.swapTarget(any(), eq(ROUND), any())).thenReturn(round());
 
-    mockMvc
-        .perform(
-            patch("/admin/zone-event-rounds/{id}/slots", ROUND)
-                .contentType("application/json")
-                .content(
-                    "{\"slotId\":\"55555555-0000-0000-0000-000000000001\",\"zoneId\":\"YEONGDO\"}"))
-        .andExpect(status().isOk());
     mockMvc
         .perform(
             post("/admin/zone-event-rounds/{id}/backup-targets", ROUND)

@@ -157,12 +157,24 @@ class AdminZoneEventControllerTest {
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
                     "/admin/zone-events/{eventId}", EVENT_ID)
                 .contentType("application/json")
-                .content("{\"title\":\"새 제목\"}"))
+                .content("{\"title\":\"새 제목\",\"expectedRevision\":0}"))
         .andExpect(status().isOk());
     mockMvc
         .perform(post("/admin/zone-events/{eventId}/cancel", EVENT_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+  }
+
+  @Test
+  @DisplayName("expectedRevision이 빠진 수정 요청은 409가 아니라 400(검증 실패)이다")
+  void updateWithoutExpectedRevisionIsBadRequest() throws Exception {
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/admin/zone-events/{eventId}", EVENT_ID)
+                .contentType("application/json")
+                .content("{\"title\":\"새 제목\"}"))
+        .andExpect(status().isBadRequest());
   }
 
   private AdminZoneEventResDto detail(String status) {

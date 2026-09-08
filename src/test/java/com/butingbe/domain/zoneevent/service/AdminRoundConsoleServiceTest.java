@@ -18,7 +18,6 @@ import com.butingbe.domain.zoneevent.dto.request.RewardSnapshotReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCancelReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundPatchReqDto;
-import com.butingbe.domain.zoneevent.dto.request.SlotReassignReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SwapTargetReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
@@ -388,36 +387,6 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("이벤트가 없는 슬롯은 구역을 교체할 수 있고, 배정되면 막힌다")
-  void reassignSlot() {
-    AdminRoundResDto created = createDraft();
-    UUID roundId = UUID.fromString(created.roundId());
-    ZoneEventRound round = roundRepository.findById(roundId).orElseThrow();
-    ZoneEventRoundSlot slot =
-        slotRepository.save(
-            ZoneEventRoundSlot.builder()
-                .round(round)
-                .slotKind(SlotKind.AUTH)
-                .zoneId("YEONGDO")
-                .build());
-
-    AdminRoundResDto after =
-        consoleService.reassignSlot(
-            operator, roundId, new SlotReassignReqDto(slot.getId(), "WESTERN_BUSAN"));
-    assertThat(after.slots())
-        .filteredOn(s -> s.slotId().equals(slot.getId().toString()))
-        .extracting(AdminRoundResDto.Slot::zoneId)
-        .containsExactly("WESTERN_BUSAN");
-
-    slotRepository.findById(slot.getId()).orElseThrow().assignEvent(UUID.randomUUID());
-    assertThatThrownBy(
-            () ->
-                consoleService.reassignSlot(
-                    operator, roundId, new SlotReassignReqDto(slot.getId(), "OLD_DOWNTOWN")))
-        .isInstanceOf(ConflictException.class);
-  }
-
-  @Test
   @DisplayName("예비 타겟을 등록하고 이벤트 인증 타겟을 우천 교체한다")
   void backupAndSwapTarget() {
     AdminRoundResDto created = createDraft();
@@ -495,19 +464,85 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("슬롯 교체 시 잘못된 구역이면 400 계열 예외다")
-  void reassignSlotWithInvalidZoneFails() {
+  @DisplayName("이벤트 하나를 취소하면 남은 구역이 3개라 schedule이 실패한다")
+  void scheduleFailsWhenOneEventCancelled() {
     AdminRoundResDto created = createDraft();
     UUID roundId = UUID.fromString(created.roundId());
-    adminZoneEventService.create(operator, zoneEventReq(roundId, "YEONGDO"));
-    UUID slotId =
-        UUID.fromString(consoleService.roundDetail(operator, roundId).slots().get(0).slotId());
+    createFourZoneEventsWithTargets(roundId);
+    UUID cancelledEventId =
+        zoneEventRepository.findByRoundId(roundId).stream()
+            .filter(e -> e.getZoneId().equals("YEONGDO"))
+            .findFirst()
+            .orElseThrow()
+            .getId();
+    adminZoneEventService.cancel(operator, cancelledEventId);
 
-    assertThatThrownBy(
-            () ->
-                consoleService.reassignSlot(
-                    operator, roundId, new SlotReassignReqDto(slotId, "NOPE")))
+    assertThatThrownBy(() -> consoleService.schedule(operator, roundId))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  @DisplayName("취소한 구역에 대체 이벤트를 다시 넣으면 schedule이 성공한다")
+  void scheduleSucceedsAfterCancelledZoneIsRefilled() {
+    AdminRoundResDto created = createDraft();
+    UUID roundId = UUID.fromString(created.roundId());
+    createFourZoneEventsWithTargets(roundId);
+    UUID cancelledEventId =
+        zoneEventRepository.findByRoundId(roundId).stream()
+            .filter(e -> e.getZoneId().equals("YEONGDO"))
+            .findFirst()
+            .orElseThrow()
+            .getId();
+    adminZoneEventService.cancel(operator, cancelledEventId);
+
+    ZoneEvent replacement =
+        zoneEventRepository
+            .findById(
+                UUID.fromString(
+                    adminZoneEventService
+                        .create(operator, zoneEventReq(roundId, "YEONGDO"))
+                        .eventId()))
+            .orElseThrow();
+    authTargetRepository.save(
+        ZoneEventAuthTarget.builder()
+            .event(replacement)
+            .targetKind(ZoneEventTargetKind.PLACE)
+            .placeName("대체 장소")
+            .latitude(35.1)
+            .longitude(129.1)
+            .radiusM(100)
+            .build());
+
+    assertThat(consoleService.schedule(operator, roundId).status())
+        .isEqualTo(RoundStatus.SCHEDULED);
+  }
+
+  @Test
+  @DisplayName("상세는 슬롯별 실제 카운트를 주고, 목록은 N+1을 피하려고 0으로 준다")
+  void listOmitsSlotCountsButDetailIncludesThem() {
+    AdminRoundResDto created = createDraft();
+    UUID roundId = UUID.fromString(created.roundId());
+    ZoneEvent event =
+        zoneEventRepository
+            .findById(
+                UUID.fromString(
+                    adminZoneEventService
+                        .create(operator, zoneEventReq(roundId, "YEONGDO"))
+                        .eventId()))
+            .orElseThrow();
+    joined(event);
+
+    AdminRoundResDto detail = consoleService.roundDetail(operator, roundId);
+    assertThat(detail.slots()).hasSize(1);
+    assertThat(detail.slots().get(0).participantCount()).isEqualTo(1);
+
+    AdminRoundResDto listed =
+        consoleService.listRounds(operator, null, null, null, "테스트 회차", 0, 50).items().stream()
+            .filter(r -> r.roundId().equals(roundId.toString()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(listed.slots()).hasSize(1);
+    assertThat(listed.slots().get(0).participantCount()).isZero();
   }
 
   private int nextRoundNo() {

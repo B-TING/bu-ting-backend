@@ -21,7 +21,10 @@ import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
+import com.butingbe.domain.zoneevent.entity.ZoneEventRoundSlot;
+import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
@@ -47,6 +50,7 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
   @Autowired private ZoneEventRoundRepository roundRepository;
   @Autowired private ZoneEventRoundSlotRepository slotRepository;
+  @Autowired private ZoneEventAuditLogRepository auditLogRepository;
 
   private AuthenticatedUser operator;
   private AuthenticatedUser normalUser;
@@ -125,6 +129,91 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
     assertThatThrownBy(
             () -> adminZoneEventService.create(operator, createReq(round.getId(), "CENTRAL_NORTH")))
         .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("취소한 이벤트의 구역은 다시 비므로 대체 이벤트를 넣을 수 있고, 남긴 슬롯을 재사용한다")
+  void cancelledZoneCanBeRefilledReusingSlot() {
+    ZoneEventRound round = draftRound(31);
+    AdminZoneEventResDto yeongdo =
+        adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
+    adminZoneEventService.create(operator, createReq(round.getId(), "OLD_DOWNTOWN"));
+    adminZoneEventService.create(operator, createReq(round.getId(), "SUYEONG_NAMGU"));
+    adminZoneEventService.create(operator, createReq(round.getId(), "WESTERN_BUSAN"));
+    UUID slotIdBefore =
+        slotRepository.findByRound_IdAndZoneId(round.getId(), "YEONGDO").orElseThrow().getId();
+
+    adminZoneEventService.cancel(operator, UUID.fromString(yeongdo.eventId()));
+
+    AdminZoneEventResDto replacement =
+        adminZoneEventService.create(
+            operator, createReq(round.getId(), "YEONGDO", OffsetDateTime.now().plusDays(10)));
+
+    assertThat(replacement.slotCode()).isEqualTo("31-A");
+    ZoneEventRoundSlot slot =
+        slotRepository.findByRound_IdAndZoneId(round.getId(), "YEONGDO").orElseThrow();
+    assertThat(slot.getId()).isEqualTo(slotIdBefore);
+    assertThat(slot.getEventId().toString()).isEqualTo(replacement.eventId());
+    assertThat(zoneEventRepository.findByRoundId(round.getId()))
+        .filteredOn(e -> e.getStatus() != ZoneEventStatus.CANCELLED)
+        .hasSize(4);
+  }
+
+  @Test
+  @DisplayName("생성·수정·취소는 모두 감사 로그를 남기고, 수정 사유는 detail에 기록된다")
+  void mutationsAreAudited() {
+    AdminZoneEventResDto created = adminZoneEventService.create(operator, createRequest());
+    UUID eventId = UUID.fromString(created.eventId());
+
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("EVENT", eventId))
+        .anyMatch(a -> a.getAction().equals("CREATE_EVENT"));
+
+    AdminZoneEventResDto updated =
+        adminZoneEventService.update(
+            operator,
+            eventId,
+            new AdminZoneEventUpdateReqDto(
+                "새 제목",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "오탈자 수정",
+                created.revision()));
+
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("EVENT", eventId))
+        .filteredOn(a -> a.getAction().equals("PATCH_EVENT"))
+        .singleElement()
+        .satisfies(a -> assertThat(a.getDetail()).containsEntry("reason", "오탈자 수정"));
+
+    adminZoneEventService.update(
+        operator,
+        eventId,
+        new AdminZoneEventUpdateReqDto(
+            "사유 없는 수정",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            updated.revision()));
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("EVENT", eventId))
+        .filteredOn(a -> a.getAction().equals("PATCH_EVENT"))
+        .anyMatch(a -> a.getDetail() == null);
+
+    adminZoneEventService.cancel(operator, eventId);
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("EVENT", eventId))
+        .anyMatch(a -> a.getAction().equals("CANCEL_EVENT"));
   }
 
   @Test

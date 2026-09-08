@@ -66,7 +66,7 @@ public class AdminZoneEventController {
   public ResponseEntity<ApiResponse<AdminZoneEventResDto>> update(
       @AuthenticationPrincipal AuthenticatedUser user,
       @PathVariable UUID eventId,
-      @RequestBody AdminZoneEventUpdateReqDto request) {
+      @RequestBody @Valid AdminZoneEventUpdateReqDto request) {
     return ResponseEntity.ok(
         ApiResponse.success("이벤트 수정", adminZoneEventService.update(user, eventId, request)));
   }

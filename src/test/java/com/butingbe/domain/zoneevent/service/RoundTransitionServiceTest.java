@@ -76,6 +76,21 @@ class RoundTransitionServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("시작·종료가 모두 지난 SCHEDULED 회차는 sync 한 번으로 CLOSED까지 이어서 전환된다")
+  void syncCascadesActivateAndCloseInOneCall() {
+    ZoneEventRound round = savedRound(RoundStatus.SCHEDULED, -2, -1);
+    ZoneEvent event = savedEvent(ZoneEventStatus.SCHEDULED);
+    savedSlot(round, "OLD_DOWNTOWN", event.getId());
+
+    transitionService.sync(round, OffsetDateTime.now());
+
+    assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
+        .isEqualTo(RoundStatus.CLOSED);
+    assertThat(zoneEventRepository.findById(event.getId()).orElseThrow().getStatus())
+        .isEqualTo(ZoneEventStatus.CLOSED);
+  }
+
+  @Test
   @DisplayName("아직 시작 전이면 아무것도 바뀌지 않는다(멱등)")
   void syncNoopWhenNotDue() {
     ZoneEventRound round = savedRound(RoundStatus.SCHEDULED, 1, 2);

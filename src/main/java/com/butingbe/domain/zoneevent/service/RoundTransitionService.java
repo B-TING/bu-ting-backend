@@ -28,13 +28,19 @@ public class RoundTransitionService {
   private final ZoneEventRoundSlotRepository slotRepository;
   private final ZoneEventRepository zoneEventRepository;
 
-  /** 주어진 시각 기준으로 이 회차 하나를 필요하면 전환한다. 조건이 안 맞으면 아무 것도 하지 않는다. */
+  /**
+   * 주어진 시각 기준으로 이 회차 하나를 필요하면 전환한다. 조건이 안 맞으면 아무 것도 하지 않는다.
+   *
+   * <p>두 조건을 독립된 {@code if}로 검사하므로, 시작·종료 시각이 모두 지난 SCHEDULED 회차는 한 번의 호출로 ACTIVE를 거쳐 CLOSED까지 이어서
+   * 전환된다(조회 경로처럼 sync가 한 번만 불리는 곳에서도 최종 상태가 보장된다).
+   */
   @Transactional
   public void sync(ZoneEventRound round, OffsetDateTime now) {
     if (round.getStatus() == RoundStatus.SCHEDULED && !round.getStartsAt().isAfter(now)) {
       round.activate();
       transitionSlotEvents(round, ZoneEventStatus.SCHEDULED, ZoneEventStatus.ACTIVE);
-    } else if (round.getStatus() == RoundStatus.ACTIVE && !round.getEndsAt().isAfter(now)) {
+    }
+    if (round.getStatus() == RoundStatus.ACTIVE && !round.getEndsAt().isAfter(now)) {
       round.close();
       transitionSlotEvents(round, ZoneEventStatus.ACTIVE, ZoneEventStatus.CLOSED);
     }

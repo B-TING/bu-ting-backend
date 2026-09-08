@@ -2,14 +2,12 @@ package com.butingbe.domain.zoneevent.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
-import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.reward.dto.response.SettlementReportResDto;
 import com.butingbe.domain.reward.service.RewardSettlementService;
 import com.butingbe.domain.zoneevent.dto.request.BackupTargetReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCancelReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundPatchReqDto;
-import com.butingbe.domain.zoneevent.dto.request.SlotReassignReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SwapTargetReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
@@ -131,7 +129,8 @@ public class AdminRoundConsoleService {
     for (ZoneEventRound round : result.getContent()) {
       transitionService.sync(round, now);
     }
-    List<AdminRoundResDto> items = result.getContent().stream().map(this::detailOf).toList();
+    List<AdminRoundResDto> items =
+        result.getContent().stream().map(round -> detailOf(round, false)).toList();
     return new AdminRoundPageResDto(
         items, pageNumber, pageSize, result.getTotalElements(), result.getTotalPages());
   }
@@ -171,7 +170,11 @@ public class AdminRoundConsoleService {
   public AdminRoundResDto schedule(AuthenticatedUser user, UUID roundId) {
     operatorAuthorization.requireOperator(user);
     ZoneEventRound round = requireRound(roundId);
-    List<ZoneEvent> events = zoneEventRepository.findByRoundId(roundId);
+    // 취소된 이벤트는 실제로 운영되지 않으므로 4구역 정족수에서 제외한다.
+    List<ZoneEvent> events =
+        zoneEventRepository.findByRoundId(roundId).stream()
+            .filter(e -> e.getStatus() != ZoneEventStatus.CANCELLED)
+            .toList();
     Set<String> distinctZones = new HashSet<>();
     for (ZoneEvent event : events) {
       distinctZones.add(event.getZoneId());
@@ -217,21 +220,6 @@ public class AdminRoundConsoleService {
       }
     }
     audit(user, "CANCEL_ROUND", "ROUND", roundId, Map.of("reason", request.reason()));
-    return detailOf(round);
-  }
-
-  @Transactional
-  public AdminRoundResDto reassignSlot(
-      AuthenticatedUser user, UUID roundId, SlotReassignReqDto request) {
-    operatorAuthorization.requireOperator(user);
-    ZoneEventRound round = requireRound(roundId);
-    ZoneEventRoundSlot slot =
-        slotRepository
-            .findById(request.slotId())
-            .filter(s -> s.getRound().getId().equals(roundId))
-            .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
-    slot.reassignZone(parseZone(request.zoneId()));
-    audit(user, "REASSIGN_SLOT", "SLOT", slot.getId(), Map.of("zone", request.zoneId()));
     return detailOf(round);
   }
 
@@ -383,21 +371,33 @@ public class AdminRoundConsoleService {
   }
 
   private AdminRoundResDto detailOf(ZoneEventRound round) {
+    return detailOf(round, true);
+  }
+
+  /**
+   * 회차 상세 DTO를 만든다.
+   *
+   * <p>{@code includeCounts=false}면 슬롯별 참여/성공/검수 카운트 질의(슬롯당 3회)를 생략한다. 목록 엔드포인트는 페이지당 회차 수 × 슬롯 수만큼
+   * 질의가 늘어나므로(N+1) 카운트를 0으로 두고, 실제 카운트는 상세 조회에서만 제공한다.
+   */
+  private AdminRoundResDto detailOf(ZoneEventRound round, boolean includeCounts) {
     List<ZoneEventRoundSlot> slots = slotRepository.findByRound_Id(round.getId());
     Map<String, long[]> countsByEventId = new HashMap<>();
-    for (ZoneEventRoundSlot slot : slots) {
-      if (slot.getEventId() == null) {
-        continue;
+    if (includeCounts) {
+      for (ZoneEventRoundSlot slot : slots) {
+        if (slot.getEventId() == null) {
+          continue;
+        }
+        String eventId = slot.getEventId().toString();
+        long participants = participationRepository.countByEvent_Id(slot.getEventId());
+        long success =
+            participationRepository.countByEvent_IdAndStatus(
+                slot.getEventId(), ParticipationStatus.SUCCESS);
+        long underReview =
+            participationRepository.countByEvent_IdAndStatus(
+                slot.getEventId(), ParticipationStatus.UNDER_REVIEW);
+        countsByEventId.put(eventId, new long[] {participants, success, underReview});
       }
-      String eventId = slot.getEventId().toString();
-      long participants = participationRepository.countByEvent_Id(slot.getEventId());
-      long success =
-          participationRepository.countByEvent_IdAndStatus(
-              slot.getEventId(), ParticipationStatus.SUCCESS);
-      long underReview =
-          participationRepository.countByEvent_IdAndStatus(
-              slot.getEventId(), ParticipationStatus.UNDER_REVIEW);
-      countsByEventId.put(eventId, new long[] {participants, success, underReview});
     }
     return AdminRoundResDto.of(
         round, slots, backupTargetRepository.findByRound_Id(round.getId()), countsByEventId);
@@ -427,14 +427,6 @@ public class AdminRoundConsoleService {
     return roundRepository
         .findById(roundId)
         .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
-  }
-
-  private String parseZone(String zone) {
-    try {
-      return ChatZone.fromString(zone).name();
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.invalid_zone");
-    }
   }
 
   private void audit(

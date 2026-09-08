@@ -15,6 +15,7 @@ import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.RoundStatus;
 import com.butingbe.domain.zoneevent.entity.SlotKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
@@ -23,6 +24,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
@@ -35,6 +37,7 @@ import jakarta.persistence.criteria.Predicate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -59,6 +62,7 @@ public class AdminZoneEventService {
   private final RewardCatalogRepository rewardCatalogRepository;
   private final ZoneEventRoundRepository roundRepository;
   private final ZoneEventRoundSlotRepository slotRepository;
+  private final ZoneEventAuditLogRepository auditLogRepository;
   private final OperatorAuthorization operatorAuthorization;
 
   @Transactional
@@ -74,21 +78,34 @@ public class AdminZoneEventService {
     ZoneEventRound round = null;
     String slotCode = null;
     if (request.roundId() != null) {
-      round =
+      ZoneEventRound draft =
           roundRepository
               .findById(request.roundId())
               .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
-      if (round.getStatus() != RoundStatus.DRAFT) {
+      if (draft.getStatus() != RoundStatus.DRAFT) {
         throw new ConflictException("error.zone_event.invalid_state");
       }
-      if (slotRepository.findByRound_IdAndZoneId(round.getId(), zoneId).isPresent()) {
+      // 취소된 이벤트는 그 구역을 계속 점유하지 않는다. 취소 후 같은 구역에 대체 이벤트를 넣을 수 있어야 한다.
+      List<ZoneEvent> existing =
+          zoneEventRepository.findByRoundId(draft.getId()).stream()
+              .filter(e -> e.getStatus() != ZoneEventStatus.CANCELLED)
+              .toList();
+      if (existing.stream().anyMatch(e -> e.getZoneId().equals(zoneId))) {
         throw new ConflictException("error.zone_event.invalid_state");
       }
-      List<ZoneEvent> existing = zoneEventRepository.findByRoundId(round.getId());
       if (existing.size() >= 4) {
         throw new ConflictException("error.zone_event.invalid_state");
       }
-      slotCode = round.getRoundNo() + "-" + SLOT_LETTERS.get(existing.size());
+      // (round_id, slot_code) 유니크 인덱스가 있으므로 아직 쓰이지 않은 첫 글자를 고른다. 취소된 이벤트는
+      // markCancelled()에서 코드를 반납하므로, 취소된 구역을 다시 채울 때 그 글자가 재사용된다.
+      List<String> usedCodes = existing.stream().map(ZoneEvent::getSlotCode).toList();
+      slotCode =
+          SLOT_LETTERS.stream()
+              .map(letter -> draft.getRoundNo() + "-" + letter)
+              .filter(code -> !usedCodes.contains(code))
+              .toList()
+              .get(0);
+      round = draft;
     }
 
     RewardSnapshotReqDto excellence =
@@ -116,14 +133,20 @@ public class AdminZoneEventService {
                 .build());
 
     if (round != null) {
-      slotRepository
-          .save(
-              ZoneEventRoundSlot.builder()
-                  .round(round)
-                  .slotKind(SlotKind.AUTH)
-                  .zoneId(zoneId)
-                  .build())
-          .assignEvent(event.getId());
+      // (round_id, zone_id) UK가 있으므로, 취소된 이벤트가 남긴 슬롯은 새로 만들지 말고 재사용한다.
+      ZoneEventRound slotRound = round;
+      ZoneEventRoundSlot slot =
+          slotRepository
+              .findByRound_IdAndZoneId(slotRound.getId(), zoneId)
+              .orElseGet(
+                  () ->
+                      slotRepository.save(
+                          ZoneEventRoundSlot.builder()
+                              .round(slotRound)
+                              .slotKind(SlotKind.AUTH)
+                              .zoneId(zoneId)
+                              .build()));
+      slot.assignEvent(event.getId());
     }
 
     ZoneEventAuthTarget target = null;
@@ -135,6 +158,7 @@ public class AdminZoneEventService {
     } else if (request.authTarget() != null) {
       target = authTargetRepository.save(buildTarget(event, request.authTarget()));
     }
+    audit(user, "CREATE_EVENT", "EVENT", event.getId(), Map.of("zoneId", zoneId));
     return AdminZoneEventResDto.of(event, target, 0, 0);
   }
 
@@ -250,6 +274,12 @@ public class AdminZoneEventService {
                       request.authTarget().longitude(),
                       request.authTarget().radiusM()));
     }
+    audit(
+        user,
+        "PATCH_EVENT",
+        "EVENT",
+        eventId,
+        request.reason() == null ? null : Map.of("reason", request.reason()));
     return toDetail(event);
   }
 
@@ -268,7 +298,24 @@ public class AdminZoneEventService {
                 ParticipationStatus.UNDER_REVIEW))) {
       open.cancel("EVENT_CANCELLED");
     }
+    audit(user, "CANCEL_EVENT", "EVENT", eventId, null);
     return toDetail(event);
+  }
+
+  private void audit(
+      AuthenticatedUser user,
+      String action,
+      String targetType,
+      UUID targetId,
+      Map<String, Object> detail) {
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action(action)
+            .targetType(targetType)
+            .targetId(targetId)
+            .detail(detail)
+            .build());
   }
 
   private AdminZoneEventResDto toDetail(ZoneEvent event) {

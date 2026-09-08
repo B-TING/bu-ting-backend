@@ -5296,52 +5296,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
-  /api/v1/admin/zone-event-rounds/{roundId}/slots:
-    patch:
-      tags:
-        - Zone Event
-      summary: "슬롯 구역 교체"
-      description: "ROLE_ADMIN/MANAGER. 이벤트 미배정 슬롯의 구역을 교체합니다."
-      security:
-        - opaqueToken: [ ]
-      parameters:
-        - name: roundId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SlotReassignRequest"
-      responses:
-        "200":
-          description: "OK"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AdminRoundEnvelope"
-        "403":
-          description: "운영 권한 없음"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiErrorResponse"
-        "404":
-          description: "회차·슬롯 없음"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiErrorResponse"
-        "409":
-          description: "이미 이벤트 배정됨"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/admin/zone-event-rounds/{roundId}/backup-targets:
     post:
       tags:
@@ -8618,9 +8572,11 @@ components:
         status:
           type: string
           enum:
+            - DRAFT
             - SCHEDULED
-            - OPEN
+            - ACTIVE
             - CLOSED
+            - CANCELLED
             - SETTLED
         startsAt:
           type: string
@@ -10369,17 +10325,6 @@ components:
         expectedRevision:
           type: integer
           format: int64
-
-    SlotReassignRequest:
-      type: object
-      properties:
-        slotId:
-          type: string
-          format: uuid
-
-        zoneId:
-          type: string
-          example: "YEONGDO"
 
     BackupTargetRequest:
       type: object

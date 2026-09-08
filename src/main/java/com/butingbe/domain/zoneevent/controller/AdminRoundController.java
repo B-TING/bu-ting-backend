@@ -5,7 +5,6 @@ import com.butingbe.domain.zoneevent.dto.request.BackupTargetReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCancelReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundPatchReqDto;
-import com.butingbe.domain.zoneevent.dto.request.SlotReassignReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SwapTargetReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
@@ -96,15 +95,6 @@ public class AdminRoundController {
       @RequestBody @Valid RoundCancelReqDto request) {
     return ResponseEntity.ok(
         ApiResponse.success("회차 긴급 취소", consoleService.cancel(user, roundId, request)));
-  }
-
-  @PatchMapping("/{roundId}/slots")
-  public ResponseEntity<ApiResponse<AdminRoundResDto>> reassignSlot(
-      @AuthenticationPrincipal AuthenticatedUser user,
-      @PathVariable UUID roundId,
-      @RequestBody @Valid SlotReassignReqDto request) {
-    return ResponseEntity.ok(
-        ApiResponse.success("슬롯 교체", consoleService.reassignSlot(user, roundId, request)));
   }
 
   @PostMapping("/{roundId}/backup-targets")

@@ -129,12 +129,18 @@ public class ZoneEvent extends BaseEntity {
     this.status = ZoneEventStatus.CLOSED;
   }
 
-  /** SCHEDULED/ACTIVE → CANCELLED. 이미 종료·취소된 이벤트는 취소할 수 없다. */
+  /**
+   * SCHEDULED/ACTIVE → CANCELLED. 이미 종료·취소된 이벤트는 취소할 수 없다.
+   *
+   * <p>취소된 이벤트는 회차 슬롯을 더 이상 점유하지 않으므로 slot_code도 반납한다. (round_id, slot_code) 부분 유니크 인덱스가 있어, 반납하지
+   * 않으면 같은 회차에 대체 이벤트를 넣을 때 코드가 충돌한다.
+   */
   public void markCancelled() {
     if (status != ZoneEventStatus.SCHEDULED && status != ZoneEventStatus.ACTIVE) {
       throw new ConflictException("error.zone_event.invalid_state");
     }
     this.status = ZoneEventStatus.CANCELLED;
+    this.slotCode = null;
   }
 
   /** 상태와 무관하게 수정 가능한 항목(제목·설명·기간·성공 상한·우수 보상). null은 건너뛴다. */
