@@ -38,7 +38,11 @@ class RoundTransitionServiceTest extends AbstractContainerTest {
   void setUp() {
     type =
         zoneEventTypeRepository.save(
-            ZoneEventType.builder().typeCode("PLACE_AUTH").name("장소 인증").requiresUpload(true).build());
+            ZoneEventType.builder()
+                .typeCode("PLACE_AUTH")
+                .name("장소 인증")
+                .requiresUpload(true)
+                .build());
   }
 
   @Test
@@ -119,8 +123,14 @@ class RoundTransitionServiceTest extends AbstractContainerTest {
             .build());
   }
 
-  private ZoneEventRoundSlot savedSlot(ZoneEventRound round, String zoneId, java.util.UUID eventId) {
+  private ZoneEventRoundSlot savedSlot(
+      ZoneEventRound round, String zoneId, java.util.UUID eventId) {
     return slotRepository.save(
-        ZoneEventRoundSlot.builder().round(round).slotKind(SlotKind.AUTH).zoneId(zoneId).eventId(eventId).build());
+        ZoneEventRoundSlot.builder()
+            .round(round)
+            .slotKind(SlotKind.AUTH)
+            .zoneId(zoneId)
+            .eventId(eventId)
+            .build());
   }
 }

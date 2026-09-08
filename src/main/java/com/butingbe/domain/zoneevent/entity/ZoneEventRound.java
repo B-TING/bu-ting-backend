@@ -115,7 +115,9 @@ public class ZoneEventRound extends BaseEntity {
 
   /** DRAFT/SCHEDULED/ACTIVE → CANCELLED. 그 외 상태면 409. */
   public void cancel(String reason) {
-    if (status != RoundStatus.DRAFT && status != RoundStatus.SCHEDULED && status != RoundStatus.ACTIVE) {
+    if (status != RoundStatus.DRAFT
+        && status != RoundStatus.SCHEDULED
+        && status != RoundStatus.ACTIVE) {
       throw new ConflictException("error.zone_event.invalid_state");
     }
     this.status = RoundStatus.CANCELLED;
@@ -124,7 +126,11 @@ public class ZoneEventRound extends BaseEntity {
 
   /** DRAFT/SCHEDULED에서만 메타데이터 수정 가능. null은 미변경. 그 외 상태면 409. */
   public void applyEditable(
-      String name, OffsetDateTime startsAt, OffsetDateTime endsAt, String timezone, RoundType roundType) {
+      String name,
+      OffsetDateTime startsAt,
+      OffsetDateTime endsAt,
+      String timezone,
+      RoundType roundType) {
     if (status != RoundStatus.DRAFT && status != RoundStatus.SCHEDULED) {
       throw new ConflictException("error.zone_event.invalid_state");
     }

@@ -43,15 +43,18 @@ public class RoundTransitionService {
   /** 전체 회차를 훑어 대상이 되는 것만 전환한다(스케줄러 진입점). */
   @Transactional
   public void syncAll(OffsetDateTime now) {
-    for (ZoneEventRound round : roundRepository.findByStatusAndStartsAtLessThanEqual(RoundStatus.SCHEDULED, now)) {
+    for (ZoneEventRound round :
+        roundRepository.findByStatusAndStartsAtLessThanEqual(RoundStatus.SCHEDULED, now)) {
       sync(round, now);
     }
-    for (ZoneEventRound round : roundRepository.findByStatusAndEndsAtLessThanEqual(RoundStatus.ACTIVE, now)) {
+    for (ZoneEventRound round :
+        roundRepository.findByStatusAndEndsAtLessThanEqual(RoundStatus.ACTIVE, now)) {
       sync(round, now);
     }
   }
 
-  private void transitionSlotEvents(ZoneEventRound round, ZoneEventStatus from, ZoneEventStatus to) {
+  private void transitionSlotEvents(
+      ZoneEventRound round, ZoneEventStatus from, ZoneEventStatus to) {
     List<UUID> eventIds =
         slotRepository.findByRound_Id(round.getId()).stream()
             .map(ZoneEventRoundSlot::getEventId)

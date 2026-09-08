@@ -63,13 +63,25 @@ public record AdminRoundResDto(
             .map(
                 s -> {
                   String eventId = s.getEventId() == null ? null : s.getEventId().toString();
-                  long[] counts = eventId == null ? new long[] {0, 0, 0} : countsByEventId.getOrDefault(eventId, new long[] {0, 0, 0});
+                  long[] counts =
+                      eventId == null
+                          ? new long[] {0, 0, 0}
+                          : countsByEventId.getOrDefault(eventId, new long[] {0, 0, 0});
                   return new Slot(
-                      s.getId().toString(), s.getSlotKind().name(), s.getZoneId(), eventId, counts[0], counts[1], counts[2]);
+                      s.getId().toString(),
+                      s.getSlotKind().name(),
+                      s.getZoneId(),
+                      eventId,
+                      counts[0],
+                      counts[1],
+                      counts[2]);
                 })
             .toList(),
         backups.stream()
-            .map(b -> new Backup(b.getId().toString(), b.getPlaceName(), b.getLatitude(), b.getLongitude()))
+            .map(
+                b ->
+                    new Backup(
+                        b.getId().toString(), b.getPlaceName(), b.getLatitude(), b.getLongitude()))
             .toList());
   }
 }

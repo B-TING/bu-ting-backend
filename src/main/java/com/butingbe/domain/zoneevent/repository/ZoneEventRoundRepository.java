@@ -14,8 +14,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ZoneEventRoundRepository
-    extends JpaRepository<ZoneEventRound, UUID>,
-        JpaSpecificationExecutor<ZoneEventRound> {
+    extends JpaRepository<ZoneEventRound, UUID>, JpaSpecificationExecutor<ZoneEventRound> {
 
   List<ZoneEventRound> findByStatusAndStartsAtLessThanEqual(RoundStatus status, OffsetDateTime at);
 
