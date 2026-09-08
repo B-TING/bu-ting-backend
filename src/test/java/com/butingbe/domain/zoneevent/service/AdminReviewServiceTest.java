@@ -13,6 +13,7 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.dto.response.AdminParticipationPageResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
 import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
@@ -143,6 +144,57 @@ class AdminReviewServiceTest extends AbstractContainerTest {
         .isInstanceOf(ResourceNotFoundException.class);
     assertThatThrownBy(() -> reviewService.unhide(operator, UUID.randomUUID()))
         .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("전체 참여 목록은 roundId·eventId·zoneId·userId·status·keyword로 필터링하고 페이지 정보를 돌려준다")
+  void listFiltersAndPages() {
+    ZoneEventParticipation match =
+        participationRepository.save(participation(ParticipationStatus.SUCCESS, false));
+    participationRepository.save(participation(ParticipationStatus.FAIL, false)); // status 안 맞음
+
+    AdminParticipationPageResDto page =
+        reviewService.list(
+            operator, null, event.getId(), event.getZoneId(), null, "SUCCESS", null, 1, 20);
+
+    assertThat(page.items()).hasSize(1);
+    assertThat(page.items().get(0).participationId()).isEqualTo(match.getId().toString());
+    assertThat(page.totalElements()).isEqualTo(1);
+    assertThat(page.page()).isEqualTo(1);
+    assertThat(page.hasNext()).isFalse();
+  }
+
+  @Test
+  @DisplayName("keyword는 참여자 닉네임·이메일로 찾는다")
+  void listFiltersByKeyword() {
+    User target = savedUser("특이닉네임");
+    ZoneEventParticipation p =
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(target.getId())
+            .status(ParticipationStatus.SUCCESS)
+            .gpsLat(35.1)
+            .gpsLng(129.1)
+            .joinedAt(OffsetDateTime.now())
+            .visibility(ParticipationVisibility.PUBLIC)
+            .build();
+    participationRepository.save(p);
+    participationRepository.save(participation(ParticipationStatus.SUCCESS, false));
+
+    AdminParticipationPageResDto page =
+        reviewService.list(operator, null, null, null, null, null, "특이닉네임", 1, 20);
+
+    assertThat(page.items()).hasSize(1);
+    assertThat(page.items().get(0).userId()).isEqualTo(target.getId().toString());
+  }
+
+  @Test
+  @DisplayName("운영자가 아니면 목록 조회는 403이다")
+  void listForbidden() {
+    AuthenticatedUser normalUser = AuthenticatedUser.from(savedUser("normal"));
+    assertThatThrownBy(
+            () -> reviewService.list(normalUser, null, null, null, null, null, null, 1, 20))
+        .isInstanceOf(com.butingbe.global.error.exception.ForbiddenException.class);
   }
 
   private ZoneEventParticipation participation(ParticipationStatus status, boolean hidden) {

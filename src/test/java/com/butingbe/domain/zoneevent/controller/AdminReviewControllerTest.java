@@ -4,10 +4,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.zoneevent.dto.response.AdminParticipationPageResDto;
 import com.butingbe.domain.zoneevent.service.AdminReviewService;
 import com.butingbe.global.error.GlobalExceptionHandler;
 import com.butingbe.global.error.exception.ForbiddenException;
@@ -59,6 +62,14 @@ class AdminReviewControllerTest {
             .setControllerAdvice(
                 new GlobalExceptionHandler(messageSource, new FixedLocaleResolver(Locale.KOREAN)))
             .build();
+  }
+
+  @Test
+  @DisplayName("전체 참여 목록 200")
+  void list() throws Exception {
+    when(adminReviewService.list(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(new AdminParticipationPageResDto(List.of(), 1, 20, 0, 0, false));
+    mockMvc.perform(get("/admin/zone-event-participations")).andExpect(status().isOk());
   }
 
   @Test
