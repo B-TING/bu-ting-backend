@@ -1,6 +1,7 @@
 package com.butingbe.domain.zoneevent.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,5 +58,56 @@ class ZoneEventAuthTargetTest {
     target.cancel();
 
     assertThat(target.getStatus()).isEqualTo(ZoneEventTargetStatus.CANCELLED);
+  }
+
+  @Test
+  @DisplayName("ACTIVE가 아닌 타겟은 취소할 수 없다")
+  void cancelNonActiveTargetConflicts() {
+    ZoneEventAuthTarget target =
+        ZoneEventAuthTarget.builder()
+            .targetKind(ZoneEventTargetKind.PLACE)
+            .placeName("해운대 해수욕장")
+            .latitude(35.1587)
+            .longitude(129.1604)
+            .radiusM(100)
+            .build();
+    target.cancel();
+
+    assertThatThrownBy(target::cancel)
+        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("긴급 교체되면 REPLACED 상태가 된다")
+  void markReplacedSetsReplacedStatus() {
+    ZoneEventAuthTarget target =
+        ZoneEventAuthTarget.builder()
+            .targetKind(ZoneEventTargetKind.PLACE)
+            .placeName("해운대 해수욕장")
+            .latitude(35.1587)
+            .longitude(129.1604)
+            .radiusM(100)
+            .build();
+
+    target.markReplaced();
+
+    assertThat(target.getStatus()).isEqualTo(ZoneEventTargetStatus.REPLACED);
+  }
+
+  @Test
+  @DisplayName("ACTIVE가 아닌 타겟은 교체 표시할 수 없다")
+  void markReplacedNonActiveTargetConflicts() {
+    ZoneEventAuthTarget target =
+        ZoneEventAuthTarget.builder()
+            .targetKind(ZoneEventTargetKind.PLACE)
+            .placeName("해운대 해수욕장")
+            .latitude(35.1587)
+            .longitude(129.1604)
+            .radiusM(100)
+            .build();
+    target.cancel();
+
+    assertThatThrownBy(target::markReplaced)
+        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class);
   }
 }
