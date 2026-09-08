@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.file.service.FileStorageService;
+import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
+import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
@@ -28,6 +30,9 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
+import com.butingbe.domain.zonetitle.entity.ZoneTitleDef;
+import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
+import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
@@ -53,6 +58,10 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
   @Autowired private ZoneEventAuthTargetRepository authTargetRepository;
   @Autowired private ZoneEventSubmissionRepository submissionRepository;
+  @Autowired private BaseRewardPayoutRepository baseRewardPayoutRepository;
+  @Autowired private RewardPayoutRepository rewardPayoutRepository;
+  @Autowired private ZoneTitleDefRepository titleDefRepository;
+  @Autowired private UserZoneTitleRepository userZoneTitleRepository;
   @MockitoBean private FileStorageService fileStorageService;
 
   private ZoneEvent event;
@@ -177,6 +186,16 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   void approveMarksSuccessWithoutReward() {
     ZoneEventParticipation p = underReviewWithSubmission();
     ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    titleDefRepository.save(
+        ZoneTitleDef.builder()
+            .titleCode(event.getZoneId() + "_T1")
+            .zoneId(event.getZoneId())
+            .tier(1)
+            .requiredSuccessCount(1)
+            .titleName(event.getZoneId() + " T1")
+            .style("chip")
+            .color("#000000")
+            .build());
 
     AdminReviewDecisionResDto result =
         reviewService.approve(
@@ -187,6 +206,10 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
     assertThat(result.status()).isEqualTo("SUCCESS");
     assertThat(submissionRepository.findById(submission.getId()).orElseThrow().getReviewStatus())
         .isEqualTo(com.butingbe.domain.zoneevent.entity.SubmissionReviewStatus.SUCCESS);
+    assertThat(baseRewardPayoutRepository.count()).isZero();
+    assertThat(rewardPayoutRepository.count()).isZero();
+    assertThat(result.newlyAwardedTitles()).isNotEmpty();
+    assertThat(userZoneTitleRepository.countByUserIdAndEquippedIsTrue(p.getUserId())).isZero();
   }
 
   @Test
@@ -199,7 +222,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
             () ->
                 reviewService.approve(
                     operator, p.getId(), new ReviewApproveReqDto(submission.getId(), submission.getRevision() + 1), null))
-        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class);
+        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
+        .hasMessage("error.zone_event.review.stale_revision");
   }
 
   @Test
@@ -223,7 +247,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
             () ->
                 reviewService.approve(
                     operator, p.getId(), new ReviewApproveReqDto(stale.getId(), stale.getRevision()), null))
-        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class);
+        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
+        .hasMessage("error.zone_event.review.stale_submission");
   }
 
   @Test
@@ -258,7 +283,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
             () ->
                 reviewService.approve(
                     operator, p.getId(), new ReviewApproveReqDto(submission.getId(), revisionSeenByBoth), null))
-        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class);
+        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
+        .hasMessage("error.zone_event.participation.invalid_state");
   }
 
   private ZoneEventParticipation underReviewWithSubmission() {
