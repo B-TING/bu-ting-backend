@@ -4,8 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
-import com.butingbe.domain.file.entity.FileMetadata;
-import com.butingbe.domain.file.repository.FileMetadataRepository;
+import com.butingbe.domain.file.service.FileStorageService;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
@@ -35,8 +34,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,13 +51,15 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
   @Autowired private ZoneEventAuthTargetRepository authTargetRepository;
   @Autowired private ZoneEventSubmissionRepository submissionRepository;
-  @Autowired private FileMetadataRepository fileMetadataRepository;
+  @MockitoBean private FileStorageService fileStorageService;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
 
   @BeforeEach
   void setUp() {
+    Mockito.when(fileStorageService.getPresignedUrl(Mockito.anyString()))
+        .thenReturn("https://signed.example/media.jpg");
     ZoneEventType type =
         zoneEventTypeRepository.save(
             ZoneEventType.builder().typeCode("PLACE_AUTH").name("장소 인증").requiresUpload(true).build());
@@ -133,15 +136,6 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
                 .longitude(129.1)
                 .radiusM(100)
                 .build());
-    fileMetadataRepository.save(
-        FileMetadata.builder()
-            .objectKey("uploads/images/photo.jpg")
-            .originalFileName("photo.jpg")
-            .contentType("image/jpeg")
-            .mediaType("IMAGE")
-            .fileSize(1024L)
-            .bucket("buting-private")
-            .build());
     ZoneEventSubmission submission =
         submissionRepository.save(
             ZoneEventSubmission.builder()
