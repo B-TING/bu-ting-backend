@@ -67,5 +67,26 @@ class IdempotencyServiceTest extends AbstractContainerTest {
     assertThat(idempotencyService.findReplay("", "zone-event-review-approve", "fp")).isEmpty();
   }
 
+  @Test
+  @DisplayName("응답 직렬화에 실패하면 저장하지 않고 명확한 예외를 던진다")
+  void saveWrapsSerializationFailure() {
+    assertThatThrownBy(
+            () ->
+                idempotencyService.save(
+                    "key-boom-" + java.util.UUID.randomUUID(),
+                    "zone-event-review-approve",
+                    "fp-boom",
+                    new Unserializable()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to serialize");
+  }
+
   private record Sample(String name, int value) {}
+
+  /** getter가 항상 실패해서 Jackson 직렬화 자체가 예외를 던지게 만드는 테스트 전용 타입. */
+  private static final class Unserializable {
+    public String getValue() {
+      throw new RuntimeException("boom");
+    }
+  }
 }
