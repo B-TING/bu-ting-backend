@@ -174,6 +174,18 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
   }
 
   @Test
+  @DisplayName("OBJECT 타겟은 원본 좌표가 없으므로 좌표를 생략하면 400이다")
+  void createObjectTargetWithoutCoordinatesRejected() {
+    AdminAuthTargetCreateReqDto missingCoordinates =
+        new AdminAuthTargetCreateReqDto(
+            "OBJECT", "signpost-1", null, null, "표지판", null, null, null, null, 100);
+
+    assertThatThrownBy(() -> targetService.create(operator, eventId, missingCoordinates))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.zone_event.target.invalid_coordinates");
+  }
+
+  @Test
   @DisplayName("targetKind가 유효하지 않으면 400이다")
   void createWithInvalidKindRejected() {
     AdminAuthTargetCreateReqDto invalidKind =
