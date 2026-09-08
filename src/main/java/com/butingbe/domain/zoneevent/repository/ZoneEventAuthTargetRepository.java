@@ -18,4 +18,11 @@ public interface ZoneEventAuthTargetRepository extends JpaRepository<ZoneEventAu
    */
   Optional<ZoneEventAuthTarget> findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
       UUID eventId, ZoneEventTargetStatus status);
+
+  /** eventId 범위로 스코프된 타겟 조회(다른 이벤트의 타겟 접근 방지). */
+  Optional<ZoneEventAuthTarget> findByIdAndEvent_Id(UUID id, UUID eventId);
+
+  /** 같은 이벤트에서 같은 관광지 contentId로 이미 등록된 타겟이 있는지(중복 등록 방지). */
+  Optional<ZoneEventAuthTarget> findByEvent_IdAndPlaceContentIdAndStatus(
+      UUID eventId, String placeContentId, ZoneEventTargetStatus status);
 }
