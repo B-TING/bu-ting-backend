@@ -12,6 +12,9 @@ public interface ZoneEventAuthTargetRepository extends JpaRepository<ZoneEventAu
   /** 이벤트의 선택 장소 전체(취소 포함). 상세·목록 조회용. */
   List<ZoneEventAuthTarget> findByEvent_Id(UUID eventId);
 
+  /** 이벤트의 ACTIVE 타겟 전체(참여자가 고를 수 있는 목록). */
+  List<ZoneEventAuthTarget> findByEvent_IdAndStatus(UUID eventId, ZoneEventTargetStatus status);
+
   /**
    * 이벤트에서 참여·제출에 실제로 쓸 대표 타겟 하나. 오늘은 이벤트당 ACTIVE 타겟이 정확히 하나뿐이라 안전하다. 여러 개 중 사용자가 직접 고르는 흐름은 후속
    * 이슈(참여·제출 API)에서 다룬다.
