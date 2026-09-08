@@ -317,8 +317,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("동시에 두 번 승인 요청이 오면 하나만 성공하고 나머지는 409다(비관적 재현: 두 트랜잭션이 같은 revision을 읽은 상태 시뮬레이션)")
-  void concurrentApproveOnlyOneWins() {
+  @DisplayName("이미 승인되어 SUCCESS로 바뀐 참여를 다시 승인하면 409다(requireUnderReview 상태 가드)")
+  void secondApproveAfterSuccessIsRejected() {
     ZoneEventParticipation p = underReviewWithSubmission();
     ZoneEventSubmission submission =
         submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
@@ -327,7 +327,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
     reviewService.approve(
         operator, p.getId(), new ReviewApproveReqDto(submission.getId(), revisionSeenByBoth), null);
 
-    // 두 번째 "동시" 요청은 같은 revision을 들고 왔지만 첫 요청이 이미 revision을 올렸으므로 매뉴얼 체크에서 막힌다.
+    // 첫 승인으로 참여는 이미 SUCCESS로 바뀌었으므로, 같은 revision을 들고 온 두 번째 요청은 revision 비교에 닿기도
+    // 전에 requireUnderReview의 상태 가드(더 이상 UNDER_REVIEW가 아님)에서 막힌다.
     assertThatThrownBy(
             () ->
                 reviewService.approve(
@@ -398,6 +399,33 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
 
     assertThat(submissionRepository.findById(submission.getId()).orElseThrow().getRevision())
         .isEqualTo(revisionBeforeReject + 1); // 딱 한 번만 처리됨
+  }
+
+  @Test
+  @DisplayName("같은 Idempotency-Key를 다른 반려 사유로 재전송하면 재생이 아니라 409(idempotency_key_conflict)다")
+  void rejectWithDifferentReasonConflicts() {
+    ZoneEventParticipation p = underReviewWithSubmission();
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    String key = "idem-" + UUID.randomUUID();
+    Long revisionBeforeReject = submission.getRevision();
+
+    reviewService.reject(
+        operator,
+        p.getId(),
+        new ReviewRejectReqDto(submission.getId(), "NOT_ON_SITE", revisionBeforeReject),
+        key);
+
+    assertThatThrownBy(
+            () ->
+                reviewService.reject(
+                    operator,
+                    p.getId(),
+                    new ReviewRejectReqDto(
+                        submission.getId(), "BLURRY_PHOTO", revisionBeforeReject),
+                    key))
+        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
+        .hasMessage("error.zone_event.review.idempotency_key_conflict");
   }
 
   @Test

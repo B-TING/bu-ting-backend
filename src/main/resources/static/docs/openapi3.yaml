@@ -10725,13 +10725,6 @@ components:
           type: string
           nullable: true
 
-    RejectRequest:
-      type: object
-      properties:
-        failReason:
-          type: string
-          example: "NOT_ON_SITE"
-
     AdminParticipationListItem:
       type: object
       properties:

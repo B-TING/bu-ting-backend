@@ -169,7 +169,13 @@ public class AdminZoneEventReviewService {
       String idempotencyKey) {
     operatorAuthorization.requireOperator(user);
     String fingerprint =
-        participationId + ":" + request.submissionId() + ":" + request.expectedRevision();
+        participationId
+            + ":"
+            + request.submissionId()
+            + ":"
+            + request.expectedRevision()
+            + ":"
+            + request.reason();
     if (idempotencyService.findReplay(idempotencyKey, REJECT_ENDPOINT, fingerprint).isPresent()) {
       return;
     }

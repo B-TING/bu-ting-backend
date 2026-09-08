@@ -4,7 +4,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.reward.service.RewardRevokeService;
-import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.zoneevent.dto.response.AdminParticipationListItemResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminParticipationPageResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
@@ -16,8 +16,10 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -39,7 +41,6 @@ public class AdminReviewService {
   private final ZoneEventReportRepository reportRepository;
   private final RewardRevokeService rewardRevokeService;
   private final OperatorAuthorization operatorAuthorization;
-  private final UserRepository userRepository;
 
   /** SUCCESS → REVOKED + 보상 회수(포인트 되돌림, 미사용 쿠폰 회수). */
   @Transactional
@@ -85,25 +86,13 @@ public class AdminReviewService {
     ParticipationStatus statusFilter =
         status == null || status.isBlank()
             ? null
-            : ParticipationStatus.valueOf(status.toUpperCase());
+            : ParticipationStatus.valueOf(status.toUpperCase(Locale.ROOT));
     String resolvedZoneId =
         zoneId == null || zoneId.isBlank() ? null : ChatZone.fromString(zoneId).name();
-
-    List<UUID> keywordUserIds = null;
-    if (keyword != null && !keyword.isBlank()) {
-      keywordUserIds =
-          userRepository
-              .findByNicknameContainingIgnoreCaseOrEmailContainingIgnoreCase(keyword, keyword)
-              .stream()
-              .map(u -> u.getId())
-              .toList();
-      if (keywordUserIds.isEmpty()) {
-        return new AdminParticipationPageResDto(List.of(), pageNumber, pageSize, 0, 0, false);
-      }
-    }
+    String resolvedKeyword = keyword == null || keyword.isBlank() ? null : keyword;
 
     Specification<ZoneEventParticipation> spec =
-        buildListSpec(roundId, eventId, resolvedZoneId, userId, statusFilter, keywordUserIds);
+        buildListSpec(roundId, eventId, resolvedZoneId, userId, statusFilter, resolvedKeyword);
     Page<ZoneEventParticipation> result =
         participationRepository.findAll(
             spec, PageRequest.of(pageNumber - 1, pageSize, Sort.by(Sort.Order.desc("joinedAt"))));
@@ -125,7 +114,7 @@ public class AdminReviewService {
       String zoneId,
       UUID userId,
       ParticipationStatus status,
-      List<UUID> keywordUserIds) {
+      String keyword) {
     return (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
       if (roundId != null) {
@@ -143,8 +132,17 @@ public class AdminReviewService {
       if (status != null) {
         predicates.add(cb.equal(root.get("status"), status));
       }
-      if (keywordUserIds != null) {
-        predicates.add(root.get("userId").in(keywordUserIds));
+      if (keyword != null) {
+        Subquery<UUID> userSub = query.subquery(UUID.class);
+        var userRoot = userSub.from(User.class);
+        String pattern = "%" + keyword.toLowerCase(Locale.ROOT) + "%";
+        userSub
+            .select(userRoot.get("id"))
+            .where(
+                cb.or(
+                    cb.like(cb.lower(userRoot.get("nickname")), pattern),
+                    cb.like(cb.lower(userRoot.get("email")), pattern)));
+        predicates.add(root.get("userId").in(userSub));
       }
       return cb.and(predicates.toArray(new Predicate[0]));
     };
