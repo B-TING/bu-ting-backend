@@ -221,6 +221,8 @@ class ZoneEventParticipationControllerTest {
                     OffsetDateTime.now(),
                     OffsetDateTime.now(),
                     List.of()),
+                UUID.randomUUID().toString(),
+                1,
                 List.of(
                     new com.butingbe.domain.reward.dto.response.GrantedRewardDto(
                         UUID.randomUUID().toString(),
@@ -240,11 +242,15 @@ class ZoneEventParticipationControllerTest {
                     OPEN_ID)
                 .contentType("application/json")
                 .content(
-                    "{\"mediaFileKey\":\"uploads/p.jpg\",\"latitude\":35.1532,\"longitude\":129.1182}"))
+                    "{\"targetId\":\""
+                        + TARGET_ID
+                        + "\",\"mediaFileKey\":\"uploads/p.jpg\","
+                        + "\"latitude\":35.1532,\"longitude\":129.1182}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.participation.status").value("SUCCESS"))
         .andExpect(jsonPath("$.data.rewards[0].code").value("POINT_BASE"))
-        .andExpect(jsonPath("$.data.pointBalance").value(350));
+        .andExpect(jsonPath("$.data.pointBalance").value(350))
+        .andExpect(jsonPath("$.data.attemptNo").value(1));
   }
 
   @Test

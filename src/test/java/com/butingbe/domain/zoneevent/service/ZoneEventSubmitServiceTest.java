@@ -24,16 +24,18 @@ import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
-import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -54,12 +56,14 @@ class ZoneEventSubmitServiceTest {
   private static final UUID OTHER_ID = UUID.fromString("22222222-0000-0000-0000-000000000009");
   private static final UUID PARTICIPATION_ID =
       UUID.fromString("33333333-0000-0000-0000-000000000001");
+  private static final UUID TARGET_ID = UUID.fromString("44444444-0000-0000-0000-000000000001");
   private static final double IN_LAT = 35.1532;
   private static final double IN_LNG = 129.1182;
   private static final String FILE_KEY = "uploads/images/photo.jpg";
 
   @Mock private ZoneEventParticipationRepository participationRepository;
   @Mock private ZoneEventAuthTargetRepository authTargetRepository;
+  @Mock private ZoneEventSubmissionRepository submissionRepository;
   @Mock private FileMetadataRepository fileMetadataRepository;
   @Mock private RewardService rewardService;
   @Mock private UserPointService userPointService;
@@ -75,19 +79,29 @@ class ZoneEventSubmitServiceTest {
         new ZoneEventSubmitService(
             participationRepository,
             authTargetRepository,
+            submissionRepository,
             fileMetadataRepository,
             rewardService,
             userPointService,
             zoneTitleService);
     ReflectionTestUtils.setField(service, "reviewMode", "AUTO");
     ReflectionTestUtils.setField(service, "capturedAtThresholdMinutes", 10L);
+    ReflectionTestUtils.setField(service, "uploadRecencyThresholdMinutes", 30L);
     user = new AuthenticatedUser(USER_ID, "u@example.com", "u", List.of());
     event = event(ZoneEventStatus.ACTIVE);
+    lenient()
+        .when(submissionRepository.save(any()))
+        .thenAnswer(
+            invocation -> {
+              ZoneEventSubmission s = invocation.getArgument(0);
+              ReflectionTestUtils.setField(s, "id", UUID.randomUUID());
+              return s;
+            });
   }
 
   @Test
-  @DisplayName("AUTO 판정에서 제출이 통과하면 SUCCESS로 확정하고 기본 보상을 지급한다")
-  void autoApproveGrantsReward() {
+  @DisplayName("AUTO 판정에서 제출이 통과하면 SUCCESS로 확정하고 기본 보상을 지급하며 첫 제출 이력을 남긴다")
+  void autoApproveGrantsRewardAndCreatesFirstSubmission() {
     ZoneEventParticipation participation = joined();
     stubJoinedWithTargetAndMedia(participation, "image/jpeg");
     when(rewardService.grantBaseReward(
@@ -114,6 +128,8 @@ class ZoneEventSubmitServiceTest {
     assertThat(result.rewards()).hasSize(1);
     assertThat(result.pointBalance()).isEqualTo(350);
     assertThat(result.participation().status()).isEqualTo("SUCCESS");
+    assertThat(result.attemptNo()).isEqualTo(1);
+    assertThat(result.submissionId()).isNotBlank();
   }
 
   @Test
@@ -129,6 +145,7 @@ class ZoneEventSubmitServiceTest {
     assertThat(participation.getStatus()).isEqualTo(ParticipationStatus.UNDER_REVIEW);
     assertThat(result.rewards()).isEmpty();
     assertThat(result.pointBalance()).isEqualTo(100);
+    assertThat(result.attemptNo()).isEqualTo(1);
     verify(rewardService, never()).grantBaseReward(any(), any(), any(), any(), any());
   }
 
@@ -140,13 +157,82 @@ class ZoneEventSubmitServiceTest {
     when(userPointService.getBalance(USER_ID)).thenReturn(0);
     ParticipationSubmitReqDto stale =
         new ParticipationSubmitReqDto(
-            FILE_KEY, "후기", IN_LAT, IN_LNG, OffsetDateTime.now().minusMinutes(30));
+            TARGET_ID, FILE_KEY, "후기", IN_LAT, IN_LNG, OffsetDateTime.now().minusMinutes(30));
 
     SubmitResultResDto result = service.submit(user, EVENT_ID, PARTICIPATION_ID, stale);
 
     assertThat(participation.getStatus()).isEqualTo(ParticipationStatus.UNDER_REVIEW);
     assertThat(result.rewards()).isEmpty();
     verify(rewardService, never()).grantBaseReward(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("반려 후 재제출하면 attemptNo가 늘어난 새 제출 이력이 쌓인다")
+  void resubmitAfterRejectionCreatesNewAttempt() {
+    ZoneEventParticipation participation = joined();
+    ReflectionTestUtils.setField(participation, "status", ParticipationStatus.FAIL);
+    stubJoinedWithTargetAndMedia(participation, "image/jpeg");
+    when(submissionRepository.countByParticipation_Id(PARTICIPATION_ID)).thenReturn(1L);
+    when(rewardService.grantBaseReward(any(), any(), any(), any(), any()))
+        .thenReturn(new BaseRewardResult(List.of(), 0));
+
+    SubmitResultResDto result = service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY));
+
+    assertThat(result.attemptNo()).isEqualTo(2);
+    assertThat(participation.getStatus()).isEqualTo(ParticipationStatus.SUCCESS);
+  }
+
+  @Test
+  @DisplayName("UNDER_REVIEW 상태에서는 재제출할 수 없다(409)")
+  void resubmitFromUnderReviewRejected() {
+    ZoneEventParticipation participation = joined();
+    ReflectionTestUtils.setField(participation, "status", ParticipationStatus.UNDER_REVIEW);
+    when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
+
+    assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_event.participation.invalid_state");
+  }
+
+  @Test
+  @DisplayName("SUCCESS 상태에서는 재제출할 수 없다(409)")
+  void resubmitFromSuccessRejected() {
+    ZoneEventParticipation participation = joined();
+    ReflectionTestUtils.setField(participation, "status", ParticipationStatus.SUCCESS);
+    when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
+
+    assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_event.participation.invalid_state");
+  }
+
+  @Test
+  @DisplayName("마감 시각이 지나면 최초 제출도 409(ended)다")
+  void submitAfterDeadlineRejected() {
+    ZoneEvent ended = event(ZoneEventStatus.ACTIVE);
+    ReflectionTestUtils.setField(ended, "startsAt", OffsetDateTime.now().minusMinutes(20));
+    ReflectionTestUtils.setField(ended, "durationMinutes", 10);
+    ZoneEventParticipation participation = joinedOf(ended);
+    when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
+
+    assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_event.ended");
+  }
+
+  @Test
+  @DisplayName("마감 시각이 지나면 FAIL 상태의 재제출도 409(ended)다")
+  void resubmitAfterDeadlineRejected() {
+    ZoneEvent ended = event(ZoneEventStatus.ACTIVE);
+    ReflectionTestUtils.setField(ended, "startsAt", OffsetDateTime.now().minusMinutes(20));
+    ReflectionTestUtils.setField(ended, "durationMinutes", 10);
+    ZoneEventParticipation participation = joinedOf(ended);
+    ReflectionTestUtils.setField(participation, "status", ParticipationStatus.FAIL);
+    when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
+
+    assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_event.ended");
   }
 
   @Test
@@ -165,8 +251,7 @@ class ZoneEventSubmitServiceTest {
   void unknownMediaRejected() {
     ZoneEventParticipation participation = joined();
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
-    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
-            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID))
         .thenReturn(Optional.of(target()));
     when(fileMetadataRepository.findByObjectKey(FILE_KEY)).thenReturn(Optional.empty());
 
@@ -180,21 +265,20 @@ class ZoneEventSubmitServiceTest {
   void submitOutOfRange() {
     ZoneEventParticipation participation = joined();
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
-    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
-            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID))
         .thenReturn(Optional.of(target()));
 
     ParticipationSubmitReqDto far =
-        new ParticipationSubmitReqDto(FILE_KEY, "후기", 35.16, 129.13, null);
+        new ParticipationSubmitReqDto(TARGET_ID, FILE_KEY, "후기", 35.16, 129.13, null);
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, far))
         .isInstanceOf(ZoneEventOutOfRangeException.class);
   }
 
   @Test
-  @DisplayName("JOINED가 아니면 409(invalid_state)다")
-  void notJoinedRejected() {
+  @DisplayName("JOINED도 FAIL도 아니면 409(invalid_state)다")
+  void notJoinedOrFailedRejected() {
     ZoneEventParticipation participation = joined();
-    ReflectionTestUtils.setField(participation, "status", ParticipationStatus.SUCCESS);
+    ReflectionTestUtils.setField(participation, "status", ParticipationStatus.CANCELLED);
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
 
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
@@ -235,6 +319,18 @@ class ZoneEventSubmitServiceTest {
   }
 
   @Test
+  @DisplayName("다른 이벤트 소속이거나 비활성인 타겟으로 제출하면 404(target_not_found)다")
+  void submitWithInvalidTargetRejected() {
+    ZoneEventParticipation participation = joined();
+    when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
+    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.zone_event.target_not_found");
+  }
+
+  @Test
   @DisplayName("미인증이면 401이다")
   void unauthenticated() {
     assertThatThrownBy(() -> service.submit(null, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
@@ -242,35 +338,67 @@ class ZoneEventSubmitServiceTest {
   }
 
   @Test
-  @DisplayName("타인이 업로드한 미디어로 제출하면 403이다")
-  void rejectsMediaUploadedByAnother() {
+  @DisplayName("업로더 정보가 없거나(익명·레거시) 타인이 업로드한 미디어는 403이다")
+  void rejectsMediaWithoutOwnerOrUploadedByAnother() {
     ZoneEventParticipation participation = joined();
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
-    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
-            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID))
         .thenReturn(Optional.of(target()));
-    FileMetadata file = mock(FileMetadata.class);
-    when(file.getContentType()).thenReturn("image/jpeg");
-    when(file.getUploaderId()).thenReturn(UUID.randomUUID()); // 제출자(USER_ID)와 다른 업로더
-    when(fileMetadataRepository.findByObjectKey(FILE_KEY)).thenReturn(Optional.of(file));
+    FileMetadata anonymous = mock(FileMetadata.class);
+    when(anonymous.getContentType()).thenReturn("image/jpeg");
+    when(anonymous.getUploaderId()).thenReturn(null);
+    when(fileMetadataRepository.findByObjectKey(FILE_KEY)).thenReturn(Optional.of(anonymous));
 
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
-        .isInstanceOf(ForbiddenException.class);
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("error.zone_event.media.forbidden");
+  }
+
+  @Test
+  @DisplayName("이미 다른 제출에 쓰인 fileKey는 400(media.already_used)이다")
+  void rejectsAlreadyUsedMedia() {
+    ZoneEventParticipation participation = joined();
+    stubJoinedWithTargetAndMedia(participation, "image/jpeg");
+    when(submissionRepository.existsByMediaFileKey(FILE_KEY)).thenReturn(true);
+
+    assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.zone_event.media.already_used");
+  }
+
+  @Test
+  @DisplayName("업로드한 지 너무 오래된 fileKey는 400(media.stale)이다")
+  void rejectsStaleMedia() {
+    ZoneEventParticipation participation = joined();
+    when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
+    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID))
+        .thenReturn(Optional.of(target()));
+    FileMetadata stale = mock(FileMetadata.class);
+    when(stale.getContentType()).thenReturn("image/jpeg");
+    when(stale.getUploaderId()).thenReturn(USER_ID);
+    when(stale.getCreatedAt()).thenReturn(LocalDateTime.now().minusHours(2));
+    when(fileMetadataRepository.findByObjectKey(FILE_KEY)).thenReturn(Optional.of(stale));
+
+    assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.zone_event.media.stale");
   }
 
   private void stubJoinedWithTargetAndMedia(
       ZoneEventParticipation participation, String contentType) {
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
-    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
-            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID))
         .thenReturn(Optional.of(target()));
     FileMetadata file = mock(FileMetadata.class);
     lenient().when(file.getContentType()).thenReturn(contentType);
+    lenient().when(file.getUploaderId()).thenReturn(USER_ID);
+    lenient().when(file.getCreatedAt()).thenReturn(LocalDateTime.now());
     when(fileMetadataRepository.findByObjectKey(FILE_KEY)).thenReturn(Optional.of(file));
   }
 
   private ParticipationSubmitReqDto request(String fileKey) {
-    return new ParticipationSubmitReqDto(fileKey, "야경 미쳤다", IN_LAT, IN_LNG, OffsetDateTime.now());
+    return new ParticipationSubmitReqDto(
+        TARGET_ID, fileKey, "야경 미쳤다", IN_LAT, IN_LNG, OffsetDateTime.now());
   }
 
   private ZoneEventParticipation joined() {
@@ -302,13 +430,16 @@ class ZoneEventSubmitServiceTest {
   }
 
   private ZoneEventAuthTarget target() {
-    return ZoneEventAuthTarget.builder()
-        .event(event)
-        .targetKind(ZoneEventTargetKind.PLACE)
-        .placeName("광안대교 야경")
-        .latitude(35.153)
-        .longitude(129.118)
-        .radiusM(100)
-        .build();
+    ZoneEventAuthTarget created =
+        ZoneEventAuthTarget.builder()
+            .event(event)
+            .targetKind(ZoneEventTargetKind.PLACE)
+            .placeName("광안대교 야경")
+            .latitude(35.153)
+            .longitude(129.118)
+            .radiusM(100)
+            .build();
+    ReflectionTestUtils.setField(created, "id", TARGET_ID);
+    return created;
   }
 }
