@@ -47,6 +47,7 @@ class ZoneEventParticipationControllerTest {
   private static final UUID EVENT_ID = UUID.fromString("11111111-0000-0000-0000-000000000001");
   private static final UUID USER_ID = UUID.fromString("22222222-0000-0000-0000-000000000001");
   private static final UUID OPEN_ID = UUID.fromString("33333333-0000-0000-0000-000000000001");
+  private static final UUID TARGET_ID = UUID.fromString("44444444-0000-0000-0000-000000000001");
 
   @Mock private ZoneEventParticipationService participationService;
   @Mock private com.butingbe.domain.zoneevent.service.ZoneEventSubmitService submitService;
@@ -83,7 +84,7 @@ class ZoneEventParticipationControllerTest {
   @Test
   @DisplayName("반경 이내 참여 시작은 201과 JOINED 참여를 반환한다")
   void joinReturns201() throws Exception {
-    when(participationService.join(any(), eq(EVENT_ID), anyDouble(), anyDouble()))
+    when(participationService.join(any(), eq(EVENT_ID), any(), anyDouble(), anyDouble()))
         .thenReturn(
             new ParticipationResDto(
                 OPEN_ID.toString(),
@@ -105,7 +106,10 @@ class ZoneEventParticipationControllerTest {
         .perform(
             post("/zone-events/{eventId}/participations", EVENT_ID)
                 .contentType("application/json")
-                .content("{\"latitude\":35.1532,\"longitude\":129.1182}"))
+                .content(
+                    "{\"targetId\":\""
+                        + TARGET_ID
+                        + "\",\"latitude\":35.1532,\"longitude\":129.1182}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.status").value("JOINED"))
@@ -115,14 +119,17 @@ class ZoneEventParticipationControllerTest {
   @Test
   @DisplayName("반경 밖이면 400과 data에 거리를 담는다")
   void outOfRangeReturns400WithDistance() throws Exception {
-    when(participationService.join(any(), eq(EVENT_ID), anyDouble(), anyDouble()))
+    when(participationService.join(any(), eq(EVENT_ID), any(), anyDouble(), anyDouble()))
         .thenThrow(new ZoneEventOutOfRangeException(1340));
 
     mockMvc
         .perform(
             post("/zone-events/{eventId}/participations", EVENT_ID)
                 .contentType("application/json")
-                .content("{\"latitude\":35.16,\"longitude\":129.13}"))
+                .content(
+                    "{\"targetId\":\""
+                        + TARGET_ID
+                        + "\",\"latitude\":35.16,\"longitude\":129.13}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.message").value("반경 밖입니다."))
@@ -132,14 +139,17 @@ class ZoneEventParticipationControllerTest {
   @Test
   @DisplayName("이미 열린 참여가 있으면 409와 data에 참여 id를 담는다")
   void alreadyOpenReturns409WithId() throws Exception {
-    when(participationService.join(any(), eq(EVENT_ID), anyDouble(), anyDouble()))
+    when(participationService.join(any(), eq(EVENT_ID), any(), anyDouble(), anyDouble()))
         .thenThrow(new OpenParticipationExistsException(OPEN_ID));
 
     mockMvc
         .perform(
             post("/zone-events/{eventId}/participations", EVENT_ID)
                 .contentType("application/json")
-                .content("{\"latitude\":35.1532,\"longitude\":129.1182}"))
+                .content(
+                    "{\"targetId\":\""
+                        + TARGET_ID
+                        + "\",\"latitude\":35.1532,\"longitude\":129.1182}"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.data.participationId").value(OPEN_ID.toString()));
   }
@@ -147,14 +157,17 @@ class ZoneEventParticipationControllerTest {
   @Test
   @DisplayName("열린 참여 id를 못 찾은 동시성 충돌은 409에 빈 data다")
   void alreadyOpenWithoutIdReturns409EmptyData() throws Exception {
-    when(participationService.join(any(), eq(EVENT_ID), anyDouble(), anyDouble()))
+    when(participationService.join(any(), eq(EVENT_ID), any(), anyDouble(), anyDouble()))
         .thenThrow(new OpenParticipationExistsException(null));
 
     mockMvc
         .perform(
             post("/zone-events/{eventId}/participations", EVENT_ID)
                 .contentType("application/json")
-                .content("{\"latitude\":35.1532,\"longitude\":129.1182}"))
+                .content(
+                    "{\"targetId\":\""
+                        + TARGET_ID
+                        + "\",\"latitude\":35.1532,\"longitude\":129.1182}"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.data.participationId").doesNotExist());
   }
@@ -162,14 +175,17 @@ class ZoneEventParticipationControllerTest {
   @Test
   @DisplayName("미인증이면 401이다")
   void unauthenticatedReturns401() throws Exception {
-    when(participationService.join(any(), eq(EVENT_ID), anyDouble(), anyDouble()))
+    when(participationService.join(any(), eq(EVENT_ID), any(), anyDouble(), anyDouble()))
         .thenThrow(new UnauthenticatedException());
 
     mockMvc
         .perform(
             post("/zone-events/{eventId}/participations", EVENT_ID)
                 .contentType("application/json")
-                .content("{\"latitude\":35.1532,\"longitude\":129.1182}"))
+                .content(
+                    "{\"targetId\":\""
+                        + TARGET_ID
+                        + "\",\"latitude\":35.1532,\"longitude\":129.1182}"))
         .andExpect(status().isUnauthorized());
   }
 

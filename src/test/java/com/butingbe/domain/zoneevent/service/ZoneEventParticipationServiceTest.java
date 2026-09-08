@@ -16,7 +16,6 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
-import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.exception.OpenParticipationExistsException;
 import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
@@ -47,6 +46,7 @@ class ZoneEventParticipationServiceTest {
   private static final UUID USER_ID = UUID.fromString("22222222-0000-0000-0000-000000000001");
   private static final UUID OPEN_ID = UUID.fromString("33333333-0000-0000-0000-000000000001");
   private static final UUID OTHER_ID = UUID.fromString("22222222-0000-0000-0000-000000000009");
+  private static final UUID TARGET_ID = UUID.fromString("44444444-0000-0000-0000-000000000001");
   private static final double IN_LAT = 35.1532;
   private static final double IN_LNG = 129.1182;
   private static final double OUT_LAT = 35.16;
@@ -87,7 +87,7 @@ class ZoneEventParticipationServiceTest {
               return p;
             });
 
-    ParticipationResDto result = service.join(user, EVENT_ID, IN_LAT, IN_LNG);
+    ParticipationResDto result = service.join(user, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG);
 
     assertThat(result.status()).isEqualTo("JOINED");
     assertThat(result.distanceM()).isEqualTo(28);
@@ -100,7 +100,7 @@ class ZoneEventParticipationServiceTest {
   void joinOutOfRange() {
     stubActiveEventWithTarget();
 
-    assertThatThrownBy(() -> service.join(user, EVENT_ID, OUT_LAT, OUT_LNG))
+    assertThatThrownBy(() -> service.join(user, EVENT_ID, TARGET_ID, OUT_LAT, OUT_LNG))
         .isInstanceOf(ZoneEventOutOfRangeException.class)
         .satisfies(
             e ->
@@ -117,7 +117,26 @@ class ZoneEventParticipationServiceTest {
             eq(EVENT_ID), eq(USER_ID), any()))
         .thenReturn(Optional.of(open));
 
-    assertThatThrownBy(() -> service.join(user, EVENT_ID, IN_LAT, IN_LNG))
+    assertThatThrownBy(() -> service.join(user, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG))
+        .isInstanceOf(OpenParticipationExistsException.class)
+        .satisfies(
+            e ->
+                assertThat(((OpenParticipationExistsException) e).getParticipationId())
+                    .isEqualTo(OPEN_ID));
+  }
+
+  @Test
+  @DisplayName("반려(FAIL)로 재제출 대기 중인 참여가 있어도 새 참여는 409다")
+  void joinWhenFailedParticipationExists() {
+    stubActiveEventWithTarget();
+    ZoneEventParticipation failed = ZoneEventParticipation.join(event, USER_ID, IN_LAT, IN_LNG);
+    ReflectionTestUtils.setField(failed, "id", OPEN_ID);
+    ReflectionTestUtils.setField(failed, "status", ParticipationStatus.FAIL);
+    when(participationRepository.findByEvent_IdAndUserIdAndStatusIn(
+            eq(EVENT_ID), eq(USER_ID), any()))
+        .thenReturn(Optional.of(failed));
+
+    assertThatThrownBy(() -> service.join(user, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG))
         .isInstanceOf(OpenParticipationExistsException.class)
         .satisfies(
             e ->
@@ -136,7 +155,7 @@ class ZoneEventParticipationServiceTest {
             EVENT_ID, USER_ID, ParticipationStatus.SUCCESS))
         .thenReturn(1L);
 
-    assertThatThrownBy(() -> service.join(user, EVENT_ID, IN_LAT, IN_LNG))
+    assertThatThrownBy(() -> service.join(user, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG))
         .isInstanceOf(ConflictException.class)
         .hasMessage("error.zone_event.participation.limit_reached");
   }
@@ -155,7 +174,7 @@ class ZoneEventParticipationServiceTest {
     when(participationRepository.save(any()))
         .thenThrow(new DataIntegrityViolationException("uk_zone_event_participation_open"));
 
-    assertThatThrownBy(() -> service.join(user, EVENT_ID, IN_LAT, IN_LNG))
+    assertThatThrownBy(() -> service.join(user, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG))
         .isInstanceOf(OpenParticipationExistsException.class)
         .satisfies(
             e ->
@@ -169,9 +188,22 @@ class ZoneEventParticipationServiceTest {
     when(zoneEventRepository.findById(EVENT_ID))
         .thenReturn(Optional.of(event(ZoneEventStatus.SCHEDULED, 1)));
 
-    assertThatThrownBy(() -> service.join(user, EVENT_ID, IN_LAT, IN_LNG))
+    assertThatThrownBy(() -> service.join(user, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG))
         .isInstanceOf(ConflictException.class)
         .hasMessage("error.zone_event.not_active");
+  }
+
+  @Test
+  @DisplayName("마감 시각이 지났으면 409(ended)다")
+  void joinAfterDeadline() {
+    ZoneEvent ended = event(ZoneEventStatus.ACTIVE, 1);
+    ReflectionTestUtils.setField(ended, "startsAt", OffsetDateTime.now().minusMinutes(20));
+    ReflectionTestUtils.setField(ended, "durationMinutes", 10);
+    when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(ended));
+
+    assertThatThrownBy(() -> service.join(user, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_event.ended");
   }
 
   @Test
@@ -179,36 +211,48 @@ class ZoneEventParticipationServiceTest {
   void joinWhenEventNotFound() {
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.join(user, EVENT_ID, IN_LAT, IN_LNG))
+    assertThatThrownBy(() -> service.join(user, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessage("error.zone_event.not_found");
   }
 
   @Test
-  @DisplayName("타겟이 없는 이벤트는 404다")
+  @DisplayName("다른 이벤트 소속이거나 존재하지 않는 타겟은 404(target_not_found)다")
   void joinWhenTargetMissing() {
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
-            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.join(user, EVENT_ID, IN_LAT, IN_LNG))
-        .isInstanceOf(ResourceNotFoundException.class);
+    assertThatThrownBy(() -> service.join(user, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.zone_event.target_not_found");
+  }
+
+  @Test
+  @DisplayName("비활성(취소·교체) 타겟은 404(target_not_found)다")
+  void joinWhenTargetInactive() {
+    when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
+    ZoneEventAuthTarget cancelled = target(event);
+    cancelled.cancel();
+    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID))
+        .thenReturn(Optional.of(cancelled));
+
+    assertThatThrownBy(() -> service.join(user, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.zone_event.target_not_found");
   }
 
   @Test
   @DisplayName("미인증이면 401이다")
   void joinWhenUnauthenticated() {
-    assertThatThrownBy(() -> service.join(null, EVENT_ID, IN_LAT, IN_LNG))
+    assertThatThrownBy(() -> service.join(null, EVENT_ID, TARGET_ID, IN_LAT, IN_LNG))
         .isInstanceOf(UnauthenticatedException.class);
   }
 
   private void stubActiveEventWithTarget() {
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
     lenient()
-        .when(
-            authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
-                EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID))
         .thenReturn(Optional.of(target(event)));
   }
 
@@ -277,13 +321,16 @@ class ZoneEventParticipationServiceTest {
   }
 
   private ZoneEventAuthTarget target(ZoneEvent event) {
-    return ZoneEventAuthTarget.builder()
-        .event(event)
-        .targetKind(ZoneEventTargetKind.PLACE)
-        .placeName("광안대교 야경")
-        .latitude(35.153)
-        .longitude(129.118)
-        .radiusM(100)
-        .build();
+    ZoneEventAuthTarget created =
+        ZoneEventAuthTarget.builder()
+            .event(event)
+            .targetKind(ZoneEventTargetKind.PLACE)
+            .placeName("광안대교 야경")
+            .latitude(35.153)
+            .longitude(129.118)
+            .radiusM(100)
+            .build();
+    ReflectionTestUtils.setField(created, "id", TARGET_ID);
+    return created;
   }
 }

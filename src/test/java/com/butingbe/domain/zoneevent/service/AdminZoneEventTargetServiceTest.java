@@ -426,7 +426,10 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
     event.activate();
     zoneEventRepository.saveAndFlush(event);
 
-    assertThatThrownBy(() -> participationService.join(operator, eventId, 35.1532, 129.1181))
+    assertThatThrownBy(
+            () ->
+                participationService.join(
+                    operator, eventId, UUID.fromString(created.targetId()), 35.1532, 129.1181))
         .isInstanceOf(ResourceNotFoundException.class);
   }
 

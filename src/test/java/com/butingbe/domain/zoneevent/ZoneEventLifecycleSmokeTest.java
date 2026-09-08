@@ -195,7 +195,9 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
         .isEqualTo(ZoneEventStatus.ACTIVE);
 
     // 4) 참여 시작(GPS 반경 내)
-    ParticipationResDto joined = participationService.join(participant, eventId, LAT, LNG);
+    UUID targetId = UUID.fromString(event.authTarget().targetId());
+    ParticipationResDto joined =
+        participationService.join(participant, eventId, targetId, LAT, LNG);
     UUID participationId = UUID.fromString(joined.participationId());
 
     // 5) 제출 → AUTO 성공 + 기본 보상 + 구역 칭호
