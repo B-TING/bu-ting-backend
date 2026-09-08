@@ -1,6 +1,7 @@
 package com.butingbe.domain.zoneevent.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventResDto;
 import com.butingbe.domain.zoneevent.service.AdminZoneEventService;
 import com.butingbe.global.error.GlobalExceptionHandler;
@@ -129,35 +131,25 @@ class AdminZoneEventControllerTest {
   }
 
   @Test
-  @DisplayName("상태 전환은 200을 반환한다")
-  void activate() throws Exception {
-    when(adminZoneEventService.activate(any(), eq(EVENT_ID))).thenReturn(detail("ACTIVE"));
-
-    mockMvc
-        .perform(post("/admin/zone-events/{eventId}/activate", EVENT_ID))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.status").value("ACTIVE"));
-  }
-
-  @Test
-  @DisplayName("목록은 200을 반환한다")
+  @DisplayName("이벤트 목록 200 (roundId/page/size)")
   void list() throws Exception {
-    when(adminZoneEventService.list(any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(
-            new com.butingbe.domain.zoneevent.dto.response.AdminZoneEventPageResDto(
-                List.of(detail("SCHEDULED")), null, false));
+    when(adminZoneEventService.list(any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        .thenReturn(new AdminZoneEventPageResDto(List.of(), 0, 20, 0, 0));
 
     mockMvc
-        .perform(get("/admin/zone-events").param("zone", "SUYEONG_NAMGU"))
+        .perform(
+            get("/admin/zone-events")
+                .param("roundId", "44444444-0000-0000-0000-000000000001")
+                .param("page", "0")
+                .param("size", "20"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.items[0].eventId").value(EVENT_ID.toString()));
+        .andExpect(jsonPath("$.data.page").value(0));
   }
 
   @Test
-  @DisplayName("수정·종료·취소는 200을 반환한다")
-  void updateCloseCancel() throws Exception {
+  @DisplayName("수정·취소는 200을 반환한다")
+  void updateCancel() throws Exception {
     when(adminZoneEventService.update(any(), eq(EVENT_ID), any())).thenReturn(detail("ACTIVE"));
-    when(adminZoneEventService.close(any(), eq(EVENT_ID))).thenReturn(detail("CLOSED"));
     when(adminZoneEventService.cancel(any(), eq(EVENT_ID))).thenReturn(detail("CANCELLED"));
 
     mockMvc
@@ -165,16 +157,24 @@ class AdminZoneEventControllerTest {
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
                     "/admin/zone-events/{eventId}", EVENT_ID)
                 .contentType("application/json")
-                .content("{\"title\":\"새 제목\"}"))
+                .content("{\"title\":\"새 제목\",\"expectedRevision\":0}"))
         .andExpect(status().isOk());
-    mockMvc
-        .perform(post("/admin/zone-events/{eventId}/close", EVENT_ID))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.status").value("CLOSED"));
     mockMvc
         .perform(post("/admin/zone-events/{eventId}/cancel", EVENT_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+  }
+
+  @Test
+  @DisplayName("expectedRevision이 빠진 수정 요청은 409가 아니라 400(검증 실패)이다")
+  void updateWithoutExpectedRevisionIsBadRequest() throws Exception {
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/admin/zone-events/{eventId}", EVENT_ID)
+                .contentType("application/json")
+                .content("{\"title\":\"새 제목\"}"))
+        .andExpect(status().isBadRequest());
   }
 
   private AdminZoneEventResDto detail(String status) {
@@ -194,7 +194,9 @@ class AdminZoneEventControllerTest {
         null,
         null,
         0,
-        0);
+        0,
+        null,
+        0L);
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {

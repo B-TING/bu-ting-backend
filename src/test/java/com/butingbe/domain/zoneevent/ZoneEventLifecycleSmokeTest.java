@@ -29,11 +29,9 @@ import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventResDto;
 import com.butingbe.domain.zoneevent.dto.response.ParticipationResDto;
 import com.butingbe.domain.zoneevent.dto.response.SubmitResultResDto;
-import com.butingbe.domain.zoneevent.entity.ZoneEventRoundSlot;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
-import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventSettlementReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.domain.zonetitle.entity.ZoneTitleDef;
@@ -50,7 +48,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 구역 이벤트 전 구간 해피패스 스모크: 회차 생성·오픈 → 참여 → 제출(AUTO 성공+보상+칭호) → 종료·정산(TOP_LIKE 쿠폰+리포트) → 운영 푸시.
+ * 구역 이벤트 전 구간 해피패스 스모크: 회차 확정(schedule)·자동 시작 → 참여 → 제출(AUTO 성공+보상+칭호) → 자동 종료·정산(TOP_LIKE 쿠폰+리포트)
+ * → 운영 푸시.
  *
  * <p>도메인(zoneevent·reward·zonetitle·notification) 경계를 가로지르는 서비스 배선과 상태 전이를 한 번에 지키는 회귀 방어망이다. 외부
  * 연동은 실제 목 없이 안전한 기본 빈(LoggingPushSender)을 그대로 쓰고, 미디어·보상 카탈로그·칭호 정의는 테스트에서 시드한다.
@@ -73,10 +72,13 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
   @Autowired private com.butingbe.domain.zoneevent.service.ZoneEventSubmitService submitService;
   @Autowired private NotificationService notificationService;
   @Autowired private UserPointService userPointService;
+  @Autowired private com.butingbe.domain.zoneevent.service.RoundTransitionService transitionService;
+
+  @Autowired
+  private com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository roundRepository;
 
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private ZoneEventRepository zoneEventRepository;
-  @Autowired private ZoneEventRoundSlotRepository slotRepository;
   @Autowired private ZoneEventSettlementReportRepository settlementReportRepository;
   @Autowired private RewardCatalogRepository rewardCatalogRepository;
   @Autowired private UserCouponRepository userCouponRepository;
@@ -134,19 +136,23 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("회차 오픈→참여→제출(성공·보상·칭호)→정산(쿠폰·리포트)→운영 푸시가 한 흐름으로 이어진다")
+  @DisplayName("회차 확정→자동 시작→참여→제출(성공·보상·칭호)→자동 종료→정산(쿠폰·리포트)→운영 푸시가 한 흐름으로 이어진다")
   void lifecycle() {
-    // 1) 회차 생성 + 이벤트 생성 + 슬롯 연결
+    // 1) 회차 초안 생성(DRAFT)
     AdminRoundResDto round =
         consoleService.createRound(
             operator,
             new RoundCreateReqDto(
                 null,
+                501,
+                "스모크 회차",
                 OffsetDateTime.now().minusMinutes(1),
                 OffsetDateTime.now().plusHours(2),
                 null,
-                List.of(ZONE)));
+                null));
     UUID roundId = UUID.fromString(round.roundId());
+
+    // 2) 메인 이벤트 + 예비 3개 구역 이벤트 생성(스케줄 확정에 필요한 "정확히 4개 구역" 충족)
     AdminZoneEventResDto event =
         adminZoneEventService.create(
             operator,
@@ -163,20 +169,36 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
                 new RewardSnapshotReqDto(null, null, 1, "COUPON_CAFE"),
                 new AuthTargetReqDto("PLACE", null, "부산타워", "가이드", null, LAT, LNG, 100)));
     UUID eventId = UUID.fromString(event.eventId());
-    ZoneEventRoundSlot slot = slotRepository.findByRound_Id(roundId).get(0);
-    slot.assignEvent(eventId);
-    slotRepository.save(slot);
+    for (String extraZone : List.of("YEONGDO", "OLD_DOWNTOWN", "WESTERN_BUSAN")) {
+      adminZoneEventService.create(
+          operator,
+          new AdminZoneEventCreateReqDto(
+              extraZone,
+              "PLACE_AUTH",
+              "예비 구역 인증",
+              null,
+              OffsetDateTime.now().minusMinutes(1),
+              120,
+              roundId,
+              1,
+              new RewardSnapshotReqDto(50, null, null, null),
+              null,
+              new AuthTargetReqDto("PLACE", null, "예비 장소", "안내", null, LAT, LNG, 100)));
+    }
 
-    // 2) 회차 오픈 → 이벤트 ACTIVE
-    consoleService.open(operator, roundId);
+    // 3) 확정(DRAFT→SCHEDULED) → 자동 시작(SCHEDULED→ACTIVE, 시각 주입으로 시뮬레이션)
+    consoleService.schedule(operator, roundId);
+    com.butingbe.domain.zoneevent.entity.ZoneEventRound persistedRound =
+        roundRepository.findById(roundId).orElseThrow();
+    transitionService.sync(persistedRound, OffsetDateTime.now());
     assertThat(zoneEventRepository.findById(eventId).orElseThrow().getStatus())
         .isEqualTo(ZoneEventStatus.ACTIVE);
 
-    // 3) 참여 시작(GPS 반경 내)
+    // 4) 참여 시작(GPS 반경 내)
     ParticipationResDto joined = participationService.join(participant, eventId, LAT, LNG);
     UUID participationId = UUID.fromString(joined.participationId());
 
-    // 4) 제출 → AUTO 성공 + 기본 보상 + 구역 칭호
+    // 5) 제출 → AUTO 성공 + 기본 보상 + 구역 칭호
     SubmitResultResDto submitted =
         submitService.submit(
             participant,
@@ -187,15 +209,15 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
     assertThat(submitted.newlyEarnedTitles()).isNotEmpty();
     assertThat(userPointService.getBalance(participant.id())).isEqualTo(50);
 
-    // 5) 회차 종료 → 정산(TOP_LIKE 쿠폰 + 리포트)
-    consoleService.close(operator, roundId);
+    // 6) 자동 종료(ACTIVE→CLOSED, 시각을 종료 이후로 주입) → 정산(TOP_LIKE 쿠폰 + 리포트)
+    transitionService.sync(persistedRound, OffsetDateTime.now().plusHours(3));
     consoleService.settle(operator, roundId);
     assertThat(settlementReportRepository.findById(roundId)).isPresent();
     assertThat(userCouponRepository.findAll()).hasSize(1);
     assertThat(zoneEventRepository.findById(eventId).orElseThrow().getStatus())
         .isEqualTo(ZoneEventStatus.CLOSED);
 
-    // 6) 운영 푸시(전체 발송) → 로그 적재
+    // 7) 운영 푸시(전체 발송) → 로그 적재
     PushLogResDto push =
         notificationService.operatorPush(operator, "ALL", null, "정산 완료", "우수 인증 보상이 지급되었습니다");
     assertThat(push.pushLogId()).isNotBlank();

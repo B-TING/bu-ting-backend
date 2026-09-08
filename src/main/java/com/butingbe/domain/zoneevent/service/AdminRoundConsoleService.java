@@ -2,18 +2,18 @@ package com.butingbe.domain.zoneevent.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
-import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.reward.dto.response.SettlementReportResDto;
 import com.butingbe.domain.reward.service.RewardSettlementService;
 import com.butingbe.domain.zoneevent.dto.request.BackupTargetReqDto;
+import com.butingbe.domain.zoneevent.dto.request.RoundCancelReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
-import com.butingbe.domain.zoneevent.dto.request.SlotReassignReqDto;
+import com.butingbe.domain.zoneevent.dto.request.RoundPatchReqDto;
 import com.butingbe.domain.zoneevent.dto.request.SwapTargetReqDto;
+import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
 import com.butingbe.domain.zoneevent.dto.response.SlotSuggestionResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.RoundStatus;
-import com.butingbe.domain.zoneevent.entity.SlotKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
@@ -32,30 +32,37 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventSettlementReportRepository;
+import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
+import jakarta.persistence.criteria.Predicate;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 운영 콘솔: 회차 캘린더·슬롯 배정·예비/우천 타겟·수동 전환·정산 재실행(FR-OPS-04/06/07).
+ * 운영 콘솔: 회차 캘린더·슬롯 배정·예비/우천 타겟·확정/취소·정산 재실행.
  *
- * <p>모든 메서드는 ROLE_ADMIN/MANAGER만 호출할 수 있고, 상태를 바꾸는 행위는 감사 로그(NFR-12)에 남긴다. open/close는 스케줄러와 같은
- * 규칙으로 슬롯에 연결된 이벤트를 함께 전환하고, settle은 회차 행을 잠근 뒤 TOP_LIKE 정산을 오케스트레이션하며 재실행해도 같은 결과가 된다(BR-12).
+ * <p>ACTIVE/CLOSED는 자동 전환({@link RoundTransitionService})으로만 도달하며, 이 서비스는 더 이상 수동 open/close를 제공하지
+ * 않는다. 모든 메서드는 ROLE_ADMIN/MANAGER만 호출할 수 있고, 상태를 바꾸는 행위는 감사 로그에 남긴다.
  */
 @Service
 @RequiredArgsConstructor
 public class AdminRoundConsoleService {
 
-  private static final String SEOUL = "Asia/Seoul";
+  private static final int DEFAULT_SIZE = 20;
+  private static final int MAX_SIZE = 50;
 
   private final OperatorAuthorization operatorAuthorization;
   private final ZoneEventRoundRepository roundRepository;
@@ -67,65 +74,152 @@ public class AdminRoundConsoleService {
   private final ZoneEventSettlementReportRepository settlementReportRepository;
   private final ZoneEventAuditLogRepository auditLogRepository;
   private final RoundSlotSuggestionService suggestionService;
+  private final RoundTransitionService transitionService;
   private final RewardSettlementService settlementService;
 
   @Transactional
   public AdminRoundResDto createRound(AuthenticatedUser user, RoundCreateReqDto request) {
     operatorAuthorization.requireOperator(user);
+    if (roundRepository.existsByRoundNo(request.roundNo())) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
     ZoneEventRound round =
         roundRepository.save(
             ZoneEventRound.builder()
                 .roundType(request.roundType())
+                .roundNo(request.roundNo())
+                .name(request.name())
                 .startsAt(request.startsAt())
                 .endsAt(request.endsAt())
                 .timezone(request.timezone())
-                .status(RoundStatus.SCHEDULED)
+                .excellenceReward(
+                    request.excellenceReward() == null
+                        ? null
+                        : request.excellenceReward().toSnapshot())
                 .build());
-    for (String zone : request.zoneIds()) {
-      slotRepository.save(
-          ZoneEventRoundSlot.builder()
-              .round(round)
-              .slotKind(SlotKind.AUTH)
-              .zoneId(parseZone(zone))
-              .build());
-    }
-    audit(user, "CREATE_ROUND", "ROUND", round.getId(), Map.of("zones", request.zoneIds()));
+    audit(user, "CREATE_ROUND", "ROUND", round.getId(), Map.of("roundNo", round.getRoundNo()));
     return detailOf(round);
   }
 
-  @Transactional(readOnly = true)
-  public List<AdminRoundResDto> listRounds(
-      AuthenticatedUser user, OffsetDateTime from, OffsetDateTime to) {
+  @Transactional
+  public AdminRoundPageResDto listRounds(
+      AuthenticatedUser user,
+      String status,
+      OffsetDateTime from,
+      OffsetDateTime to,
+      String keyword,
+      Integer page,
+      Integer size) {
     operatorAuthorization.requireOperator(user);
-    return roundRepository.findByStartsAtBetweenOrderByStartsAtAsc(from, to).stream()
-        .map(this::detailOf)
-        .toList();
+    RoundStatus statusFilter =
+        status == null || status.isBlank() ? null : RoundStatus.valueOf(status.trim());
+    int pageSize = size == null || size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+    int pageNumber = page == null || page < 0 ? 0 : page;
+
+    Specification<ZoneEventRound> spec = buildRoundSpec(statusFilter, from, to, keyword);
+    Page<ZoneEventRound> result =
+        roundRepository.findAll(
+            spec,
+            PageRequest.of(
+                pageNumber,
+                pageSize,
+                org.springframework.data.domain.Sort.by("startsAt").descending()));
+
+    OffsetDateTime now = OffsetDateTime.now();
+    for (ZoneEventRound round : result.getContent()) {
+      transitionService.sync(round, now);
+    }
+    List<AdminRoundResDto> items =
+        result.getContent().stream().map(round -> detailOf(round, false)).toList();
+    return new AdminRoundPageResDto(
+        items, pageNumber, pageSize, result.getTotalElements(), result.getTotalPages());
   }
 
-  @Transactional(readOnly = true)
+  @Transactional
   public AdminRoundResDto roundDetail(AuthenticatedUser user, UUID roundId) {
     operatorAuthorization.requireOperator(user);
-    return detailOf(requireRound(roundId));
+    ZoneEventRound round = requireRound(roundId);
+    transitionService.sync(round, OffsetDateTime.now());
+    return detailOf(round);
   }
 
   @Transactional(readOnly = true)
   public SlotSuggestionResDto suggestSlots(AuthenticatedUser user, int authSlots) {
     operatorAuthorization.requireOperator(user);
-    return suggestionService.suggest(OffsetDateTime.now(ZoneId.of(SEOUL)), authSlots);
+    return suggestionService.suggest(
+        OffsetDateTime.now(java.time.ZoneId.of("Asia/Seoul")), authSlots);
   }
 
   @Transactional
-  public AdminRoundResDto reassignSlot(
-      AuthenticatedUser user, UUID roundId, SlotReassignReqDto request) {
+  public AdminRoundResDto patch(AuthenticatedUser user, UUID roundId, RoundPatchReqDto request) {
     operatorAuthorization.requireOperator(user);
     ZoneEventRound round = requireRound(roundId);
-    ZoneEventRoundSlot slot =
-        slotRepository
-            .findById(request.slotId())
-            .filter(s -> s.getRound().getId().equals(roundId))
-            .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
-    slot.reassignZone(parseZone(request.zoneId()));
-    audit(user, "REASSIGN_SLOT", "SLOT", slot.getId(), Map.of("zone", request.zoneId()));
+    requireMatchingRevision(round.getRevision(), request.expectedRevision());
+    round.applyEditable(
+        request.name(),
+        request.startsAt(),
+        request.endsAt(),
+        request.timezone(),
+        request.roundType());
+    audit(user, "PATCH_ROUND", "ROUND", roundId, null);
+    return detailOf(round);
+  }
+
+  /** DRAFT → SCHEDULED. 정확히 4개 서로 다른 구역, 각 슬롯 ACTIVE 타겟 1개 이상이어야 한다. */
+  @Transactional
+  public AdminRoundResDto schedule(AuthenticatedUser user, UUID roundId) {
+    operatorAuthorization.requireOperator(user);
+    ZoneEventRound round = requireRound(roundId);
+    // 취소된 이벤트는 실제로 운영되지 않으므로 4구역 정족수에서 제외한다.
+    List<ZoneEvent> events =
+        zoneEventRepository.findByRoundId(roundId).stream()
+            .filter(e -> e.getStatus() != ZoneEventStatus.CANCELLED)
+            .toList();
+    Set<String> distinctZones = new HashSet<>();
+    for (ZoneEvent event : events) {
+      distinctZones.add(event.getZoneId());
+    }
+    if (events.size() != 4 || distinctZones.size() != 4) {
+      throw new IllegalArgumentException("error.zone_event.round_slots_incomplete");
+    }
+    for (ZoneEvent event : events) {
+      boolean hasActiveTarget =
+          authTargetRepository
+              .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
+                  event.getId(), ZoneEventTargetStatus.ACTIVE)
+              .isPresent();
+      if (!hasActiveTarget) {
+        throw new IllegalArgumentException("error.zone_event.round_target_missing");
+      }
+    }
+    round.confirmSchedule();
+    audit(user, "SCHEDULE_ROUND", "ROUND", roundId, null);
+    return detailOf(round);
+  }
+
+  /** DRAFT/SCHEDULED/ACTIVE → CANCELLED. 연결된 구역 슬롯도 함께 취소하되 기존 이력은 보존한다. */
+  @Transactional
+  public AdminRoundResDto cancel(AuthenticatedUser user, UUID roundId, RoundCancelReqDto request) {
+    operatorAuthorization.requireOperator(user);
+    ZoneEventRound round = requireRound(roundId);
+    requireMatchingRevision(round.getRevision(), request.expectedRevision());
+    round.cancel(request.reason());
+    for (ZoneEvent event : zoneEventRepository.findByRoundId(roundId)) {
+      if (event.getStatus() == ZoneEventStatus.SCHEDULED
+          || event.getStatus() == ZoneEventStatus.ACTIVE) {
+        event.markCancelled();
+        for (ZoneEventParticipation open :
+            participationRepository.findByEvent_IdAndStatusIn(
+                event.getId(),
+                List.of(
+                    ParticipationStatus.JOINED,
+                    ParticipationStatus.SUBMITTED,
+                    ParticipationStatus.UNDER_REVIEW))) {
+          open.cancel("ROUND_CANCELLED");
+        }
+      }
+    }
+    audit(user, "CANCEL_ROUND", "ROUND", roundId, Map.of("reason", request.reason()));
     return detailOf(round);
   }
 
@@ -152,7 +246,6 @@ public class AdminRoundConsoleService {
     return detailOf(round);
   }
 
-  /** 예비 타겟으로 이벤트의 인증 타겟을 즉시 교체(우천 대응, FR-RND-05). */
   @Transactional
   public AdminRoundResDto swapTarget(
       AuthenticatedUser user, UUID roundId, SwapTargetReqDto request) {
@@ -184,36 +277,6 @@ public class AdminRoundConsoleService {
     return detailOf(round);
   }
 
-  /** SCHEDULED → OPEN. 슬롯에 연결된 이벤트도 활성화한다. 이미 OPEN 이후면 아무것도 하지 않는다(멱등). */
-  @Transactional
-  public AdminRoundResDto open(AuthenticatedUser user, UUID roundId) {
-    operatorAuthorization.requireOperator(user);
-    ZoneEventRound round = requireRound(roundId);
-    if (round.getStatus() == RoundStatus.SCHEDULED) {
-      round.open();
-      transitionSlotEvents(round, ZoneEventStatus.SCHEDULED, ZoneEventStatus.ACTIVE);
-      audit(user, "OPEN_ROUND", "ROUND", roundId, null);
-    }
-    return detailOf(round);
-  }
-
-  /** OPEN → CLOSED. 슬롯에 연결된 이벤트도 종료한다(멱등). */
-  @Transactional
-  public AdminRoundResDto close(AuthenticatedUser user, UUID roundId) {
-    operatorAuthorization.requireOperator(user);
-    ZoneEventRound round = requireRound(roundId);
-    if (round.getStatus() == RoundStatus.OPEN) {
-      round.close();
-      transitionSlotEvents(round, ZoneEventStatus.ACTIVE, ZoneEventStatus.CLOSED);
-      audit(user, "CLOSE_ROUND", "ROUND", roundId, null);
-    }
-    return detailOf(round);
-  }
-
-  /**
-   * 회차 정산 재실행(FR-OPS-07). 회차 행을 잠그고, 미완료 참여를 만료 처리한 뒤 TOP_LIKE 정산을 실행하고 정산 리포트를 저장한다. 이미 SETTLED면
-   * 저장된 리포트를 그대로 돌려준다(BR-12).
-   */
   @Transactional
   public Map<String, Object> settle(AuthenticatedUser user, UUID roundId) {
     operatorAuthorization.requireOperator(user);
@@ -222,14 +285,13 @@ public class AdminRoundConsoleService {
             .findWithLockById(roundId)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
     if (round.getStatus() == RoundStatus.SETTLED) {
-      return settlementReport(user, roundId); // 저장된 리포트를 그대로(BR-12)
+      return settlementReport(user, roundId);
     }
     expireOpenParticipations(roundId);
     SettlementReportResDto prizeReport = settlementService.settleTopLike(roundId);
     OffsetDateTime now = OffsetDateTime.now();
     round.settle(now);
     Map<String, Object> report = assembleReport(roundId, now, prizeReport);
-    // 회차 락 + SETTLED 조기 반환이 리포트가 회차당 한 번만 저장되도록 보장한다.
     settlementReportRepository.save(
         ZoneEventSettlementReport.builder().roundId(roundId).report(report).build());
     audit(user, "SETTLE_ROUND", "ROUND", roundId, null);
@@ -243,6 +305,12 @@ public class AdminRoundConsoleService {
         .findById(roundId)
         .map(ZoneEventSettlementReport::getReport)
         .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
+  }
+
+  private void requireMatchingRevision(Long actual, Long expected) {
+    if (!actual.equals(expected)) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
   }
 
   private void expireOpenParticipations(UUID roundId) {
@@ -263,10 +331,14 @@ public class AdminRoundConsoleService {
       for (SettlementReportResDto.Prize prize : ep.prizes()) {
         prizes.add(
             Map.of(
-                "userId", prize.userId(),
-                "participationId", prize.participationId(),
-                "rewardCode", prize.rewardCode(),
-                "status", prize.status()));
+                "userId",
+                prize.userId(),
+                "participationId",
+                prize.participationId(),
+                "rewardCode",
+                prize.rewardCode(),
+                "status",
+                prize.status()));
       }
       prizesByEvent.put(ep.eventId(), prizes);
     }
@@ -298,47 +370,63 @@ public class AdminRoundConsoleService {
     return report;
   }
 
-  private void transitionSlotEvents(
-      ZoneEventRound round, ZoneEventStatus from, ZoneEventStatus to) {
-    List<UUID> eventIds =
-        slotRepository.findByRound_Id(round.getId()).stream()
-            .map(ZoneEventRoundSlot::getEventId)
-            .filter(id -> id != null)
-            .toList();
-    if (eventIds.isEmpty()) {
-      return;
-    }
-    for (ZoneEvent event : zoneEventRepository.findAllById(eventIds)) {
-      if (event.getStatus() != from) {
-        continue;
-      }
-      if (to == ZoneEventStatus.ACTIVE) {
-        event.activate();
-      } else {
-        event.close();
-      }
-    }
+  private AdminRoundResDto detailOf(ZoneEventRound round) {
+    return detailOf(round, true);
   }
 
-  private AdminRoundResDto detailOf(ZoneEventRound round) {
+  /**
+   * 회차 상세 DTO를 만든다.
+   *
+   * <p>{@code includeCounts=false}면 슬롯별 참여/성공/검수 카운트 질의(슬롯당 3회)를 생략한다. 목록 엔드포인트는 페이지당 회차 수 × 슬롯 수만큼
+   * 질의가 늘어나므로(N+1) 카운트를 0으로 두고, 실제 카운트는 상세 조회에서만 제공한다.
+   */
+  private AdminRoundResDto detailOf(ZoneEventRound round, boolean includeCounts) {
+    List<ZoneEventRoundSlot> slots = slotRepository.findByRound_Id(round.getId());
+    Map<String, long[]> countsByEventId = new HashMap<>();
+    if (includeCounts) {
+      for (ZoneEventRoundSlot slot : slots) {
+        if (slot.getEventId() == null) {
+          continue;
+        }
+        String eventId = slot.getEventId().toString();
+        long participants = participationRepository.countByEvent_Id(slot.getEventId());
+        long success =
+            participationRepository.countByEvent_IdAndStatus(
+                slot.getEventId(), ParticipationStatus.SUCCESS);
+        long underReview =
+            participationRepository.countByEvent_IdAndStatus(
+                slot.getEventId(), ParticipationStatus.UNDER_REVIEW);
+        countsByEventId.put(eventId, new long[] {participants, success, underReview});
+      }
+    }
     return AdminRoundResDto.of(
-        round,
-        slotRepository.findByRound_Id(round.getId()),
-        backupTargetRepository.findByRound_Id(round.getId()));
+        round, slots, backupTargetRepository.findByRound_Id(round.getId()), countsByEventId);
+  }
+
+  private Specification<ZoneEventRound> buildRoundSpec(
+      RoundStatus status, OffsetDateTime from, OffsetDateTime to, String keyword) {
+    return (root, query, cb) -> {
+      List<Predicate> predicates = new ArrayList<>();
+      if (status != null) {
+        predicates.add(cb.equal(root.get("status"), status));
+      }
+      if (from != null) {
+        predicates.add(cb.greaterThanOrEqualTo(root.get("startsAt"), from));
+      }
+      if (to != null) {
+        predicates.add(cb.lessThanOrEqualTo(root.get("startsAt"), to));
+      }
+      if (keyword != null && !keyword.isBlank()) {
+        predicates.add(cb.like(root.get("name"), "%" + keyword + "%"));
+      }
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
   }
 
   private ZoneEventRound requireRound(UUID roundId) {
     return roundRepository
         .findById(roundId)
         .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
-  }
-
-  private String parseZone(String zone) {
-    try {
-      return ChatZone.fromString(zone).name();
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.invalid_zone");
-    }
   }
 
   private void audit(

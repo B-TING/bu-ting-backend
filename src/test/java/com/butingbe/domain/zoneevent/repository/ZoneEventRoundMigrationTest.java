@@ -37,7 +37,7 @@ class ZoneEventRoundMigrationTest {
               postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
         assertThat(hasCheckConstraint(connection, "ck_zone_event_round_status")).isTrue();
 
-        UUID roundId = insertRound(connection, "OPEN");
+        UUID roundId = insertRound(connection, "ACTIVE");
         assertThat(catchThrowable(() -> insertRound(connection, "WRONG")))
             .isInstanceOf(SQLException.class)
             .hasMessageContaining("ck_zone_event_round_status");
@@ -61,8 +61,8 @@ class ZoneEventRoundMigrationTest {
     try (PreparedStatement s =
         connection.prepareStatement(
             """
-            INSERT INTO zone_event_round (round_id, starts_at, ends_at, status)
-            VALUES (?, now(), now() + interval '1 day', ?)
+            INSERT INTO zone_event_round (round_id, round_no, starts_at, ends_at, status)
+            VALUES (?, (SELECT COALESCE(MAX(round_no), 0) + 1 FROM zone_event_round), now(), now() + interval '1 day', ?)
             """)) {
       s.setObject(1, roundId);
       s.setString(2, status);

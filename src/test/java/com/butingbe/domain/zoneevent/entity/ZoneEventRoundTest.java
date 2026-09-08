@@ -1,40 +1,94 @@
 package com.butingbe.domain.zoneevent.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.butingbe.global.error.exception.ConflictException;
 import java.time.OffsetDateTime;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class ZoneEventRoundTest {
 
-  @Test
-  @DisplayName("종료하면 closedAt이 채워진다")
-  void closeStampsClosedAt() {
-    ZoneEventRound round =
-        ZoneEventRound.builder()
-            .startsAt(OffsetDateTime.now())
-            .endsAt(OffsetDateTime.now().plusDays(1))
-            .build();
-
-    round.close();
-
-    assertThat(round.getStatus()).isEqualTo(RoundStatus.CLOSED);
-    assertThat(round.getClosedAt()).isNotNull();
+  private ZoneEventRound draft() {
+    return ZoneEventRound.builder()
+        .roundNo(1)
+        .name("부산 바다 인증의 날")
+        .startsAt(OffsetDateTime.now())
+        .endsAt(OffsetDateTime.now().plusDays(1))
+        .timezone("Asia/Seoul")
+        .roundType(RoundType.REGULAR)
+        .build();
   }
 
   @Test
-  @DisplayName("회차 번호가 비어 있을 때만 배정된다")
-  void assignsRoundNoOnlyOnce() {
-    ZoneEventRound round =
-        ZoneEventRound.builder()
-            .startsAt(OffsetDateTime.now())
-            .endsAt(OffsetDateTime.now().plusDays(1))
-            .build();
+  void 생성하면_DRAFT다() {
+    assertThat(draft().getStatus()).isEqualTo(RoundStatus.DRAFT);
+  }
 
-    round.assignRoundNo(1);
-    round.assignRoundNo(2);
+  @Test
+  void DRAFT에서_확정하면_SCHEDULED다() {
+    ZoneEventRound round = draft();
+    round.confirmSchedule();
+    assertThat(round.getStatus()).isEqualTo(RoundStatus.SCHEDULED);
+  }
 
-    assertThat(round.getRoundNo()).isEqualTo(1);
+  @Test
+  void SCHEDULED가_아니면_확정할_수_없다() {
+    ZoneEventRound round = draft();
+    assertThatThrownBy(round::activate).isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  void SCHEDULED에서_activate하면_ACTIVE다() {
+    ZoneEventRound round = draft();
+    round.confirmSchedule();
+    round.activate();
+    assertThat(round.getStatus()).isEqualTo(RoundStatus.ACTIVE);
+  }
+
+  @Test
+  void ACTIVE가_아니면_close할_수_없다() {
+    ZoneEventRound round = draft();
+    assertThatThrownBy(round::close).isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  void DRAFT_SCHEDULED_ACTIVE에서_취소할_수_있고_CLOSED_이후엔_안된다() {
+    ZoneEventRound round = draft();
+    round.cancel("우천으로 인한 취소");
+    assertThat(round.getStatus()).isEqualTo(RoundStatus.CANCELLED);
+    assertThat(round.getCancelReason()).isEqualTo("우천으로 인한 취소");
+
+    ZoneEventRound closed = draft();
+    closed.confirmSchedule();
+    closed.activate();
+    closed.close();
+    assertThatThrownBy(() -> closed.cancel("사유")).isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  void DRAFT_SCHEDULED에서만_메타데이터를_수정할_수_있다() {
+    ZoneEventRound round = draft();
+    round.applyEditable("새 이름", null, null, null, null);
+    assertThat(round.getName()).isEqualTo("새 이름");
+
+    round.confirmSchedule();
+    round.activate();
+    assertThatThrownBy(() -> round.applyEditable("또 다른 이름", null, null, null, null))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  void applyEditable은_모든_필드를_바꿀_수_있다() {
+    ZoneEventRound round = draft();
+    OffsetDateTime newStarts = OffsetDateTime.now().plusDays(5);
+    OffsetDateTime newEnds = OffsetDateTime.now().plusDays(6);
+
+    round.applyEditable("새 이름", newStarts, newEnds, "UTC", RoundType.GUERRILLA);
+
+    assertThat(round.getStartsAt()).isEqualTo(newStarts);
+    assertThat(round.getEndsAt()).isEqualTo(newEnds);
+    assertThat(round.getTimezone()).isEqualTo("UTC");
+    assertThat(round.getRoundType()).isEqualTo(RoundType.GUERRILLA);
   }
 }

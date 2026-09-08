@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class RoundStatusQueryServiceTest extends AbstractContainerTest {
 
+  private static int roundNoSeq = 300;
+
   @Autowired private RoundStatusQueryService queryService;
   @Autowired private ZoneEventRoundRepository roundRepository;
   @Autowired private ZoneEventRoundSlotRepository slotRepository;
@@ -29,12 +31,12 @@ class RoundStatusQueryServiceTest extends AbstractContainerTest {
   @Test
   @DisplayName("열린 회차가 있으면 슬롯 구역은 OPEN, 나머지는 REST다")
   void openRoundShowsOpenAndRest() {
-    ZoneEventRound round = round(RoundStatus.OPEN, OffsetDateTime.now().minusHours(1));
+    ZoneEventRound round = round(RoundStatus.ACTIVE, OffsetDateTime.now().minusHours(1));
     slot(round, "SUYEONG_NAMGU", UUID.randomUUID());
 
     RoundStatusResDto status = queryService.current();
 
-    assertThat(status.status()).isEqualTo(RoundStatus.OPEN);
+    assertThat(status.status()).isEqualTo(RoundStatus.ACTIVE);
     assertThat(status.zones()).hasSize(6);
     assertThat(status.zones()).anyMatch(z -> z.slotStatus().equals("OPEN"));
     assertThat(status.zones()).anyMatch(z -> z.slotStatus().equals("REST"));
@@ -58,9 +60,43 @@ class RoundStatusQueryServiceTest extends AbstractContainerTest {
     assertThatThrownBy(() -> queryService.current()).isInstanceOf(ResourceNotFoundException.class);
   }
 
+  @Test
+  @DisplayName("종료 시각이 지났지만 아직 ACTIVE인 회차는 조회 시점에 CLOSED로 동기화된다")
+  void syncsClosureOnRead() {
+    roundRepository.save(
+        ZoneEventRound.builder()
+            .roundNo(998)
+            .startsAt(OffsetDateTime.now().minusHours(2))
+            .endsAt(OffsetDateTime.now().minusMinutes(1))
+            .status(RoundStatus.ACTIVE)
+            .build());
+
+    assertThatThrownBy(() -> queryService.current()).isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("시작 시각이 지났지만 아직 SCHEDULED인 회차도 조회 시점에 ACTIVE로 동기화된다")
+  void syncsOnRead() {
+    ZoneEventRound round =
+        roundRepository.save(
+            ZoneEventRound.builder()
+                .roundNo(999)
+                .startsAt(OffsetDateTime.now().minusMinutes(5))
+                .endsAt(OffsetDateTime.now().plusHours(1))
+                .status(RoundStatus.SCHEDULED)
+                .build());
+
+    RoundStatusResDto result = queryService.current();
+
+    assertThat(result.roundId()).isEqualTo(round.getId().toString());
+    assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
+        .isEqualTo(RoundStatus.ACTIVE);
+  }
+
   private ZoneEventRound round(RoundStatus status, OffsetDateTime startsAt) {
     return roundRepository.save(
         ZoneEventRound.builder()
+            .roundNo(roundNoSeq++)
             .startsAt(startsAt)
             .endsAt(startsAt.plusDays(1))
             .status(status)

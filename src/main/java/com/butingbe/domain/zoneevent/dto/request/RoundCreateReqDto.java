@@ -1,15 +1,16 @@
 package com.butingbe.domain.zoneevent.dto.request;
 
 import com.butingbe.domain.zoneevent.entity.RoundType;
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
-import java.util.List;
 
-/** 회차 생성. zoneIds에 대해 AUTH 슬롯을 만든다. */
+/** 회차 초안(DRAFT) 생성. 구역 슬롯은 이후 POST /admin/zone-events로 개별 추가한다. */
 public record RoundCreateReqDto(
     RoundType roundType,
+    @NotNull Integer roundNo,
+    String name,
     @NotNull OffsetDateTime startsAt,
     @NotNull OffsetDateTime endsAt,
     String timezone,
-    @NotEmpty List<String> zoneIds) {}
+    @Valid RewardSnapshotReqDto excellenceReward) {}

@@ -1,6 +1,7 @@
 package com.butingbe.domain.zoneevent.entity;
 
 import com.butingbe.global.common.BaseEntity;
+import com.butingbe.global.error.exception.ConflictException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -16,6 +17,8 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** 이벤트가 동시에 열리는 운영 단위. v1은 1일(KST 10:00 → 익일 10:00). */
 @Entity
@@ -33,8 +36,8 @@ public class ZoneEventRound extends BaseEntity {
   @Column(name = "round_type", nullable = false, length = 20)
   private RoundType roundType;
 
-  /** 관리자 페이지에 노출할 회차 번호. 서버가 발급한다. 배정 전에는 비어 있을 수 있다. */
-  @Column(name = "round_no")
+  /** 관리자 페이지에 노출할 회차 번호. 관리자가 생성 시점에 직접 지정한다(중복 시 409). */
+  @Column(name = "round_no", nullable = false)
   private Integer roundNo;
 
   @Column(length = 255)
@@ -59,6 +62,14 @@ public class ZoneEventRound extends BaseEntity {
   @Column(name = "settled_at")
   private OffsetDateTime settledAt;
 
+  @Column(name = "cancel_reason", length = 300)
+  private String cancelReason;
+
+  /** 회차 공통 기본 우수 보상(TOP N 포함). 구역 슬롯 생성 시 개별로 안 넘기면 이 값을 물려받는다. */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "excellence_reward", columnDefinition = "jsonb")
+  private RewardSnapshot excellenceReward;
+
   @Version
   @Column(nullable = false)
   private Long revision;
@@ -71,31 +82,72 @@ public class ZoneEventRound extends BaseEntity {
       OffsetDateTime startsAt,
       OffsetDateTime endsAt,
       String timezone,
-      RoundStatus status) {
+      RoundStatus status,
+      RewardSnapshot excellenceReward) {
     this.roundType = roundType == null ? RoundType.REGULAR : roundType;
     this.roundNo = roundNo;
     this.name = name;
     this.startsAt = startsAt;
     this.endsAt = endsAt;
     this.timezone = timezone == null ? "Asia/Seoul" : timezone;
-    this.status = status == null ? RoundStatus.SCHEDULED : status;
+    this.status = status == null ? RoundStatus.DRAFT : status;
+    this.excellenceReward = excellenceReward;
   }
 
-  /** SCHEDULED → OPEN. */
-  public void open() {
-    this.status = RoundStatus.OPEN;
+  /** DRAFT → SCHEDULED. DRAFT가 아니면 409. */
+  public void confirmSchedule() {
+    requireStatus(RoundStatus.DRAFT);
+    this.status = RoundStatus.SCHEDULED;
   }
 
-  /** OPEN → CLOSED. */
+  /** SCHEDULED → ACTIVE. SCHEDULED가 아니면 409. */
+  public void activate() {
+    requireStatus(RoundStatus.SCHEDULED);
+    this.status = RoundStatus.ACTIVE;
+  }
+
+  /** ACTIVE → CLOSED. ACTIVE가 아니면 409. */
   public void close() {
+    requireStatus(RoundStatus.ACTIVE);
     this.status = RoundStatus.CLOSED;
     this.closedAt = OffsetDateTime.now();
   }
 
-  /** 관리자가 회차 번호를 배정한다(서버 발급). 이미 배정된 번호는 바꾸지 않는다. */
-  public void assignRoundNo(int roundNo) {
-    if (this.roundNo == null) {
-      this.roundNo = roundNo;
+  /** DRAFT/SCHEDULED/ACTIVE → CANCELLED. 그 외 상태면 409. */
+  public void cancel(String reason) {
+    if (status != RoundStatus.DRAFT
+        && status != RoundStatus.SCHEDULED
+        && status != RoundStatus.ACTIVE) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
+    this.status = RoundStatus.CANCELLED;
+    this.cancelReason = reason;
+  }
+
+  /** DRAFT/SCHEDULED에서만 메타데이터 수정 가능. null은 미변경. 그 외 상태면 409. */
+  public void applyEditable(
+      String name,
+      OffsetDateTime startsAt,
+      OffsetDateTime endsAt,
+      String timezone,
+      RoundType roundType) {
+    if (status != RoundStatus.DRAFT && status != RoundStatus.SCHEDULED) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
+    if (name != null) {
+      this.name = name;
+    }
+    if (startsAt != null) {
+      this.startsAt = startsAt;
+    }
+    if (endsAt != null) {
+      this.endsAt = endsAt;
+    }
+    if (timezone != null) {
+      this.timezone = timezone;
+    }
+    if (roundType != null) {
+      this.roundType = roundType;
     }
   }
 
@@ -104,6 +156,12 @@ public class ZoneEventRound extends BaseEntity {
     if (status != RoundStatus.SETTLED) {
       this.status = RoundStatus.SETTLED;
       this.settledAt = at;
+    }
+  }
+
+  private void requireStatus(RoundStatus expected) {
+    if (status != expected) {
+      throw new ConflictException("error.zone_event.invalid_state");
     }
   }
 }

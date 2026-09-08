@@ -1,9 +1,9 @@
 package com.butingbe.domain.zoneevent.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
 import com.butingbe.domain.zoneevent.dto.response.SlotSuggestionResDto;
 import com.butingbe.domain.zoneevent.entity.RoundStatus;
@@ -73,18 +74,25 @@ class AdminRoundControllerTest {
   private AdminRoundResDto round() {
     return new AdminRoundResDto(
         ROUND.toString(),
+        1,
+        "테스트 회차",
         RoundType.REGULAR,
-        RoundStatus.SCHEDULED,
+        RoundStatus.DRAFT,
         OffsetDateTime.now(),
         OffsetDateTime.now().plusDays(1),
         "Asia/Seoul",
         null,
+        null,
+        false,
+        null,
+        null,
+        0L,
         List.of(),
         List.of());
   }
 
   @Test
-  @DisplayName("회차 생성 201")
+  @DisplayName("회차 초안 생성 201")
   void create() throws Exception {
     when(consoleService.createRound(any(), any())).thenReturn(round());
     mockMvc
@@ -92,27 +100,29 @@ class AdminRoundControllerTest {
             post("/admin/zone-event-rounds")
                 .contentType("application/json")
                 .content(
-                    "{\"startsAt\":\"2026-09-06T10:00:00+09:00\",\"endsAt\":\"2026-09-07T10:00:00+09:00\",\"zoneIds\":[\"YEONGDO\"]}"))
+                    "{\"roundNo\":1,\"name\":\"테스트 회차\",\"startsAt\":\"2026-09-06T10:00:00+09:00\",\"endsAt\":\"2026-09-07T10:00:00+09:00\"}"))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.data.roundId").value(ROUND.toString()));
+        .andExpect(jsonPath("$.data.roundId").value(ROUND.toString()))
+        .andExpect(jsonPath("$.data.status").value("DRAFT"));
   }
 
   @Test
-  @DisplayName("빈 구역 목록으로 생성하면 400")
+  @DisplayName("roundNo 없이 생성하면 400")
   void createInvalid() throws Exception {
     mockMvc
         .perform(
             post("/admin/zone-event-rounds")
                 .contentType("application/json")
                 .content(
-                    "{\"startsAt\":\"2026-09-06T10:00:00+09:00\",\"endsAt\":\"2026-09-07T10:00:00+09:00\",\"zoneIds\":[]}"))
+                    "{\"startsAt\":\"2026-09-06T10:00:00+09:00\",\"endsAt\":\"2026-09-07T10:00:00+09:00\"}"))
         .andExpect(status().isBadRequest());
   }
 
   @Test
-  @DisplayName("캘린더·상세·제안 200")
+  @DisplayName("목록·상세·제안 200")
   void reads() throws Exception {
-    when(consoleService.listRounds(any(), any(), any())).thenReturn(List.of(round()));
+    when(consoleService.listRounds(any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(new AdminRoundPageResDto(List.of(round()), 0, 20, 1, 1));
     when(consoleService.roundDetail(any(), eq(ROUND))).thenReturn(round());
     when(consoleService.suggestSlots(any(), anyInt()))
         .thenReturn(new SlotSuggestionResDto(List.of("YEONGDO"), List.of("YEONGDO: 직전 2회차 미오픈")));
@@ -120,10 +130,12 @@ class AdminRoundControllerTest {
     mockMvc
         .perform(
             get("/admin/zone-event-rounds")
-                .param("from", "2026-09-01T00:00:00+09:00")
-                .param("to", "2026-09-30T00:00:00+09:00"))
+                .param("status", "DRAFT")
+                .param("page", "0")
+                .param("size", "20"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[0].roundId").value(ROUND.toString()));
+        .andExpect(jsonPath("$.data.items[0].roundId").value(ROUND.toString()))
+        .andExpect(jsonPath("$.data.totalElements").value(1));
     mockMvc.perform(get("/admin/zone-event-rounds/{id}", ROUND)).andExpect(status().isOk());
     mockMvc
         .perform(get("/admin/zone-event-rounds/suggest-slots").param("authSlots", "1"))
@@ -132,19 +144,35 @@ class AdminRoundControllerTest {
   }
 
   @Test
-  @DisplayName("슬롯 교체·예비 타겟·우천 교체")
+  @DisplayName("PATCH·schedule·cancel")
   void mutations() throws Exception {
-    when(consoleService.reassignSlot(any(), eq(ROUND), any())).thenReturn(round());
-    when(consoleService.addBackupTarget(any(), eq(ROUND), any())).thenReturn(round());
-    when(consoleService.swapTarget(any(), eq(ROUND), any())).thenReturn(round());
+    when(consoleService.patch(any(), eq(ROUND), any())).thenReturn(round());
+    when(consoleService.schedule(any(), eq(ROUND))).thenReturn(round());
+    when(consoleService.cancel(any(), eq(ROUND), any())).thenReturn(round());
 
     mockMvc
         .perform(
-            patch("/admin/zone-event-rounds/{id}/slots", ROUND)
+            patch("/admin/zone-event-rounds/{id}", ROUND)
                 .contentType("application/json")
-                .content(
-                    "{\"slotId\":\"55555555-0000-0000-0000-000000000001\",\"zoneId\":\"YEONGDO\"}"))
+                .content("{\"expectedRevision\":0,\"name\":\"새 이름\"}"))
         .andExpect(status().isOk());
+    mockMvc
+        .perform(post("/admin/zone-event-rounds/{id}/schedule", ROUND))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(
+            post("/admin/zone-event-rounds/{id}/cancel", ROUND)
+                .contentType("application/json")
+                .content("{\"reason\":\"우천\",\"expectedRevision\":0}"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("예비 타겟·우천 교체")
+  void slotMutations() throws Exception {
+    when(consoleService.addBackupTarget(any(), eq(ROUND), any())).thenReturn(round());
+    when(consoleService.swapTarget(any(), eq(ROUND), any())).thenReturn(round());
+
     mockMvc
         .perform(
             post("/admin/zone-event-rounds/{id}/backup-targets", ROUND)
@@ -162,25 +190,25 @@ class AdminRoundControllerTest {
   }
 
   @Test
-  @DisplayName("오픈·종료·정산·리포트")
-  void lifecycle() throws Exception {
-    when(consoleService.open(any(), eq(ROUND))).thenReturn(round());
-    when(consoleService.close(any(), eq(ROUND))).thenReturn(round());
+  @DisplayName("정산·리포트")
+  void settlement() throws Exception {
     when(consoleService.settle(any(), eq(ROUND)))
         .thenReturn(Map.of("roundId", ROUND.toString(), "events", List.of()));
     when(consoleService.settlementReport(any(), eq(ROUND)))
         .thenReturn(Map.of("roundId", ROUND.toString()));
 
-    mockMvc.perform(post("/admin/zone-event-rounds/{id}/open", ROUND)).andExpect(status().isOk());
-    mockMvc.perform(post("/admin/zone-event-rounds/{id}/close", ROUND)).andExpect(status().isOk());
-    mockMvc
-        .perform(post("/admin/zone-event-rounds/{id}/settle", ROUND))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.roundId").value(ROUND.toString()));
+    mockMvc.perform(post("/admin/zone-event-rounds/{id}/settle", ROUND)).andExpect(status().isOk());
     mockMvc
         .perform(get("/admin/zone-event-rounds/{id}/settlement-report", ROUND))
         .andExpect(status().isOk());
-    verify(consoleService).open(any(), eq(ROUND));
+  }
+
+  @Test
+  @DisplayName("open/close 엔드포인트는 더 이상 존재하지 않는다")
+  void openCloseRemoved() {
+    for (var method : controller.getClass().getMethods()) {
+      assertThat(method.getName()).isNotIn("open", "close");
+    }
   }
 
   @Test

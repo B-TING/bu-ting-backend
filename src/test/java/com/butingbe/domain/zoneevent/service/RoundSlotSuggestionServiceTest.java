@@ -57,6 +57,7 @@ class RoundSlotSuggestionServiceTest extends AbstractContainerTest {
   private ZoneEventRound savedRound(int startsDaysOffset) {
     return roundRepository.save(
         ZoneEventRound.builder()
+            .roundNo(700)
             .startsAt(OffsetDateTime.now().plusDays(startsDaysOffset))
             .endsAt(OffsetDateTime.now().plusDays(startsDaysOffset + 1))
             .status(RoundStatus.CLOSED)

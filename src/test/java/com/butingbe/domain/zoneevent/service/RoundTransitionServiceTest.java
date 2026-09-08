@@ -23,17 +23,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
-class ZoneEventRoundSchedulerTest extends AbstractContainerTest {
+class RoundTransitionServiceTest extends AbstractContainerTest {
 
-  private static int roundNoSeq = 200;
-
-  @Autowired private ZoneEventRoundScheduler scheduler;
+  @Autowired private RoundTransitionService transitionService;
   @Autowired private ZoneEventRoundRepository roundRepository;
   @Autowired private ZoneEventRoundSlotRepository slotRepository;
   @Autowired private ZoneEventRepository zoneEventRepository;
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
 
   private ZoneEventType type;
+  private static int roundNoSeq = 1000;
 
   @BeforeEach
   void setUp() {
@@ -47,13 +46,13 @@ class ZoneEventRoundSchedulerTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("시작 시각이 지난 SCHEDULED 회차를 ACTIVE로 바꾸고 슬롯 이벤트를 ACTIVE로 바꾼다")
-  void opensDueRoundsAndActivatesEvents() {
+  @DisplayName("시작 시각이 지난 SCHEDULED 회차는 ACTIVE로, 연결 이벤트도 ACTIVE로 바뀐다")
+  void syncActivates() {
     ZoneEventRound round = savedRound(RoundStatus.SCHEDULED, -1, 1);
     ZoneEvent event = savedEvent(ZoneEventStatus.SCHEDULED);
     savedSlot(round, "SUYEONG_NAMGU", event.getId());
 
-    scheduler.advance(OffsetDateTime.now());
+    transitionService.sync(round, OffsetDateTime.now());
 
     assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
         .isEqualTo(RoundStatus.ACTIVE);
@@ -62,13 +61,13 @@ class ZoneEventRoundSchedulerTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("종료 시각이 지난 ACTIVE 회차를 CLOSED로 바꾸고 슬롯 이벤트를 CLOSED로 바꾼다")
-  void closesEndedRoundsAndEvents() {
+  @DisplayName("종료 시각이 지난 ACTIVE 회차는 CLOSED로, 연결 이벤트도 CLOSED로 바뀐다")
+  void syncCloses() {
     ZoneEventRound round = savedRound(RoundStatus.ACTIVE, -2, -1);
     ZoneEvent event = savedEvent(ZoneEventStatus.ACTIVE);
     savedSlot(round, "YEONGDO", event.getId());
 
-    scheduler.advance(OffsetDateTime.now());
+    transitionService.sync(round, OffsetDateTime.now());
 
     assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
         .isEqualTo(RoundStatus.CLOSED);
@@ -77,61 +76,42 @@ class ZoneEventRoundSchedulerTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("두 번 실행해도 결과가 같다(멱등)")
-  void idempotentOnRerun() {
-    ZoneEventRound round = savedRound(RoundStatus.SCHEDULED, -1, 1);
+  @DisplayName("시작·종료가 모두 지난 SCHEDULED 회차는 sync 한 번으로 CLOSED까지 이어서 전환된다")
+  void syncCascadesActivateAndCloseInOneCall() {
+    ZoneEventRound round = savedRound(RoundStatus.SCHEDULED, -2, -1);
     ZoneEvent event = savedEvent(ZoneEventStatus.SCHEDULED);
-    savedSlot(round, "CENTRAL_NORTH", event.getId());
+    savedSlot(round, "OLD_DOWNTOWN", event.getId());
 
-    scheduler.advance(OffsetDateTime.now());
-    scheduler.advance(OffsetDateTime.now()); // 재실행
+    transitionService.sync(round, OffsetDateTime.now());
 
     assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
-        .isEqualTo(RoundStatus.ACTIVE);
+        .isEqualTo(RoundStatus.CLOSED);
     assertThat(zoneEventRepository.findById(event.getId()).orElseThrow().getStatus())
-        .isEqualTo(ZoneEventStatus.ACTIVE);
+        .isEqualTo(ZoneEventStatus.CLOSED);
   }
 
   @Test
-  @DisplayName("아직 시작 전인 회차는 건드리지 않는다")
-  void leavesFutureRounds() {
-    ZoneEventRound future = savedRound(RoundStatus.SCHEDULED, 1, 2);
+  @DisplayName("아직 시작 전이면 아무것도 바뀌지 않는다(멱등)")
+  void syncNoopWhenNotDue() {
+    ZoneEventRound round = savedRound(RoundStatus.SCHEDULED, 1, 2);
 
-    scheduler.advance(OffsetDateTime.now());
+    transitionService.sync(round, OffsetDateTime.now());
 
-    assertThat(roundRepository.findById(future.getId()).orElseThrow().getStatus())
+    assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
         .isEqualTo(RoundStatus.SCHEDULED);
   }
 
   @Test
-  @DisplayName("이벤트가 배정되지 않은 슬롯은 건너뛰고 회차만 연다")
-  void opensRoundWithSlotButNoEvent() {
-    ZoneEventRound round = savedRound(RoundStatus.SCHEDULED, -1, 1);
-    savedSlot(round, "WESTERN_BUSAN", null);
+  @DisplayName("syncAll은 대상 회차 전체를 훑어 전환한다")
+  void syncAllScansEverything() {
+    savedRound(RoundStatus.SCHEDULED, -1, 1);
+    savedRound(RoundStatus.ACTIVE, -2, -1);
 
-    scheduler.advance(OffsetDateTime.now());
+    transitionService.syncAll(OffsetDateTime.now());
 
-    assertThat(roundRepository.findById(round.getId()).orElseThrow().getStatus())
-        .isEqualTo(RoundStatus.ACTIVE);
-  }
-
-  @Test
-  @DisplayName("이미 ACTIVE인 슬롯 이벤트는 다시 활성화하지 않는다")
-  void skipsEventAlreadyInTargetState() {
-    ZoneEventRound round = savedRound(RoundStatus.SCHEDULED, -1, 1);
-    ZoneEvent alreadyActive = savedEvent(ZoneEventStatus.ACTIVE);
-    savedSlot(round, "OLD_DOWNTOWN", alreadyActive.getId());
-
-    scheduler.advance(OffsetDateTime.now());
-
-    assertThat(zoneEventRepository.findById(alreadyActive.getId()).orElseThrow().getStatus())
-        .isEqualTo(ZoneEventStatus.ACTIVE);
-  }
-
-  @Test
-  @DisplayName("스케줄 진입 메서드는 예외 없이 실행된다")
-  void scheduledEntryRuns() {
-    scheduler.advanceRounds();
+    assertThat(roundRepository.findAll())
+        .extracting(ZoneEventRound::getStatus)
+        .containsExactlyInAnyOrder(RoundStatus.ACTIVE, RoundStatus.CLOSED);
   }
 
   private ZoneEventRound savedRound(RoundStatus status, int startsDaysOffset, int endsDaysOffset) {

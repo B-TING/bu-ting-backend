@@ -11,25 +11,33 @@ import com.butingbe.domain.zoneevent.dto.request.RewardSnapshotReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
+import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
+import com.butingbe.domain.zoneevent.entity.RoundStatus;
+import com.butingbe.domain.zoneevent.entity.SlotKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
+import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
+import com.butingbe.domain.zoneevent.entity.ZoneEventRoundSlot;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
-import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -45,12 +53,16 @@ public class AdminZoneEventService {
 
   private static final int DEFAULT_SIZE = 20;
   private static final int MAX_SIZE = 50;
+  private static final List<Character> SLOT_LETTERS = List.of('A', 'B', 'C', 'D');
 
   private final ZoneEventRepository zoneEventRepository;
   private final ZoneEventAuthTargetRepository authTargetRepository;
   private final ZoneEventTypeRepository zoneEventTypeRepository;
   private final ZoneEventParticipationRepository participationRepository;
   private final RewardCatalogRepository rewardCatalogRepository;
+  private final ZoneEventRoundRepository roundRepository;
+  private final ZoneEventRoundSlotRepository slotRepository;
+  private final ZoneEventAuditLogRepository auditLogRepository;
   private final OperatorAuthorization operatorAuthorization;
 
   @Transactional
@@ -60,24 +72,83 @@ public class AdminZoneEventService {
     ZoneEventType type = requireType(request.typeCode());
     validateRewardCodes(request.baseReward(), request.excellenceReward());
 
+    OffsetDateTime endsAt = request.startsAt().plusMinutes(request.durationMinutes());
+    requireNoOverlap(zoneId, request.startsAt(), endsAt, null);
+
+    ZoneEventRound round = null;
+    String slotCode = null;
+    if (request.roundId() != null) {
+      ZoneEventRound draft =
+          roundRepository
+              .findById(request.roundId())
+              .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
+      if (draft.getStatus() != RoundStatus.DRAFT) {
+        throw new ConflictException("error.zone_event.invalid_state");
+      }
+      // 취소된 이벤트는 그 구역을 계속 점유하지 않는다. 취소 후 같은 구역에 대체 이벤트를 넣을 수 있어야 한다.
+      List<ZoneEvent> existing =
+          zoneEventRepository.findByRoundId(draft.getId()).stream()
+              .filter(e -> e.getStatus() != ZoneEventStatus.CANCELLED)
+              .toList();
+      if (existing.stream().anyMatch(e -> e.getZoneId().equals(zoneId))) {
+        throw new ConflictException("error.zone_event.invalid_state");
+      }
+      if (existing.size() >= 4) {
+        throw new ConflictException("error.zone_event.invalid_state");
+      }
+      // (round_id, slot_code) 유니크 인덱스가 있으므로 아직 쓰이지 않은 첫 글자를 고른다. 취소된 이벤트는
+      // markCancelled()에서 코드를 반납하므로, 취소된 구역을 다시 채울 때 그 글자가 재사용된다.
+      List<String> usedCodes = existing.stream().map(ZoneEvent::getSlotCode).toList();
+      slotCode =
+          SLOT_LETTERS.stream()
+              .map(letter -> draft.getRoundNo() + "-" + letter)
+              .filter(code -> !usedCodes.contains(code))
+              .toList()
+              .get(0);
+      round = draft;
+    }
+
+    RewardSnapshotReqDto excellence =
+        request.excellenceReward() != null
+            ? request.excellenceReward()
+            : (round != null && round.getExcellenceReward() != null
+                ? toReqDto(round.getExcellenceReward())
+                : null);
+
     ZoneEvent event =
         zoneEventRepository.save(
             ZoneEvent.builder()
                 .zoneId(zoneId)
                 .type(type)
                 .roundId(request.roundId())
+                .slotCode(slotCode)
                 .title(request.title())
                 .description(request.description())
                 .startsAt(request.startsAt())
                 .durationMinutes(request.durationMinutes())
                 .status(ZoneEventStatus.SCHEDULED)
                 .baseReward(request.baseReward().toSnapshot())
-                .excellenceReward(
-                    request.excellenceReward() == null
-                        ? null
-                        : request.excellenceReward().toSnapshot())
+                .excellenceReward(excellence == null ? null : excellence.toSnapshot())
                 .successLimitPerUser(request.successLimitPerUser())
                 .build());
+
+    if (round != null) {
+      // (round_id, zone_id) UK가 있으므로 같은 구역에 이미 슬롯이 있으면 새로 만들지 말고 재사용한다.
+      // 취소된 이벤트의 슬롯은 cancel()에서 삭제되므로, 대개 여기서 새 슬롯이 만들어진다.
+      ZoneEventRound slotRound = round;
+      ZoneEventRoundSlot slot =
+          slotRepository
+              .findByRound_IdAndZoneId(slotRound.getId(), zoneId)
+              .orElseGet(
+                  () ->
+                      slotRepository.save(
+                          ZoneEventRoundSlot.builder()
+                              .round(slotRound)
+                              .slotKind(SlotKind.AUTH)
+                              .zoneId(zoneId)
+                              .build()));
+      slot.assignEvent(event.getId());
+    }
 
     ZoneEventAuthTarget target = null;
     if (Boolean.TRUE.equals(type.getRequiresUpload())) {
@@ -88,38 +159,56 @@ public class AdminZoneEventService {
     } else if (request.authTarget() != null) {
       target = authTargetRepository.save(buildTarget(event, request.authTarget()));
     }
+    audit(user, "CREATE_EVENT", "EVENT", event.getId(), Map.of("zoneId", zoneId));
     return AdminZoneEventResDto.of(event, target, 0, 0);
+  }
+
+  private RewardSnapshotReqDto toReqDto(RewardSnapshot snapshot) {
+    return new RewardSnapshotReqDto(
+        snapshot.points(), snapshot.badgeCode(), snapshot.topN(), snapshot.prizeRewardCode());
+  }
+
+  private void requireNoOverlap(
+      String zoneId, OffsetDateTime startsAt, OffsetDateTime endsAt, UUID excludeEventId) {
+    List<ZoneEventStatus> blocking = List.of(ZoneEventStatus.SCHEDULED, ZoneEventStatus.ACTIVE);
+    for (ZoneEvent existing : zoneEventRepository.findByZoneIdAndStatusIn(zoneId, blocking)) {
+      if (excludeEventId != null && existing.getId().equals(excludeEventId)) {
+        continue;
+      }
+      boolean overlaps =
+          existing.getStartsAt().isBefore(endsAt) && startsAt.isBefore(existing.endsAt());
+      if (overlaps) {
+        throw new ConflictException("error.zone_event.invalid_state");
+      }
+    }
   }
 
   @Transactional(readOnly = true)
   public AdminZoneEventPageResDto list(
       AuthenticatedUser user,
+      UUID roundId,
       String zone,
       String status,
       OffsetDateTime from,
       OffsetDateTime to,
-      String cursor,
+      Integer page,
       Integer size) {
     operatorAuthorization.requireOperator(user);
     String zoneId = zone == null || zone.isBlank() ? null : parseZone(zone);
     ZoneEventStatus statusFilter = status == null || status.isBlank() ? null : parseStatus(status);
-    int pageSize = resolveSize(size);
-    Cursor decoded = decodeCursor(cursor);
+    int pageSize = size == null || size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+    int pageNumber = page == null || page < 0 ? 0 : page;
 
-    Specification<ZoneEvent> spec = buildListSpec(zoneId, statusFilter, from, to, decoded);
-    List<ZoneEvent> rows =
-        zoneEventRepository
-            .findAll(
-                spec,
-                PageRequest.of(
-                    0, pageSize + 1, Sort.by(Sort.Order.desc("startsAt"), Sort.Order.desc("id"))))
-            .getContent();
+    Specification<ZoneEvent> spec = buildListSpec(roundId, zoneId, statusFilter, from, to);
+    org.springframework.data.domain.Page<ZoneEvent> result =
+        zoneEventRepository.findAll(
+            spec,
+            PageRequest.of(
+                pageNumber, pageSize, Sort.by(Sort.Order.desc("startsAt"), Sort.Order.desc("id"))));
 
-    boolean hasNext = rows.size() > pageSize;
-    List<ZoneEvent> page = hasNext ? rows.subList(0, pageSize) : rows;
-    List<AdminZoneEventResDto> items = page.stream().map(this::toDetail).toList();
-    String nextCursor = hasNext ? encodeCursor(page.get(page.size() - 1)) : null;
-    return new AdminZoneEventPageResDto(items, nextCursor, hasNext);
+    List<AdminZoneEventResDto> items = result.getContent().stream().map(this::toDetail).toList();
+    return new AdminZoneEventPageResDto(
+        items, pageNumber, pageSize, result.getTotalElements(), result.getTotalPages());
   }
 
   @Transactional(readOnly = true)
@@ -134,8 +223,26 @@ public class AdminZoneEventService {
     operatorAuthorization.requireOperator(user);
     ZoneEvent event = findEvent(eventId);
 
+    if (!event.getRevision().equals(request.expectedRevision())) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
     if (event.getStatus() == ZoneEventStatus.ACTIVE && request.touchesScheduledOnlyFields()) {
       throw new ConflictException("error.zone_event.invalid_state");
+    }
+    if (request.touchesTimeOrZone()) {
+      String overlapZoneId =
+          request.zoneId() == null ? event.getZoneId() : parseZone(request.zoneId());
+      OffsetDateTime overlapStartsAt =
+          request.startsAt() == null ? event.getStartsAt() : request.startsAt();
+      int overlapDuration =
+          request.durationMinutes() == null
+              ? event.getDurationMinutes()
+              : request.durationMinutes();
+      requireNoOverlap(
+          overlapZoneId,
+          overlapStartsAt,
+          overlapStartsAt.plusMinutes(overlapDuration),
+          event.getId());
     }
 
     RewardSnapshotReqDto base = request.baseReward();
@@ -168,22 +275,12 @@ public class AdminZoneEventService {
                       request.authTarget().longitude(),
                       request.authTarget().radiusM()));
     }
-    return toDetail(event);
-  }
-
-  @Transactional
-  public AdminZoneEventResDto activate(AuthenticatedUser user, UUID eventId) {
-    operatorAuthorization.requireOperator(user);
-    ZoneEvent event = findEvent(eventId);
-    event.activate();
-    return toDetail(event);
-  }
-
-  @Transactional
-  public AdminZoneEventResDto close(AuthenticatedUser user, UUID eventId) {
-    operatorAuthorization.requireOperator(user);
-    ZoneEvent event = findEvent(eventId);
-    event.close();
+    audit(
+        user,
+        "PATCH_EVENT",
+        "EVENT",
+        eventId,
+        request.reason() == null ? null : Map.of("reason", request.reason()));
     return toDetail(event);
   }
 
@@ -192,6 +289,13 @@ public class AdminZoneEventService {
     operatorAuthorization.requireOperator(user);
     ZoneEvent event = findEvent(eventId);
     event.markCancelled();
+    // 취소된 이벤트의 회차 슬롯을 남겨두면 공개 상태 조회(GET /zone-event-rounds/current)에서 그 구역이
+    // 계속 열린 것처럼 보인다. 다른 구역으로 대체하면 슬롯이 5개가 되므로, 취소 시 슬롯을 제거한다.
+    // 이미 다른 이벤트로 재배정된 슬롯은 건드리지 않는다.
+    slotRepository
+        .findByRound_IdAndZoneId(event.getRoundId(), event.getZoneId())
+        .filter(s -> eventId.equals(s.getEventId()))
+        .ifPresent(slotRepository::delete);
     // BR-13: 열린 참여는 EVENT_CANCELLED로 정리하고, 성공한 참여와 보상은 유지한다.
     for (ZoneEventParticipation open :
         participationRepository.findByEvent_IdAndStatusIn(
@@ -202,7 +306,24 @@ public class AdminZoneEventService {
                 ParticipationStatus.UNDER_REVIEW))) {
       open.cancel("EVENT_CANCELLED");
     }
+    audit(user, "CANCEL_EVENT", "EVENT", eventId, null);
     return toDetail(event);
+  }
+
+  private void audit(
+      AuthenticatedUser user,
+      String action,
+      String targetType,
+      UUID targetId,
+      Map<String, Object> detail) {
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action(action)
+            .targetType(targetType)
+            .targetId(targetId)
+            .detail(detail)
+            .build());
   }
 
   private AdminZoneEventResDto toDetail(ZoneEvent event) {
@@ -219,13 +340,12 @@ public class AdminZoneEventService {
   }
 
   private Specification<ZoneEvent> buildListSpec(
-      String zoneId,
-      ZoneEventStatus status,
-      OffsetDateTime from,
-      OffsetDateTime to,
-      Cursor cursor) {
+      UUID roundId, String zoneId, ZoneEventStatus status, OffsetDateTime from, OffsetDateTime to) {
     return (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
+      if (roundId != null) {
+        predicates.add(cb.equal(root.get("roundId"), roundId));
+      }
       if (zoneId != null) {
         predicates.add(cb.equal(root.get("zoneId"), zoneId));
       }
@@ -237,14 +357,6 @@ public class AdminZoneEventService {
       }
       if (to != null) {
         predicates.add(cb.lessThanOrEqualTo(root.get("startsAt"), to));
-      }
-      if (cursor != null) {
-        Predicate earlier = cb.lessThan(root.get("startsAt"), cursor.startsAt());
-        Predicate sameTimeLowerId =
-            cb.and(
-                cb.equal(root.get("startsAt"), cursor.startsAt()),
-                cb.lessThan(root.get("id"), cursor.id()));
-        predicates.add(cb.or(earlier, sameTimeLowerId));
       }
       return cb.and(predicates.toArray(new Predicate[0]));
     };
@@ -312,36 +424,4 @@ public class AdminZoneEventService {
       throw new IllegalArgumentException("error.zone_event.media.invalid");
     }
   }
-
-  private int resolveSize(Integer size) {
-    if (size == null || size <= 0) {
-      return DEFAULT_SIZE;
-    }
-    return Math.min(size, MAX_SIZE);
-  }
-
-  private String encodeCursor(ZoneEvent event) {
-    String raw = event.getStartsAt() + "|" + event.getId();
-    return Base64.getUrlEncoder()
-        .withoutPadding()
-        .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
-  }
-
-  private Cursor decodeCursor(String cursor) {
-    if (cursor == null || cursor.isBlank()) {
-      return null;
-    }
-    try {
-      String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
-      String[] parts = raw.split("\\|");
-      if (parts.length != 2) {
-        throw new IllegalArgumentException("Invalid admin event cursor.");
-      }
-      return new Cursor(OffsetDateTime.parse(parts[0]), UUID.fromString(parts[1]));
-    } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
-      throw new IllegalArgumentException("Invalid admin event cursor.");
-    }
-  }
-
-  private record Cursor(OffsetDateTime startsAt, UUID id) {}
 }
