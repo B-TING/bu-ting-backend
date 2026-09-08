@@ -74,7 +74,11 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
         .thenReturn("https://signed.example/media.jpg");
     ZoneEventType type =
         zoneEventTypeRepository.save(
-            ZoneEventType.builder().typeCode("PLACE_AUTH").name("장소 인증").requiresUpload(true).build());
+            ZoneEventType.builder()
+                .typeCode("PLACE_AUTH")
+                .name("장소 인증")
+                .requiresUpload(true)
+                .build());
     event =
         zoneEventRepository.save(
             ZoneEvent.builder()
@@ -89,16 +93,21 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
                 .build());
     operator =
         new AuthenticatedUser(
-            savedUser("op").getId(), "op@example.com", "op", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+            savedUser("op").getId(),
+            "op@example.com",
+            "op",
+            List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
   }
 
   @Test
   @DisplayName("검수 큐는 UNDER_REVIEW 참여만, roundId·eventId·zoneId로 필터링해서 돌려준다")
   void queueListsOnlyUnderReview() {
-    ZoneEventParticipation underReview = participationRepository.save(participation(ParticipationStatus.UNDER_REVIEW));
+    ZoneEventParticipation underReview =
+        participationRepository.save(participation(ParticipationStatus.UNDER_REVIEW));
     participationRepository.save(participation(ParticipationStatus.SUCCESS));
 
-    AdminReviewQueuePageResDto queue = reviewService.queue(operator, null, event.getId(), event.getZoneId(), 1, 20);
+    AdminReviewQueuePageResDto queue =
+        reviewService.queue(operator, null, event.getId(), event.getZoneId(), 1, 20);
 
     assertThat(queue.items()).hasSize(1);
     assertThat(queue.items().get(0).participationId()).isEqualTo(underReview.getId().toString());
@@ -186,7 +195,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @DisplayName("승인하면 SUCCESS·앨범 공개만 되고(보상 없음) 현재 제출도 SUCCESS가 된다")
   void approveMarksSuccessWithoutReward() {
     ZoneEventParticipation p = underReviewWithSubmission();
-    ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
     titleDefRepository.save(
         ZoneTitleDef.builder()
             .titleCode(event.getZoneId() + "_T1")
@@ -200,7 +210,10 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
 
     AdminReviewDecisionResDto result =
         reviewService.approve(
-            operator, p.getId(), new ReviewApproveReqDto(submission.getId(), submission.getRevision()), null);
+            operator,
+            p.getId(),
+            new ReviewApproveReqDto(submission.getId(), submission.getRevision()),
+            null);
 
     assertThat(participationRepository.findById(p.getId()).orElseThrow().getStatus())
         .isEqualTo(ParticipationStatus.SUCCESS);
@@ -217,12 +230,16 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @DisplayName("만료된 expectedRevision으로 승인하면 409다")
   void approveStaleRevisionConflicts() {
     ZoneEventParticipation p = underReviewWithSubmission();
-    ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
 
     assertThatThrownBy(
             () ->
                 reviewService.approve(
-                    operator, p.getId(), new ReviewApproveReqDto(submission.getId(), submission.getRevision() + 1), null))
+                    operator,
+                    p.getId(),
+                    new ReviewApproveReqDto(submission.getId(), submission.getRevision() + 1),
+                    null))
         .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
         .hasMessage("error.zone_event.review.stale_revision");
   }
@@ -231,23 +248,43 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @DisplayName("참여의 currentSubmissionId가 아닌(재제출로 밀려난) submissionId로 승인하면 409다")
   void approveStaleSubmissionConflicts() {
     ZoneEventParticipation p = underReviewWithSubmission();
-    ZoneEventAuthTarget target2 = authTargetRepository.save(
-        ZoneEventAuthTarget.builder().event(event).targetKind(ZoneEventTargetKind.PLACE)
-            .placeName("장소2").latitude(35.2).longitude(129.2).radiusM(100).build());
-    ZoneEventSubmission stale = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
-    ZoneEventSubmission current = submissionRepository.save(
-        ZoneEventSubmission.builder().participation(p).attemptNo(2).target(target2)
-            .placeName(target2.getPlaceName()).targetLatitude(target2.getLatitude())
-            .targetLongitude(target2.getLongitude()).radiusM(target2.getRadiusM())
-            .mediaFileKey("uploads/images/photo2.jpg").gpsLat(35.2).gpsLng(129.2)
-            .capturedAt(OffsetDateTime.now()).build());
+    ZoneEventAuthTarget target2 =
+        authTargetRepository.save(
+            ZoneEventAuthTarget.builder()
+                .event(event)
+                .targetKind(ZoneEventTargetKind.PLACE)
+                .placeName("장소2")
+                .latitude(35.2)
+                .longitude(129.2)
+                .radiusM(100)
+                .build());
+    ZoneEventSubmission stale =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    ZoneEventSubmission current =
+        submissionRepository.save(
+            ZoneEventSubmission.builder()
+                .participation(p)
+                .attemptNo(2)
+                .target(target2)
+                .placeName(target2.getPlaceName())
+                .targetLatitude(target2.getLatitude())
+                .targetLongitude(target2.getLongitude())
+                .radiusM(target2.getRadiusM())
+                .mediaFileKey("uploads/images/photo2.jpg")
+                .gpsLat(35.2)
+                .gpsLng(129.2)
+                .capturedAt(OffsetDateTime.now())
+                .build());
     p.linkSubmission(current.getId());
     participationRepository.save(p);
 
     assertThatThrownBy(
             () ->
                 reviewService.approve(
-                    operator, p.getId(), new ReviewApproveReqDto(stale.getId(), stale.getRevision()), null))
+                    operator,
+                    p.getId(),
+                    new ReviewApproveReqDto(stale.getId(), stale.getRevision()),
+                    null))
         .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
         .hasMessage("error.zone_event.review.stale_submission");
   }
@@ -256,13 +293,15 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @DisplayName("같은 Idempotency-Key로 재전송하면 처리를 다시 하지 않고 이전 결과를 그대로 돌려준다")
   void approveIsIdempotent() {
     ZoneEventParticipation p = underReviewWithSubmission();
-    ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
     String key = "idem-" + UUID.randomUUID();
     // 같은 페이로드로 재전송하는 실제 클라이언트 재시도를 모사한다. submission은 이 테스트와 서비스가 같은 영속성 컨텍스트를
     // 공유하므로(같은 트랜잭션), approve() 1차 호출의 flush 이후 이 객체의 revision 필드가 실제로 증가한다 — 두 번째 요청도
     // submission.getRevision()을 다시 읽으면 실제로는 같은 재시도인데도 다른 revision을 실어 보내게 되어 fingerprint가
     // 달라지므로, 재전송 의도를 정확히 반영하기 위해 요청 DTO를 재사용한다.
-    ReviewApproveReqDto request = new ReviewApproveReqDto(submission.getId(), submission.getRevision());
+    ReviewApproveReqDto request =
+        new ReviewApproveReqDto(submission.getId(), submission.getRevision());
 
     AdminReviewDecisionResDto first = reviewService.approve(operator, p.getId(), request, key);
     AdminReviewDecisionResDto replay = reviewService.approve(operator, p.getId(), request, key);
@@ -274,16 +313,21 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @DisplayName("동시에 두 번 승인 요청이 오면 하나만 성공하고 나머지는 409다(비관적 재현: 두 트랜잭션이 같은 revision을 읽은 상태 시뮬레이션)")
   void concurrentApproveOnlyOneWins() {
     ZoneEventParticipation p = underReviewWithSubmission();
-    ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
     Long revisionSeenByBoth = submission.getRevision();
 
-    reviewService.approve(operator, p.getId(), new ReviewApproveReqDto(submission.getId(), revisionSeenByBoth), null);
+    reviewService.approve(
+        operator, p.getId(), new ReviewApproveReqDto(submission.getId(), revisionSeenByBoth), null);
 
     // 두 번째 "동시" 요청은 같은 revision을 들고 왔지만 첫 요청이 이미 revision을 올렸으므로 매뉴얼 체크에서 막힌다.
     assertThatThrownBy(
             () ->
                 reviewService.approve(
-                    operator, p.getId(), new ReviewApproveReqDto(submission.getId(), revisionSeenByBoth), null))
+                    operator,
+                    p.getId(),
+                    new ReviewApproveReqDto(submission.getId(), revisionSeenByBoth),
+                    null))
         .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
         .hasMessage("error.zone_event.participation.invalid_state");
   }
@@ -292,10 +336,14 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @DisplayName("반려하면 FAIL이 되고 사유가 남으며 제출도 REJECTED가 된다(보상 없음, 재제출 가능)")
   void rejectMarksFail() {
     ZoneEventParticipation p = underReviewWithSubmission();
-    ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
 
     reviewService.reject(
-        operator, p.getId(), new ReviewRejectReqDto(submission.getId(), "NOT_ON_SITE", submission.getRevision()), null);
+        operator,
+        p.getId(),
+        new ReviewRejectReqDto(submission.getId(), "NOT_ON_SITE", submission.getRevision()),
+        null);
 
     ZoneEventParticipation after = participationRepository.findById(p.getId()).orElseThrow();
     assertThat(after.getStatus()).isEqualTo(ParticipationStatus.FAIL);
@@ -308,13 +356,17 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @DisplayName("만료된 expectedRevision으로 반려하면 409다")
   void rejectStaleRevisionConflicts() {
     ZoneEventParticipation p = underReviewWithSubmission();
-    ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
 
     assertThatThrownBy(
             () ->
                 reviewService.reject(
-                    operator, p.getId(),
-                    new ReviewRejectReqDto(submission.getId(), "NOT_ON_SITE", submission.getRevision() + 1), null))
+                    operator,
+                    p.getId(),
+                    new ReviewRejectReqDto(
+                        submission.getId(), "NOT_ON_SITE", submission.getRevision() + 1),
+                    null))
         .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
         .hasMessage("error.zone_event.review.stale_revision");
   }
@@ -323,14 +375,16 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @DisplayName("같은 Idempotency-Key로 반려를 재전송하면 두 번째 요청은 다시 처리하지 않는다(제출 상태가 한 번만 바뀐다)")
   void rejectIsIdempotent() {
     ZoneEventParticipation p = underReviewWithSubmission();
-    ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
     String key = "idem-" + UUID.randomUUID();
     // 같은 페이로드로 재전송하는 실제 클라이언트 재시도를 모사한다. submission은 이 테스트와 서비스가 같은 영속성 컨텍스트를
     // 공유하므로(같은 트랜잭션), reject() 1차 호출의 flush 이후 이 객체의 revision 필드가 실제로 증가한다 — 두 번째 요청도
     // submission.getRevision()을 다시 읽으면 실제로는 같은 재시도인데도 다른 revision을 실어 보내게 되어 fingerprint가
     // 달라지므로, 재전송 의도를 정확히 반영하기 위해 요청 DTO를 재사용한다.
     Long revisionBeforeReject = submission.getRevision();
-    ReviewRejectReqDto request = new ReviewRejectReqDto(submission.getId(), "NOT_ON_SITE", revisionBeforeReject);
+    ReviewRejectReqDto request =
+        new ReviewRejectReqDto(submission.getId(), "NOT_ON_SITE", revisionBeforeReject);
 
     reviewService.reject(operator, p.getId(), request, key);
     reviewService.reject(operator, p.getId(), request, key);
@@ -354,15 +408,29 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
                 .build());
     ZoneEventAuthTarget target =
         authTargetRepository.save(
-            ZoneEventAuthTarget.builder().event(event).targetKind(ZoneEventTargetKind.PLACE)
-                .placeName("장소").latitude(35.1).longitude(129.1).radiusM(100).build());
+            ZoneEventAuthTarget.builder()
+                .event(event)
+                .targetKind(ZoneEventTargetKind.PLACE)
+                .placeName("장소")
+                .latitude(35.1)
+                .longitude(129.1)
+                .radiusM(100)
+                .build());
     ZoneEventSubmission submission =
         submissionRepository.save(
-            ZoneEventSubmission.builder().participation(p).attemptNo(1).target(target)
-                .placeName(target.getPlaceName()).targetLatitude(target.getLatitude())
-                .targetLongitude(target.getLongitude()).radiusM(target.getRadiusM())
-                .mediaFileKey("uploads/images/photo.jpg").gpsLat(35.1).gpsLng(129.1)
-                .capturedAt(OffsetDateTime.now()).build());
+            ZoneEventSubmission.builder()
+                .participation(p)
+                .attemptNo(1)
+                .target(target)
+                .placeName(target.getPlaceName())
+                .targetLatitude(target.getLatitude())
+                .targetLongitude(target.getLongitude())
+                .radiusM(target.getRadiusM())
+                .mediaFileKey("uploads/images/photo.jpg")
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .capturedAt(OffsetDateTime.now())
+                .build());
     ReflectionTestUtils.setField(p, "currentSubmissionId", submission.getId());
     return participationRepository.save(p);
   }

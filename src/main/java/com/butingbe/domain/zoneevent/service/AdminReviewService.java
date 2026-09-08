@@ -83,7 +83,9 @@ public class AdminReviewService {
     int pageNumber = page == null || page < 1 ? 1 : page;
     int pageSize = size == null || size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
     ParticipationStatus statusFilter =
-        status == null || status.isBlank() ? null : ParticipationStatus.valueOf(status.toUpperCase());
+        status == null || status.isBlank()
+            ? null
+            : ParticipationStatus.valueOf(status.toUpperCase());
     String resolvedZoneId =
         zoneId == null || zoneId.isBlank() ? null : ChatZone.fromString(zoneId).name();
 

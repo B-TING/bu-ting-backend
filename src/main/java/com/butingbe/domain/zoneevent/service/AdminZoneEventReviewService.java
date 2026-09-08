@@ -60,11 +60,17 @@ public class AdminZoneEventReviewService {
   /** 검수 큐: UNDER_REVIEW 참여만, roundId/eventId/zoneId로 필터링, joinedAt 오름차순(먼저 온 순). */
   @Transactional(readOnly = true)
   public AdminReviewQueuePageResDto queue(
-      AuthenticatedUser user, UUID roundId, UUID eventId, String zoneId, Integer page, Integer size) {
+      AuthenticatedUser user,
+      UUID roundId,
+      UUID eventId,
+      String zoneId,
+      Integer page,
+      Integer size) {
     operatorAuthorization.requireOperator(user);
     int pageNumber = page == null || page < 1 ? 1 : page;
     int pageSize = size == null || size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
-    String resolvedZoneId = zoneId == null || zoneId.isBlank() ? null : ChatZone.fromString(zoneId).name();
+    String resolvedZoneId =
+        zoneId == null || zoneId.isBlank() ? null : ChatZone.fromString(zoneId).name();
 
     Specification<ZoneEventParticipation> spec = buildQueueSpec(roundId, eventId, resolvedZoneId);
     Page<ZoneEventParticipation> result =
@@ -107,7 +113,8 @@ public class AdminZoneEventReviewService {
             .filter(
                 s ->
                     participation.getCurrentSubmissionId() != null
-                        && s.submissionId().equals(participation.getCurrentSubmissionId().toString()))
+                        && s.submissionId()
+                            .equals(participation.getCurrentSubmissionId().toString()))
             .findFirst()
             .orElse(historyDtos.isEmpty() ? null : historyDtos.get(0));
 
@@ -118,16 +125,22 @@ public class AdminZoneEventReviewService {
   /** 제출 단위 승인: SUCCESS·앨범 공개만 하고 보상은 지급하지 않는다. 칭호 누적 집계는 트리거하되 자동 장착은 하지 않는다. */
   @Transactional
   public AdminReviewDecisionResDto approve(
-      AuthenticatedUser user, UUID participationId, ReviewApproveReqDto request, String idempotencyKey) {
+      AuthenticatedUser user,
+      UUID participationId,
+      ReviewApproveReqDto request,
+      String idempotencyKey) {
     operatorAuthorization.requireOperator(user);
-    String fingerprint = participationId + ":" + request.submissionId() + ":" + request.expectedRevision();
-    Optional<String> replay = idempotencyService.findReplay(idempotencyKey, APPROVE_ENDPOINT, fingerprint);
+    String fingerprint =
+        participationId + ":" + request.submissionId() + ":" + request.expectedRevision();
+    Optional<String> replay =
+        idempotencyService.findReplay(idempotencyKey, APPROVE_ENDPOINT, fingerprint);
     if (replay.isPresent()) {
       return readJson(replay.get(), AdminReviewDecisionResDto.class);
     }
 
     ZoneEventParticipation participation = requireUnderReview(participationId);
-    ZoneEventSubmission submission = requireCurrentSubmission(participation, request.submissionId());
+    ZoneEventSubmission submission =
+        requireCurrentSubmission(participation, request.submissionId());
     if (!submission.getRevision().equals(request.expectedRevision())) {
       throw new ConflictException("error.zone_event.review.stale_revision");
     }
@@ -139,8 +152,10 @@ public class AdminZoneEventReviewService {
 
     List<EquippedTitleResDto> titles =
         new ArrayList<>(
-            zoneTitleService.awardTitles(participation.getUserId(), participation.getEvent().getZoneId(), false));
-    AdminReviewDecisionResDto result = AdminReviewDecisionResDto.of(participation, submission, titles);
+            zoneTitleService.awardTitles(
+                participation.getUserId(), participation.getEvent().getZoneId(), false));
+    AdminReviewDecisionResDto result =
+        AdminReviewDecisionResDto.of(participation, submission, titles);
     idempotencyService.save(idempotencyKey, APPROVE_ENDPOINT, fingerprint, result);
     return result;
   }
@@ -148,15 +163,20 @@ public class AdminZoneEventReviewService {
   /** 제출 단위 반려: 같은 참여 건은 재제출로 재시도할 수 있다. */
   @Transactional
   public void reject(
-      AuthenticatedUser user, UUID participationId, ReviewRejectReqDto request, String idempotencyKey) {
+      AuthenticatedUser user,
+      UUID participationId,
+      ReviewRejectReqDto request,
+      String idempotencyKey) {
     operatorAuthorization.requireOperator(user);
-    String fingerprint = participationId + ":" + request.submissionId() + ":" + request.expectedRevision();
+    String fingerprint =
+        participationId + ":" + request.submissionId() + ":" + request.expectedRevision();
     if (idempotencyService.findReplay(idempotencyKey, REJECT_ENDPOINT, fingerprint).isPresent()) {
       return;
     }
 
     ZoneEventParticipation participation = requireUnderReview(participationId);
-    ZoneEventSubmission submission = requireCurrentSubmission(participation, request.submissionId());
+    ZoneEventSubmission submission =
+        requireCurrentSubmission(participation, request.submissionId());
     if (!submission.getRevision().equals(request.expectedRevision())) {
       throw new ConflictException("error.zone_event.review.stale_revision");
     }
@@ -181,12 +201,14 @@ public class AdminZoneEventReviewService {
     return participation;
   }
 
-  private ZoneEventSubmission requireCurrentSubmission(ZoneEventParticipation participation, UUID submissionId) {
+  private ZoneEventSubmission requireCurrentSubmission(
+      ZoneEventParticipation participation, UUID submissionId) {
     ZoneEventSubmission submission =
         submissionRepository
             .findById(submissionId)
             .filter(s -> s.getParticipation().getId().equals(participation.getId()))
-            .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.submission.not_found"));
+            .orElseThrow(
+                () -> new ResourceNotFoundException("error.zone_event.submission.not_found"));
     if (!submission.getId().equals(participation.getCurrentSubmissionId())) {
       throw new ConflictException("error.zone_event.review.stale_submission");
     }
@@ -213,7 +235,8 @@ public class AdminZoneEventReviewService {
     return mediaFileKey == null ? null : fileStorageService.getPresignedUrl(mediaFileKey);
   }
 
-  private Specification<ZoneEventParticipation> buildQueueSpec(UUID roundId, UUID eventId, String zoneId) {
+  private Specification<ZoneEventParticipation> buildQueueSpec(
+      UUID roundId, UUID eventId, String zoneId) {
     return (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
       predicates.add(cb.equal(root.get("status"), ParticipationStatus.UNDER_REVIEW));

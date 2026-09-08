@@ -75,8 +75,18 @@ class AdminZoneEventReviewControllerTest {
     when(adminZoneEventReviewService.detail(any(), eq(pid)))
         .thenReturn(
             new com.butingbe.domain.zoneevent.dto.response.AdminReviewDetailResDto(
-                pid.toString(), null, null, "SUYEONG_NAMGU", UUID.randomUUID().toString(), "닉", "e@x.com",
-                "UNDER_REVIEW", null, null, List.of(), java.time.OffsetDateTime.now()));
+                pid.toString(),
+                null,
+                null,
+                "SUYEONG_NAMGU",
+                UUID.randomUUID().toString(),
+                "닉",
+                "e@x.com",
+                "UNDER_REVIEW",
+                null,
+                null,
+                List.of(),
+                java.time.OffsetDateTime.now()));
     mockMvc.perform(get("/admin/zone-event-reviews/{id}", pid)).andExpect(status().isOk());
   }
 
@@ -92,8 +102,7 @@ class AdminZoneEventReviewControllerTest {
         .perform(
             post("/admin/zone-event-reviews/{id}/approve", pid)
                 .contentType("application/json")
-                .content(
-                    "{\"submissionId\":\"" + UUID.randomUUID() + "\",\"expectedRevision\":0}"))
+                .content("{\"submissionId\":\"" + UUID.randomUUID() + "\",\"expectedRevision\":0}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("SUCCESS"));
   }

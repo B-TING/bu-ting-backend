@@ -15,7 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 참여 회수·숨김 해제. ROLE_ADMIN/MANAGER 전용(서비스에서 검사). 검수 큐/승인/반려는 {@code /admin/zone-event-reviews}로 이동했다. */
+/**
+ * 참여 회수·숨김 해제. ROLE_ADMIN/MANAGER 전용(서비스에서 검사). 검수 큐/승인/반려는 {@code /admin/zone-event-reviews}로
+ * 이동했다.
+ */
 @RestController
 @RequestMapping("/admin/zone-event-participations")
 @RequiredArgsConstructor

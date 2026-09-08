@@ -27,7 +27,8 @@ class IdempotencyServiceTest extends AbstractContainerTest {
   void saveThenReplay() {
     idempotencyService.save("key-1", "zone-event-review-approve", "fp-1", new Sample("a", 1));
 
-    Optional<String> replay = idempotencyService.findReplay("key-1", "zone-event-review-approve", "fp-1");
+    Optional<String> replay =
+        idempotencyService.findReplay("key-1", "zone-event-review-approve", "fp-1");
 
     assertThat(replay).isPresent();
     assertThat(replay.get()).contains("\"name\":\"a\"").contains("\"value\":1");
@@ -47,9 +48,12 @@ class IdempotencyServiceTest extends AbstractContainerTest {
   void mismatchedReplayConflicts() {
     idempotencyService.save("key-3", "zone-event-review-approve", "fp-3", new Sample("a", 1));
 
-    assertThatThrownBy(() -> idempotencyService.findReplay("key-3", "zone-event-review-approve", "different-fp"))
+    assertThatThrownBy(
+            () ->
+                idempotencyService.findReplay("key-3", "zone-event-review-approve", "different-fp"))
         .isInstanceOf(ConflictException.class);
-    assertThatThrownBy(() -> idempotencyService.findReplay("key-3", "zone-event-review-reject", "fp-3"))
+    assertThatThrownBy(
+            () -> idempotencyService.findReplay("key-3", "zone-event-review-reject", "fp-3"))
         .isInstanceOf(ConflictException.class);
   }
 

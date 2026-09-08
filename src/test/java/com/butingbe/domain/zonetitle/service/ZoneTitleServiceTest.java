@@ -173,7 +173,8 @@ class ZoneTitleServiceTest extends AbstractContainerTest {
   void awardTitlesWithoutAutoEquipDoesNotEquip() {
     successInZone("SUYEONG_NAMGU", 1);
 
-    List<EquippedTitleResDto> awarded = zoneTitleService.awardTitles(userId, "SUYEONG_NAMGU", false);
+    List<EquippedTitleResDto> awarded =
+        zoneTitleService.awardTitles(userId, "SUYEONG_NAMGU", false);
 
     assertThat(awarded).isNotEmpty();
     assertThat(userZoneTitleRepository.countByUserIdAndEquippedIsTrue(userId)).isZero();

@@ -17,7 +17,11 @@ public record AdminReviewDecisionResDto(
   public static AdminReviewDecisionResDto of(
       ZoneEventParticipation p, ZoneEventSubmission s, List<EquippedTitleResDto> titles) {
     return new AdminReviewDecisionResDto(
-        p.getId().toString(), p.getStatus().name(), s.getId().toString(), s.getAttemptNo(),
-        s.getReviewStatus().name(), titles);
+        p.getId().toString(),
+        p.getStatus().name(),
+        s.getId().toString(),
+        s.getAttemptNo(),
+        s.getReviewStatus().name(),
+        titles);
   }
 }

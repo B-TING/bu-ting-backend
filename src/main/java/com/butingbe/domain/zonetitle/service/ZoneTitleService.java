@@ -47,8 +47,8 @@ public class ZoneTitleService {
   }
 
   /**
-   * 구역 성공 누적으로 새로 도달한 칭호를 발급한다. {@code autoEquip}이 false면 첫 칭호여도 자동 장착하지 않는다(운영자 검수 승인
-   * 등 대표 칭호 변경을 유발하면 안 되는 호출부용).
+   * 구역 성공 누적으로 새로 도달한 칭호를 발급한다. {@code autoEquip}이 false면 첫 칭호여도 자동 장착하지 않는다(운영자 검수 승인 등 대표 칭호 변경을
+   * 유발하면 안 되는 호출부용).
    */
   @Transactional
   public List<EquippedTitleResDto> awardTitles(UUID userId, String zoneId, boolean autoEquip) {

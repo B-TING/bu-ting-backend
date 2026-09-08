@@ -11,8 +11,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Idempotency-Key 헤더 처리. 같은 키로 재전송되면 처음 처리했던 결과를 그대로 돌려준다. 키가 없으면(null/blank) 아무 것도 하지 않는다
- * — 이 헤더는 선택적이다.
+ * Idempotency-Key 헤더 처리. 같은 키로 재전송되면 처음 처리했던 결과를 그대로 돌려준다. 키가 없으면(null/blank) 아무 것도 하지 않는다 — 이 헤더는
+ * 선택적이다.
  */
 @Service
 @RequiredArgsConstructor
@@ -22,8 +22,8 @@ public class IdempotencyService {
   private final ObjectMapper objectMapper;
 
   /**
-   * 재생할 이전 응답이 있으면 그 JSON(바디가 없었으면 빈 문자열)을 돌려준다. 같은 키인데 endpoint·fingerprint가 다르면 다른 요청에
-   * 키가 잘못 재사용된 것이므로 409.
+   * 재생할 이전 응답이 있으면 그 JSON(바디가 없었으면 빈 문자열)을 돌려준다. 같은 키인데 endpoint·fingerprint가 다르면 다른 요청에 키가 잘못 재사용된
+   * 것이므로 409.
    */
   @Transactional(readOnly = true)
   public Optional<String> findReplay(String idempotencyKey, String endpoint, String fingerprint) {
@@ -44,7 +44,8 @@ public class IdempotencyService {
 
   /** 처리 성공 결과를 저장한다. 키가 없으면 아무 것도 하지 않는다. */
   @Transactional
-  public void save(String idempotencyKey, String endpoint, String fingerprint, Object responseBody) {
+  public void save(
+      String idempotencyKey, String endpoint, String fingerprint, Object responseBody) {
     if (idempotencyKey == null || idempotencyKey.isBlank()) {
       return;
     }

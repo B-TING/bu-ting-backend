@@ -40,7 +40,8 @@ public class AdminZoneEventReviewController {
       @RequestParam(required = false) Integer size) {
     return ResponseEntity.ok(
         ApiResponse.success(
-            "검수 큐 조회", adminZoneEventReviewService.queue(user, roundId, eventId, zoneId, page, size)));
+            "검수 큐 조회",
+            adminZoneEventReviewService.queue(user, roundId, eventId, zoneId, page, size)));
   }
 
   @GetMapping("/{participationId}")
