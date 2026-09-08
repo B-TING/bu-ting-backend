@@ -12,6 +12,7 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.domain.zoneevent.dto.request.ReviewApproveReqDto;
+import com.butingbe.domain.zoneevent.dto.request.ReviewRejectReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewDecisionResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewDetailResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewQueuePageResDto;
@@ -285,6 +286,57 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
                     operator, p.getId(), new ReviewApproveReqDto(submission.getId(), revisionSeenByBoth), null))
         .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
         .hasMessage("error.zone_event.participation.invalid_state");
+  }
+
+  @Test
+  @DisplayName("반려하면 FAIL이 되고 사유가 남으며 제출도 REJECTED가 된다(보상 없음, 재제출 가능)")
+  void rejectMarksFail() {
+    ZoneEventParticipation p = underReviewWithSubmission();
+    ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+
+    reviewService.reject(
+        operator, p.getId(), new ReviewRejectReqDto(submission.getId(), "NOT_ON_SITE", submission.getRevision()), null);
+
+    ZoneEventParticipation after = participationRepository.findById(p.getId()).orElseThrow();
+    assertThat(after.getStatus()).isEqualTo(ParticipationStatus.FAIL);
+    assertThat(after.getFailReason()).isEqualTo("NOT_ON_SITE");
+    assertThat(submissionRepository.findById(submission.getId()).orElseThrow().getReviewStatus())
+        .isEqualTo(com.butingbe.domain.zoneevent.entity.SubmissionReviewStatus.REJECTED);
+  }
+
+  @Test
+  @DisplayName("만료된 expectedRevision으로 반려하면 409다")
+  void rejectStaleRevisionConflicts() {
+    ZoneEventParticipation p = underReviewWithSubmission();
+    ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+
+    assertThatThrownBy(
+            () ->
+                reviewService.reject(
+                    operator, p.getId(),
+                    new ReviewRejectReqDto(submission.getId(), "NOT_ON_SITE", submission.getRevision() + 1), null))
+        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
+        .hasMessage("error.zone_event.review.stale_revision");
+  }
+
+  @Test
+  @DisplayName("같은 Idempotency-Key로 반려를 재전송하면 두 번째 요청은 다시 처리하지 않는다(제출 상태가 한 번만 바뀐다)")
+  void rejectIsIdempotent() {
+    ZoneEventParticipation p = underReviewWithSubmission();
+    ZoneEventSubmission submission = submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    String key = "idem-" + UUID.randomUUID();
+    // 같은 페이로드로 재전송하는 실제 클라이언트 재시도를 모사한다. submission은 이 테스트와 서비스가 같은 영속성 컨텍스트를
+    // 공유하므로(같은 트랜잭션), reject() 1차 호출의 flush 이후 이 객체의 revision 필드가 실제로 증가한다 — 두 번째 요청도
+    // submission.getRevision()을 다시 읽으면 실제로는 같은 재시도인데도 다른 revision을 실어 보내게 되어 fingerprint가
+    // 달라지므로, 재전송 의도를 정확히 반영하기 위해 요청 DTO를 재사용한다.
+    Long revisionBeforeReject = submission.getRevision();
+    ReviewRejectReqDto request = new ReviewRejectReqDto(submission.getId(), "NOT_ON_SITE", revisionBeforeReject);
+
+    reviewService.reject(operator, p.getId(), request, key);
+    reviewService.reject(operator, p.getId(), request, key);
+
+    assertThat(submissionRepository.findById(submission.getId()).orElseThrow().getRevision())
+        .isEqualTo(revisionBeforeReject + 1); // 딱 한 번만 처리됨
   }
 
   private ZoneEventParticipation underReviewWithSubmission() {

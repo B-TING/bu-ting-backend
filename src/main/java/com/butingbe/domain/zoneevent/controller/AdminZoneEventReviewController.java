@@ -2,6 +2,7 @@ package com.butingbe.domain.zoneevent.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.zoneevent.dto.request.ReviewApproveReqDto;
+import com.butingbe.domain.zoneevent.dto.request.ReviewRejectReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewDecisionResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewDetailResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewQueuePageResDto;
@@ -59,5 +60,15 @@ public class AdminZoneEventReviewController {
         ApiResponse.success(
             "검수 승인",
             adminZoneEventReviewService.approve(user, participationId, request, idempotencyKey)));
+  }
+
+  @PostMapping("/{participationId}/reject")
+  public ResponseEntity<ApiResponse<Void>> reject(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID participationId,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid ReviewRejectReqDto request) {
+    adminZoneEventReviewService.reject(user, participationId, request, idempotencyKey);
+    return ResponseEntity.ok(ApiResponse.success("검수 반려", null));
   }
 }

@@ -109,6 +109,28 @@ class AdminZoneEventReviewControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  @Test
+  @DisplayName("반려 200 / 사유 없으면 400")
+  void reject() throws Exception {
+    UUID pid = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/admin/zone-event-reviews/{id}/reject", pid)
+                .contentType("application/json")
+                .content(
+                    "{\"submissionId\":\""
+                        + UUID.randomUUID()
+                        + "\",\"reason\":\"NOT_ON_SITE\",\"expectedRevision\":0}"))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/admin/zone-event-reviews/{id}/reject", pid)
+                .contentType("application/json")
+                .content("{\"submissionId\":\"" + UUID.randomUUID() + "\",\"expectedRevision\":0}"))
+        .andExpect(status().isBadRequest());
+  }
+
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
     return new HandlerMethodArgumentResolver() {
       @Override

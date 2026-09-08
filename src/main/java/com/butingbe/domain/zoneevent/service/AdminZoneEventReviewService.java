@@ -7,6 +7,7 @@ import com.butingbe.domain.file.service.FileStorageService;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.domain.zoneevent.dto.request.ReviewApproveReqDto;
+import com.butingbe.domain.zoneevent.dto.request.ReviewRejectReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewDecisionResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewDetailResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewQueueItemResDto;
@@ -45,6 +46,7 @@ public class AdminZoneEventReviewService {
   private static final int DEFAULT_SIZE = 20;
   private static final int MAX_SIZE = 50;
   private static final String APPROVE_ENDPOINT = "zone-event-review-approve";
+  private static final String REJECT_ENDPOINT = "zone-event-review-reject";
 
   private final ZoneEventParticipationRepository participationRepository;
   private final OperatorAuthorization operatorAuthorization;
@@ -141,6 +143,30 @@ public class AdminZoneEventReviewService {
     AdminReviewDecisionResDto result = AdminReviewDecisionResDto.of(participation, submission, titles);
     idempotencyService.save(idempotencyKey, APPROVE_ENDPOINT, fingerprint, result);
     return result;
+  }
+
+  /** 제출 단위 반려: 같은 참여 건은 재제출로 재시도할 수 있다. */
+  @Transactional
+  public void reject(
+      AuthenticatedUser user, UUID participationId, ReviewRejectReqDto request, String idempotencyKey) {
+    operatorAuthorization.requireOperator(user);
+    String fingerprint = participationId + ":" + request.submissionId() + ":" + request.expectedRevision();
+    if (idempotencyService.findReplay(idempotencyKey, REJECT_ENDPOINT, fingerprint).isPresent()) {
+      return;
+    }
+
+    ZoneEventParticipation participation = requireUnderReview(participationId);
+    ZoneEventSubmission submission = requireCurrentSubmission(participation, request.submissionId());
+    if (!submission.getRevision().equals(request.expectedRevision())) {
+      throw new ConflictException("error.zone_event.review.stale_revision");
+    }
+
+    participation.stampReview(user.id());
+    participation.markFail(request.reason());
+    submission.reject(user.id(), request.reason());
+    flushSubmission(submission);
+
+    idempotencyService.save(idempotencyKey, REJECT_ENDPOINT, fingerprint, null);
   }
 
   private ZoneEventParticipation requireUnderReview(UUID participationId) {
