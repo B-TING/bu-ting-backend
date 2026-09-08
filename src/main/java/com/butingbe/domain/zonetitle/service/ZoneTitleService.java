@@ -40,11 +40,21 @@ public class ZoneTitleService {
   private final ZoneEventParticipationRepository participationRepository;
   private final CityGradeService cityGradeService;
 
-  /** 구역 성공 누적으로 새로 도달한 칭호를 발급하고, 새로 얻은 칭호 목록을 돌려준다. */
+  /** 구역 성공 누적으로 새로 도달한 칭호를 발급하고, 새로 얻은 칭호 목록을 돌려준다. 처음 칭호를 얻을 때만 자동 장착한다. */
   @Transactional
   public List<EquippedTitleResDto> awardTitles(UUID userId, String zoneId) {
+    return awardTitles(userId, zoneId, true);
+  }
+
+  /**
+   * 구역 성공 누적으로 새로 도달한 칭호를 발급한다. {@code autoEquip}이 false면 첫 칭호여도 자동 장착하지 않는다(운영자 검수 승인
+   * 등 대표 칭호 변경을 유발하면 안 되는 호출부용).
+   */
+  @Transactional
+  public List<EquippedTitleResDto> awardTitles(UUID userId, String zoneId, boolean autoEquip) {
     long successCount = participationRepository.countSuccessByUserAndZone(userId, zoneId);
-    boolean autoEquip = userZoneTitleRepository.countByUserIdAndEquippedIsTrue(userId) == 0;
+    boolean shouldAutoEquip =
+        autoEquip && userZoneTitleRepository.countByUserIdAndEquippedIsTrue(userId) == 0;
 
     List<UserZoneTitle> newlyEarned = new ArrayList<>();
     for (ZoneTitleDef def : titleDefRepository.findByZoneIdOrderByTierAsc(zoneId)) {
@@ -60,7 +70,7 @@ public class ZoneTitleService {
                     .build()));
       }
     }
-    if (autoEquip && !newlyEarned.isEmpty()) {
+    if (shouldAutoEquip && !newlyEarned.isEmpty()) {
       // tier 오름차순으로 발급했으므로 마지막이 가장 높은 tier.
       newlyEarned.get(newlyEarned.size() - 1).equip();
     }

@@ -168,6 +168,28 @@ class ZoneTitleServiceTest extends AbstractContainerTest {
         .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
   }
 
+  @Test
+  @DisplayName("autoEquip=false면 첫 칭호여도 자동 장착하지 않는다")
+  void awardTitlesWithoutAutoEquipDoesNotEquip() {
+    successInZone("SUYEONG_NAMGU", 1);
+
+    List<EquippedTitleResDto> awarded = zoneTitleService.awardTitles(userId, "SUYEONG_NAMGU", false);
+
+    assertThat(awarded).isNotEmpty();
+    assertThat(userZoneTitleRepository.countByUserIdAndEquippedIsTrue(userId)).isZero();
+  }
+
+  @Test
+  @DisplayName("autoEquip=true는 기존 동작(첫 칭호 자동 장착)과 같다")
+  void awardTitlesWithAutoEquipStillEquipsFirstTitle() {
+    successInZone("SUYEONG_NAMGU", 1);
+
+    List<EquippedTitleResDto> awarded = zoneTitleService.awardTitles(userId, "SUYEONG_NAMGU", true);
+
+    assertThat(awarded).isNotEmpty();
+    assertThat(userZoneTitleRepository.countByUserIdAndEquippedIsTrue(userId)).isEqualTo(1);
+  }
+
   private void successInZone(String zoneId, int count) {
     ZoneEvent event =
         zoneEventRepository.save(
