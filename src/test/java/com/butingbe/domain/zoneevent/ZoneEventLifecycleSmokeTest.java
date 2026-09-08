@@ -110,15 +110,6 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
             .validDays(30)
             .build());
     seedTitleDefs();
-    fileMetadataRepository.save(
-        FileMetadata.builder()
-            .objectKey("auth/photo.jpg")
-            .originalFileName("photo.jpg")
-            .contentType("image/jpeg")
-            .mediaType("IMAGE")
-            .fileSize(1024L)
-            .bucket("buting")
-            .build());
 
     operator =
         new AuthenticatedUser(
@@ -127,6 +118,17 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
             "op",
             List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
     participant = AuthenticatedUser.from(savedUser("player"));
+
+    fileMetadataRepository.save(
+        FileMetadata.builder()
+            .objectKey("auth/photo.jpg")
+            .originalFileName("photo.jpg")
+            .contentType("image/jpeg")
+            .mediaType("IMAGE")
+            .fileSize(1024L)
+            .bucket("buting")
+            .uploaderId(participant.id())
+            .build());
     deviceTokenRepository.save(
         UserDeviceToken.builder()
             .userId(participant.id())
@@ -195,7 +197,9 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
         .isEqualTo(ZoneEventStatus.ACTIVE);
 
     // 4) 참여 시작(GPS 반경 내)
-    ParticipationResDto joined = participationService.join(participant, eventId, LAT, LNG);
+    UUID targetId = UUID.fromString(event.authTarget().targetId());
+    ParticipationResDto joined =
+        participationService.join(participant, eventId, targetId, LAT, LNG);
     UUID participationId = UUID.fromString(joined.participationId());
 
     // 5) 제출 → AUTO 성공 + 기본 보상 + 구역 칭호
@@ -204,7 +208,8 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
             participant,
             eventId,
             participationId,
-            new ParticipationSubmitReqDto("auth/photo.jpg", "후기", LAT, LNG, OffsetDateTime.now()));
+            new ParticipationSubmitReqDto(
+                targetId, "auth/photo.jpg", "후기", LAT, LNG, OffsetDateTime.now()));
     assertThat(submitted.pointBalance()).isEqualTo(50);
     assertThat(submitted.newlyEarnedTitles()).isNotEmpty();
     assertThat(userPointService.getBalance(participant.id())).isEqualTo(50);

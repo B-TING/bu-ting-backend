@@ -79,7 +79,8 @@ class AdminReviewControllerTest {
   @DisplayName("승인 200 (SUCCESS 결과)")
   void approve() throws Exception {
     when(adminReviewService.approve(any(), eq(PID)))
-        .thenReturn(SubmitResultResDto.of(null, List.of(), 50, List.of()));
+        .thenReturn(
+            SubmitResultResDto.of(null, UUID.randomUUID().toString(), 1, List.of(), 50, List.of()));
     mockMvc
         .perform(post("/admin/zone-event-participations/{id}/approve", PID))
         .andExpect(status().isOk())

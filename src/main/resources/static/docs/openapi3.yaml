@@ -3558,8 +3558,9 @@ paths:
         - Zone Event
       summary: 이벤트 상세 조회
       description: |
-        이벤트 상세를 조회합니다. 촬영 가이드·예시 이미지·우수 보상·성공 참여자 수·남은 참여 가능 횟수를 포함합니다.
-        비로그인도 허용하며, myRemainingAttempts는 로그인한 경우에만 채워집니다.
+        이벤트 상세를 조회합니다. 촬영 가이드·예시 이미지·우수 보상·성공 참여자 수·남은 참여 가능 횟수·이 이벤트의 ACTIVE 타겟 전체(targets)·
+        슬롯 코드(slotCode)·마감 시각(deadline)을 포함합니다. 비로그인도 허용하며, myRemainingAttempts와 myParticipation은
+        로그인한 경우에만 채워집니다.
       security:
         - opaqueToken: [ ]
         - { }
@@ -3611,7 +3612,8 @@ paths:
         - Zone Event
       summary: 참여 시작
       description: |
-        현장 GPS 좌표로 이벤트 참여를 시작합니다. 타겟 반경 밖이면 400, 이미 열린 참여가 있으면 409입니다.
+        선택한 targetId와 현재 GPS 좌표로 이벤트 참여를 시작합니다. targetId가 이 이벤트의 ACTIVE 타겟이 아니면 404, 타겟 반경 밖이면
+        400, 이미 열린 참여(반려되어 재제출 대기 중인 참여 포함)가 있으면 409, 이벤트 마감(deadline) 이후면 409입니다.
       security:
         - opaqueToken: [ ]
       parameters:
@@ -3628,6 +3630,7 @@ paths:
             schema:
               $ref: "#/components/schemas/ParticipationJoinRequest"
             example:
+              targetId: 550e8400-e29b-41d4-a716-446655440000
               latitude: 35.1532
               longitude: 129.1182
       responses:
@@ -3695,8 +3698,10 @@ paths:
         - Zone Event
       summary: 인증 제출
       description: |
-        참여에 미디어(fileKey)와 촬영 좌표를 제출합니다. AUTO 판정이면 즉시 성공 확정+기본 보상, 아니면 검수 대기입니다.
-        본인이 업로드한 미디어만 제출할 수 있습니다.
+        선택한 targetId·미디어(fileKey)·촬영 좌표로 인증을 제출합니다. 최초 제출(JOINED)뿐 아니라 반려 후 재제출(FAIL)도 이 엔드포인트로
+        처리하며, 호출마다 새 제출 이력(submissionId, attemptNo)이 쌓이고 이전 이력은 바뀌지 않습니다. 재제출 시 최초 제출과 다른 targetId를
+        고를 수 있습니다. AUTO 판정이면 즉시 성공 확정+기본 보상, 아니면 검수 대기입니다. 본인이 업로드하고, 아직 다른 제출에 쓰이지 않았으며,
+        업로드한 지 오래되지 않은 미디어만 제출할 수 있습니다.
       security:
         - opaqueToken: [ ]
       parameters:
@@ -3719,6 +3724,7 @@ paths:
             schema:
               $ref: "#/components/schemas/ParticipationSubmitRequest"
             example:
+              targetId: 550e8400-e29b-41d4-a716-446655440000
               mediaFileKey: uploads/images/photo.jpg
               content: 광안대교 야경 미쳤다
               latitude: 35.1532
@@ -3750,13 +3756,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "404":
-          description: 참여 또는 이벤트를 찾을 수 없음
+          description: 참여 또는 이벤트를 찾을 수 없거나, targetId가 이 이벤트의 ACTIVE 타겟이 아님
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "409":
-          description: 참여 상태가 제출 가능하지 않음
+          description: 참여 상태가 제출·재제출 가능하지 않거나(UNDER_REVIEW/SUCCESS 등) 이벤트 마감(deadline) 이후
           content:
             application/json:
               schema:
@@ -3815,7 +3821,8 @@ paths:
         - Zone Event
       summary: 내 참여 이력 조회
       description: |
-        내 구역 이벤트 참여 이력을 커서 페이징으로 조회합니다. 구역·타입·상태·기간으로 필터할 수 있습니다.
+        내 구역 이벤트 참여 이력을 커서 페이징으로 조회합니다. 구역·타입·상태·기간으로 필터할 수 있습니다. 각 항목에 반려 사유
+        (rejectionReason), 재제출 가능 여부(canResubmit), 제출 시도별 이력(submissions)을 포함합니다.
       security:
         - opaqueToken: [ ]
       parameters:
@@ -8786,6 +8793,20 @@ components:
           allOf:
             - $ref: "#/components/schemas/AuthTargetDetail"
           nullable: true
+          description: 하위 호환용 단일 필드(ACTIVE 타겟 중 하나). 신규 클라이언트는 targets를 쓸 것.
+        targets:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthTargetDetail"
+          description: 이 이벤트의 ACTIVE 타겟 전체. 참여·제출 시 targetId로 하나를 선택합니다.
+        slotCode:
+          type: string
+          nullable: true
+          example: 1-A
+        deadline:
+          type: string
+          format: date-time
+          description: 신규 참여·재제출 모두 이 시각 이후 거부됩니다(endsAt과 동일 값).
         successCount:
           type: integer
           format: int64
@@ -8796,9 +8817,33 @@ components:
           type: integer
           nullable: true
           description: 로그인 시에만 채워집니다.
+        myParticipation:
+          nullable: true
+          description: 로그인 시, 이 이벤트에 대한 내 가장 최근 참여 요약. 참여 이력이 없으면 null.
+          allOf:
+            - $ref: "#/components/schemas/MyParticipation"
         round:
           nullable: true
           description: 회차 정보(향후 확장). 현재는 null.
+    MyParticipation:
+      type: object
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - JOINED
+            - SUBMITTED
+            - UNDER_REVIEW
+            - SUCCESS
+            - FAIL
+            - CANCELLED
+            - REVOKED
+        canResubmit:
+          type: boolean
+          description: status가 FAIL이고 아직 deadline 전이면 true.
     RoundStatusZoneSlot:
       type: object
       properties:
@@ -8879,9 +8924,14 @@ components:
     ParticipationJoinRequest:
       type: object
       required:
+        - targetId
         - latitude
         - longitude
       properties:
+        targetId:
+          type: string
+          format: uuid
+          description: 참여할 타겟(선택 장소). 이 이벤트의 ACTIVE 타겟이어야 합니다.
         latitude:
           type: number
           format: double
@@ -8897,8 +8947,15 @@ components:
     ParticipationSubmitRequest:
       type: object
       required:
+        - targetId
         - mediaFileKey
+        - latitude
+        - longitude
       properties:
+        targetId:
+          type: string
+          format: uuid
+          description: 제출할 타겟(선택 장소). 재제출 시 최초 제출과 다른 타겟을 고를 수 있습니다.
         mediaFileKey:
           type: string
           description: /files 업로드로 받은 fileKey
@@ -9018,6 +9075,14 @@ components:
       properties:
         participation:
           $ref: "#/components/schemas/Participation"
+        submissionId:
+          type: string
+          format: uuid
+          description: 이번 호출이 만든 제출 이력의 id.
+        attemptNo:
+          type: integer
+          description: 이 참여에서 몇 번째 제출 시도인지(1부터 시작).
+          example: 1
         rewards:
           type: array
           items:
@@ -9103,6 +9168,53 @@ components:
           type: string
           format: date-time
         completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        rejectionReason:
+          type: string
+          nullable: true
+          description: 최신 제출이 반려됐을 때만 채워집니다.
+        canResubmit:
+          type: boolean
+          description: status가 FAIL이고 아직 이벤트 deadline 전이면 true.
+        submissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubmissionHistoryItem"
+          description: attemptNo 내림차순(최신 제출이 먼저).
+    SubmissionHistoryItem:
+      type: object
+      properties:
+        submissionId:
+          type: string
+          format: uuid
+        attemptNo:
+          type: integer
+          example: 1
+        targetId:
+          type: string
+          format: uuid
+        placeName:
+          type: string
+          example: 광안대교 전망 포인트
+        mediaUrl:
+          type: string
+          nullable: true
+          description: presigned URL
+        reviewStatus:
+          type: string
+          enum:
+            - UNDER_REVIEW
+            - SUCCESS
+            - REJECTED
+        rejectionReason:
+          type: string
+          nullable: true
+        submittedAt:
+          type: string
+          format: date-time
+        reviewedAt:
           type: string
           format: date-time
           nullable: true

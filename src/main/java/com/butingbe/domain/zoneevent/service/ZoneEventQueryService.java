@@ -2,6 +2,8 @@ package com.butingbe.domain.zoneevent.service;
 
 import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.file.service.FileStorageService;
+import com.butingbe.domain.zoneevent.dto.response.AuthTargetDetailResDto;
+import com.butingbe.domain.zoneevent.dto.response.MyParticipationResDto;
 import com.butingbe.domain.zoneevent.dto.response.ZoneEventDetailResDto;
 import com.butingbe.domain.zoneevent.dto.response.ZoneEventSummaryResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
@@ -60,27 +62,45 @@ public class ZoneEventQueryService {
         zoneEventRepository
             .findById(eventId)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
-    ZoneEventAuthTarget target =
-        authTargetRepository
-            .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(eventId, ZoneEventTargetStatus.ACTIVE)
-            .orElse(null);
+    List<ZoneEventAuthTarget> activeTargets =
+        authTargetRepository.findByEvent_IdAndStatusOrderByCreatedAtAsc(
+            eventId, ZoneEventTargetStatus.ACTIVE);
+    ZoneEventAuthTarget target = activeTargets.isEmpty() ? null : activeTargets.get(0);
     OffsetDateTime now = OffsetDateTime.now();
 
     long successCount =
         participationRepository.countByEvent_IdAndStatus(eventId, ParticipationStatus.SUCCESS);
-    String exampleImageUrl =
-        target == null || target.getExampleFileKey() == null
-            ? null
-            : fileStorageService.getPresignedUrl(target.getExampleFileKey());
+    String exampleImageUrl = presignedOrNull(target == null ? null : target.getExampleFileKey());
+    List<AuthTargetDetailResDto> targets =
+        activeTargets.stream()
+            .map(t -> AuthTargetDetailResDto.from(t, presignedOrNull(t.getExampleFileKey())))
+            .toList();
     Integer myRemainingAttempts = userId == null ? null : remainingAttempts(event, userId);
+    MyParticipationResDto myParticipation =
+        userId == null ? null : myParticipation(event, userId, now);
 
     return ZoneEventDetailResDto.of(
         event,
         target,
+        targets,
         exampleImageUrl,
         remainingSeconds(event, now),
         successCount,
-        myRemainingAttempts);
+        myRemainingAttempts,
+        myParticipation);
+  }
+
+  private MyParticipationResDto myParticipation(ZoneEvent event, UUID userId, OffsetDateTime now) {
+    Optional<ZoneEventParticipation> latest =
+        participationRepository.findFirstByEvent_IdAndUserIdOrderByJoinedAtDesc(
+            event.getId(), userId);
+    return latest
+        .map(p -> MyParticipationResDto.of(p, event.acceptsResubmission(p.getStatus(), now)))
+        .orElse(null);
+  }
+
+  private String presignedOrNull(String fileKey) {
+    return fileKey == null ? null : fileStorageService.getPresignedUrl(fileKey);
   }
 
   private ZoneEventSummaryResDto toSummary(ZoneEvent event, OffsetDateTime now, UUID userId) {

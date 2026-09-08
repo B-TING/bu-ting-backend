@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.file.service.FileStorageService;
 import com.butingbe.domain.reward.entity.GrantReason;
 import com.butingbe.domain.reward.entity.RewardCatalog;
 import com.butingbe.domain.reward.entity.RewardGrant;
@@ -17,12 +18,18 @@ import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.domain.zoneevent.dto.response.ParticipationHistoryPageResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
+import com.butingbe.domain.zoneevent.entity.SubmissionReviewStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
@@ -32,7 +39,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
@@ -45,6 +54,9 @@ class ZoneEventParticipationQueryServiceTest extends AbstractContainerTest {
   @Autowired private RewardCatalogRepository rewardCatalogRepository;
   @Autowired private RewardGrantRepository rewardGrantRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private ZoneEventAuthTargetRepository authTargetRepository;
+  @Autowired private ZoneEventSubmissionRepository submissionRepository;
+  @MockitoBean private FileStorageService fileStorageService;
 
   private UUID userId;
   private AuthenticatedUser user;
@@ -52,6 +64,8 @@ class ZoneEventParticipationQueryServiceTest extends AbstractContainerTest {
 
   @BeforeEach
   void setUp() {
+    Mockito.when(fileStorageService.getPresignedUrl(Mockito.anyString()))
+        .thenReturn("https://signed.example/media.jpg");
     type =
         zoneEventTypeRepository.save(
             ZoneEventType.builder()
@@ -149,6 +163,92 @@ class ZoneEventParticipationQueryServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("반려된 참여는 제출 이력과 반려 사유·재제출 가능 여부를 함께 담는다")
+  void historyIncludesSubmissionsAndRejection() {
+    ZoneEvent event = savedEvent("SUYEONG_NAMGU");
+    ZoneEventParticipation participation =
+        savedParticipation(event, ParticipationStatus.FAIL, OffsetDateTime.now());
+    ZoneEventAuthTarget target =
+        authTargetRepository.save(
+            ZoneEventAuthTarget.builder()
+                .event(event)
+                .targetKind(ZoneEventTargetKind.PLACE)
+                .placeName("광안대교 야경")
+                .latitude(35.153)
+                .longitude(129.118)
+                .radiusM(100)
+                .build());
+    ZoneEventSubmission submission =
+        submissionRepository.save(
+            ZoneEventSubmission.builder()
+                .participation(participation)
+                .attemptNo(1)
+                .target(target)
+                .placeName(target.getPlaceName())
+                .targetLatitude(target.getLatitude())
+                .targetLongitude(target.getLongitude())
+                .radiusM(target.getRadiusM())
+                .mediaFileKey("uploads/images/photo.jpg")
+                .gpsLat(35.153)
+                .gpsLng(129.118)
+                .capturedAt(OffsetDateTime.now())
+                .build());
+    submission.reject(UUID.randomUUID(), "NOT_ON_SITE");
+
+    ParticipationHistoryPageResDto page =
+        queryService.history(user, null, null, List.of(), null, null, null, 20);
+
+    var item = page.items().get(0);
+    assertThat(item.rejectionReason()).isEqualTo("NOT_ON_SITE");
+    assertThat(item.canResubmit()).isTrue();
+    assertThat(item.submissions()).hasSize(1);
+    assertThat(item.submissions().get(0).attemptNo()).isEqualTo(1);
+    assertThat(item.submissions().get(0).reviewStatus())
+        .isEqualTo(SubmissionReviewStatus.REJECTED.name());
+  }
+
+  @Test
+  @DisplayName("제출 이력이 여러 건이면 attemptNo 내림차순으로 담기고 최신 시도가 반려 사유의 기준이 된다")
+  void historyOrdersSubmissionsByAttemptNoDesc() {
+    ZoneEvent event = savedEvent("SUYEONG_NAMGU");
+    ZoneEventParticipation participation =
+        savedParticipation(event, ParticipationStatus.UNDER_REVIEW, OffsetDateTime.now());
+    ZoneEventAuthTarget target = savedTarget(event);
+    ZoneEventSubmission first = savedSubmission(participation, target, 1, "uploads/images/a1.jpg");
+    first.reject(UUID.randomUUID(), "NOT_ON_SITE");
+    savedSubmission(participation, target, 2, "uploads/images/a2.jpg");
+
+    ParticipationHistoryPageResDto page =
+        queryService.history(user, null, null, List.of(), null, null, null, 20);
+
+    var item = page.items().get(0);
+    assertThat(item.submissions()).hasSize(2);
+    assertThat(item.submissions().get(0).attemptNo()).isEqualTo(2);
+    assertThat(item.submissions().get(1).attemptNo()).isEqualTo(1);
+    // 최신 시도(attemptNo=2)가 검수 대기이므로 반려 사유는 노출하지 않는다
+    assertThat(item.submissions().get(0).reviewStatus())
+        .isEqualTo(SubmissionReviewStatus.UNDER_REVIEW.name());
+    assertThat(item.submissions().get(1).reviewStatus())
+        .isEqualTo(SubmissionReviewStatus.REJECTED.name());
+    assertThat(item.rejectionReason()).isNull();
+  }
+
+  @Test
+  @DisplayName("성공한 참여는 재제출 불가이고 반려 사유가 없다")
+  void historySuccessHasNoRejectionAndCannotResubmit() {
+    ZoneEvent event = savedEvent("SUYEONG_NAMGU");
+    savedParticipation(event, ParticipationStatus.SUCCESS, OffsetDateTime.now());
+
+    ParticipationHistoryPageResDto page =
+        queryService.history(user, null, null, List.of(), null, null, null, 20);
+
+    var item = page.items().get(0);
+    assertThat(item.rejectionReason()).isNull();
+    assertThat(item.canResubmit()).isFalse();
+    assertThat(item.submissions()).isEmpty();
+  }
+
+  @Test
   @DisplayName("이벤트별 내 참여를 최신순으로 조회한다(취소 포함)")
   void myEventParticipations() {
     ZoneEvent event = savedEvent("SUYEONG_NAMGU");
@@ -233,6 +333,39 @@ class ZoneEventParticipationQueryServiceTest extends AbstractContainerTest {
             .status(ZoneEventStatus.ACTIVE)
             .baseReward(new RewardSnapshot(50, "SPOT_GWANGAN_BRIDGE", null, null))
             .successLimitPerUser(1)
+            .build());
+  }
+
+  private ZoneEventAuthTarget savedTarget(ZoneEvent event) {
+    return authTargetRepository.save(
+        ZoneEventAuthTarget.builder()
+            .event(event)
+            .targetKind(ZoneEventTargetKind.PLACE)
+            .placeName("광안대교 야경")
+            .latitude(35.153)
+            .longitude(129.118)
+            .radiusM(100)
+            .build());
+  }
+
+  private ZoneEventSubmission savedSubmission(
+      ZoneEventParticipation participation,
+      ZoneEventAuthTarget target,
+      int attemptNo,
+      String mediaFileKey) {
+    return submissionRepository.save(
+        ZoneEventSubmission.builder()
+            .participation(participation)
+            .attemptNo(attemptNo)
+            .target(target)
+            .placeName(target.getPlaceName())
+            .targetLatitude(target.getLatitude())
+            .targetLongitude(target.getLongitude())
+            .radiusM(target.getRadiusM())
+            .mediaFileKey(mediaFileKey)
+            .gpsLat(35.153)
+            .gpsLng(129.118)
+            .capturedAt(OffsetDateTime.now())
             .build());
   }
 

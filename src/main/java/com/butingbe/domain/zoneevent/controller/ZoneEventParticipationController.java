@@ -40,7 +40,8 @@ public class ZoneEventParticipationController {
       @PathVariable UUID eventId,
       @RequestBody @Valid ParticipationJoinReqDto request) {
     ParticipationResDto participation =
-        participationService.join(user, eventId, request.latitude(), request.longitude());
+        participationService.join(
+            user, eventId, request.targetId(), request.latitude(), request.longitude());
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.success("이벤트 참여 시작", participation));
   }

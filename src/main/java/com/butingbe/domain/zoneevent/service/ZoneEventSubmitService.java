@@ -15,20 +15,27 @@ import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.domain.zoneevent.support.GpsDistance;
 import com.butingbe.domain.zonetitle.service.ZoneTitleService;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +44,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>제출을 모두 검증한 뒤 판정 모드에 따라 처리한다. AUTO면 같은 트랜잭션에서 SUCCESS로 확정하고 기본 보상을 지급한다(FR-RWD-01).
  * MANUAL/HYBRID면 검수 대기로 보낸다. 반경은 참여 시작에 이어 제출 시점에도 다시 검증한다(BR-05).
+ *
+ * <p>참여가 JOINED거나(최초 제출) FAIL이면(반려 후 재제출) 제출을 받는다. 매 호출마다 새 {@link ZoneEventSubmission} row를 만들고 이전
+ * 이력은 바꾸지 않는다. 이벤트 마감({@code endsAt}) 이후에는 최초 제출도 재제출도 받지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,6 +54,7 @@ public class ZoneEventSubmitService {
 
   private final ZoneEventParticipationRepository participationRepository;
   private final ZoneEventAuthTargetRepository authTargetRepository;
+  private final ZoneEventSubmissionRepository submissionRepository;
   private final FileMetadataRepository fileMetadataRepository;
   private final RewardService rewardService;
   private final UserPointService userPointService;
@@ -54,6 +65,9 @@ public class ZoneEventSubmitService {
 
   @Value("${zone-event.review.captured-at-threshold-minutes:10}")
   private long capturedAtThresholdMinutes;
+
+  @Value("${zone-event.review.upload-recency-threshold-minutes:30}")
+  private long uploadRecencyThresholdMinutes;
 
   @Transactional
   public SubmitResultResDto submit(
@@ -73,7 +87,8 @@ public class ZoneEventSubmitService {
     if (!participation.getUserId().equals(userId)) {
       throw new ForbiddenException("error.zone_event.participation.forbidden");
     }
-    if (participation.getStatus() != ParticipationStatus.JOINED) {
+    if (participation.getStatus() != ParticipationStatus.JOINED
+        && participation.getStatus() != ParticipationStatus.FAIL) {
       throw new ConflictException("error.zone_event.participation.invalid_state");
     }
 
@@ -81,11 +96,11 @@ public class ZoneEventSubmitService {
     if (event.getStatus() != ZoneEventStatus.ACTIVE) {
       throw new ConflictException("error.zone_event.not_active");
     }
+    if (!OffsetDateTime.now().isBefore(event.endsAt())) {
+      throw new ConflictException("error.zone_event.ended");
+    }
 
-    ZoneEventAuthTarget target =
-        authTargetRepository
-            .findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(eventId, ZoneEventTargetStatus.ACTIVE)
-            .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
+    ZoneEventAuthTarget target = requireActiveTarget(eventId, request.targetId());
     int distance =
         GpsDistance.meters(
             request.latitude(), request.longitude(), target.getLatitude(), target.getLongitude());
@@ -95,14 +110,40 @@ public class ZoneEventSubmitService {
 
     validateMedia(request.mediaFileKey(), userId);
 
+    int attemptNo = (int) submissionRepository.countByParticipation_Id(participationId) + 1;
+    ZoneEventSubmission submission;
+    try {
+      submission =
+          submissionRepository.save(
+              ZoneEventSubmission.builder()
+                  .participation(participation)
+                  .attemptNo(attemptNo)
+                  .target(target)
+                  .placeName(target.getPlaceName())
+                  .targetLatitude(target.getLatitude())
+                  .targetLongitude(target.getLongitude())
+                  .radiusM(target.getRadiusM())
+                  .guideTextSnapshot(target.getGuideText())
+                  .mediaFileKey(request.mediaFileKey())
+                  .gpsLat(request.latitude())
+                  .gpsLng(request.longitude())
+                  .capturedAt(request.capturedAt())
+                  .build());
+    } catch (DataIntegrityViolationException concurrent) {
+      // media_file_key 유니크 인덱스 위반: 동시 요청이 같은 fileKey를 먼저 제출했다.
+      throw new IllegalArgumentException("error.zone_event.media.already_used");
+    }
+
     participation.submit(
         request.mediaFileKey(),
         request.content(),
         request.latitude(),
         request.longitude(),
         request.capturedAt());
+    participation.linkSubmission(submission.getId());
 
     if (isAutoApprove() && !capturedTooOld(request.capturedAt())) {
+      submission.approve(null);
       participation.markSuccess();
       RewardSnapshot base = event.getBaseReward();
       BaseRewardResult reward =
@@ -113,9 +154,11 @@ public class ZoneEventSubmitService {
               base == null ? null : base.points(),
               base == null ? null : base.badgeCode());
       List<Object> newlyEarnedTitles =
-          new java.util.ArrayList<>(zoneTitleService.awardTitles(userId, event.getZoneId()));
+          new ArrayList<>(zoneTitleService.awardTitles(userId, event.getZoneId()));
       return SubmitResultResDto.of(
           ParticipationResDto.of(participation, null),
+          submission.getId().toString(),
+          attemptNo,
           reward.rewards(),
           reward.pointBalance(),
           newlyEarnedTitles);
@@ -124,11 +167,24 @@ public class ZoneEventSubmitService {
     participation.markUnderReview();
     return SubmitResultResDto.of(
         ParticipationResDto.of(participation, null),
+        submission.getId().toString(),
+        attemptNo,
         List.of(),
         userPointService.getBalance(userId));
   }
 
-  /** fileKey가 등록된 이미지인지 확인한다. 업로더 검증은 FileMetadata가 업로더를 저장하지 않아 보류한다. */
+  private ZoneEventAuthTarget requireActiveTarget(UUID eventId, UUID targetId) {
+    ZoneEventAuthTarget target =
+        authTargetRepository
+            .findByIdAndEvent_Id(targetId, eventId)
+            .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.target_not_found"));
+    if (target.getStatus() != ZoneEventTargetStatus.ACTIVE) {
+      throw new ResourceNotFoundException("error.zone_event.target_not_found");
+    }
+    return target;
+  }
+
+  /** fileKey가 등록된 본인 소유의 이미지이고, 다른 제출에 쓰이지 않았으며, 업로드한 지 오래되지 않았는지 확인한다. */
   private void validateMedia(String mediaFileKey, UUID userId) {
     FileMetadata file =
         fileMetadataRepository
@@ -137,16 +193,22 @@ public class ZoneEventSubmitService {
     if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
       throw new IllegalArgumentException("error.zone_event.media.invalid");
     }
-    // 업로더가 기록된 파일은 본인이 올린 것만 제출할 수 있다. 미상(레거시·비인증 업로드)은 통과.
-    if (file.getUploaderId() != null && !file.getUploaderId().equals(userId)) {
+    if (file.getUploaderId() == null || !file.getUploaderId().equals(userId)) {
       throw new ForbiddenException("error.zone_event.media.forbidden");
+    }
+    if (submissionRepository.existsByMediaFileKey(mediaFileKey)) {
+      throw new IllegalArgumentException("error.zone_event.media.already_used");
+    }
+    if (Duration.between(file.getCreatedAt(), LocalDateTime.now()).toMinutes()
+        > uploadRecencyThresholdMinutes) {
+      throw new IllegalArgumentException("error.zone_event.media.stale");
     }
   }
 
   /** 촬영 시각과 서버 수신 시각 차이가 임계치를 넘으면 자동 성공 대신 검수로 보낸다(FR-PTC-09). */
-  private boolean capturedTooOld(java.time.OffsetDateTime capturedAt) {
+  private boolean capturedTooOld(OffsetDateTime capturedAt) {
     return capturedAt != null
-        && java.time.Duration.between(capturedAt, java.time.OffsetDateTime.now()).toMinutes()
+        && Duration.between(capturedAt, OffsetDateTime.now()).toMinutes()
             > capturedAtThresholdMinutes;
   }
 

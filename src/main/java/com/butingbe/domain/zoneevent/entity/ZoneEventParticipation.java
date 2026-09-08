@@ -125,7 +125,12 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.commentCount = 0;
   }
 
-  /** 인증 미디어와 촬영 좌표를 제출한다. 상태는 SUBMITTED로 옮긴다. */
+  /**
+   * 인증 미디어와 촬영 좌표를 제출한다. 상태는 SUBMITTED로 옮긴다.
+   *
+   * <p>반려 후 재제출이면 이전 시도의 종결 정보(completedAt·failReason)를 지운다. 다시 종결될 때 {@link #markSuccess()}/{@link
+   * #markFail(String)}이 새 값을 채운다.
+   */
   public void submit(
       String mediaFileKey,
       String content,
@@ -138,6 +143,8 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.submitGpsLng = submitGpsLng;
     this.capturedAt = capturedAt;
     this.status = ParticipationStatus.SUBMITTED;
+    this.completedAt = null;
+    this.failReason = null;
   }
 
   /** 자동 판정 통과. SUCCESS로 확정한다. */

@@ -139,9 +139,13 @@ class ZoneEventControllerTest {
                     35.153,
                     129.118,
                     100),
+                List.of(),
+                "1-A",
+                OffsetDateTime.now().plusHours(23),
                 27,
                 1,
                 1,
+                null,
                 null));
 
     mockMvc
@@ -153,7 +157,8 @@ class ZoneEventControllerTest {
         .andExpect(
             jsonPath("$.data.authTarget.exampleImageUrl")
                 .value("https://signed.example/example.jpg"))
-        .andExpect(jsonPath("$.data.excellenceReward.topN").value(5));
+        .andExpect(jsonPath("$.data.excellenceReward.topN").value(5))
+        .andExpect(jsonPath("$.data.slotCode").value("1-A"));
   }
 
   @Test

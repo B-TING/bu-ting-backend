@@ -18,6 +18,10 @@ public interface ZoneEventParticipationRepository
   List<ZoneEventParticipation> findByEvent_IdAndUserIdOrderByJoinedAtDesc(
       UUID eventId, UUID userId);
 
+  /** 이 이벤트에 대한 내 최근 참여 1건. 전체 목록을 읽어 첫 원소만 쓰는 대신 DB에서 1건만 가져온다. */
+  Optional<ZoneEventParticipation> findFirstByEvent_IdAndUserIdOrderByJoinedAtDesc(
+      UUID eventId, UUID userId);
+
   Optional<ZoneEventParticipation> findByEvent_IdAndUserIdAndStatusIn(
       UUID eventId, UUID userId, Collection<ParticipationStatus> statuses);
 
