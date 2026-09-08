@@ -16,6 +16,7 @@ import com.butingbe.domain.zoneevent.dto.request.ReviewRejectReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewDecisionResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewDetailResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewQueuePageResDto;
+import com.butingbe.domain.zoneevent.entity.IdempotencyRecord;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
 import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
@@ -26,6 +27,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.IdempotencyRecordRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
@@ -34,8 +36,11 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.domain.zonetitle.entity.ZoneTitleDef;
 import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
 import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
+import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
+import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -63,6 +68,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @Autowired private RewardPayoutRepository rewardPayoutRepository;
   @Autowired private ZoneTitleDefRepository titleDefRepository;
   @Autowired private UserZoneTitleRepository userZoneTitleRepository;
+  @Autowired private IdempotencyRecordRepository idempotencyRecordRepository;
+  @Autowired private EntityManager entityManager;
   @MockitoBean private FileStorageService fileStorageService;
 
   private ZoneEvent event;
@@ -391,6 +398,141 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
 
     assertThat(submissionRepository.findById(submission.getId()).orElseThrow().getRevision())
         .isEqualTo(revisionBeforeReject + 1); // 딱 한 번만 처리됨
+  }
+
+  @Test
+  @DisplayName("검수 큐는 roundId로도 필터링한다")
+  void queueFiltersByRoundId() {
+    UUID roundId = UUID.randomUUID();
+    ZoneEvent roundEvent =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("SUYEONG_NAMGU")
+                .type(event.getType())
+                .roundId(roundId)
+                .title("회차 이벤트")
+                .startsAt(OffsetDateTime.now().minusHours(1))
+                .durationMinutes(1440)
+                .status(ZoneEventStatus.ACTIVE)
+                .baseReward(new RewardSnapshot(50, null, null, null))
+                .successLimitPerUser(1)
+                .build());
+    ZoneEventParticipation matching =
+        participationRepository.save(
+            ZoneEventParticipation.builder()
+                .event(roundEvent)
+                .userId(savedUser("roundUser").getId())
+                .status(ParticipationStatus.UNDER_REVIEW)
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .joinedAt(OffsetDateTime.now())
+                .visibility(ParticipationVisibility.PUBLIC)
+                .build());
+    participationRepository.save(
+        participation(ParticipationStatus.UNDER_REVIEW)); // 다른 이벤트(roundId 없음)
+
+    AdminReviewQueuePageResDto queue = reviewService.queue(operator, roundId, null, null, 1, 20);
+
+    assertThat(queue.items()).hasSize(1);
+    assertThat(queue.items().get(0).participationId()).isEqualTo(matching.getId().toString());
+  }
+
+  @Test
+  @DisplayName("참여는 있는데 사용자가 없으면 상세 조회는 404다")
+  void detailUserNotFound() {
+    ZoneEventParticipation p =
+        participationRepository.save(
+            ZoneEventParticipation.builder()
+                .event(event)
+                .userId(UUID.randomUUID()) // 존재하지 않는 사용자
+                .status(ParticipationStatus.UNDER_REVIEW)
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .joinedAt(OffsetDateTime.now())
+                .visibility(ParticipationVisibility.PUBLIC)
+                .build());
+
+    assertThatThrownBy(() -> reviewService.detail(operator, p.getId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.user.not_found");
+  }
+
+  @Test
+  @DisplayName("없는 참여를 승인하려 하면 404다")
+  void approveParticipationNotFound() {
+    assertThatThrownBy(
+            () ->
+                reviewService.approve(
+                    operator,
+                    UUID.randomUUID(),
+                    new ReviewApproveReqDto(UUID.randomUUID(), 0L),
+                    null))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.zone_event.participation.not_found");
+  }
+
+  @Test
+  @DisplayName("참여에 속하지 않는 submissionId로 승인하려 하면 404다")
+  void approveSubmissionNotFound() {
+    ZoneEventParticipation p = underReviewWithSubmission();
+
+    assertThatThrownBy(
+            () ->
+                reviewService.approve(
+                    operator, p.getId(), new ReviewApproveReqDto(UUID.randomUUID(), 0L), null))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.zone_event.submission.not_found");
+  }
+
+  @Test
+  @DisplayName("매뉴얼 체크 통과 후에도 실제 flush 시점에 다른 트랜잭션이 이미 revision을 올렸다면 409다(진짜 낙관적 락 충돌)")
+  void approveFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = underReviewWithSubmission();
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    Long revisionSeenByCaller = submission.getRevision();
+
+    // 이 서비스 호출이 붙잡고 있는 영속성 컨텍스트가 모르는 사이, 다른 트랜잭션이 같은 row의 revision을 이미 올렸다고 가정한다.
+    // 네이티브 쿼리로 DB만 바꾸면 1차 캐시에 남아있는 submission 엔티티는 여전히 예전 revision을 들고 있으므로,
+    // 매뉴얼 체크(expectedRevision)는 통과하지만 실제 saveAndFlush의 버전 체크는 실패한다.
+    entityManager
+        .createNativeQuery(
+            "UPDATE zone_event_submission SET revision = revision + 1 WHERE submission_id ="
+                + " :id")
+        .setParameter("id", submission.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                reviewService.approve(
+                    operator,
+                    p.getId(),
+                    new ReviewApproveReqDto(submission.getId(), revisionSeenByCaller),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_event.review.stale_revision");
+  }
+
+  @Test
+  @DisplayName("저장된 재생 응답이 손상된 JSON이면 500 대신 명확한 예외를 던진다")
+  void approveReplayWithCorruptedJsonThrows() {
+    ZoneEventParticipation p = underReviewWithSubmission();
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    String key = "idem-corrupt-" + UUID.randomUUID();
+    String fingerprint = p.getId() + ":" + submission.getId() + ":" + submission.getRevision();
+    idempotencyRecordRepository.save(
+        new IdempotencyRecord(key, "zone-event-review-approve", fingerprint, "not-a-json"));
+
+    assertThatThrownBy(
+            () ->
+                reviewService.approve(
+                    operator,
+                    p.getId(),
+                    new ReviewApproveReqDto(submission.getId(), submission.getRevision()),
+                    key))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to deserialize");
   }
 
   private ZoneEventParticipation underReviewWithSubmission() {
