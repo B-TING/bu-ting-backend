@@ -24,9 +24,14 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
+import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
@@ -50,6 +55,8 @@ class AdminReviewServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private ZoneEventReportRepository reportRepository;
+  @Autowired private ZoneEventAuthTargetRepository authTargetRepository;
+  @Autowired private ZoneEventSubmissionRepository submissionRepository;
   @Autowired private RewardCatalogRepository rewardCatalogRepository;
   @Autowired private UserPointService userPointService;
   @Autowired private UserRepository userRepository;
@@ -123,10 +130,11 @@ class AdminReviewServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("승인하면 SUCCESS로 확정되고 보상이 지급된다")
+  @DisplayName("승인하면 SUCCESS로 확정되고 보상이 지급되며 제출도 함께 승인된다")
   void approveGrantsReward() {
     ZoneEventParticipation p =
         participationRepository.save(participation(ParticipationStatus.UNDER_REVIEW, false));
+    ZoneEventSubmission submission = savedSubmission(p);
 
     SubmitResultResDto result = reviewService.approve(operator, p.getId());
 
@@ -135,20 +143,30 @@ class AdminReviewServiceTest extends AbstractContainerTest {
     assertThat(participationRepository.findById(p.getId()).orElseThrow().getReviewedBy())
         .isEqualTo(operator.id());
     assertThat(result.rewards()).isNotEmpty();
+    assertThat(result.submissionId()).isEqualTo(submission.getId().toString());
+    assertThat(result.attemptNo()).isEqualTo(1);
     assertThat(userPointService.getBalance(p.getUserId())).isEqualTo(50);
+    assertThat(submissionRepository.findById(submission.getId()).orElseThrow().getReviewStatus())
+        .isEqualTo(com.butingbe.domain.zoneevent.entity.SubmissionReviewStatus.SUCCESS);
   }
 
   @Test
-  @DisplayName("반려하면 FAIL이 되고 사유가 남는다")
+  @DisplayName("반려하면 FAIL이 되고 사유가 남으며 제출도 함께 반려된다")
   void rejectMarksFail() {
     ZoneEventParticipation p =
         participationRepository.save(participation(ParticipationStatus.UNDER_REVIEW, false));
+    ZoneEventSubmission submission = savedSubmission(p);
 
     reviewService.reject(operator, p.getId(), "NOT_ON_SITE");
 
     ZoneEventParticipation after = participationRepository.findById(p.getId()).orElseThrow();
     assertThat(after.getStatus()).isEqualTo(ParticipationStatus.FAIL);
     assertThat(after.getFailReason()).isEqualTo("NOT_ON_SITE");
+    ZoneEventSubmission submissionAfter =
+        submissionRepository.findById(submission.getId()).orElseThrow();
+    assertThat(submissionAfter.getReviewStatus())
+        .isEqualTo(com.butingbe.domain.zoneevent.entity.SubmissionReviewStatus.REJECTED);
+    assertThat(submissionAfter.getRejectionReason()).isEqualTo("NOT_ON_SITE");
   }
 
   @Test
@@ -156,6 +174,7 @@ class AdminReviewServiceTest extends AbstractContainerTest {
   void revokeReversesReward() {
     ZoneEventParticipation p =
         participationRepository.save(participation(ParticipationStatus.UNDER_REVIEW, false));
+    savedSubmission(p);
     reviewService.approve(operator, p.getId());
     assertThat(userPointService.getBalance(p.getUserId())).isEqualTo(50);
 
@@ -228,6 +247,36 @@ class AdminReviewServiceTest extends AbstractContainerTest {
         .isInstanceOf(com.butingbe.global.error.exception.ResourceNotFoundException.class);
     assertThatThrownBy(() -> reviewService.unhide(operator, UUID.randomUUID()))
         .isInstanceOf(com.butingbe.global.error.exception.ResourceNotFoundException.class);
+  }
+
+  private ZoneEventAuthTarget savedTarget() {
+    return authTargetRepository.save(
+        ZoneEventAuthTarget.builder()
+            .event(event)
+            .targetKind(ZoneEventTargetKind.PLACE)
+            .placeName("장소")
+            .latitude(35.1)
+            .longitude(129.1)
+            .radiusM(100)
+            .build());
+  }
+
+  private ZoneEventSubmission savedSubmission(ZoneEventParticipation participation) {
+    ZoneEventAuthTarget target = savedTarget();
+    return submissionRepository.save(
+        ZoneEventSubmission.builder()
+            .participation(participation)
+            .attemptNo(1)
+            .target(target)
+            .placeName(target.getPlaceName())
+            .targetLatitude(target.getLatitude())
+            .targetLongitude(target.getLongitude())
+            .radiusM(target.getRadiusM())
+            .mediaFileKey("uploads/images/photo.jpg")
+            .gpsLat(35.1)
+            .gpsLng(129.1)
+            .capturedAt(OffsetDateTime.now())
+            .build());
   }
 
   private ZoneEventParticipation participation(ParticipationStatus status, boolean hidden) {

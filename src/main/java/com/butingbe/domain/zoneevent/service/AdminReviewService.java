@@ -15,8 +15,10 @@ import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
+import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.domain.zonetitle.service.ZoneTitleService;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
@@ -49,6 +51,7 @@ public class AdminReviewService {
 
   private final ZoneEventParticipationRepository participationRepository;
   private final ZoneEventReportRepository reportRepository;
+  private final ZoneEventSubmissionRepository submissionRepository;
   private final RewardService rewardService;
   private final RewardRevokeService rewardRevokeService;
   private final ZoneTitleService zoneTitleService;
@@ -96,14 +99,16 @@ public class AdminReviewService {
     return new ReviewQueuePageResDto(items, nextCursor, hasNext);
   }
 
-  /** UNDER_REVIEW → SUCCESS + 보상·칭호 지급(제출 성공 경로와 동일). */
+  /** UNDER_REVIEW → SUCCESS + 보상·칭호 지급(제출 성공 경로와 동일). 현재 제출도 함께 승인한다. */
   @Transactional
   public SubmitResultResDto approve(AuthenticatedUser user, UUID participationId) {
     operatorAuthorization.requireOperator(user);
     ZoneEventParticipation participation =
         requireStatus(participationId, ParticipationStatus.UNDER_REVIEW);
+    ZoneEventSubmission submission = requireLatestSubmission(participationId);
     participation.stampReview(user.id());
     participation.markSuccess();
+    submission.approve(user.id());
 
     ZoneEvent event = participation.getEvent();
     RewardSnapshot base = event.getBaseReward();
@@ -118,19 +123,23 @@ public class AdminReviewService {
         new ArrayList<>(zoneTitleService.awardTitles(participation.getUserId(), event.getZoneId()));
     return SubmitResultResDto.of(
         ParticipationResDto.of(participation, null),
+        submission.getId().toString(),
+        submission.getAttemptNo(),
         reward.rewards(),
         reward.pointBalance(),
         titles);
   }
 
-  /** UNDER_REVIEW → FAIL. */
+  /** UNDER_REVIEW → FAIL. 현재 제출도 함께 반려한다(같은 참여는 재제출로 재시도 가능). */
   @Transactional
   public void reject(AuthenticatedUser user, UUID participationId, String failReason) {
     operatorAuthorization.requireOperator(user);
     ZoneEventParticipation participation =
         requireStatus(participationId, ParticipationStatus.UNDER_REVIEW);
+    ZoneEventSubmission submission = requireLatestSubmission(participationId);
     participation.stampReview(user.id());
     participation.markFail(failReason);
+    submission.reject(user.id(), failReason);
   }
 
   /** SUCCESS → REVOKED + 보상 회수(포인트 되돌림, 미사용 쿠폰 회수). */
@@ -157,6 +166,15 @@ public class AdminReviewService {
     for (ZoneEventReport report : reportRepository.findByParticipationId(participationId)) {
       report.resolveAs(ReportStatus.DISMISSED);
     }
+  }
+
+  private ZoneEventSubmission requireLatestSubmission(UUID participationId) {
+    return submissionRepository
+        .findFirstByParticipation_IdOrderByAttemptNoDesc(participationId)
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "UNDER_REVIEW participation has no submission: " + participationId));
   }
 
   private ZoneEventParticipation requireStatus(UUID participationId, ParticipationStatus expected) {
