@@ -208,6 +208,32 @@ class ZoneEventParticipationQueryServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("제출 이력이 여러 건이면 attemptNo 내림차순으로 담기고 최신 시도가 반려 사유의 기준이 된다")
+  void historyOrdersSubmissionsByAttemptNoDesc() {
+    ZoneEvent event = savedEvent("SUYEONG_NAMGU");
+    ZoneEventParticipation participation =
+        savedParticipation(event, ParticipationStatus.UNDER_REVIEW, OffsetDateTime.now());
+    ZoneEventAuthTarget target = savedTarget(event);
+    ZoneEventSubmission first = savedSubmission(participation, target, 1, "uploads/images/a1.jpg");
+    first.reject(UUID.randomUUID(), "NOT_ON_SITE");
+    savedSubmission(participation, target, 2, "uploads/images/a2.jpg");
+
+    ParticipationHistoryPageResDto page =
+        queryService.history(user, null, null, List.of(), null, null, null, 20);
+
+    var item = page.items().get(0);
+    assertThat(item.submissions()).hasSize(2);
+    assertThat(item.submissions().get(0).attemptNo()).isEqualTo(2);
+    assertThat(item.submissions().get(1).attemptNo()).isEqualTo(1);
+    // 최신 시도(attemptNo=2)가 검수 대기이므로 반려 사유는 노출하지 않는다
+    assertThat(item.submissions().get(0).reviewStatus())
+        .isEqualTo(SubmissionReviewStatus.UNDER_REVIEW.name());
+    assertThat(item.submissions().get(1).reviewStatus())
+        .isEqualTo(SubmissionReviewStatus.REJECTED.name());
+    assertThat(item.rejectionReason()).isNull();
+  }
+
+  @Test
   @DisplayName("성공한 참여는 재제출 불가이고 반려 사유가 없다")
   void historySuccessHasNoRejectionAndCannotResubmit() {
     ZoneEvent event = savedEvent("SUYEONG_NAMGU");
@@ -307,6 +333,39 @@ class ZoneEventParticipationQueryServiceTest extends AbstractContainerTest {
             .status(ZoneEventStatus.ACTIVE)
             .baseReward(new RewardSnapshot(50, "SPOT_GWANGAN_BRIDGE", null, null))
             .successLimitPerUser(1)
+            .build());
+  }
+
+  private ZoneEventAuthTarget savedTarget(ZoneEvent event) {
+    return authTargetRepository.save(
+        ZoneEventAuthTarget.builder()
+            .event(event)
+            .targetKind(ZoneEventTargetKind.PLACE)
+            .placeName("광안대교 야경")
+            .latitude(35.153)
+            .longitude(129.118)
+            .radiusM(100)
+            .build());
+  }
+
+  private ZoneEventSubmission savedSubmission(
+      ZoneEventParticipation participation,
+      ZoneEventAuthTarget target,
+      int attemptNo,
+      String mediaFileKey) {
+    return submissionRepository.save(
+        ZoneEventSubmission.builder()
+            .participation(participation)
+            .attemptNo(attemptNo)
+            .target(target)
+            .placeName(target.getPlaceName())
+            .targetLatitude(target.getLatitude())
+            .targetLongitude(target.getLongitude())
+            .radiusM(target.getRadiusM())
+            .mediaFileKey(mediaFileKey)
+            .gpsLat(35.153)
+            .gpsLng(129.118)
+            .capturedAt(OffsetDateTime.now())
             .build());
   }
 

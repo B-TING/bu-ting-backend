@@ -127,7 +127,8 @@ class ZoneEventQueryServiceTest {
   @DisplayName("상세는 예시 이미지 presigned URL·우수 보상·남은 참여 횟수를 채운다")
   void detailFillsExampleUrlAndRemainingAttempts() {
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-    when(authTargetRepository.findByEvent_IdAndStatus(EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+    when(authTargetRepository.findByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
         .thenReturn(List.of(target));
     when(participationRepository.countByEvent_IdAndStatus(EVENT_ID, ParticipationStatus.SUCCESS))
         .thenReturn(3L);
@@ -159,7 +160,8 @@ class ZoneEventQueryServiceTest {
     ZoneEventAuthTarget noImage = target(event);
     ReflectionTestUtils.setField(noImage, "exampleFileKey", null);
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-    when(authTargetRepository.findByEvent_IdAndStatus(EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+    when(authTargetRepository.findByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
         .thenReturn(List.of(noImage));
     when(participationRepository.countByEvent_IdAndStatus(any(), any())).thenReturn(0L);
 
@@ -174,7 +176,8 @@ class ZoneEventQueryServiceTest {
   void detailListsAllActiveTargets() {
     ZoneEventAuthTarget second = target(event);
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-    when(authTargetRepository.findByEvent_IdAndStatus(EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+    when(authTargetRepository.findByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
         .thenReturn(List.of(target, second));
     when(participationRepository.countByEvent_IdAndStatus(any(), any())).thenReturn(0L);
     when(fileStorageService.getPresignedUrl("uploads/example.jpg"))
@@ -199,13 +202,14 @@ class ZoneEventQueryServiceTest {
             .build();
     ReflectionTestUtils.setField(failed, "id", PARTICIPATION_ID);
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-    when(authTargetRepository.findByEvent_IdAndStatus(EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+    when(authTargetRepository.findByEvent_IdAndStatusOrderByCreatedAtAsc(
+            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
         .thenReturn(List.of(target));
     when(participationRepository.countByEvent_IdAndStatus(any(), any())).thenReturn(0L);
     when(participationRepository.countByEvent_IdAndUserIdAndStatus(any(), any(), any()))
         .thenReturn(0L);
-    when(participationRepository.findByEvent_IdAndUserIdOrderByJoinedAtDesc(EVENT_ID, USER_ID))
-        .thenReturn(List.of(failed));
+    when(participationRepository.findFirstByEvent_IdAndUserIdOrderByJoinedAtDesc(EVENT_ID, USER_ID))
+        .thenReturn(Optional.of(failed));
     when(fileStorageService.getPresignedUrl("uploads/example.jpg"))
         .thenReturn("https://signed.example/uploads/example.jpg");
 

@@ -117,6 +117,13 @@ public class ZoneEvent extends BaseEntity {
     return startsAt.plusMinutes(durationMinutes);
   }
 
+  /** 재제출 가능 여부: 참여가 FAIL 상태이고, 이벤트가 ACTIVE이며, 아직 마감(endsAt) 전이어야 한다. */
+  public boolean acceptsResubmission(ParticipationStatus participationStatus, OffsetDateTime now) {
+    return participationStatus == ParticipationStatus.FAIL
+        && status == ZoneEventStatus.ACTIVE
+        && now.isBefore(endsAt());
+  }
+
   /** SCHEDULED → ACTIVE. 다른 상태에서 호출하면 409. */
   public void activate() {
     requireStatus(ZoneEventStatus.SCHEDULED);

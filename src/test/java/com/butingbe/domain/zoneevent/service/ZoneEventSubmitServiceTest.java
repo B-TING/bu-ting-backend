@@ -3,6 +3,7 @@ package com.butingbe.domain.zoneevent.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -46,6 +47,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -380,6 +382,36 @@ class ZoneEventSubmitServiceTest {
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("error.zone_event.media.already_used");
+  }
+
+  @Test
+  @DisplayName("동시 요청이 같은 fileKey를 먼저 저장했으면(유니크 위반) 400(media.already_used)으로 바꾼다")
+  void translatesConcurrentMediaKeyViolation() {
+    ZoneEventParticipation participation = joined();
+    stubJoinedWithTargetAndMedia(participation, "image/jpeg");
+    doThrow(new DataIntegrityViolationException("uk_zone_event_submission_media_file_key"))
+        .when(submissionRepository)
+        .save(any());
+
+    assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.zone_event.media.already_used");
+  }
+
+  @Test
+  @DisplayName("반려 후 재제출하면 이전 시도의 completedAt·failReason이 남지 않는다")
+  void resubmitClearsPreviousFailureFields() {
+    ZoneEventParticipation participation = joined();
+    participation.markFail("NOT_ON_SITE");
+    stubJoinedWithTargetAndMedia(participation, "image/jpeg");
+    when(userPointService.getBalance(USER_ID)).thenReturn(0);
+    ReflectionTestUtils.setField(service, "reviewMode", "MANUAL");
+
+    service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY));
+
+    assertThat(participation.getStatus()).isEqualTo(ParticipationStatus.UNDER_REVIEW);
+    assertThat(participation.getCompletedAt()).isNull();
+    assertThat(participation.getFailReason()).isNull();
   }
 
   @Test

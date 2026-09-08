@@ -123,8 +123,7 @@ public class ZoneEventParticipationQueryService {
             ? latest.getRejectionReason()
             : null;
     boolean canResubmit =
-        participation.getStatus() == ParticipationStatus.FAIL
-            && now.isBefore(participation.getEvent().endsAt());
+        participation.getEvent().acceptsResubmission(participation.getStatus(), now);
     List<SubmissionHistoryItemResDto> submissionItems =
         sorted.stream()
             .map(s -> SubmissionHistoryItemResDto.of(s, presignedUrl(s.getMediaFileKey())))

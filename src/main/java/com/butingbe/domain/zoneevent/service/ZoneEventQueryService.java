@@ -63,7 +63,8 @@ public class ZoneEventQueryService {
             .findById(eventId)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.not_found"));
     List<ZoneEventAuthTarget> activeTargets =
-        authTargetRepository.findByEvent_IdAndStatus(eventId, ZoneEventTargetStatus.ACTIVE);
+        authTargetRepository.findByEvent_IdAndStatusOrderByCreatedAtAsc(
+            eventId, ZoneEventTargetStatus.ACTIVE);
     ZoneEventAuthTarget target = activeTargets.isEmpty() ? null : activeTargets.get(0);
     OffsetDateTime now = OffsetDateTime.now();
 
@@ -91,15 +92,10 @@ public class ZoneEventQueryService {
 
   private MyParticipationResDto myParticipation(ZoneEvent event, UUID userId, OffsetDateTime now) {
     Optional<ZoneEventParticipation> latest =
-        participationRepository
-            .findByEvent_IdAndUserIdOrderByJoinedAtDesc(event.getId(), userId)
-            .stream()
-            .findFirst();
+        participationRepository.findFirstByEvent_IdAndUserIdOrderByJoinedAtDesc(
+            event.getId(), userId);
     return latest
-        .map(
-            p ->
-                MyParticipationResDto.of(
-                    p, p.getStatus() == ParticipationStatus.FAIL && now.isBefore(event.endsAt())))
+        .map(p -> MyParticipationResDto.of(p, event.acceptsResubmission(p.getStatus(), now)))
         .orElse(null);
   }
 

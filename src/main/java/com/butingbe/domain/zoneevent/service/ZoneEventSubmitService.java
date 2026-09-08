@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -110,22 +111,28 @@ public class ZoneEventSubmitService {
     validateMedia(request.mediaFileKey(), userId);
 
     int attemptNo = (int) submissionRepository.countByParticipation_Id(participationId) + 1;
-    ZoneEventSubmission submission =
-        submissionRepository.save(
-            ZoneEventSubmission.builder()
-                .participation(participation)
-                .attemptNo(attemptNo)
-                .target(target)
-                .placeName(target.getPlaceName())
-                .targetLatitude(target.getLatitude())
-                .targetLongitude(target.getLongitude())
-                .radiusM(target.getRadiusM())
-                .guideTextSnapshot(target.getGuideText())
-                .mediaFileKey(request.mediaFileKey())
-                .gpsLat(request.latitude())
-                .gpsLng(request.longitude())
-                .capturedAt(request.capturedAt())
-                .build());
+    ZoneEventSubmission submission;
+    try {
+      submission =
+          submissionRepository.save(
+              ZoneEventSubmission.builder()
+                  .participation(participation)
+                  .attemptNo(attemptNo)
+                  .target(target)
+                  .placeName(target.getPlaceName())
+                  .targetLatitude(target.getLatitude())
+                  .targetLongitude(target.getLongitude())
+                  .radiusM(target.getRadiusM())
+                  .guideTextSnapshot(target.getGuideText())
+                  .mediaFileKey(request.mediaFileKey())
+                  .gpsLat(request.latitude())
+                  .gpsLng(request.longitude())
+                  .capturedAt(request.capturedAt())
+                  .build());
+    } catch (DataIntegrityViolationException concurrent) {
+      // media_file_key 유니크 인덱스 위반: 동시 요청이 같은 fileKey를 먼저 제출했다.
+      throw new IllegalArgumentException("error.zone_event.media.already_used");
+    }
 
     participation.submit(
         request.mediaFileKey(),

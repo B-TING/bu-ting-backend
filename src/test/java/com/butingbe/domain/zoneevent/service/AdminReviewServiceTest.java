@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.file.entity.FileMetadata;
+import com.butingbe.domain.file.repository.FileMetadataRepository;
 import com.butingbe.domain.reward.entity.RewardCatalog;
 import com.butingbe.domain.reward.entity.RewardType;
 import com.butingbe.domain.reward.repository.RewardCatalogRepository;
@@ -12,6 +14,8 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.dto.request.ParticipationSubmitReqDto;
+import com.butingbe.domain.zoneevent.dto.response.ParticipationResDto;
 import com.butingbe.domain.zoneevent.dto.response.ReviewQueuePageResDto;
 import com.butingbe.domain.zoneevent.dto.response.SubmitResultResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
@@ -19,6 +23,7 @@ import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
 import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
 import com.butingbe.domain.zoneevent.entity.ReportStatus;
 import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
+import com.butingbe.domain.zoneevent.entity.SubmissionReviewStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
@@ -51,6 +56,9 @@ import org.springframework.transaction.annotation.Transactional;
 class AdminReviewServiceTest extends AbstractContainerTest {
 
   @Autowired private AdminReviewService reviewService;
+  @Autowired private ZoneEventSubmitService submitService;
+  @Autowired private ZoneEventParticipationService participationService;
+  @Autowired private FileMetadataRepository fileMetadataRepository;
   @Autowired private ZoneEventRepository zoneEventRepository;
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private ZoneEventParticipationRepository participationRepository;
@@ -257,6 +265,93 @@ class AdminReviewServiceTest extends AbstractContainerTest {
         .isInstanceOf(com.butingbe.global.error.exception.ResourceNotFoundException.class);
     assertThatThrownBy(() -> reviewService.unhide(operator, UUID.randomUUID()))
         .isInstanceOf(com.butingbe.global.error.exception.ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("반려 후 재제출하면 다른 타겟으로도 새 시도가 쌓이고 승인까지 이어진다(전체 왕복)")
+  void rejectThenResubmitRoundTrip() {
+    ZoneEventAuthTarget firstTarget = savedTarget();
+    ZoneEventAuthTarget secondTarget = savedTarget();
+    AuthenticatedUser participant = AuthenticatedUser.from(savedUser("participant"));
+
+    // 1) 참여 시작
+    ParticipationResDto joined =
+        participationService.join(
+            participant,
+            event.getId(),
+            firstTarget.getId(),
+            firstTarget.getLatitude(),
+            firstTarget.getLongitude());
+    UUID participationId = UUID.fromString(joined.participationId());
+
+    // 2) 최초 제출. 촬영 시각이 임계치보다 오래되어 AUTO 모드여도 검수 대기로 간다.
+    submitService.submit(
+        participant,
+        event.getId(),
+        participationId,
+        new ParticipationSubmitReqDto(
+            firstTarget.getId(),
+            savedFile(participant.id(), "auth/first.jpg"),
+            "첫 시도",
+            firstTarget.getLatitude(),
+            firstTarget.getLongitude(),
+            OffsetDateTime.now().minusMinutes(30)));
+    assertThat(participationRepository.findById(participationId).orElseThrow().getStatus())
+        .isEqualTo(ParticipationStatus.UNDER_REVIEW);
+
+    // 3) 반려
+    reviewService.reject(operator, participationId, "NOT_ON_SITE");
+    ZoneEventParticipation afterReject =
+        participationRepository.findById(participationId).orElseThrow();
+    assertThat(afterReject.getStatus()).isEqualTo(ParticipationStatus.FAIL);
+    assertThat(afterReject.getFailReason()).isEqualTo("NOT_ON_SITE");
+    assertThat(afterReject.getCompletedAt()).isNotNull();
+
+    // 4) 재제출 — 다른 타겟으로. 이전 시도의 종결 정보는 지워져야 한다.
+    submitService.submit(
+        participant,
+        event.getId(),
+        participationId,
+        new ParticipationSubmitReqDto(
+            secondTarget.getId(),
+            savedFile(participant.id(), "auth/second.jpg"),
+            "재시도",
+            secondTarget.getLatitude(),
+            secondTarget.getLongitude(),
+            OffsetDateTime.now().minusMinutes(30)));
+    ZoneEventParticipation afterResubmit =
+        participationRepository.findById(participationId).orElseThrow();
+    assertThat(afterResubmit.getStatus()).isEqualTo(ParticipationStatus.UNDER_REVIEW);
+    assertThat(afterResubmit.getCompletedAt()).isNull();
+    assertThat(afterResubmit.getFailReason()).isNull();
+
+    // 5) 승인 — attemptNo=2 제출이 승인되고, attemptNo=1은 그대로 REJECTED로 남는다
+    reviewService.approve(operator, participationId);
+    List<ZoneEventSubmission> submissions =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(participationId);
+    assertThat(submissions).hasSize(2);
+    assertThat(submissions.get(0).getAttemptNo()).isEqualTo(2);
+    assertThat(submissions.get(0).getReviewStatus()).isEqualTo(SubmissionReviewStatus.SUCCESS);
+    assertThat(submissions.get(0).getTarget().getId()).isEqualTo(secondTarget.getId());
+    assertThat(submissions.get(1).getAttemptNo()).isEqualTo(1);
+    assertThat(submissions.get(1).getReviewStatus()).isEqualTo(SubmissionReviewStatus.REJECTED);
+    assertThat(submissions.get(1).getTarget().getId()).isEqualTo(firstTarget.getId());
+    assertThat(participationRepository.findById(participationId).orElseThrow().getStatus())
+        .isEqualTo(ParticipationStatus.SUCCESS);
+  }
+
+  private String savedFile(UUID uploaderId, String objectKey) {
+    fileMetadataRepository.save(
+        FileMetadata.builder()
+            .objectKey(objectKey)
+            .originalFileName("photo.jpg")
+            .contentType("image/jpeg")
+            .mediaType("IMAGE")
+            .fileSize(1024L)
+            .bucket("buting")
+            .uploaderId(uploaderId)
+            .build());
+    return objectKey;
   }
 
   private ZoneEventAuthTarget savedTarget() {
