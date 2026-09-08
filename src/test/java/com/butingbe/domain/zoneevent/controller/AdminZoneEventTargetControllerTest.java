@@ -154,7 +154,8 @@ class AdminZoneEventTargetControllerTest {
         .andExpect(status().isOk());
 
     mockMvc
-        .perform(post("/admin/zone-events/{eventId}/targets/{targetId}/cancel", EVENT_ID, TARGET_ID))
+        .perform(
+            post("/admin/zone-events/{eventId}/targets/{targetId}/cancel", EVENT_ID, TARGET_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("CANCELLED"));
   }

@@ -174,6 +174,30 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
   }
 
   @Test
+  @DisplayName("targetKind가 유효하지 않으면 400이다")
+  void createWithInvalidKindRejected() {
+    AdminAuthTargetCreateReqDto invalidKind =
+        new AdminAuthTargetCreateReqDto(
+            "GHOST", null, "126081", "12", null, null, null, null, null, 100);
+
+    assertThatThrownBy(() -> targetService.create(operator, eventId, invalidKind))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.zone_event.target.invalid_kind");
+  }
+
+  @Test
+  @DisplayName("PLACE 타겟은 placeContentId·contentTypeId가 모두 있어야 한다")
+  void createPlaceTargetRequiresContentIdAndTypeId() {
+    AdminAuthTargetCreateReqDto missingContentTypeId =
+        new AdminAuthTargetCreateReqDto(
+            "PLACE", null, "126081", null, null, null, null, null, null, 100);
+
+    assertThatThrownBy(() -> targetService.create(operator, eventId, missingContentTypeId))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.zone_event.target.invalid_kind");
+  }
+
+  @Test
   @DisplayName("운영자가 아니면 403이다")
   void nonOperatorForbidden() {
     assertThatThrownBy(
@@ -292,6 +316,21 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
   }
 
   @Test
+  @DisplayName("존재하지 않는 타겟을 수정·교체·취소하면 404다")
+  void unknownTargetNotFound() {
+    UUID randomTargetId = UUID.randomUUID();
+
+    assertThatThrownBy(
+            () ->
+                targetService.patch(
+                    operator,
+                    eventId,
+                    randomTargetId,
+                    new AdminAuthTargetPatchReqDto(null, null, null, null, null, null, 0L)))
+        .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
   @DisplayName("교체하면 기존 타겟은 REPLACED, 새 타겟은 ACTIVE가 된다")
   void replaceMarksOldReplacedAndCreatesNewActive() {
     when(placeService.getPlaceSummary(eq("126081")))
@@ -338,6 +377,27 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
                     new AdminAuthTargetReplaceReqDto(
                         "999999", "12", null, null, null, null, 100, null)))
         .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("교체 대상 contentId가 존재하지 않으면 400이다")
+  void replaceWithUnknownPlaceRejected() {
+    when(placeService.getPlaceSummary(eq("126081")))
+        .thenReturn(new PlaceSummaryResDto("126081", "광안대교", 35.1532, 129.1181));
+    when(placeService.getPlaceSummary(eq("GHOST"))).thenReturn(null);
+    AdminAuthTargetResDto created =
+        targetService.create(operator, eventId, placeCreateReq("126081", null, null));
+
+    assertThatThrownBy(
+            () ->
+                targetService.replace(
+                    operator,
+                    eventId,
+                    UUID.fromString(created.targetId()),
+                    new AdminAuthTargetReplaceReqDto(
+                        "GHOST", "12", null, null, null, null, 100, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.zone_event.place_not_found");
   }
 
   @Test

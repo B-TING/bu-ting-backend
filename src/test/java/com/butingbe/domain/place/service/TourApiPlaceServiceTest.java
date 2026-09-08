@@ -727,6 +727,24 @@ class TourApiPlaceServiceTest {
     assertThatIllegalStateException()
         .isThrownBy(() -> placeService.getPlaceDetail("2651318", "32", null))
         .withMessage("Tour API service key is not configured.");
+    assertThatIllegalStateException()
+        .isThrownBy(() -> placeService.getPlaceSummary("126081"))
+        .withMessage("Tour API service key is not configured.");
+
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("contentId가 비어 있으면 요약 조회를 거부한다")
+  void getPlaceSummaryRequiresContentId() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> placeService.getPlaceSummary("  "))
+        .withMessage("contentId is required.");
 
     server.verify();
   }
