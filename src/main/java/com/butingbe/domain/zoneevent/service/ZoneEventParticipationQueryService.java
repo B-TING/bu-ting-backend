@@ -9,15 +9,20 @@ import com.butingbe.domain.reward.repository.RewardGrantRepository;
 import com.butingbe.domain.zoneevent.dto.response.ParticipationHistoryItemResDto;
 import com.butingbe.domain.zoneevent.dto.response.ParticipationHistoryPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.ParticipationResDto;
+import com.butingbe.domain.zoneevent.dto.response.SubmissionHistoryItemResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
+import com.butingbe.domain.zoneevent.entity.SubmissionReviewStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
+import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.persistence.criteria.Predicate;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,7 +35,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 내 참여 조회: 이벤트별 내 참여 목록과, 필터·커서 페이징 기반 전체 이력. */
+/** 내 참여 조회: 이벤트별 내 참여 목록과, 필터·커서 페이징 기반 전체 이력(제출 이력·반려 사유·재제출 가능 여부 포함). */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -40,6 +45,7 @@ public class ZoneEventParticipationQueryService {
   private static final int MAX_SIZE = 50;
 
   private final ZoneEventParticipationRepository participationRepository;
+  private final ZoneEventSubmissionRepository submissionRepository;
   private final RewardGrantRepository rewardGrantRepository;
   private final FileStorageService fileStorageService;
 
@@ -85,19 +91,52 @@ public class ZoneEventParticipationQueryService {
     List<ZoneEventParticipation> page = hasNext ? rows.subList(0, pageSize) : rows;
 
     Map<UUID, List<GrantedRewardDto>> rewardsByParticipation = rewardsFor(page);
+    Map<UUID, List<ZoneEventSubmission>> submissionsByParticipation = submissionsFor(page);
+    OffsetDateTime now = OffsetDateTime.now();
     List<ParticipationHistoryItemResDto> items =
         page.stream()
             .map(
                 participation ->
-                    ParticipationHistoryItemResDto.of(
+                    toHistoryItem(
                         participation,
-                        presignedUrl(participation.getMediaFileKey()),
-                        presignedUrlExpiration,
-                        rewardsByParticipation.getOrDefault(participation.getId(), List.of())))
+                        rewardsByParticipation.getOrDefault(participation.getId(), List.of()),
+                        submissionsByParticipation.getOrDefault(participation.getId(), List.of()),
+                        now))
             .toList();
 
     String nextCursor = hasNext ? encodeCursor(page.get(page.size() - 1)) : null;
     return new ParticipationHistoryPageResDto(items, nextCursor, hasNext);
+  }
+
+  private ParticipationHistoryItemResDto toHistoryItem(
+      ZoneEventParticipation participation,
+      List<GrantedRewardDto> rewards,
+      List<ZoneEventSubmission> submissions,
+      OffsetDateTime now) {
+    List<ZoneEventSubmission> sorted =
+        submissions.stream()
+            .sorted(Comparator.comparing(ZoneEventSubmission::getAttemptNo).reversed())
+            .toList();
+    ZoneEventSubmission latest = sorted.isEmpty() ? null : sorted.get(0);
+    String rejectionReason =
+        latest != null && latest.getReviewStatus() == SubmissionReviewStatus.REJECTED
+            ? latest.getRejectionReason()
+            : null;
+    boolean canResubmit =
+        participation.getStatus() == ParticipationStatus.FAIL
+            && now.isBefore(participation.getEvent().endsAt());
+    List<SubmissionHistoryItemResDto> submissionItems =
+        sorted.stream()
+            .map(s -> SubmissionHistoryItemResDto.of(s, presignedUrl(s.getMediaFileKey())))
+            .toList();
+    return ParticipationHistoryItemResDto.of(
+        participation,
+        presignedUrl(participation.getMediaFileKey()),
+        presignedUrlExpiration,
+        rewards,
+        rejectionReason,
+        canResubmit,
+        submissionItems);
   }
 
   private Map<UUID, List<GrantedRewardDto>> rewardsFor(List<ZoneEventParticipation> page) {
@@ -112,6 +151,15 @@ public class ZoneEventParticipationQueryService {
                 Collectors.mapping(
                     grant -> GrantedRewardDto.of(grant, grant.getReward().getPointAmount()),
                     Collectors.toList())));
+  }
+
+  private Map<UUID, List<ZoneEventSubmission>> submissionsFor(List<ZoneEventParticipation> page) {
+    if (page.isEmpty()) {
+      return Map.of();
+    }
+    List<UUID> ids = page.stream().map(ZoneEventParticipation::getId).toList();
+    return submissionRepository.findByParticipation_IdIn(ids).stream()
+        .collect(Collectors.groupingBy(s -> s.getParticipation().getId()));
   }
 
   private Specification<ZoneEventParticipation> buildSpec(
