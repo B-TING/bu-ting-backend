@@ -1306,7 +1306,7 @@ class TourApiPlaceServiceTest {
                 {
                   "response": {
                     "header": { "resultCode": "0000", "resultMsg": "OK" },
-                    "body": { "items": "" }
+                    "body": { "items": {} }
                   }
                 }
                 """,
