@@ -44,8 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>제출을 모두 검증한 뒤 판정 모드에 따라 처리한다. AUTO면 같은 트랜잭션에서 SUCCESS로 확정하고 기본 보상을 지급한다(FR-RWD-01).
  * MANUAL/HYBRID면 검수 대기로 보낸다. 반경은 참여 시작에 이어 제출 시점에도 다시 검증한다(BR-05).
  *
- * <p>참여가 JOINED거나(최초 제출) FAIL이면(반려 후 재제출) 제출을 받는다. 매 호출마다 새 {@link ZoneEventSubmission} row를 만들고
- * 이전 이력은 바꾸지 않는다. 이벤트 마감({@code endsAt}) 이후에는 최초 제출도 재제출도 받지 않는다.
+ * <p>참여가 JOINED거나(최초 제출) FAIL이면(반려 후 재제출) 제출을 받는다. 매 호출마다 새 {@link ZoneEventSubmission} row를 만들고 이전
+ * 이력은 바꾸지 않는다. 이벤트 마감({@code endsAt}) 이후에는 최초 제출도 재제출도 받지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -170,8 +170,7 @@ public class ZoneEventSubmitService {
     ZoneEventAuthTarget target =
         authTargetRepository
             .findByIdAndEvent_Id(targetId, eventId)
-            .orElseThrow(
-                () -> new ResourceNotFoundException("error.zone_event.target_not_found"));
+            .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.target_not_found"));
     if (target.getStatus() != ZoneEventTargetStatus.ACTIVE) {
       throw new ResourceNotFoundException("error.zone_event.target_not_found");
     }

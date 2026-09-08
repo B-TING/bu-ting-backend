@@ -323,7 +323,8 @@ class ZoneEventSubmitServiceTest {
   void submitWithInvalidTargetRejected() {
     ZoneEventParticipation participation = joined();
     when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
-    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID)).thenReturn(Optional.empty());
+    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID))
+        .thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
         .isInstanceOf(ResourceNotFoundException.class)

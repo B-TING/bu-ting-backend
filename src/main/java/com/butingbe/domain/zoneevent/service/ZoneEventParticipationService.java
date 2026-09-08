@@ -29,8 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 이벤트 참여 시작.
  *
- * <p>선택한 타겟의 반경 이내일 때만 JOINED 참여를 만든다. 유저·이벤트당 열린 참여(반려되어 재제출 대기 중인 FAIL 포함)는 하나이고(부분 UK,
- * NFR-02), 성공 상한을 넘기면 새 참여를 막는다. 마감(endsAt) 이후에는 신규 참여를 받지 않는다.
+ * <p>선택한 타겟의 반경 이내일 때만 JOINED 참여를 만든다. 유저·이벤트당 열린 참여(반려되어 재제출 대기 중인 FAIL 포함)는 하나이고(부분 UK, NFR-02),
+ * 성공 상한을 넘기면 새 참여를 막는다. 마감(endsAt) 이후에는 신규 참여를 받지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -125,8 +125,7 @@ public class ZoneEventParticipationService {
     ZoneEventAuthTarget target =
         authTargetRepository
             .findByIdAndEvent_Id(targetId, eventId)
-            .orElseThrow(
-                () -> new ResourceNotFoundException("error.zone_event.target_not_found"));
+            .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.target_not_found"));
     if (target.getStatus() != ZoneEventTargetStatus.ACTIVE) {
       throw new ResourceNotFoundException("error.zone_event.target_not_found");
     }

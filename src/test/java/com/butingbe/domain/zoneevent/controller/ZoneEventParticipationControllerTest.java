@@ -127,9 +127,7 @@ class ZoneEventParticipationControllerTest {
             post("/zone-events/{eventId}/participations", EVENT_ID)
                 .contentType("application/json")
                 .content(
-                    "{\"targetId\":\""
-                        + TARGET_ID
-                        + "\",\"latitude\":35.16,\"longitude\":129.13}"))
+                    "{\"targetId\":\"" + TARGET_ID + "\",\"latitude\":35.16,\"longitude\":129.13}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.message").value("반경 밖입니다."))
