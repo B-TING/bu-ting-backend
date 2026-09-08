@@ -4,20 +4,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.file.entity.FileMetadata;
+import com.butingbe.domain.file.repository.FileMetadataRepository;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.dto.response.AdminReviewDetailResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewQueuePageResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
 import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuthTarget;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
+import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.support.AbstractContainerTest;
@@ -29,6 +37,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
@@ -39,6 +48,9 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private ZoneEventAuthTargetRepository authTargetRepository;
+  @Autowired private ZoneEventSubmissionRepository submissionRepository;
+  @Autowired private FileMetadataRepository fileMetadataRepository;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
@@ -94,6 +106,74 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
                     .build()));
     assertThatThrownBy(() -> reviewService.queue(normalUser, null, null, null, 1, 20))
         .isInstanceOf(ForbiddenException.class);
+  }
+
+  @Test
+  @DisplayName("상세 조회는 사용자 표시 정보·현재 제출·전체 제출 이력·타겟/보상 스냅샷을 담는다")
+  void detailReturnsFullPicture() {
+    User participant = savedUser("참가자닉");
+    ZoneEventParticipation p =
+        participationRepository.save(
+            ZoneEventParticipation.builder()
+                .event(event)
+                .userId(participant.getId())
+                .status(ParticipationStatus.UNDER_REVIEW)
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .joinedAt(OffsetDateTime.now())
+                .visibility(ParticipationVisibility.PUBLIC)
+                .build());
+    ZoneEventAuthTarget target =
+        authTargetRepository.save(
+            ZoneEventAuthTarget.builder()
+                .event(event)
+                .targetKind(ZoneEventTargetKind.PLACE)
+                .placeName("장소")
+                .latitude(35.1)
+                .longitude(129.1)
+                .radiusM(100)
+                .build());
+    fileMetadataRepository.save(
+        FileMetadata.builder()
+            .objectKey("uploads/images/photo.jpg")
+            .originalFileName("photo.jpg")
+            .contentType("image/jpeg")
+            .mediaType("IMAGE")
+            .fileSize(1024L)
+            .bucket("buting-private")
+            .build());
+    ZoneEventSubmission submission =
+        submissionRepository.save(
+            ZoneEventSubmission.builder()
+                .participation(p)
+                .attemptNo(1)
+                .target(target)
+                .placeName(target.getPlaceName())
+                .targetLatitude(target.getLatitude())
+                .targetLongitude(target.getLongitude())
+                .radiusM(target.getRadiusM())
+                .mediaFileKey("uploads/images/photo.jpg")
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .capturedAt(OffsetDateTime.now())
+                .build());
+    ReflectionTestUtils.setField(p, "currentSubmissionId", submission.getId());
+    participationRepository.save(p);
+
+    AdminReviewDetailResDto detail = reviewService.detail(operator, p.getId());
+
+    assertThat(detail.userNickname()).isEqualTo("참가자닉");
+    assertThat(detail.currentSubmission().submissionId()).isEqualTo(submission.getId().toString());
+    assertThat(detail.submissionHistory()).hasSize(1);
+    assertThat(detail.rewardSnapshot().points()).isEqualTo(50);
+    assertThat(detail.currentSubmission().placeName()).isEqualTo("장소");
+  }
+
+  @Test
+  @DisplayName("없는 참여 상세 조회는 404다")
+  void detailNotFound() {
+    assertThatThrownBy(() -> reviewService.detail(operator, UUID.randomUUID()))
+        .isInstanceOf(com.butingbe.global.error.exception.ResourceNotFoundException.class);
   }
 
   private ZoneEventParticipation participation(ParticipationStatus status) {

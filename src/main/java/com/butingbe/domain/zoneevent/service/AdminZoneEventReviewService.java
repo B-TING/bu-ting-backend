@@ -3,11 +3,19 @@ package com.butingbe.domain.zoneevent.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.chat.entity.ChatZone;
+import com.butingbe.domain.file.service.FileStorageService;
+import com.butingbe.domain.user.entity.User;
+import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.dto.response.AdminReviewDetailResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewQueueItemResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewQueuePageResDto;
+import com.butingbe.domain.zoneevent.dto.response.AdminSubmissionDetailResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
+import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +38,9 @@ public class AdminZoneEventReviewService {
 
   private final ZoneEventParticipationRepository participationRepository;
   private final OperatorAuthorization operatorAuthorization;
+  private final ZoneEventSubmissionRepository submissionRepository;
+  private final UserRepository userRepository;
+  private final FileStorageService fileStorageService;
 
   /** 검수 큐: UNDER_REVIEW 참여만, roundId/eventId/zoneId로 필터링, joinedAt 오름차순(먼저 온 순). */
   @Transactional(readOnly = true)
@@ -54,6 +65,43 @@ public class AdminZoneEventReviewService {
         result.getTotalElements(),
         result.getTotalPages(),
         pageNumber < result.getTotalPages());
+  }
+
+  /** 검수 상세: 사용자 표시 정보 + 현재 제출 + 전체 제출 이력(attemptNo 내림차순) + 당시 타겟/보상 스냅샷. */
+  @Transactional(readOnly = true)
+  public AdminReviewDetailResDto detail(AuthenticatedUser user, UUID participationId) {
+    operatorAuthorization.requireOperator(user);
+    ZoneEventParticipation participation =
+        participationRepository
+            .findById(participationId)
+            .orElseThrow(
+                () -> new ResourceNotFoundException("error.zone_event.participation.not_found"));
+    User participant =
+        userRepository
+            .findById(participation.getUserId())
+            .orElseThrow(() -> new ResourceNotFoundException("error.user.not_found"));
+
+    List<ZoneEventSubmission> history =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(participationId);
+    List<AdminSubmissionDetailResDto> historyDtos =
+        history.stream()
+            .map(s -> AdminSubmissionDetailResDto.of(s, presignedUrl(s.getMediaFileKey())))
+            .toList();
+    AdminSubmissionDetailResDto current =
+        historyDtos.stream()
+            .filter(
+                s ->
+                    participation.getCurrentSubmissionId() != null
+                        && s.submissionId().equals(participation.getCurrentSubmissionId().toString()))
+            .findFirst()
+            .orElse(historyDtos.isEmpty() ? null : historyDtos.get(0));
+
+    return AdminReviewDetailResDto.of(
+        participation, participant.getNickname(), participant.getEmail(), current, historyDtos);
+  }
+
+  private String presignedUrl(String mediaFileKey) {
+    return mediaFileKey == null ? null : fileStorageService.getPresignedUrl(mediaFileKey);
   }
 
   private Specification<ZoneEventParticipation> buildQueueSpec(UUID roundId, UUID eventId, String zoneId) {

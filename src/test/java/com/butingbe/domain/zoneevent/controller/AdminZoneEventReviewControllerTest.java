@@ -1,6 +1,7 @@
 package com.butingbe.domain.zoneevent.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -63,6 +64,18 @@ class AdminZoneEventReviewControllerTest {
     when(adminZoneEventReviewService.queue(any(), any(), any(), any(), any(), any()))
         .thenReturn(new AdminReviewQueuePageResDto(List.of(), 1, 20, 0, 0, false));
     mockMvc.perform(get("/admin/zone-event-reviews")).andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("검수 상세 200")
+  void detail() throws Exception {
+    UUID pid = UUID.randomUUID();
+    when(adminZoneEventReviewService.detail(any(), eq(pid)))
+        .thenReturn(
+            new com.butingbe.domain.zoneevent.dto.response.AdminReviewDetailResDto(
+                pid.toString(), null, null, "SUYEONG_NAMGU", UUID.randomUUID().toString(), "닉", "e@x.com",
+                "UNDER_REVIEW", null, null, List.of(), java.time.OffsetDateTime.now()));
+    mockMvc.perform(get("/admin/zone-event-reviews/{id}", pid)).andExpect(status().isOk());
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
