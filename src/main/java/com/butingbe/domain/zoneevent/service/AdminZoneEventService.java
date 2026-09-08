@@ -133,7 +133,8 @@ public class AdminZoneEventService {
                 .build());
 
     if (round != null) {
-      // (round_id, zone_id) UK가 있으므로, 취소된 이벤트가 남긴 슬롯은 새로 만들지 말고 재사용한다.
+      // (round_id, zone_id) UK가 있으므로 같은 구역에 이미 슬롯이 있으면 새로 만들지 말고 재사용한다.
+      // 취소된 이벤트의 슬롯은 cancel()에서 삭제되므로, 대개 여기서 새 슬롯이 만들어진다.
       ZoneEventRound slotRound = round;
       ZoneEventRoundSlot slot =
           slotRepository
@@ -288,6 +289,13 @@ public class AdminZoneEventService {
     operatorAuthorization.requireOperator(user);
     ZoneEvent event = findEvent(eventId);
     event.markCancelled();
+    // 취소된 이벤트의 회차 슬롯을 남겨두면 공개 상태 조회(GET /zone-event-rounds/current)에서 그 구역이
+    // 계속 열린 것처럼 보인다. 다른 구역으로 대체하면 슬롯이 5개가 되므로, 취소 시 슬롯을 제거한다.
+    // 이미 다른 이벤트로 재배정된 슬롯은 건드리지 않는다.
+    slotRepository
+        .findByRound_IdAndZoneId(event.getRoundId(), event.getZoneId())
+        .filter(s -> eventId.equals(s.getEventId()))
+        .ifPresent(slotRepository::delete);
     // BR-13: 열린 참여는 EVENT_CANCELLED로 정리하고, 성공한 참여와 보상은 유지한다.
     for (ZoneEventParticipation open :
         participationRepository.findByEvent_IdAndStatusIn(

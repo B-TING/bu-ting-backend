@@ -132,18 +132,18 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("취소한 이벤트의 구역은 다시 비므로 대체 이벤트를 넣을 수 있고, 남긴 슬롯을 재사용한다")
-  void cancelledZoneCanBeRefilledReusingSlot() {
+  @DisplayName("취소한 이벤트의 구역은 다시 비므로 같은 구역에 대체 이벤트를 넣을 수 있다")
+  void cancelledZoneCanBeRefilled() {
     ZoneEventRound round = draftRound(31);
     AdminZoneEventResDto yeongdo =
         adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
     adminZoneEventService.create(operator, createReq(round.getId(), "OLD_DOWNTOWN"));
     adminZoneEventService.create(operator, createReq(round.getId(), "SUYEONG_NAMGU"));
     adminZoneEventService.create(operator, createReq(round.getId(), "WESTERN_BUSAN"));
-    UUID slotIdBefore =
-        slotRepository.findByRound_IdAndZoneId(round.getId(), "YEONGDO").orElseThrow().getId();
 
     adminZoneEventService.cancel(operator, UUID.fromString(yeongdo.eventId()));
+    // 취소로 슬롯이 비워졌으므로 그 구역은 공개 상태 조회에서 더 이상 열려 보이지 않는다.
+    assertThat(slotRepository.findByRound_IdAndZoneId(round.getId(), "YEONGDO")).isEmpty();
 
     AdminZoneEventResDto replacement =
         adminZoneEventService.create(
@@ -152,11 +152,31 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
     assertThat(replacement.slotCode()).isEqualTo("31-A");
     ZoneEventRoundSlot slot =
         slotRepository.findByRound_IdAndZoneId(round.getId(), "YEONGDO").orElseThrow();
-    assertThat(slot.getId()).isEqualTo(slotIdBefore);
     assertThat(slot.getEventId().toString()).isEqualTo(replacement.eventId());
+    assertThat(slotRepository.findByRound_Id(round.getId())).hasSize(4);
     assertThat(zoneEventRepository.findByRoundId(round.getId()))
         .filteredOn(e -> e.getStatus() != ZoneEventStatus.CANCELLED)
         .hasSize(4);
+  }
+
+  @Test
+  @DisplayName("취소된 구역을 다른 구역으로 교체하면 회차 슬롯은 정확히 4개로 유지된다")
+  void cancelThenRefillDifferentZoneKeepsExactlyFourSlots() {
+    ZoneEventRound round = draftRound(32);
+    AdminZoneEventResDto toCancel =
+        adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
+    adminZoneEventService.create(operator, createReq(round.getId(), "OLD_DOWNTOWN"));
+    adminZoneEventService.create(operator, createReq(round.getId(), "SUYEONG_NAMGU"));
+    adminZoneEventService.create(operator, createReq(round.getId(), "WESTERN_BUSAN"));
+
+    adminZoneEventService.cancel(operator, UUID.fromString(toCancel.eventId()));
+    adminZoneEventService.create(operator, createReq(round.getId(), "CENTRAL_NORTH"));
+
+    assertThat(slotRepository.findByRound_Id(round.getId())).hasSize(4);
+    assertThat(slotRepository.findByRound_Id(round.getId()))
+        .extracting(ZoneEventRoundSlot::getZoneId)
+        .containsExactlyInAnyOrder(
+            "OLD_DOWNTOWN", "SUYEONG_NAMGU", "WESTERN_BUSAN", "CENTRAL_NORTH");
   }
 
   @Test
