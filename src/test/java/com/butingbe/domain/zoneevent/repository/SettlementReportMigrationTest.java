@@ -48,7 +48,7 @@ class SettlementReportMigrationTest {
     UUID id = UUID.randomUUID();
     try (PreparedStatement s =
         c.prepareStatement(
-            "INSERT INTO zone_event_round (round_id, starts_at, ends_at, status) VALUES (?, now(), now(), 'CLOSED')")) {
+            "INSERT INTO zone_event_round (round_id, round_no, starts_at, ends_at, status) VALUES (?, 1, now(), now(), 'CLOSED')")) {
       s.setObject(1, id);
       s.executeUpdate();
     }

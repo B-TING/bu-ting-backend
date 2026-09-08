@@ -77,4 +77,18 @@ class ZoneEventRoundTest {
     assertThatThrownBy(() -> round.applyEditable("또 다른 이름", null, null, null, null))
         .isInstanceOf(ConflictException.class);
   }
+
+  @Test
+  void applyEditable은_모든_필드를_바꿀_수_있다() {
+    ZoneEventRound round = draft();
+    OffsetDateTime newStarts = OffsetDateTime.now().plusDays(5);
+    OffsetDateTime newEnds = OffsetDateTime.now().plusDays(6);
+
+    round.applyEditable("새 이름", newStarts, newEnds, "UTC", RoundType.GUERRILLA);
+
+    assertThat(round.getStartsAt()).isEqualTo(newStarts);
+    assertThat(round.getEndsAt()).isEqualTo(newEnds);
+    assertThat(round.getTimezone()).isEqualTo("UTC");
+    assertThat(round.getRoundType()).isEqualTo(RoundType.GUERRILLA);
+  }
 }

@@ -476,6 +476,40 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     assertThat(detail.slots().get(0).participantCount()).isZero();
   }
 
+  @Test
+  @DisplayName("슬롯 배정을 제안한다")
+  void suggestSlotsWorks() {
+    assertThat(consoleService.suggestSlots(operator, 6).slots()).hasSize(6);
+  }
+
+  @Test
+  @DisplayName("목록 조회는 from/to 시간 범위로도 필터링된다")
+  void listRoundsFiltersByTimeRange() {
+    createDraft();
+    OffsetDateTime from = OffsetDateTime.now().minusDays(1);
+    OffsetDateTime to = OffsetDateTime.now().plusDays(3);
+
+    AdminRoundPageResDto page = consoleService.listRounds(operator, null, from, to, null, 0, 20);
+
+    assertThat(page.items()).isNotEmpty();
+  }
+
+  @Test
+  @DisplayName("슬롯 교체 시 잘못된 구역이면 400 계열 예외다")
+  void reassignSlotWithInvalidZoneFails() {
+    AdminRoundResDto created = createDraft();
+    UUID roundId = UUID.fromString(created.roundId());
+    adminZoneEventService.create(operator, zoneEventReq(roundId, "YEONGDO"));
+    UUID slotId =
+        UUID.fromString(consoleService.roundDetail(operator, roundId).slots().get(0).slotId());
+
+    assertThatThrownBy(
+            () ->
+                consoleService.reassignSlot(
+                    operator, roundId, new SlotReassignReqDto(slotId, "NOPE")))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
   private int nextRoundNo() {
     return roundNoSeq++;
   }

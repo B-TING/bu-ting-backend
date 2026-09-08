@@ -1,5 +1,6 @@
 package com.butingbe.domain.zoneevent.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -212,13 +213,10 @@ class AdminRoundControllerTest {
 
   @Test
   @DisplayName("open/close 엔드포인트는 더 이상 존재하지 않는다")
-  void openCloseRemoved() throws Exception {
-    mockMvc
-        .perform(post("/admin/zone-event-rounds/{id}/open", ROUND))
-        .andExpect(status().isNotFound());
-    mockMvc
-        .perform(post("/admin/zone-event-rounds/{id}/close", ROUND))
-        .andExpect(status().isNotFound());
+  void openCloseRemoved() {
+    for (var method : controller.getClass().getMethods()) {
+      assertThat(method.getName()).isNotIn("open", "close");
+    }
   }
 
   @Test

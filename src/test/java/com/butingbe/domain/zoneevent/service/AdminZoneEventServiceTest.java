@@ -84,7 +84,8 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   void createAssignsSlotCodeAndLinksSlot() {
     ZoneEventRound round = draftRound(11);
 
-    AdminZoneEventResDto first = adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
+    AdminZoneEventResDto first =
+        adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
     AdminZoneEventResDto second =
         adminZoneEventService.create(operator, createReq(round.getId(), "OLD_DOWNTOWN"));
 
@@ -133,13 +134,31 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
     adminZoneEventService.create(
         operator,
         new AdminZoneEventCreateReqDto(
-            "YEONGDO", type.getTypeCode(), "1차", null, start, 120, null, 1,
-            new RewardSnapshotReqDto(50, null, null, null), null, null));
+            "YEONGDO",
+            type.getTypeCode(),
+            "1차",
+            null,
+            start,
+            120,
+            null,
+            1,
+            new RewardSnapshotReqDto(50, null, null, null),
+            null,
+            null));
 
     AdminZoneEventCreateReqDto overlapping =
         new AdminZoneEventCreateReqDto(
-            "YEONGDO", type.getTypeCode(), "2차", null, start.plusMinutes(60), 120, null, 1,
-            new RewardSnapshotReqDto(50, null, null, null), null, null);
+            "YEONGDO",
+            type.getTypeCode(),
+            "2차",
+            null,
+            start.plusMinutes(60),
+            120,
+            null,
+            1,
+            new RewardSnapshotReqDto(50, null, null, null),
+            null,
+            null);
 
     assertThatThrownBy(() -> adminZoneEventService.create(operator, overlapping))
         .isInstanceOf(ConflictException.class);
@@ -158,6 +177,36 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("DRAFT가 아닌 회차에는 구역 슬롯을 추가할 수 없다")
+  void createOnNonDraftRoundConflicts() {
+    ZoneEventRound round = draftRound(16);
+    round.confirmSchedule();
+    roundRepository.save(round);
+
+    assertThatThrownBy(
+            () -> adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO")))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("겹침 재검증 시 자기 자신은 제외한다")
+  void updateExcludesSelfFromOverlapCheck() {
+    ZoneEventRound round = draftRound(17);
+    AdminZoneEventResDto created =
+        adminZoneEventService.create(operator, createReq(round.getId(), "YEONGDO"));
+
+    AdminZoneEventUpdateReqDto onlyDurationChange =
+        new AdminZoneEventUpdateReqDto(
+            null, null, 90, null, null, null, null, null, null, null, null, created.revision());
+
+    AdminZoneEventResDto updated =
+        adminZoneEventService.update(
+            operator, UUID.fromString(created.eventId()), onlyDurationChange);
+
+    assertThat(updated.durationMinutes()).isEqualTo(90);
+  }
+
+  @Test
   @DisplayName("expectedRevision이 다르면 수정 시 409")
   void updateWithStaleRevisionConflicts() {
     ZoneEventRound round = draftRound(15);
@@ -166,11 +215,23 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
 
     AdminZoneEventUpdateReqDto staleUpdate =
         new AdminZoneEventUpdateReqDto(
-            "새 제목", null, null, null, null, null, null, null, null, null, "사유",
+            "새 제목",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "사유",
             created.revision() + 1);
 
     assertThatThrownBy(
-            () -> adminZoneEventService.update(operator, UUID.fromString(created.eventId()), staleUpdate))
+            () ->
+                adminZoneEventService.update(
+                    operator, UUID.fromString(created.eventId()), staleUpdate))
         .isInstanceOf(ConflictException.class);
   }
 
@@ -181,8 +242,17 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
   private AdminZoneEventCreateReqDto createReq(
       UUID roundId, String zoneId, OffsetDateTime startsAt) {
     return new AdminZoneEventCreateReqDto(
-        zoneId, type.getTypeCode(), "미션", null, startsAt, 120, roundId, 1,
-        new RewardSnapshotReqDto(50, null, null, null), null, null);
+        zoneId,
+        type.getTypeCode(),
+        "미션",
+        null,
+        startsAt,
+        120,
+        roundId,
+        1,
+        new RewardSnapshotReqDto(50, null, null, null),
+        null,
+        null);
   }
 
   @Test
@@ -301,7 +371,17 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
             operator,
             eventId,
             new AdminZoneEventUpdateReqDto(
-                "새 제목", null, null, null, null, null, null, null, null, null, null,
+                "새 제목",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 activated.revision()));
     assertThat(updated.title()).isEqualTo("새 제목");
 
@@ -311,7 +391,17 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
                     operator,
                     eventId,
                     new AdminZoneEventUpdateReqDto(
-                        null, null, null, null, null, "YEONGDO", null, null, null, null, null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "YEONGDO",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
                         updated.revision())))
         .isInstanceOf(ConflictException.class);
   }

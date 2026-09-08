@@ -64,6 +64,7 @@ class RewardSettlementServiceTest extends AbstractContainerTest {
     round =
         roundRepository.save(
             ZoneEventRound.builder()
+                .roundNo(600)
                 .startsAt(OffsetDateTime.now().minusDays(1))
                 .endsAt(OffsetDateTime.now())
                 .status(RoundStatus.CLOSED)

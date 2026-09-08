@@ -61,6 +61,20 @@ class RoundStatusQueryServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("종료 시각이 지났지만 아직 ACTIVE인 회차는 조회 시점에 CLOSED로 동기화된다")
+  void syncsClosureOnRead() {
+    roundRepository.save(
+        ZoneEventRound.builder()
+            .roundNo(998)
+            .startsAt(OffsetDateTime.now().minusHours(2))
+            .endsAt(OffsetDateTime.now().minusMinutes(1))
+            .status(RoundStatus.ACTIVE)
+            .build());
+
+    assertThatThrownBy(() -> queryService.current()).isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
   @DisplayName("시작 시각이 지났지만 아직 SCHEDULED인 회차도 조회 시점에 ACTIVE로 동기화된다")
   void syncsOnRead() {
     ZoneEventRound round =
