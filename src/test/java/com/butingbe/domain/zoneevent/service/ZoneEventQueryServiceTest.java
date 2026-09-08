@@ -127,9 +127,8 @@ class ZoneEventQueryServiceTest {
   @DisplayName("상세는 예시 이미지 presigned URL·우수 보상·남은 참여 횟수를 채운다")
   void detailFillsExampleUrlAndRemainingAttempts() {
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
-            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
-        .thenReturn(Optional.of(target));
+    when(authTargetRepository.findByEvent_IdAndStatus(EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(List.of(target));
     when(participationRepository.countByEvent_IdAndStatus(EVENT_ID, ParticipationStatus.SUCCESS))
         .thenReturn(3L);
     when(participationRepository.countByEvent_IdAndUserIdAndStatus(
@@ -146,6 +145,12 @@ class ZoneEventQueryServiceTest {
     assertThat(detail.authTarget().exampleImageUrl())
         .isEqualTo("https://signed.example/uploads/example.jpg");
     assertThat(detail.authTarget().guideText()).isEqualTo("가로로 촬영");
+    assertThat(detail.targets()).hasSize(1);
+    assertThat(detail.targets().get(0).exampleImageUrl())
+        .isEqualTo("https://signed.example/uploads/example.jpg");
+    assertThat(detail.slotCode()).isNull();
+    assertThat(detail.deadline()).isEqualTo(detail.endsAt());
+    assertThat(detail.myParticipation()).isNull();
   }
 
   @Test
@@ -154,15 +159,61 @@ class ZoneEventQueryServiceTest {
     ZoneEventAuthTarget noImage = target(event);
     ReflectionTestUtils.setField(noImage, "exampleFileKey", null);
     when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-    when(authTargetRepository.findFirstByEvent_IdAndStatusOrderByCreatedAtAsc(
-            EVENT_ID, ZoneEventTargetStatus.ACTIVE))
-        .thenReturn(Optional.of(noImage));
+    when(authTargetRepository.findByEvent_IdAndStatus(EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(List.of(noImage));
     when(participationRepository.countByEvent_IdAndStatus(any(), any())).thenReturn(0L);
 
     ZoneEventDetailResDto detail = service.getEventDetail(EVENT_ID, null);
 
     assertThat(detail.myRemainingAttempts()).isNull();
     assertThat(detail.authTarget().exampleImageUrl()).isNull();
+  }
+
+  @Test
+  @DisplayName("이벤트에 ACTIVE 타겟이 여러 개면 모두 targets에 담긴다")
+  void detailListsAllActiveTargets() {
+    ZoneEventAuthTarget second = target(event);
+    when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
+    when(authTargetRepository.findByEvent_IdAndStatus(EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(List.of(target, second));
+    when(participationRepository.countByEvent_IdAndStatus(any(), any())).thenReturn(0L);
+    when(fileStorageService.getPresignedUrl("uploads/example.jpg"))
+        .thenReturn("https://signed.example/uploads/example.jpg");
+
+    ZoneEventDetailResDto detail = service.getEventDetail(EVENT_ID, null);
+
+    assertThat(detail.targets()).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("로그인 유저의 최근 참여가 FAIL이고 마감 전이면 canResubmit이 true다")
+  void detailFillsMyParticipationWhenFailed() {
+    ZoneEventParticipation failed =
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(USER_ID)
+            .status(ParticipationStatus.FAIL)
+            .gpsLat(35.15)
+            .gpsLng(129.11)
+            .joinedAt(OffsetDateTime.now())
+            .build();
+    ReflectionTestUtils.setField(failed, "id", PARTICIPATION_ID);
+    when(zoneEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
+    when(authTargetRepository.findByEvent_IdAndStatus(EVENT_ID, ZoneEventTargetStatus.ACTIVE))
+        .thenReturn(List.of(target));
+    when(participationRepository.countByEvent_IdAndStatus(any(), any())).thenReturn(0L);
+    when(participationRepository.countByEvent_IdAndUserIdAndStatus(any(), any(), any()))
+        .thenReturn(0L);
+    when(participationRepository.findByEvent_IdAndUserIdOrderByJoinedAtDesc(EVENT_ID, USER_ID))
+        .thenReturn(List.of(failed));
+    when(fileStorageService.getPresignedUrl("uploads/example.jpg"))
+        .thenReturn("https://signed.example/uploads/example.jpg");
+
+    ZoneEventDetailResDto detail = service.getEventDetail(EVENT_ID, USER_ID);
+
+    assertThat(detail.myParticipation()).isNotNull();
+    assertThat(detail.myParticipation().status()).isEqualTo("FAIL");
+    assertThat(detail.myParticipation().canResubmit()).isTrue();
   }
 
   @Test
