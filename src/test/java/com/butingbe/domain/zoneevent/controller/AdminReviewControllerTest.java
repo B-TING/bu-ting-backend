@@ -2,16 +2,12 @@ package com.butingbe.domain.zoneevent.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
-import com.butingbe.domain.zoneevent.dto.response.ReviewQueuePageResDto;
-import com.butingbe.domain.zoneevent.dto.response.SubmitResultResDto;
 import com.butingbe.domain.zoneevent.service.AdminReviewService;
 import com.butingbe.global.error.GlobalExceptionHandler;
 import com.butingbe.global.error.exception.ForbiddenException;
@@ -66,47 +62,6 @@ class AdminReviewControllerTest {
   }
 
   @Test
-  @DisplayName("검수 큐 200")
-  void reviewQueue() throws Exception {
-    when(adminReviewService.reviewQueue(any(), any(), any()))
-        .thenReturn(new ReviewQueuePageResDto(List.of(), null, false));
-    mockMvc
-        .perform(get("/admin/zone-event-participations/review-queue"))
-        .andExpect(status().isOk());
-  }
-
-  @Test
-  @DisplayName("승인 200 (SUCCESS 결과)")
-  void approve() throws Exception {
-    when(adminReviewService.approve(any(), eq(PID)))
-        .thenReturn(
-            SubmitResultResDto.of(null, UUID.randomUUID().toString(), 1, List.of(), 50, List.of()));
-    mockMvc
-        .perform(post("/admin/zone-event-participations/{id}/approve", PID))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.pointBalance").value(50));
-  }
-
-  @Test
-  @DisplayName("반려 200 / 사유 없으면 400")
-  void reject() throws Exception {
-    mockMvc
-        .perform(
-            post("/admin/zone-event-participations/{id}/reject", PID)
-                .contentType("application/json")
-                .content("{\"failReason\":\"NOT_ON_SITE\"}"))
-        .andExpect(status().isOk());
-    verify(adminReviewService).reject(any(), eq(PID), eq("NOT_ON_SITE"));
-
-    mockMvc
-        .perform(
-            post("/admin/zone-event-participations/{id}/reject", PID)
-                .contentType("application/json")
-                .content("{}"))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
   @DisplayName("회수·숨김해제 200")
   void revokeAndUnhide() throws Exception {
     mockMvc
@@ -122,10 +77,11 @@ class AdminReviewControllerTest {
   @Test
   @DisplayName("운영 권한 없으면 403")
   void forbidden() throws Exception {
-    when(adminReviewService.reviewQueue(any(), any(), any()))
-        .thenThrow(new ForbiddenException("error.operator.forbidden"));
+    doThrow(new ForbiddenException("error.operator.forbidden"))
+        .when(adminReviewService)
+        .revoke(any(), eq(PID));
     mockMvc
-        .perform(get("/admin/zone-event-participations/review-queue"))
+        .perform(post("/admin/zone-event-participations/{id}/revoke", PID))
         .andExpect(status().isForbidden());
   }
 
