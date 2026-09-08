@@ -1,6 +1,7 @@
 package com.butingbe.domain.zoneevent.entity;
 
 import com.butingbe.global.common.BaseEntity;
+import com.butingbe.global.error.exception.ConflictException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -114,9 +115,20 @@ public class ZoneEventAuthTarget extends BaseEntity {
     this.status = ZoneEventTargetStatus.ACTIVE;
   }
 
-  /** 관리자가 이 타겟을 취소한다. 기존 제출 이력은 보존된다. */
+  /** 관리자가 이 타겟을 취소한다(ACTIVE만 가능). 기존 제출 이력은 보존된다. */
   public void cancel() {
+    if (status != ZoneEventTargetStatus.ACTIVE) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
     this.status = ZoneEventTargetStatus.CANCELLED;
+  }
+
+  /** 다른 contentId로 긴급 교체되어 REPLACED 상태가 된다(ACTIVE만 가능). 새 ACTIVE 타겟은 서비스 계층에서 별도로 만든다. */
+  public void markReplaced() {
+    if (status != ZoneEventTargetStatus.ACTIVE) {
+      throw new ConflictException("error.zone_event.invalid_state");
+    }
+    this.status = ZoneEventTargetStatus.REPLACED;
   }
 
   /** 원본 좌표에서 관리자가 인증 중심 좌표를 수정했는지. */

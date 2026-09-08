@@ -287,6 +287,24 @@ public class TourApiPlaceService implements PlaceService {
     return PlaceDetailResDto.from(item, contentId, contentTypeId, googlePlace);
   }
 
+  @Override
+  public PlaceSummaryResDto getPlaceSummary(String contentId) {
+    if (!StringUtils.hasText(serviceKey)) {
+      throw new IllegalStateException("Tour API service key is not configured.");
+    }
+    if (!StringUtils.hasText(contentId)) {
+      throw new IllegalArgumentException("contentId is required.");
+    }
+
+    Optional<TourCommonItem> item = tourCommonInfo(contentId);
+    if (item.isEmpty()) {
+      return null;
+    }
+    TourCommonItem common = item.get();
+    return new PlaceSummaryResDto(
+        common.contentid(), common.title(), parseDouble(common.mapy()), parseDouble(common.mapx()));
+  }
+
   private TourApiResponse.Body body(TourApiResponse response) {
     if (response == null || response.response() == null || response.response().body() == null) {
       return new TourApiResponse.Body(new TourApiResponse.Items(List.of()), 0, 0, 0);
