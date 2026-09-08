@@ -4,6 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
@@ -76,6 +78,35 @@ class AdminZoneEventReviewControllerTest {
                 pid.toString(), null, null, "SUYEONG_NAMGU", UUID.randomUUID().toString(), "닉", "e@x.com",
                 "UNDER_REVIEW", null, null, List.of(), java.time.OffsetDateTime.now()));
     mockMvc.perform(get("/admin/zone-event-reviews/{id}", pid)).andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("승인 200")
+  void approve() throws Exception {
+    UUID pid = UUID.randomUUID();
+    when(adminZoneEventReviewService.approve(any(), eq(pid), any(), any()))
+        .thenReturn(
+            new com.butingbe.domain.zoneevent.dto.response.AdminReviewDecisionResDto(
+                pid.toString(), "SUCCESS", UUID.randomUUID().toString(), 1, "SUCCESS", List.of()));
+    mockMvc
+        .perform(
+            post("/admin/zone-event-reviews/{id}/approve", pid)
+                .contentType("application/json")
+                .content(
+                    "{\"submissionId\":\"" + UUID.randomUUID() + "\",\"expectedRevision\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("SUCCESS"));
+  }
+
+  @Test
+  @DisplayName("승인 요청에 submissionId·expectedRevision이 없으면 400")
+  void approveValidation() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/zone-event-reviews/{id}/approve", UUID.randomUUID())
+                .contentType("application/json")
+                .content("{}"))
+        .andExpect(status().isBadRequest());
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
