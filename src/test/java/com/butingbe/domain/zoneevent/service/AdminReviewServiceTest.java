@@ -241,6 +241,16 @@ class AdminReviewServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("검수 대기 참여에 제출 이력이 없으면 승인·반려는 예외를 던진다(방어 코드)")
+  void approveWithoutSubmissionThrows() {
+    ZoneEventParticipation p =
+        participationRepository.save(participation(ParticipationStatus.UNDER_REVIEW, false));
+
+    assertThatThrownBy(() -> reviewService.approve(operator, p.getId()))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
   @DisplayName("없는 참여 승인·숨김해제는 404다")
   void notFound() {
     assertThatThrownBy(() -> reviewService.approve(operator, UUID.randomUUID()))

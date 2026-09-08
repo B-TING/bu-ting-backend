@@ -332,6 +332,21 @@ class ZoneEventSubmitServiceTest {
   }
 
   @Test
+  @DisplayName("비활성(취소·교체) 타겟으로 제출하면 404(target_not_found)다")
+  void submitWithInactiveTargetRejected() {
+    ZoneEventParticipation participation = joined();
+    when(participationRepository.findById(PARTICIPATION_ID)).thenReturn(Optional.of(participation));
+    ZoneEventAuthTarget inactive = target();
+    inactive.cancel();
+    when(authTargetRepository.findByIdAndEvent_Id(TARGET_ID, EVENT_ID))
+        .thenReturn(Optional.of(inactive));
+
+    assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.zone_event.target_not_found");
+  }
+
+  @Test
   @DisplayName("미인증이면 401이다")
   void unauthenticated() {
     assertThatThrownBy(() -> service.submit(null, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
