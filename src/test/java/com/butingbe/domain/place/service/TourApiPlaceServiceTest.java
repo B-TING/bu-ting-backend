@@ -15,6 +15,7 @@ import com.butingbe.domain.place.dto.request.PlaceSearchReqDto;
 import com.butingbe.domain.place.dto.response.FestivalSearchResDto;
 import com.butingbe.domain.place.dto.response.PlaceDetailResDto;
 import com.butingbe.domain.place.dto.response.PlaceSearchResDto;
+import com.butingbe.domain.place.dto.response.PlaceSummaryResDto;
 import com.butingbe.domain.place.exception.PlaceKeywordNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -1232,5 +1233,85 @@ class TourApiPlaceServiceTest {
 
     assertThat(response.googlePlace()).isNull();
     server.verify();
+  }
+
+  @Test
+  @DisplayName("detailCommon2로 제목·원본 좌표 요약을 가져온다")
+  void getPlaceSummaryReturnsTitleAndCoordinates() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(
+            requestTo(
+                "https://tour.example.com/detailCommon2"
+                    + "?MobileOS=WEB"
+                    + "&MobileApp=buting"
+                    + "&_type=json"
+                    + "&contentId=126081"
+                    + "&defaultYN=Y"
+                    + "&addrinfoYN=Y"
+                    + "&mapinfoYN=Y"
+                    + "&serviceKey=SERVICE_KEY"))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "response": {
+                    "header": { "resultCode": "0000", "resultMsg": "OK" },
+                    "body": {
+                      "items": {
+                        "item": [
+                          {
+                            "contentid": "126081",
+                            "title": "광안대교",
+                            "addr1": "부산광역시 수영구",
+                            "mapx": "129.1181",
+                            "mapy": "35.1532"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                """,
+                MediaType.APPLICATION_JSON));
+
+    PlaceSummaryResDto summary = placeService.getPlaceSummary("126081");
+
+    assertThat(summary.contentId()).isEqualTo("126081");
+    assertThat(summary.title()).isEqualTo("광안대교");
+    assertThat(summary.latitude()).isEqualTo(35.1532);
+    assertThat(summary.longitude()).isEqualTo(129.1181);
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 contentId는 null을 반환한다")
+  void getPlaceSummaryReturnsNullWhenNotFound() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(requestTo(org.hamcrest.Matchers.containsString("/detailCommon2")))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "response": {
+                    "header": { "resultCode": "0000", "resultMsg": "OK" },
+                    "body": { "items": "" }
+                  }
+                }
+                """,
+                MediaType.APPLICATION_JSON));
+
+    assertThat(placeService.getPlaceSummary("GHOST")).isNull();
   }
 }
