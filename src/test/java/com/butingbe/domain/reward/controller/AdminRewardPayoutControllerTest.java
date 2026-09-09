@@ -207,6 +207,59 @@ class AdminRewardPayoutControllerTest {
         .andExpect(status().isOk());
   }
 
+  @Test
+  @DisplayName("메일 발송 기록 200")
+  void markMailSent() throws Exception {
+    UUID payoutId = UUID.randomUUID();
+    when(adminRewardPayoutService.markMailSent(any(), any(), any()))
+        .thenReturn(
+            new AdminRewardPayoutDetailResDto(
+                payoutId.toString(), "TOP_LIKE", UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(), 1, 3L, null, "MAIL_SENT", "NONE",
+                null, null, null, null, null, null, null, null, null, null, 1L, null, null));
+
+    mockMvc
+        .perform(
+            post("/admin/reward-payouts/mark-mail-sent")
+                .contentType("application/json")
+                .content(
+                    "{\"payoutId\":\"" + payoutId + "\",\"note\":\"발송\",\"expectedRevision\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("MAIL_SENT"));
+  }
+
+  @Test
+  @DisplayName("개인정보 수집 기록 200")
+  void markInfoCollected() throws Exception {
+    UUID payoutId = UUID.randomUUID();
+    when(adminRewardPayoutService.markInfoCollected(any(), any(), any()))
+        .thenReturn(
+            new AdminRewardPayoutDetailResDto(
+                payoutId.toString(), "TOP_LIKE", UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(), 1, 3L, null, "INFO_COLLECTED", "NONE",
+                null, null, null, null, null, null, null, null, null, null, 1L, null, null));
+
+    mockMvc
+        .perform(
+            post("/admin/reward-payouts/mark-info-collected")
+                .contentType("application/json")
+                .content(
+                    "{\"payoutId\":\"" + payoutId + "\",\"note\":\"수집\",\"expectedRevision\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("INFO_COLLECTED"));
+  }
+
+  @Test
+  @DisplayName("mark-mail-sent: payoutId·expectedRevision이 없으면 400")
+  void markMailSentValidation() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/reward-payouts/mark-mail-sent")
+                .contentType("application/json")
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+  }
+
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
     return new HandlerMethodArgumentResolver() {
       @Override

@@ -4,6 +4,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
@@ -59,6 +60,8 @@ public class AdminRewardPayoutService {
   private static final String UPDATE_ENDPOINT = "reward-payout-update";
   private static final String BULK_CONFIRM_ENDPOINT = "reward-payout-bulk-confirm";
   private static final String BULK_SCHEDULE_ENDPOINT = "reward-payout-bulk-schedule";
+  private static final String MARK_MAIL_SENT_ENDPOINT = "reward-payout-mark-mail-sent";
+  private static final String MARK_INFO_COLLECTED_ENDPOINT = "reward-payout-mark-info-collected";
   private static final int DEFAULT_SIZE = 20;
   private static final int MAX_SIZE = 50;
 
@@ -548,6 +551,89 @@ public class AdminRewardPayoutService {
         new AdminRewardPayoutBulkResultResDto(ids.stream().map(UUID::toString).toList());
     idempotencyService.save(idempotencyKey, BULK_SCHEDULE_ENDPOINT, fingerprint, result);
     return result;
+  }
+
+  @Transactional
+  public AdminRewardPayoutDetailResDto markMailSent(
+      AuthenticatedUser user, AdminRewardPayoutMarkReqDto request, String idempotencyKey) {
+    return applyTopLikeOnlyStep(
+        user,
+        request,
+        idempotencyKey,
+        MARK_MAIL_SENT_ENDPOINT,
+        "MARK_MAIL_SENT",
+        RewardPayoutStatus.CONFIRMED,
+        (payout, at, note) -> payout.markMailSent(at == null ? OffsetDateTime.now() : at, note));
+  }
+
+  @Transactional
+  public AdminRewardPayoutDetailResDto markInfoCollected(
+      AuthenticatedUser user, AdminRewardPayoutMarkReqDto request, String idempotencyKey) {
+    return applyTopLikeOnlyStep(
+        user,
+        request,
+        idempotencyKey,
+        MARK_INFO_COLLECTED_ENDPOINT,
+        "MARK_INFO_COLLECTED",
+        RewardPayoutStatus.MAIL_SENT,
+        (payout, at, note) -> payout.markInfoCollected(at == null ? OffsetDateTime.now() : at, note));
+  }
+
+  private AdminRewardPayoutDetailResDto applyTopLikeOnlyStep(
+      AuthenticatedUser user,
+      AdminRewardPayoutMarkReqDto request,
+      String idempotencyKey,
+      String endpoint,
+      String auditAction,
+      RewardPayoutStatus requiredStatus,
+      TopLikeStepAction action) {
+    operatorAuthorization.requireOperator(user);
+    String fingerprint =
+        request.payoutId() + ":" + request.at() + ":" + request.note() + ":" + request.expectedRevision();
+    Optional<String> replay = idempotencyService.findReplay(idempotencyKey, endpoint, fingerprint);
+    if (replay.isPresent()) {
+      return readJson(replay.get(), AdminRewardPayoutDetailResDto.class);
+    }
+
+    if (baseRewardPayoutRepository.findById(request.payoutId()).isPresent()) {
+      throw new ConflictException("error.reward.payout.wrong_type");
+    }
+    RewardPayout payout =
+        rewardPayoutRepository
+            .findById(request.payoutId())
+            .orElseThrow(() -> new ResourceNotFoundException("error.reward.payout.not_found"));
+    if (!payout.getRevision().equals(request.expectedRevision())) {
+      throw new ConflictException("error.reward.payout.stale_revision");
+    }
+    if (payout.getHoldStatus() != PayoutHoldStatus.NONE) {
+      throw new ConflictException("error.reward.payout.invalid_state");
+    }
+    if (payout.getStatus() != requiredStatus) {
+      throw new ConflictException("error.reward.payout.invalid_state");
+    }
+    action.apply(payout, request.at(), request.note());
+    try {
+      rewardPayoutRepository.saveAndFlush(payout);
+    } catch (ObjectOptimisticLockingFailureException e) {
+      throw new ConflictException("error.reward.payout.stale_revision");
+    }
+
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action(auditAction)
+            .targetType("REWARD_PAYOUT")
+            .targetId(payout.getId())
+            .detail(Map.of("note", request.note() == null ? "" : request.note()))
+            .build());
+    AdminRewardPayoutDetailResDto result = AdminRewardPayoutDetailResDto.ofTopLike(payout);
+    idempotencyService.save(idempotencyKey, endpoint, fingerprint, result);
+    return result;
+  }
+
+  @FunctionalInterface
+  private interface TopLikeStepAction {
+    void apply(RewardPayout payout, OffsetDateTime at, String note);
   }
 
   /**

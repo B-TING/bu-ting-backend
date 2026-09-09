@@ -153,6 +153,22 @@ public class RewardPayout extends TimestampEntity {
     this.confirmedAt = OffsetDateTime.now();
   }
 
+  public void markMailSent(OffsetDateTime mailedAt, String note) {
+    this.status = RewardPayoutStatus.MAIL_SENT;
+    this.mailedAt = mailedAt;
+    if (note != null) {
+      this.memo = note;
+    }
+  }
+
+  public void markInfoCollected(OffsetDateTime informationCollectedAt, String note) {
+    this.status = RewardPayoutStatus.INFO_COLLECTED;
+    this.informationCollectedAt = informationCollectedAt;
+    if (note != null) {
+      this.memo = note;
+    }
+  }
+
   public void updateMemo(String memo) {
     this.memo = memo;
   }

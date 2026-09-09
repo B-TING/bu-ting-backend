@@ -811,6 +811,152 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
         .isNull();
   }
 
+  @Test
+  @DisplayName("mark-mail-sent: CONFIRMED인 TOP_LIKE를 MAIL_SENT로 바꾼다")
+  void marksMailSent() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    var result =
+        payoutService.markMailSent(
+            operator,
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto(
+                payout.getId(), null, "메일 발송함", payout.getRevision()),
+            null);
+
+    assertThat(result.status()).isEqualTo("MAIL_SENT");
+    assertThat(result.memo()).isEqualTo("메일 발송함");
+    assertThat(result.mailedAt()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("mark-mail-sent: BASE 지급 건에 호출하면 409(wrong_type)다")
+  void markMailSentRejectsBaseType() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder().participationId(p.getId()).reward(new RewardSnapshot(50, null, null, null)).build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markMailSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto(
+                        payout.getId(), null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.wrong_type");
+  }
+
+  @Test
+  @DisplayName("mark-mail-sent: CONFIRMED가 아니면 409(invalid_state)다")
+  void markMailSentRejectsWrongStatus() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markMailSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto(
+                        payout.getId(), null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.invalid_state");
+  }
+
+  @Test
+  @DisplayName("mark-info-collected: MAIL_SENT인 TOP_LIKE를 INFO_COLLECTED로 바꾼다")
+  void marksInfoCollected() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    payout.markMailSent(OffsetDateTime.now(), null);
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    var result =
+        payoutService.markInfoCollected(
+            operator,
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto(
+                payout.getId(), null, "주소 수집 완료", payout.getRevision()),
+            null);
+
+    assertThat(result.status()).isEqualTo("INFO_COLLECTED");
+    assertThat(result.informationCollectedAt()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("mark-info-collected: BASE 지급 건에 호출하면 409(wrong_type)다")
+  void markInfoCollectedRejectsBaseType() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder().participationId(p.getId()).reward(new RewardSnapshot(50, null, null, null)).build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markInfoCollected(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto(
+                        payout.getId(), null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.wrong_type");
+  }
+
+  @Test
+  @DisplayName("mark-info-collected: MAIL_SENT가 아니면 409(invalid_state)다")
+  void markInfoCollectedRejectsWrongStatus() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markInfoCollected(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto(
+                        payout.getId(), null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.invalid_state");
+  }
+
   private ZoneEventParticipation participation() {
     return participationRepository.save(
         ZoneEventParticipation.builder()

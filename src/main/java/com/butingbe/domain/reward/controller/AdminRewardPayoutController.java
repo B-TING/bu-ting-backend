@@ -3,6 +3,7 @@ package com.butingbe.domain.reward.controller;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
@@ -117,5 +118,26 @@ public class AdminRewardPayoutController {
     return ResponseEntity.ok(
         ApiResponse.success(
             "지급 일괄 일정", adminRewardPayoutService.bulkSchedule(user, request, idempotencyKey)));
+  }
+
+  @PostMapping("/mark-mail-sent")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> markMailSent(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutMarkReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "메일 발송 기록", adminRewardPayoutService.markMailSent(user, request, idempotencyKey)));
+  }
+
+  @PostMapping("/mark-info-collected")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> markInfoCollected(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutMarkReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "개인정보 수집 기록",
+            adminRewardPayoutService.markInfoCollected(user, request, idempotencyKey)));
   }
 }
