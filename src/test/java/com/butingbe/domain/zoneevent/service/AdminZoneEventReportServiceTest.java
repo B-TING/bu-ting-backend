@@ -1,0 +1,152 @@
+package com.butingbe.domain.zoneevent.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.user.entity.Name;
+import com.butingbe.domain.user.entity.User;
+import com.butingbe.domain.user.entity.UserRole;
+import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
+import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
+import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
+import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
+import com.butingbe.domain.zoneevent.entity.ZoneEvent;
+import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
+import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
+import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
+import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.support.AbstractContainerTest;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.transaction.annotation.Transactional;
+
+@Transactional
+class AdminZoneEventReportServiceTest extends AbstractContainerTest {
+
+  @Autowired private AdminZoneEventReportService reportService;
+  @Autowired private ZoneEventRepository zoneEventRepository;
+  @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
+  @Autowired private ZoneEventParticipationRepository participationRepository;
+  @Autowired private ZoneEventReportRepository reportRepository;
+  @Autowired private UserRepository userRepository;
+
+  private ZoneEvent event;
+  private AuthenticatedUser operator;
+
+  @BeforeEach
+  void setUp() {
+    ZoneEventType type =
+        zoneEventTypeRepository.save(
+            ZoneEventType.builder()
+                .typeCode("PLACE_AUTH")
+                .name("장소 인증")
+                .requiresUpload(true)
+                .build());
+    event =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("SUYEONG_NAMGU")
+                .type(type)
+                .title("이벤트")
+                .startsAt(OffsetDateTime.now().minusHours(1))
+                .durationMinutes(1440)
+                .status(ZoneEventStatus.ACTIVE)
+                .baseReward(new RewardSnapshot(50, null, null, null))
+                .successLimitPerUser(1)
+                .build());
+    operator =
+        new AuthenticatedUser(
+            userRepository
+                .save(
+                    User.builder()
+                        .email("op-" + UUID.randomUUID() + "@example.com")
+                        .provider("google")
+                        .providerId("google-" + UUID.randomUUID())
+                        .name(new Name("Kim", "Tester"))
+                        .nickname("op")
+                        .role(UserRole.USER)
+                        .build())
+                .getId(),
+            "op@example.com",
+            "op",
+            List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+  }
+
+  @Test
+  @DisplayName("신고 목록은 status·eventId·participationId로 필터링하고 페이지 정보를 돌려준다")
+  void listFiltersAndPages() {
+    ZoneEventParticipation p1 = participation();
+    ZoneEventParticipation p2 = participation();
+    ZoneEventReport open =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p1.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    reportRepository.save(
+        ZoneEventReport.builder()
+            .participationId(p2.getId())
+            .reporterId(UUID.randomUUID())
+            .reasonCode(ReportReasonCode.OTHER)
+            .build());
+
+    var page = reportService.list(operator, "OPEN", null, event.getId(), p1.getId(), 1, 20);
+
+    assertThat(page.items()).hasSize(1);
+    assertThat(page.items().get(0).reportId()).isEqualTo(open.getId().toString());
+    assertThat(page.items().get(0).eventId()).isEqualTo(event.getId().toString());
+    assertThat(page.totalElements()).isEqualTo(1);
+    assertThat(page.page()).isEqualTo(1);
+    assertThat(page.hasNext()).isFalse();
+  }
+
+  @Test
+  @DisplayName("운영자가 아니면 목록 조회는 403이다")
+  void listForbidden() {
+    AuthenticatedUser normalUser =
+        new AuthenticatedUser(
+            userRepository
+                .save(
+                    User.builder()
+                        .email("n-" + UUID.randomUUID() + "@example.com")
+                        .provider("google")
+                        .providerId("google-" + UUID.randomUUID())
+                        .name(new Name("Kim", "Tester"))
+                        .nickname("normal")
+                        .role(UserRole.USER)
+                        .build())
+                .getId(),
+            "n@example.com",
+            "normal",
+            List.of());
+    assertThatThrownBy(() -> reportService.list(normalUser, null, null, null, null, 1, 20))
+        .isInstanceOf(ForbiddenException.class);
+  }
+
+  private ZoneEventParticipation participation() {
+    return participationRepository.save(
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(UUID.randomUUID())
+            .status(ParticipationStatus.SUCCESS)
+            .gpsLat(35.1)
+            .gpsLng(129.1)
+            .joinedAt(OffsetDateTime.now())
+            .visibility(ParticipationVisibility.PUBLIC)
+            .build());
+  }
+}
