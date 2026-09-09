@@ -8,6 +8,7 @@ import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.entity.BaseRewardPayout;
 import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardPayout;
+import com.butingbe.domain.reward.entity.RewardPayoutStatus;
 import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.user.entity.Name;
@@ -36,6 +37,7 @@ import com.butingbe.support.AbstractContainerTest;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -557,6 +559,148 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
 
     assertThat(result.status()).isEqualTo("PENDING_CONFIRM");
     assertThat(result.memo()).isEqualTo("1등 상품 확정");
+  }
+
+  @Test
+  @DisplayName("이미 CONFIRMED인 지급의 reward를 바꾸려 하면 409다")
+  void updateRewardAfterConfirmConflicts() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.update(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+                        new RewardSnapshot(100, null, null, null), null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.reward_locked");
+  }
+
+  @Test
+  @DisplayName("CONFIRMED 이후에도 memo·scheduledAt은 바꿀 수 있다")
+  void updateMemoAndScheduleAfterConfirmStillAllowed() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+    OffsetDateTime schedule = OffsetDateTime.now().plusDays(1);
+
+    var result =
+        payoutService.update(
+            operator,
+            payout.getId(),
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+                null, "발송 예정", schedule, payout.getRevision()),
+            null);
+
+    assertThat(result.memo()).isEqualTo("발송 예정");
+    assertThat(result.scheduledAt()).isEqualTo(schedule);
+  }
+
+  @Test
+  @DisplayName("일괄 확정: PENDING_CONFIRM인 건들을 모두 CONFIRMED로 바꾼다")
+  void bulkConfirmsAllPendingConfirmPayouts() {
+    ZoneEventParticipation p1 = participation();
+    ZoneEventParticipation p2 = participation();
+    BaseRewardPayout base =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder().participationId(p1.getId()).reward(new RewardSnapshot(50, null, null, null)).build());
+    RewardPayout topLike =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p2.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    topLike.assignReward(new RewardSnapshot(null, null, 1, "COUPON_TOP"));
+    rewardPayoutRepository.saveAndFlush(topLike);
+
+    var result =
+        payoutService.bulkConfirm(
+            operator,
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto(
+                List.of(base.getId().toString(), topLike.getId().toString()),
+                Map.of(base.getId().toString(), base.getRevision(), topLike.getId().toString(), topLike.getRevision())),
+            null);
+
+    assertThat(result.processedPayoutIds()).hasSize(2);
+    assertThat(baseRewardPayoutRepository.findById(base.getId()).orElseThrow().getStatus())
+        .isEqualTo(com.butingbe.domain.reward.entity.BaseRewardPayoutStatus.CONFIRMED);
+    assertThat(rewardPayoutRepository.findById(topLike.getId()).orElseThrow().getStatus())
+        .isEqualTo(RewardPayoutStatus.CONFIRMED);
+  }
+
+  @Test
+  @DisplayName("일괄 확정: 하나라도 조건 미충족이면 전부 반영하지 않고 문제 id 목록과 함께 409다")
+  void bulkConfirmAllOrNothingOnConflict() {
+    ZoneEventParticipation p1 = participation();
+    ZoneEventParticipation p2 = participation();
+    BaseRewardPayout ok =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder().participationId(p1.getId()).reward(new RewardSnapshot(50, null, null, null)).build());
+    BaseRewardPayout held =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder().participationId(p2.getId()).reward(new RewardSnapshot(50, null, null, null)).build());
+    held.hold();
+    baseRewardPayoutRepository.saveAndFlush(held);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.bulkConfirm(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto(
+                        List.of(ok.getId().toString(), held.getId().toString()),
+                        Map.of(ok.getId().toString(), ok.getRevision(), held.getId().toString(), held.getRevision())),
+                    null))
+        .isInstanceOf(com.butingbe.global.error.exception.BulkPayoutConflictException.class)
+        .satisfies(
+            e ->
+                assertThat(((com.butingbe.global.error.exception.BulkPayoutConflictException) e).getProblemPayoutIds())
+                    .containsExactly(held.getId().toString()));
+    assertThat(baseRewardPayoutRepository.findById(ok.getId()).orElseThrow().getStatus())
+        .isEqualTo(com.butingbe.domain.reward.entity.BaseRewardPayoutStatus.PENDING_CONFIRM);
+  }
+
+  @Test
+  @DisplayName("일괄 확정: 아직 상품 코드가 없는 TOP_LIKE(PENDING_ASSIGN)는 문제 목록에 포함된다")
+  void bulkConfirmRejectsUnassignedTopLike() {
+    ZoneEventParticipation p = participation();
+    RewardPayout topLike =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, null))
+                .build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.bulkConfirm(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto(
+                        List.of(topLike.getId().toString()),
+                        Map.of(topLike.getId().toString(), topLike.getRevision())),
+                    null))
+        .isInstanceOf(com.butingbe.global.error.exception.BulkPayoutConflictException.class);
   }
 
   private ZoneEventParticipation participation() {

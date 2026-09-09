@@ -1,8 +1,10 @@
 package com.butingbe.domain.reward.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutPageResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutReleaseHoldResDto;
@@ -94,5 +96,15 @@ public class AdminRewardPayoutController {
     return ResponseEntity.ok(
         ApiResponse.success(
             "지급 건 수정", adminRewardPayoutService.update(user, payoutId, request, idempotencyKey)));
+  }
+
+  @PostMapping("/bulk-confirm")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutBulkResultResDto>> bulkConfirm(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutBulkConfirmReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "지급 일괄 확정", adminRewardPayoutService.bulkConfirm(user, request, idempotencyKey)));
   }
 }

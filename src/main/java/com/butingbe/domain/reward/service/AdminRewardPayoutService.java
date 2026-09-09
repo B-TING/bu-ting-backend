@@ -2,8 +2,10 @@ package com.butingbe.domain.reward.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutListItemResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutPageResDto;
@@ -21,6 +23,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.service.IdempotencyService;
+import com.butingbe.global.error.exception.BulkPayoutConflictException;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.time.OffsetDateTime;
@@ -53,6 +56,7 @@ public class AdminRewardPayoutService {
 
   private static final String RELEASE_HOLD_ENDPOINT = "reward-payout-release-hold";
   private static final String UPDATE_ENDPOINT = "reward-payout-update";
+  private static final String BULK_CONFIRM_ENDPOINT = "reward-payout-bulk-confirm";
   private static final int DEFAULT_SIZE = 20;
   private static final int MAX_SIZE = 50;
 
@@ -366,6 +370,89 @@ public class AdminRewardPayoutService {
       throw new ConflictException("error.reward.payout.stale_revision");
     }
     return AdminRewardPayoutDetailResDto.ofBase(payout, eventId);
+  }
+
+  @Transactional
+  public AdminRewardPayoutBulkResultResDto bulkConfirm(
+      AuthenticatedUser user, AdminRewardPayoutBulkConfirmReqDto request, String idempotencyKey) {
+    operatorAuthorization.requireOperator(user);
+    List<UUID> ids = request.payoutIds().stream().map(UUID::fromString).toList();
+    String fingerprint = ids + ":" + request.expectedRevisions();
+    Optional<String> replay =
+        idempotencyService.findReplay(idempotencyKey, BULK_CONFIRM_ENDPOINT, fingerprint);
+    if (replay.isPresent()) {
+      return readJson(replay.get(), AdminRewardPayoutBulkResultResDto.class);
+    }
+
+    List<String> problems = new ArrayList<>();
+    for (UUID id : ids) {
+      Long expected = request.expectedRevisions().get(id.toString());
+      Optional<RewardPayout> topLike = rewardPayoutRepository.findById(id);
+      if (topLike.isPresent()) {
+        RewardPayout p = topLike.get();
+        if (expected == null || !p.getRevision().equals(expected)) {
+          problems.add(id.toString());
+        } else if (p.getHoldStatus() != PayoutHoldStatus.NONE) {
+          problems.add(id.toString());
+        } else if (p.getStatus() != RewardPayoutStatus.PENDING_CONFIRM) {
+          problems.add(id.toString());
+        }
+        continue;
+      }
+      Optional<BaseRewardPayout> base = baseRewardPayoutRepository.findById(id);
+      if (base.isEmpty()) {
+        problems.add(id.toString());
+        continue;
+      }
+      BaseRewardPayout p = base.get();
+      if (expected == null || !p.getRevision().equals(expected)) {
+        problems.add(id.toString());
+      } else if (p.getHoldStatus() != PayoutHoldStatus.NONE) {
+        problems.add(id.toString());
+      } else if (p.getStatus() != BaseRewardPayoutStatus.PENDING_CONFIRM) {
+        problems.add(id.toString());
+      }
+    }
+    if (!problems.isEmpty()) {
+      throw new BulkPayoutConflictException("error.reward.payout.bulk_conflict", problems);
+    }
+
+    for (UUID id : ids) {
+      rewardPayoutRepository
+          .findById(id)
+          .ifPresentOrElse(
+              p -> {
+                p.confirm(user.id());
+                auditLogRepository.save(
+                    ZoneEventAuditLog.builder()
+                        .actorId(user.id())
+                        .action("CONFIRM_PAYOUT")
+                        .targetType("REWARD_PAYOUT")
+                        .targetId(id)
+                        .detail(Map.of("payoutType", "TOP_LIKE"))
+                        .build());
+              },
+              () ->
+                  baseRewardPayoutRepository
+                      .findById(id)
+                      .ifPresent(
+                          p -> {
+                            p.confirm(user.id());
+                            auditLogRepository.save(
+                                ZoneEventAuditLog.builder()
+                                    .actorId(user.id())
+                                    .action("CONFIRM_PAYOUT")
+                                    .targetType("REWARD_PAYOUT")
+                                    .targetId(id)
+                                    .detail(Map.of("payoutType", "BASE"))
+                                    .build());
+                          }));
+    }
+
+    AdminRewardPayoutBulkResultResDto result =
+        new AdminRewardPayoutBulkResultResDto(ids.stream().map(UUID::toString).toList());
+    idempotencyService.save(idempotencyKey, BULK_CONFIRM_ENDPOINT, fingerprint, result);
+    return result;
   }
 
   /**

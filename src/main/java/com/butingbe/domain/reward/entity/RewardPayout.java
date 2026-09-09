@@ -146,6 +146,13 @@ public class RewardPayout extends TimestampEntity {
     }
   }
 
+  /** PENDING_CONFIRM에서만 호출 가능(서비스가 상태를 먼저 검사한다). */
+  public void confirm(UUID operatorId) {
+    this.status = RewardPayoutStatus.CONFIRMED;
+    this.confirmedBy = operatorId;
+    this.confirmedAt = OffsetDateTime.now();
+  }
+
   public void updateMemo(String memo) {
     this.memo = memo;
   }

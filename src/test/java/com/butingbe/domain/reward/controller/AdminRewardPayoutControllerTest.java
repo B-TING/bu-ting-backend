@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutPageResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutReleaseHoldResDto;
@@ -149,6 +150,32 @@ class AdminRewardPayoutControllerTest {
                     "/admin/reward-payouts/{id}", UUID.randomUUID())
                 .contentType("application/json")
                 .content("{}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("일괄 확정 200")
+  void bulkConfirm() throws Exception {
+    when(adminRewardPayoutService.bulkConfirm(any(), any(), any()))
+        .thenReturn(new AdminRewardPayoutBulkResultResDto(List.of()));
+
+    mockMvc
+        .perform(
+            post("/admin/reward-payouts/bulk-confirm")
+                .contentType("application/json")
+                .content(
+                    "{\"payoutIds\":[\"" + UUID.randomUUID() + "\"],\"expectedRevisions\":{}}"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("일괄 확정: payoutIds가 비어있으면 400")
+  void bulkConfirmValidation() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/reward-payouts/bulk-confirm")
+                .contentType("application/json")
+                .content("{\"payoutIds\":[],\"expectedRevisions\":{}}"))
         .andExpect(status().isBadRequest());
   }
 

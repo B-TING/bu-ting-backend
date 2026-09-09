@@ -5,6 +5,7 @@ import com.butingbe.domain.travel.ai.TravelPlanValidationException;
 import com.butingbe.domain.zoneevent.exception.OpenParticipationExistsException;
 import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
 import com.butingbe.global.common.ApiResponse;
+import com.butingbe.global.error.exception.BulkPayoutConflictException;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
@@ -133,6 +134,17 @@ public class GlobalExceptionHandler {
             : Map.of("participationId", e.getParticipationId().toString());
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(ApiResponse.fail(message(e.getMessage(), request), data));
+  }
+
+  @ExceptionHandler(BulkPayoutConflictException.class)
+  public ResponseEntity<ApiResponse<Map<String, Object>>> handleBulkPayoutConflict(
+      BulkPayoutConflictException e, HttpServletRequest request) {
+    log.warn("Bulk payout conflict: problemPayoutIds={}", e.getProblemPayoutIds());
+
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(
+            ApiResponse.fail(
+                message(e.getMessage(), request), Map.of("problemPayoutIds", e.getProblemPayoutIds())));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -110,4 +110,10 @@ public class BaseRewardPayout extends TimestampEntity {
   public void updateSchedule(OffsetDateTime scheduledAt) {
     this.scheduledAt = scheduledAt;
   }
+
+  public void confirm(UUID operatorId) {
+    this.status = BaseRewardPayoutStatus.CONFIRMED;
+    this.confirmedBy = operatorId;
+    this.confirmedAt = OffsetDateTime.now();
+  }
 }
