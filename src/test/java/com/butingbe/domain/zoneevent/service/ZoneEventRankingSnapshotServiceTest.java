@@ -115,6 +115,16 @@ class ZoneEventRankingSnapshotServiceTest extends AbstractContainerTest {
     assertThat(snapshotRepository.countByEventId(event.getId())).isEqualTo(countAfterFirst);
   }
 
+  @Test
+  @DisplayName("우수 보상은 설정돼 있지만 참여가 하나도 없으면 스냅샷을 만들지 않는다")
+  void skipsWhenNoParticipations() {
+    ZoneEvent event = eventWithTopN(3);
+
+    snapshotService.freeze(event, OffsetDateTime.now());
+
+    assertThat(snapshotRepository.countByEventId(event.getId())).isZero();
+  }
+
   private ZoneEvent eventWithTopN(int topN) {
     return zoneEventRepository.save(
         baseEventBuilder()

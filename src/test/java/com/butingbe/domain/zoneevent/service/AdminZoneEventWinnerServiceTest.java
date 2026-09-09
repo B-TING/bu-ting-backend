@@ -12,6 +12,7 @@ import com.butingbe.domain.zoneevent.dto.request.WinnerConfirmReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminTopNResDto;
 import com.butingbe.domain.zoneevent.dto.response.TopNZoneGroupResDto;
 import com.butingbe.domain.zoneevent.dto.response.WinnerConfirmResDto;
+import com.butingbe.domain.zoneevent.entity.IdempotencyRecord;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
 import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
@@ -23,6 +24,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.IdempotencyRecordRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRankingSnapshotRepository;
@@ -58,6 +60,7 @@ class AdminZoneEventWinnerServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventReportRepository reportRepository;
   @Autowired private ZoneEventAuditLogRepository auditLogRepository;
   @Autowired private IdempotencyService idempotencyService;
+  @Autowired private IdempotencyRecordRepository idempotencyRecordRepository;
   @Autowired private UserRepository userRepository;
 
   private ZoneEventRound round;
@@ -345,6 +348,94 @@ class AdminZoneEventWinnerServiceTest extends AbstractContainerTest {
                 .getFinalized())
         .isTrue();
     assertThat(auditLogRepository.findByTargetTypeAndTargetId("EVENT", event.getId())).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("같은 Idempotency-Key로 재전송하면 다시 처리하지 않고 이전 결과를 그대로 돌려준다")
+  void confirmWinnersIsIdempotent() {
+    ZoneEventParticipation p = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID snapshotId =
+        snapshotRepository
+            .findByEventIdAndVersionAndParticipationId(event.getId(), 1, p.getId())
+            .orElseThrow()
+            .getId();
+    String key = "idem-" + UUID.randomUUID();
+    WinnerConfirmReqDto request = new WinnerConfirmReqDto(snapshotId, List.of(p.getId()), "사유", 1);
+
+    WinnerConfirmResDto first = winnerService.confirmWinners(operator, event.getId(), request, key);
+    WinnerConfirmResDto replay =
+        winnerService.confirmWinners(operator, event.getId(), request, key);
+
+    assertThat(replay).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("멱등성 키 재사용 시 저장된 응답을 그대로 재생하며, 손상된 JSON이면 500 대신 예외를 던진다")
+  void confirmWinnersReplayWithCorruptedJsonThrows() {
+    ZoneEventParticipation p = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID snapshotId =
+        snapshotRepository
+            .findByEventIdAndVersionAndParticipationId(event.getId(), 1, p.getId())
+            .orElseThrow()
+            .getId();
+    String key = "idem-corrupt-" + UUID.randomUUID();
+    List<UUID> sortedIds = List.of(p.getId()).stream().sorted().toList();
+    String fingerprint = event.getId() + ":" + snapshotId + ":" + sortedIds + ":" + "사유" + ":" + 1;
+    idempotencyRecordRepository.save(
+        new IdempotencyRecord(key, "zone-event-winner-confirm", fingerprint, "not-a-json"));
+
+    assertThatThrownBy(
+            () ->
+                winnerService.confirmWinners(
+                    operator,
+                    event.getId(),
+                    new WinnerConfirmReqDto(snapshotId, List.of(p.getId()), "사유", 1),
+                    key))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to deserialize");
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 snapshotId를 anchor로 지정하면 404")
+  void confirmWinnersAnchorSnapshotNotFound() {
+    ZoneEventParticipation p = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+
+    assertThatThrownBy(
+            () ->
+                winnerService.confirmWinners(
+                    operator,
+                    event.getId(),
+                    new WinnerConfirmReqDto(UUID.randomUUID(), List.of(p.getId()), "사유", 1),
+                    null))
+        .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("요청한 participationId에 해당하는 스냅샷 행이 없으면 404")
+  void confirmWinnersParticipationSnapshotNotFound() {
+    ZoneEventParticipation p = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID anchorSnapshotId =
+        snapshotRepository
+            .findByEventIdAndVersionAndParticipationId(event.getId(), 1, p.getId())
+            .orElseThrow()
+            .getId();
+
+    assertThatThrownBy(
+            () ->
+                winnerService.confirmWinners(
+                    operator,
+                    event.getId(),
+                    new WinnerConfirmReqDto(anchorSnapshotId, List.of(UUID.randomUUID()), "사유", 1),
+                    null))
+        .isInstanceOf(ResourceNotFoundException.class);
   }
 
   private ZoneEventParticipation success(long likeCount) {
