@@ -125,6 +125,27 @@ class ZoneEventRankingSnapshotServiceTest extends AbstractContainerTest {
     assertThat(snapshotRepository.countByEventId(event.getId())).isZero();
   }
 
+  @Test
+  @DisplayName("신고 누적으로 자동 숨김된 참여도 스냅샷 행을 남긴다(숨김이 풀리면 확정할 수 있어야 하므로)")
+  void includesAutoHiddenParticipations() {
+    ZoneEvent event = eventWithTopN(2);
+    ZoneEventParticipation first = success(event, 10);
+    ZoneEventParticipation hiddenSecond = success(event, 8);
+    hiddenSecond.hide();
+    participationRepository.save(hiddenSecond);
+    success(event, 5); // 컷오프(8) 미만 → 제외
+
+    snapshotService.freeze(event, OffsetDateTime.now());
+
+    List<ZoneEventRankingSnapshot> rows =
+        snapshotRepository.findByEventIdAndVersionOrderByRankNAsc(event.getId(), 1);
+    assertThat(rows)
+        .extracting(ZoneEventRankingSnapshot::getParticipationId)
+        .containsExactly(first.getId(), hiddenSecond.getId());
+    assertThat(rows.get(1).getRankN()).isEqualTo(2);
+    assertThat(rows.get(1).getLikeCountAtClose()).isEqualTo(8L);
+  }
+
   private ZoneEvent eventWithTopN(int topN) {
     return zoneEventRepository.save(
         baseEventBuilder()

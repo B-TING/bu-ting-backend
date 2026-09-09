@@ -9,7 +9,6 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRankingSnapshotReposito
 import java.time.OffsetDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Top N 경계에서 동점이면 동점자 전원을 포함해 기록하고, 관리자가 {@code winners/confirm}으로 최종 선정할 때까지 자동으로 풀리지
  * 않는다({@link ZoneEventRankingSnapshot}). 이벤트에 우수 보상이 설정돼 있지 않거나 이미 스냅샷이 존재하면 아무 일도 하지 않는다.
+ *
+ * <p>신고 누적으로 자동 숨김된 참여도 순위 산정에 포함한다 — 제외하면 신고가 기각된 뒤에도 확정할 스냅샷 행이 없고 컷오프가 조용히 밀린다. 대신 미해결 신고가 있는
+ * 동안은 {@code top-n}·{@code winners/confirm}이 신고 상태로 보류를 판단한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -38,7 +40,7 @@ public class ZoneEventRankingSnapshotService {
       return;
     }
     List<ZoneEventParticipation> ranked =
-        participationRepository.findTopPublicSuccessByEvent(event.getId(), Pageable.unpaged());
+        participationRepository.findRankedPublicSuccessByEvent(event.getId());
     if (ranked.isEmpty()) {
       return;
     }
