@@ -5750,7 +5750,7 @@ paths:
       tags:
         - Zone Event
       summary: "ROLE_ADMIN/MANAGER. 지급 보류 해제"
-      description: "신고로 보류된 지급의 보류를 해제합니다. 해당 참여에 미해결 신고가 하나라도 남아 있으면 409이며, 이 API만이 보류를 해제할 수 있습니다(신고 처리로는 자동 해제되지 않음). payoutId는 TOP_LIKE(RewardPayout) 또는 기본 보상(BaseRewardPayout) 중 하나를 가리킵니다."
+      description: "신고로 보류된 지급의 보류를 해제합니다. 해당 참여에 미해결 신고가 하나라도 남아 있으면 409이며, 이 신고 검수 흐름에서는 이 API로만 보류를 해제합니다(신고 처리로는 자동 해제되지 않음). 참여 숨김 해제(unhide)는 별도의 레거시 경로로 issue #241부터 존재하며 이번 이슈 범위 밖입니다. payoutId는 TOP_LIKE(RewardPayout) 또는 기본 보상(BaseRewardPayout) 중 하나를 가리킵니다."
       security:
         - opaqueToken: [ ]
       parameters:

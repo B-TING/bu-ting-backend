@@ -25,7 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-/** 신고로 보류된 지급의 해제. 미해결 신고가 하나도 없어야 하며, 이 API로만 해제할 수 있다(issue #243). */
+/**
+ * 신고로 보류된 지급의 해제. 미해결 신고가 하나도 없어야 하며, 이 신고 검수 흐름에서 보류를 해제하는 API다(issue #243).
+ *
+ * <p>참여 숨김 해제({@code AdminReviewService.unhide()})는 별도의 레거시 경로로 issue #241부터 존재하며, 참여의 모든 신고를 일괄
+ * 기각하는 부수 효과로 보류도 해제한다. 이번 이슈 범위 밖이라 손대지 않는다.
+ */
 @Service
 @RequiredArgsConstructor
 public class AdminRewardPayoutService {
@@ -103,7 +108,10 @@ public class AdminRewardPayoutService {
         payout.getId().toString(), "BASE", payout.getHoldStatus().name(), payout.getRevision());
   }
 
-  /** revision·보류 상태·미해결 신고 전체를 확인한다 — 방금 처리한 신고 하나만 보고 판단하지 않는다. */
+  /**
+   * revision·보류 상태·미해결 신고 전체를 확인한다 — 방금 처리한 신고 하나만 보고 판단하지 않는다. (레거시 {@code
+   * AdminReviewService.unhide()} 경로는 예외로 남아 있다 — issue #241, 이번 이슈 범위 밖.)
+   */
   private void requireHeldAndCurrent(
       PayoutHoldStatus holdStatus, Long revision, UUID participationId, ReleaseHoldReqDto request) {
     if (!revision.equals(request.expectedRevision())) {

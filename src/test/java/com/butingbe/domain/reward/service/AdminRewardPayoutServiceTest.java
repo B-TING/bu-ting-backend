@@ -17,6 +17,7 @@ import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
 import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
+import com.butingbe.domain.zoneevent.entity.ReportStatus;
 import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
@@ -142,6 +143,48 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
             .participationId(p.getId())
             .reporterId(UUID.randomUUID())
             .reasonCode(ReportReasonCode.SPAM)
+            .build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.releaseHold(
+                    operator,
+                    payout.getId(),
+                    new ReleaseHoldReqDto("확인", payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.unresolved_reports_remain");
+  }
+
+  @Test
+  @DisplayName("두 신고 중 하나만 기각되고 나머지가 미해결이면 보류를 해제할 수 없다(409)")
+  void refusesReleaseWhenOneOfTwoReportsStillUnresolved() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.hold();
+    rewardPayoutRepository.saveAndFlush(payout);
+    ZoneEventReport dismissedReport =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    dismissedReport.resolveAs(ReportStatus.DISMISSED);
+    reportRepository.saveAndFlush(dismissedReport);
+    reportRepository.save(
+        ZoneEventReport.builder()
+            .participationId(p.getId())
+            .reporterId(UUID.randomUUID())
+            .reasonCode(ReportReasonCode.OTHER)
             .build());
 
     assertThatThrownBy(

@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.entity.BaseRewardPayout;
+import com.butingbe.domain.reward.entity.BaseRewardPayoutStatus;
 import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardPayout;
+import com.butingbe.domain.reward.entity.RewardPayoutStatus;
 import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.user.entity.Name;
@@ -41,6 +44,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
@@ -241,6 +245,74 @@ class AdminZoneEventReportServiceTest extends AbstractContainerTest {
     assertThat(reloaded.getDecisionNote()).isEqualTo("근거 확인됨");
     assertThat(rewardPayoutRepository.findById(payout.getId()).orElseThrow().getHoldStatus())
         .isEqualTo(PayoutHoldStatus.HELD_REPORT);
+  }
+
+  @Test
+  @DisplayName("이미 발송 완료(SENT)된 TOP_LIKE 지급은 신고 인정으로도 보류하지 않는다")
+  void upholdDoesNotHoldAlreadySentTopLikePayout() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    ReflectionTestUtils.setField(payout, "status", RewardPayoutStatus.SENT);
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    var decision =
+        reportService.uphold(
+            operator,
+            report.getId(),
+            new ReportUpholdReqDto("근거 확인됨", ReportUpholdAction.HOLD, report.getRevision()),
+            null);
+
+    assertThat(decision.status()).isEqualTo("UPHELD");
+    assertThat(rewardPayoutRepository.findById(payout.getId()).orElseThrow().getHoldStatus())
+        .isEqualTo(PayoutHoldStatus.NONE);
+  }
+
+  @Test
+  @DisplayName("이미 지급 완료(PAID)된 기본 보상은 신고 인정으로도 보류하지 않는다")
+  void upholdDoesNotHoldAlreadyPaidBasePayout() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    BaseRewardPayout basePayout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    ReflectionTestUtils.setField(basePayout, "status", BaseRewardPayoutStatus.PAID);
+    baseRewardPayoutRepository.saveAndFlush(basePayout);
+
+    var decision =
+        reportService.uphold(
+            operator,
+            report.getId(),
+            new ReportUpholdReqDto("근거 확인됨", ReportUpholdAction.HOLD, report.getRevision()),
+            null);
+
+    assertThat(decision.status()).isEqualTo("UPHELD");
+    assertThat(
+            baseRewardPayoutRepository.findById(basePayout.getId()).orElseThrow().getHoldStatus())
+        .isEqualTo(PayoutHoldStatus.NONE);
   }
 
   @Test

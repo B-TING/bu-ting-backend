@@ -3,10 +3,8 @@ package com.butingbe.domain.zoneevent.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.reward.entity.BaseRewardPayout;
-import com.butingbe.domain.reward.entity.BaseRewardPayoutStatus;
 import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardPayout;
-import com.butingbe.domain.reward.entity.RewardPayoutStatus;
 import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.user.entity.User;
@@ -242,20 +240,12 @@ public class ZoneEventSocialService {
     rewardPayoutRepository
         .findByParticipationId(participationId)
         .filter(payout -> payout.getHoldStatus() != PayoutHoldStatus.HELD_REPORT)
-        .filter(
-            payout ->
-                payout.getStatus() != RewardPayoutStatus.SENT
-                    && payout.getStatus() != RewardPayoutStatus.MAIL_SENT
-                    && payout.getStatus() != RewardPayoutStatus.INFO_COLLECTED
-                    && payout.getStatus() != RewardPayoutStatus.FAILED)
+        .filter(RewardPayout::isHoldable)
         .ifPresent(RewardPayout::hold);
     baseRewardPayoutRepository
         .findByParticipationId(participationId)
         .filter(payout -> payout.getHoldStatus() != PayoutHoldStatus.HELD_REPORT)
-        .filter(
-            payout ->
-                payout.getStatus() != BaseRewardPayoutStatus.PAID
-                    && payout.getStatus() != BaseRewardPayoutStatus.FAILED)
+        .filter(BaseRewardPayout::isHoldable)
         .ifPresent(BaseRewardPayout::hold);
   }
 

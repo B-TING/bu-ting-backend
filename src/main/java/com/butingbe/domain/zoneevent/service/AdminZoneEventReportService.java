@@ -190,10 +190,12 @@ public class AdminZoneEventReportService {
     rewardPayoutRepository
         .findByParticipationId(report.getParticipationId())
         .filter(payout -> payout.getHoldStatus() != PayoutHoldStatus.HELD_REPORT)
+        .filter(RewardPayout::isHoldable)
         .ifPresent(RewardPayout::hold);
     baseRewardPayoutRepository
         .findByParticipationId(report.getParticipationId())
         .filter(payout -> payout.getHoldStatus() != PayoutHoldStatus.HELD_REPORT)
+        .filter(BaseRewardPayout::isHoldable)
         .ifPresent(BaseRewardPayout::hold);
 
     auditLogRepository.save(
