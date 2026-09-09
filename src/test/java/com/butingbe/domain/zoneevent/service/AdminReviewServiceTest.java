@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardCatalog;
+import com.butingbe.domain.reward.entity.RewardPayout;
+import com.butingbe.domain.reward.entity.RewardPayoutStatus;
 import com.butingbe.domain.reward.entity.RewardType;
 import com.butingbe.domain.reward.repository.RewardCatalogRepository;
+import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.reward.service.RewardService;
 import com.butingbe.domain.reward.service.UserPointService;
 import com.butingbe.domain.user.entity.Name;
@@ -54,6 +58,7 @@ class AdminReviewServiceTest extends AbstractContainerTest {
   @Autowired private UserPointService userPointService;
   @Autowired private RewardService rewardService;
   @Autowired private UserRepository userRepository;
+  @Autowired private RewardPayoutRepository payoutRepository;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
@@ -126,6 +131,56 @@ class AdminReviewServiceTest extends AbstractContainerTest {
     assertThat(participationRepository.findById(p.getId()).orElseThrow().getHidden()).isFalse();
     assertThat(reportRepository.findByParticipationId(p.getId()).get(0).getStatus())
         .isEqualTo(ReportStatus.DISMISSED);
+  }
+
+  @Test
+  @DisplayName("숨김 해제 시 HELD_REPORT였던 지급 건은 보류가 풀린다")
+  void unhideReleasesPayoutHold() {
+    ZoneEventParticipation p =
+        participationRepository.save(participation(ParticipationStatus.SUCCESS, true));
+    reportRepository.save(
+        ZoneEventReport.builder()
+            .participationId(p.getId())
+            .reporterId(UUID.randomUUID())
+            .reasonCode(ReportReasonCode.SPAM)
+            .build());
+    RewardPayout payout =
+        payoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(5L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.hold();
+
+    reviewService.unhide(operator, p.getId());
+
+    assertThat(payoutRepository.findById(payout.getId()).orElseThrow().getHoldStatus())
+        .isEqualTo(PayoutHoldStatus.NONE);
+  }
+
+  @Test
+  @DisplayName("회수 시 아직 발송 전인 지급 건은 FAILED로 바뀐다")
+  void revokeFailsUnsentPayout() {
+    ZoneEventParticipation p =
+        participationRepository.save(participation(ParticipationStatus.SUCCESS, false));
+    RewardPayout payout =
+        payoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(5L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+
+    reviewService.revoke(operator, p.getId());
+
+    RewardPayout reloaded = payoutRepository.findById(payout.getId()).orElseThrow();
+    assertThat(reloaded.getStatus()).isEqualTo(RewardPayoutStatus.FAILED);
+    assertThat(reloaded.getFailureCode()).isEqualTo("PARTICIPATION_REVOKED");
   }
 
   @Test
