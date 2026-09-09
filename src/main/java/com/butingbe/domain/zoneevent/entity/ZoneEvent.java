@@ -66,7 +66,7 @@ public class ZoneEvent extends BaseEntity {
   private ZoneEventStatus status;
 
   @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "base_reward", nullable = false, columnDefinition = "jsonb")
+  @Column(name = "base_reward", columnDefinition = "jsonb")
   private RewardSnapshot baseReward;
 
   @JdbcTypeCode(SqlTypes.JSON)

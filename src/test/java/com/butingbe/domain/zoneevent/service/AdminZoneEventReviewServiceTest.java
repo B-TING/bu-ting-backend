@@ -30,6 +30,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.IdempotencyRecordRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
@@ -69,6 +70,7 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @Autowired private ZoneTitleDefRepository titleDefRepository;
   @Autowired private UserZoneTitleRepository userZoneTitleRepository;
   @Autowired private IdempotencyRecordRepository idempotencyRecordRepository;
+  @Autowired private ZoneEventReportRepository reportRepository;
   @Autowired private EntityManager entityManager;
   @MockitoBean private FileStorageService fileStorageService;
 
@@ -199,8 +201,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("승인하면 SUCCESS·앨범 공개만 되고(보상 없음) 현재 제출도 SUCCESS가 된다")
-  void approveMarksSuccessWithoutReward() {
+  @DisplayName("승인하면 SUCCESS·앨범 공개가 되고 보상은 아직 지급하지 않는다(BASE 지급 건만 PENDING_CONFIRM으로 생성)")
+  void approveMarksSuccessAndCreatesBasePayout() {
     ZoneEventParticipation p = underReviewWithSubmission();
     ZoneEventSubmission submission =
         submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
@@ -227,10 +229,95 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
     assertThat(result.status()).isEqualTo("SUCCESS");
     assertThat(submissionRepository.findById(submission.getId()).orElseThrow().getReviewStatus())
         .isEqualTo(com.butingbe.domain.zoneevent.entity.SubmissionReviewStatus.SUCCESS);
-    assertThat(baseRewardPayoutRepository.count()).isZero();
     assertThat(rewardPayoutRepository.count()).isZero();
+    var basePayout = baseRewardPayoutRepository.findByParticipationId(p.getId()).orElseThrow();
+    assertThat(basePayout.getStatus())
+        .isEqualTo(com.butingbe.domain.reward.entity.BaseRewardPayoutStatus.PENDING_CONFIRM);
+    assertThat(basePayout.getHoldStatus())
+        .isEqualTo(com.butingbe.domain.reward.entity.PayoutHoldStatus.NONE);
+    assertThat(basePayout.getReward()).isEqualTo(event.getBaseReward());
     assertThat(result.newlyAwardedTitles()).isNotEmpty();
     assertThat(userZoneTitleRepository.countByUserIdAndEquippedIsTrue(p.getUserId())).isZero();
+  }
+
+  @Test
+  @DisplayName("이벤트에 baseReward가 없으면 BASE 지급 건을 만들지 않는다")
+  void approveWithoutBaseRewardCreatesNoPayout() {
+    ZoneEvent noRewardEvent =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("SUYEONG_NAMGU")
+                .type(zoneEventTypeRepository.findAll().get(0))
+                .title("보상 없는 이벤트")
+                .startsAt(OffsetDateTime.now().minusHours(1))
+                .durationMinutes(1440)
+                .status(ZoneEventStatus.ACTIVE)
+                .successLimitPerUser(1)
+                .build());
+    ZoneEventAuthTarget target =
+        authTargetRepository.save(
+            ZoneEventAuthTarget.builder()
+                .event(noRewardEvent)
+                .targetKind(ZoneEventTargetKind.PLACE)
+                .placeName("장소")
+                .latitude(35.1)
+                .longitude(129.1)
+                .radiusM(100)
+                .build());
+    ZoneEventParticipation p =
+        participationRepository.save(
+            ZoneEventParticipation.builder()
+                .event(noRewardEvent)
+                .userId(savedUser("참가자2").getId())
+                .status(ParticipationStatus.UNDER_REVIEW)
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .joinedAt(OffsetDateTime.now())
+                .visibility(ParticipationVisibility.PUBLIC)
+                .build());
+    ZoneEventSubmission submission =
+        submissionRepository.save(
+            ZoneEventSubmission.builder()
+                .participation(p)
+                .attemptNo(1)
+                .target(target)
+                .placeName(target.getPlaceName())
+                .targetLatitude(target.getLatitude())
+                .targetLongitude(target.getLongitude())
+                .radiusM(target.getRadiusM())
+                .mediaFileKey("uploads/images/photo2.jpg")
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .capturedAt(OffsetDateTime.now())
+                .build());
+    ReflectionTestUtils.setField(p, "currentSubmissionId", submission.getId());
+    p = participationRepository.save(p);
+
+    reviewService.approve(
+        operator, p.getId(), new ReviewApproveReqDto(submission.getId(), submission.getRevision()), null);
+
+    assertThat(baseRewardPayoutRepository.findByParticipationId(p.getId())).isEmpty();
+  }
+
+  @Test
+  @DisplayName("승인 시점에 미해결 신고가 있으면 새로 만든 BASE 지급 건도 바로 보류 상태로 생성한다")
+  void approveCreatesHeldBasePayoutWhenUnresolvedReportExists() {
+    ZoneEventParticipation p = underReviewWithSubmission();
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    reportRepository.save(
+        com.butingbe.domain.zoneevent.entity.ZoneEventReport.builder()
+            .participationId(p.getId())
+            .reporterId(UUID.randomUUID())
+            .reasonCode(com.butingbe.domain.zoneevent.entity.ReportReasonCode.SPAM)
+            .build());
+
+    reviewService.approve(
+        operator, p.getId(), new ReviewApproveReqDto(submission.getId(), submission.getRevision()), null);
+
+    var basePayout = baseRewardPayoutRepository.findByParticipationId(p.getId()).orElseThrow();
+    assertThat(basePayout.getHoldStatus())
+        .isEqualTo(com.butingbe.domain.reward.entity.PayoutHoldStatus.HELD_REPORT);
   }
 
   @Test
