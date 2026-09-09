@@ -4,15 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardPayout;
+import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.dto.request.ReportUpholdAction;
+import com.butingbe.domain.zoneevent.dto.request.ReportUpholdReqDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
 import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
+import com.butingbe.domain.zoneevent.entity.ReportStatus;
 import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
@@ -23,6 +28,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
+import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
@@ -46,6 +52,7 @@ class AdminZoneEventReportServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventReportRepository reportRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private RewardPayoutRepository rewardPayoutRepository;
+  @Autowired private BaseRewardPayoutRepository baseRewardPayoutRepository;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
@@ -197,6 +204,103 @@ class AdminZoneEventReportServiceTest extends AbstractContainerTest {
   void detailNotFound() {
     assertThatThrownBy(() -> reportService.detail(operator, UUID.randomUUID()))
         .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("신고 인정(HOLD)은 상태를 UPHELD로 바꾸고 관련 지급을 보류한다")
+  void upholdMarksUpheldAndHoldsPayouts() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+
+    var decision =
+        reportService.uphold(
+            operator,
+            report.getId(),
+            new ReportUpholdReqDto("근거 확인됨", ReportUpholdAction.HOLD, report.getRevision()),
+            null);
+
+    assertThat(decision.status()).isEqualTo("UPHELD");
+    ZoneEventReport reloaded = reportRepository.findById(report.getId()).orElseThrow();
+    assertThat(reloaded.getStatus()).isEqualTo(ReportStatus.UPHELD);
+    assertThat(reloaded.getDecisionNote()).isEqualTo("근거 확인됨");
+    assertThat(rewardPayoutRepository.findById(payout.getId()).orElseThrow().getHoldStatus())
+        .isEqualTo(PayoutHoldStatus.HELD_REPORT);
+  }
+
+  @Test
+  @DisplayName("action=DISQUALIFY는 아직 지원하지 않으므로 400이다")
+  void upholdDisqualifyNotSupported() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+
+    assertThatThrownBy(
+            () ->
+                reportService.uphold(
+                    operator,
+                    report.getId(),
+                    new ReportUpholdReqDto(
+                        "근거", ReportUpholdAction.DISQUALIFY, report.getRevision()),
+                    null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.zone_event.report.action_not_supported");
+  }
+
+  @Test
+  @DisplayName("expectedRevision이 다르면 409, 이미 처리된 신고면 409다")
+  void upholdConflicts() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+
+    assertThatThrownBy(
+            () ->
+                reportService.uphold(
+                    operator,
+                    report.getId(),
+                    new ReportUpholdReqDto("근거", ReportUpholdAction.HOLD, report.getRevision() + 1),
+                    null))
+        .isInstanceOf(ConflictException.class);
+
+    reportService.uphold(
+        operator,
+        report.getId(),
+        new ReportUpholdReqDto("근거", ReportUpholdAction.HOLD, report.getRevision()),
+        null);
+    ZoneEventReport decided = reportRepository.findById(report.getId()).orElseThrow();
+    assertThatThrownBy(
+            () ->
+                reportService.uphold(
+                    operator,
+                    report.getId(),
+                    new ReportUpholdReqDto("근거", ReportUpholdAction.HOLD, decided.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class);
   }
 
   private ZoneEventParticipation participation() {

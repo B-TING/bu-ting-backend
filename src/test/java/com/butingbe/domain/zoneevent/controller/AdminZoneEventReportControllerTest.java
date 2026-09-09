@@ -4,9 +4,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportDecisionResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportDetailResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportPageResDto;
 import com.butingbe.domain.zoneevent.service.AdminZoneEventReportService;
@@ -91,6 +94,34 @@ class AdminZoneEventReportControllerTest {
                 OffsetDateTime.now(),
                 List.of()));
     mockMvc.perform(get("/admin/zone-event-reports/{id}", reportId)).andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("신고 인정 200")
+  void uphold() throws Exception {
+    UUID reportId = UUID.randomUUID();
+    when(adminZoneEventReportService.uphold(any(), eq(reportId), any(), any()))
+        .thenReturn(
+            new AdminZoneEventReportDecisionResDto(
+                reportId.toString(), "UPHELD", UUID.randomUUID().toString(), 1L));
+    mockMvc
+        .perform(
+            post("/admin/zone-event-reports/{id}/uphold", reportId)
+                .contentType("application/json")
+                .content("{\"note\":\"근거 확인\",\"action\":\"HOLD\",\"expectedRevision\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("UPHELD"));
+  }
+
+  @Test
+  @DisplayName("신고 인정 요청에 note·action·expectedRevision이 없으면 400")
+  void upholdValidation() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/zone-event-reports/{id}/uphold", UUID.randomUUID())
+                .contentType("application/json")
+                .content("{}"))
+        .andExpect(status().isBadRequest());
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
