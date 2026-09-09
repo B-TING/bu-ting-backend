@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ZoneEventReportRepository extends JpaRepository<ZoneEventReport, UUID> {
 
+  List<ReportStatus> UNRESOLVED_STATUSES = List.of(ReportStatus.OPEN, ReportStatus.REVIEWING);
+
   boolean existsByParticipationIdAndReporterId(UUID participationId, UUID reporterId);
 
   long countByParticipationId(UUID participationId);
@@ -18,4 +20,9 @@ public interface ZoneEventReportRepository extends JpaRepository<ZoneEventReport
   /** 미해결 신고(OPEN/REVIEWING) 존재 여부 — 수상자 선정·지급 보류 판단에 쓴다. */
   boolean existsByParticipationIdAndStatusIn(
       UUID participationId, Collection<ReportStatus> statuses);
+
+  /** {@link #existsByParticipationIdAndStatusIn}을 {@link #UNRESOLVED_STATUSES}로 고정한 편의 메서드. */
+  default boolean hasUnresolvedReports(UUID participationId) {
+    return existsByParticipationIdAndStatusIn(participationId, UNRESOLVED_STATUSES);
+  }
 }

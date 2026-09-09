@@ -5,7 +5,6 @@ import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.reward.dto.response.PayoutGenerateResDto;
 import com.butingbe.domain.reward.entity.RewardPayout;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
-import com.butingbe.domain.zoneevent.entity.ReportStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRankingSnapshot;
@@ -28,9 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class RewardPayoutService {
-
-  private static final List<ReportStatus> UNRESOLVED =
-      List.of(ReportStatus.OPEN, ReportStatus.REVIEWING);
 
   private final OperatorAuthorization operatorAuthorization;
   private final ZoneEventRepository zoneEventRepository;
@@ -63,8 +59,7 @@ public class RewardPayoutService {
               .likeCountAtClose(row.getLikeCountAtClose())
               .reward(event.getExcellenceReward())
               .build();
-      if (reportRepository.existsByParticipationIdAndStatusIn(
-          row.getParticipationId(), UNRESOLVED)) {
+      if (reportRepository.hasUnresolvedReports(row.getParticipationId())) {
         payout.hold();
         heldOnCreate++;
       }
