@@ -1,14 +1,17 @@
 package com.butingbe.domain.zoneevent.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportDetailResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportPageResDto;
 import com.butingbe.domain.zoneevent.service.AdminZoneEventReportService;
 import com.butingbe.global.error.GlobalExceptionHandler;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -63,6 +66,31 @@ class AdminZoneEventReportControllerTest {
     when(adminZoneEventReportService.list(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(new AdminZoneEventReportPageResDto(List.of(), 1, 20, 0, 0, false));
     mockMvc.perform(get("/admin/zone-event-reports")).andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("신고 상세 200")
+  void detail() throws Exception {
+    UUID reportId = UUID.randomUUID();
+    when(adminZoneEventReportService.detail(any(), eq(reportId)))
+        .thenReturn(
+            new AdminZoneEventReportDetailResDto(
+                reportId.toString(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                null,
+                "SUYEONG_NAMGU",
+                UUID.randomUUID().toString(),
+                "SPAM",
+                null,
+                "OPEN",
+                null,
+                null,
+                null,
+                0L,
+                OffsetDateTime.now(),
+                List.of()));
+    mockMvc.perform(get("/admin/zone-event-reports/{id}", reportId)).andExpect(status().isOk());
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {

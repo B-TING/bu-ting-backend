@@ -1,6 +1,7 @@
 package com.butingbe.domain.zoneevent.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportDetailResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportPageResDto;
 import com.butingbe.domain.zoneevent.service.AdminZoneEventReportService;
 import com.butingbe.global.common.ApiResponse;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,5 +37,12 @@ public class AdminZoneEventReportController {
             "신고 목록",
             adminZoneEventReportService.list(
                 user, status, roundId, eventId, participationId, page, size)));
+  }
+
+  @GetMapping("/{reportId}")
+  public ResponseEntity<ApiResponse<AdminZoneEventReportDetailResDto>> detail(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID reportId) {
+    return ResponseEntity.ok(
+        ApiResponse.success("신고 상세", adminZoneEventReportService.detail(user, reportId)));
   }
 }

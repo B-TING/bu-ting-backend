@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.entity.RewardPayout;
+import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
@@ -22,6 +24,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -42,6 +45,7 @@ class AdminZoneEventReportServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private ZoneEventReportRepository reportRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RewardPayoutRepository rewardPayoutRepository;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
@@ -135,6 +139,45 @@ class AdminZoneEventReportServiceTest extends AbstractContainerTest {
             List.of());
     assertThatThrownBy(() -> reportService.list(normalUser, null, null, null, null, 1, 20))
         .isInstanceOf(ForbiddenException.class);
+  }
+
+  @Test
+  @DisplayName("신고 상세는 참여·이벤트·관련 지급 건 정보를 함께 돌려준다")
+  void detailIncludesParticipationAndPayouts() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .memo("도배")
+                .build());
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+
+    var detail = reportService.detail(operator, report.getId());
+
+    assertThat(detail.reportId()).isEqualTo(report.getId().toString());
+    assertThat(detail.eventId()).isEqualTo(event.getId().toString());
+    assertThat(detail.memo()).isEqualTo("도배");
+    assertThat(detail.payouts()).hasSize(1);
+    assertThat(detail.payouts().get(0).payoutId()).isEqualTo(payout.getId().toString());
+    assertThat(detail.payouts().get(0).payoutType()).isEqualTo("TOP_LIKE");
+  }
+
+  @Test
+  @DisplayName("없는 신고 상세 조회는 404다")
+  void detailNotFound() {
+    assertThatThrownBy(() -> reportService.detail(operator, UUID.randomUUID()))
+        .isInstanceOf(ResourceNotFoundException.class);
   }
 
   private ZoneEventParticipation participation() {
