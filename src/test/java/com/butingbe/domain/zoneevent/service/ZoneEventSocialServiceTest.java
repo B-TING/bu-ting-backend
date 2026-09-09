@@ -136,7 +136,8 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
     ZoneEventParticipation p = publicSuccess();
 
     socialService.like(viewer, p.getId());
-    assertThat(participationRepository.findById(p.getId()).orElseThrow().getLikeCount()).isEqualTo(1);
+    assertThat(participationRepository.findById(p.getId()).orElseThrow().getLikeCount())
+        .isEqualTo(1);
 
     socialService.unlike(viewer, p.getId());
     assertThat(participationRepository.findById(p.getId()).orElseThrow().getLikeCount()).isZero();

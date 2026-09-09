@@ -92,7 +92,8 @@ public class ZoneEventSocialService {
         likeRepository
             .findByParticipationIdAndUserId(participationId, userId)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.like.duplicate"));
-    ZoneEventParticipation participation = participationRepository.findById(participationId).orElse(null);
+    ZoneEventParticipation participation =
+        participationRepository.findById(participationId).orElse(null);
     if (participation != null) {
       requireEventActive(participation);
       participation.decreaseLikeCount();
