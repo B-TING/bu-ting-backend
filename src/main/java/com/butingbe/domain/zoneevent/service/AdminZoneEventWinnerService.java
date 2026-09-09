@@ -7,7 +7,6 @@ import com.butingbe.domain.zoneevent.dto.response.AdminTopNResDto;
 import com.butingbe.domain.zoneevent.dto.response.TopNCandidateResDto;
 import com.butingbe.domain.zoneevent.dto.response.TopNZoneGroupResDto;
 import com.butingbe.domain.zoneevent.dto.response.WinnerConfirmResDto;
-import com.butingbe.domain.zoneevent.entity.ReportStatus;
 import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
@@ -36,8 +35,6 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class AdminZoneEventWinnerService {
 
-  private static final List<ReportStatus> UNRESOLVED =
-      List.of(ReportStatus.OPEN, ReportStatus.REVIEWING);
   private static final String CONFIRM_ENDPOINT = "zone-event-winner-confirm";
 
   private final OperatorAuthorization operatorAuthorization;
@@ -110,7 +107,7 @@ public class AdminZoneEventWinnerService {
               .orElseThrow(
                   () ->
                       new ResourceNotFoundException("error.zone_event.ranking_snapshot.not_found"));
-      if (reportRepository.existsByParticipationIdAndStatusIn(participationId, UNRESOLVED)) {
+      if (reportRepository.hasUnresolvedReports(participationId)) {
         throw new ConflictException("error.zone_event.winner.held_by_report");
       }
       targets.add(row);
@@ -179,9 +176,7 @@ public class AdminZoneEventWinnerService {
             .map(
                 row ->
                     TopNCandidateResDto.of(
-                        row,
-                        reportRepository.existsByParticipationIdAndStatusIn(
-                            row.getParticipationId(), UNRESOLVED)))
+                        row, reportRepository.hasUnresolvedReports(row.getParticipationId())))
             .toList();
     return new TopNZoneGroupResDto(
         event.getId().toString(), event.getZoneId(), version, candidates);

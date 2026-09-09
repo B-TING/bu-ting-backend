@@ -111,6 +111,14 @@ public class RewardPayout extends TimestampEntity {
     this.holdStatus = PayoutHoldStatus.HELD_REPORT;
   }
 
+  /** 이미 발송·지급이 끝났거나 실패 처리된 건은 보류 대상이 아니다(SENT/MAIL_SENT/INFO_COLLECTED/FAILED 제외). */
+  public boolean isHoldable() {
+    return status != RewardPayoutStatus.SENT
+        && status != RewardPayoutStatus.MAIL_SENT
+        && status != RewardPayoutStatus.INFO_COLLECTED
+        && status != RewardPayoutStatus.FAILED;
+  }
+
   /** 미해결 신고가 없음을 확인한 뒤 보류를 해제한다. */
   public void releaseHold() {
     this.holdStatus = PayoutHoldStatus.NONE;

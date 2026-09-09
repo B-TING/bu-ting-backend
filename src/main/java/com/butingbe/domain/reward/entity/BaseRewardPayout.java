@@ -86,6 +86,11 @@ public class BaseRewardPayout extends TimestampEntity {
     this.holdStatus = PayoutHoldStatus.HELD_REPORT;
   }
 
+  /** 이미 지급이 끝났거나 실패 처리된 건은 보류 대상이 아니다(PAID/FAILED 제외). */
+  public boolean isHoldable() {
+    return status != BaseRewardPayoutStatus.PAID && status != BaseRewardPayoutStatus.FAILED;
+  }
+
   /** 미해결 신고가 없음을 확인한 뒤 보류를 해제한다. */
   public void releaseHold() {
     this.holdStatus = PayoutHoldStatus.NONE;

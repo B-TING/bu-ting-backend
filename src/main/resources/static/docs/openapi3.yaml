@@ -5528,6 +5528,284 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-reports:
+    get:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 신고 목록"
+      description: "status/roundId/eventId/participationId로 필터링한 신고 목록을 페이지로 조회합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [OPEN, REVIEWING, UPHELD, DISMISSED]
+        - name: roundId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: eventId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: participationId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventReportPageEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/zone-event-reports/{reportId}:
+    get:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 신고 상세"
+      description: "신고 내용, 검수 대상 참여·이벤트 정보, 관련 지급 건을 함께 돌려줍니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventReportDetailEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "신고를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/zone-event-reports/{reportId}/uphold:
+    post:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 신고 인정"
+      description: "신고를 UPHELD로 확정합니다. action=HOLD만 지원하며(DISQUALIFY는 정책 확정 전까지 400), 관련 미지급 보상을 보류 상태로 유지합니다. 이미 처리된 신고나 오래된 expectedRevision이면 409입니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportUpholdRequest"
+            example:
+              note: "촬영 조건 미충족 확인"
+              action: HOLD
+              expectedRevision: 0
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventReportDecisionEnvelope"
+        "400":
+          description: "유효성 실패 또는 지원하지 않는 action"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "신고를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "이미 처리된 신고 또는 오래된 expectedRevision"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/zone-event-reports/{reportId}/dismiss:
+    post:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 신고 기각"
+      description: "신고를 DISMISSED로 확정합니다. 다른 미해결 신고가 있어도 그대로 두며, 지급 보류를 자동으로 해제하지 않습니다(해제는 /admin/reward-payouts/{payoutId}/release-hold 전용). 이미 처리된 신고나 오래된 expectedRevision이면 409입니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportDismissRequest"
+            example:
+              note: "촬영 조건 충족 확인, 신고 근거 부족"
+              expectedRevision: 2
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventReportDecisionEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "신고를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "이미 처리된 신고 또는 오래된 expectedRevision"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/reward-payouts/{payoutId}/release-hold:
+    post:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 지급 보류 해제"
+      description: "신고로 보류된 지급의 보류를 해제합니다. 해당 참여에 미해결 신고가 하나라도 남아 있으면 409이며, 이 신고 검수 흐름에서는 이 API로만 보류를 해제합니다(신고 처리로는 자동 해제되지 않음). 참여 숨김 해제(unhide)는 별도의 레거시 경로로 issue #241부터 존재하며 이번 이슈 범위 밖입니다. payoutId는 TOP_LIKE(RewardPayout) 또는 기본 보상(BaseRewardPayout) 중 하나를 가리킵니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: payoutId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReleaseHoldRequest"
+            example:
+              note: "최종 검수 완료, 미해결 신고 없음 확인"
+              expectedRevision: 1
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardPayoutReleaseHoldEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "지급 건을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "보류 중이 아니거나, 미해결 신고가 남아 있거나, 오래된 expectedRevision"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/admin/zone-event-rounds:
     post:
       tags:
@@ -11228,6 +11506,241 @@ components:
           example: "검수 승인"
         data:
           $ref: "#/components/schemas/AdminReviewDecision"
+
+    AdminZoneEventReportListItem:
+      type: object
+      properties:
+        reportId:
+          type: string
+          format: uuid
+        participationId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        roundId:
+          type: string
+          format: uuid
+          nullable: true
+        reporterId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+          enum: [NOT_ON_SITE, INAPPROPRIATE, SPAM, OTHER]
+        status:
+          type: string
+          enum: [OPEN, REVIEWING, UPHELD, DISMISSED]
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminZoneEventReportPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminZoneEventReportListItem"
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        hasNext:
+          type: boolean
+
+    AdminZoneEventReportPageEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "신고 목록"
+        data:
+          $ref: "#/components/schemas/AdminZoneEventReportPage"
+
+    AdminZoneEventReportPayout:
+      type: object
+      properties:
+        payoutId:
+          type: string
+          format: uuid
+        payoutType:
+          type: string
+          enum: [TOP_LIKE, BASE]
+        status:
+          type: string
+        holdStatus:
+          type: string
+          enum: [NONE, HELD_REPORT]
+
+    AdminZoneEventReportDetail:
+      type: object
+      properties:
+        reportId:
+          type: string
+          format: uuid
+        participationId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        roundId:
+          type: string
+          format: uuid
+          nullable: true
+        zoneId:
+          type: string
+        reporterId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+        memo:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [OPEN, REVIEWING, UPHELD, DISMISSED]
+        reviewedBy:
+          type: string
+          format: uuid
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        decisionNote:
+          type: string
+          nullable: true
+        revision:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        payouts:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminZoneEventReportPayout"
+
+    AdminZoneEventReportDetailEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "신고 상세"
+        data:
+          $ref: "#/components/schemas/AdminZoneEventReportDetail"
+
+    ReportUpholdRequest:
+      type: object
+      properties:
+        note:
+          type: string
+        action:
+          type: string
+          enum: [HOLD, DISQUALIFY]
+          description: "현재는 HOLD만 지원합니다. DISQUALIFY는 정책 확정 전까지 400을 반환합니다."
+        expectedRevision:
+          type: integer
+          format: int64
+      required:
+        - note
+        - action
+        - expectedRevision
+
+    ReportDismissRequest:
+      type: object
+      properties:
+        note:
+          type: string
+        expectedRevision:
+          type: integer
+          format: int64
+      required:
+        - note
+        - expectedRevision
+
+    AdminZoneEventReportDecision:
+      type: object
+      properties:
+        reportId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [UPHELD, DISMISSED]
+        participationId:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          format: int64
+
+    AdminZoneEventReportDecisionEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "신고 인정"
+        data:
+          $ref: "#/components/schemas/AdminZoneEventReportDecision"
+
+    ReleaseHoldRequest:
+      type: object
+      properties:
+        note:
+          type: string
+        expectedRevision:
+          type: integer
+          format: int64
+      required:
+        - note
+        - expectedRevision
+
+    AdminRewardPayoutReleaseHold:
+      type: object
+      properties:
+        payoutId:
+          type: string
+          format: uuid
+        payoutType:
+          type: string
+          enum: [TOP_LIKE, BASE]
+        holdStatus:
+          type: string
+          enum: [NONE, HELD_REPORT]
+        revision:
+          type: integer
+          format: int64
+
+    AdminRewardPayoutReleaseHoldEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "지급 보류 해제"
+        data:
+          $ref: "#/components/schemas/AdminRewardPayoutReleaseHold"
 
     ReviewRejectRequest:
       type: object
