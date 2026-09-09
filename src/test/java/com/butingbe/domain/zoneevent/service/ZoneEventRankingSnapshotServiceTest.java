@@ -93,8 +93,7 @@ class ZoneEventRankingSnapshotServiceTest extends AbstractContainerTest {
   @Test
   @DisplayName("우수 보상이 없는 이벤트는 스냅샷을 만들지 않는다")
   void skipsWithoutExcellenceReward() {
-    ZoneEvent event =
-        zoneEventRepository.save(baseEventBuilder().excellenceReward(null).build());
+    ZoneEvent event = zoneEventRepository.save(baseEventBuilder().excellenceReward(null).build());
     success(event, 10);
 
     snapshotService.freeze(event, OffsetDateTime.now());
