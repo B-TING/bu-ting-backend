@@ -3,6 +3,7 @@ package com.butingbe.domain.reward.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
@@ -57,6 +58,7 @@ public class AdminRewardPayoutService {
   private static final String RELEASE_HOLD_ENDPOINT = "reward-payout-release-hold";
   private static final String UPDATE_ENDPOINT = "reward-payout-update";
   private static final String BULK_CONFIRM_ENDPOINT = "reward-payout-bulk-confirm";
+  private static final String BULK_SCHEDULE_ENDPOINT = "reward-payout-bulk-schedule";
   private static final int DEFAULT_SIZE = 20;
   private static final int MAX_SIZE = 50;
 
@@ -452,6 +454,99 @@ public class AdminRewardPayoutService {
     AdminRewardPayoutBulkResultResDto result =
         new AdminRewardPayoutBulkResultResDto(ids.stream().map(UUID::toString).toList());
     idempotencyService.save(idempotencyKey, BULK_CONFIRM_ENDPOINT, fingerprint, result);
+    return result;
+  }
+
+  @Transactional
+  public AdminRewardPayoutBulkResultResDto bulkSchedule(
+      AuthenticatedUser user, AdminRewardPayoutBulkScheduleReqDto request, String idempotencyKey) {
+    operatorAuthorization.requireOperator(user);
+    List<UUID> ids = request.payoutIds().stream().map(UUID::fromString).toList();
+    String fingerprint = ids + ":" + request.scheduledAt() + ":" + request.expectedRevisions();
+    Optional<String> replay =
+        idempotencyService.findReplay(idempotencyKey, BULK_SCHEDULE_ENDPOINT, fingerprint);
+    if (replay.isPresent()) {
+      return readJson(replay.get(), AdminRewardPayoutBulkResultResDto.class);
+    }
+
+    List<String> problems = new ArrayList<>();
+    for (UUID id : ids) {
+      Long expected = request.expectedRevisions().get(id.toString());
+      Optional<RewardPayout> topLike = rewardPayoutRepository.findById(id);
+      if (topLike.isPresent()) {
+        RewardPayout p = topLike.get();
+        if (expected == null || !p.getRevision().equals(expected)) {
+          problems.add(id.toString());
+        } else if (p.getHoldStatus() != PayoutHoldStatus.NONE) {
+          problems.add(id.toString());
+        } else if (p.getStatus() != RewardPayoutStatus.CONFIRMED) {
+          problems.add(id.toString());
+        }
+        continue;
+      }
+      Optional<BaseRewardPayout> base = baseRewardPayoutRepository.findById(id);
+      if (base.isEmpty()) {
+        problems.add(id.toString());
+        continue;
+      }
+      BaseRewardPayout p = base.get();
+      if (expected == null || !p.getRevision().equals(expected)) {
+        problems.add(id.toString());
+      } else if (p.getHoldStatus() != PayoutHoldStatus.NONE) {
+        problems.add(id.toString());
+      } else if (p.getStatus() != BaseRewardPayoutStatus.CONFIRMED) {
+        problems.add(id.toString());
+      }
+    }
+    if (!problems.isEmpty()) {
+      throw new BulkPayoutConflictException("error.reward.payout.bulk_conflict", problems);
+    }
+
+    for (UUID id : ids) {
+      rewardPayoutRepository
+          .findById(id)
+          .ifPresentOrElse(
+              p -> {
+                p.updateSchedule(request.scheduledAt());
+                auditLogRepository.save(
+                    ZoneEventAuditLog.builder()
+                        .actorId(user.id())
+                        .action("SCHEDULE_PAYOUT")
+                        .targetType("REWARD_PAYOUT")
+                        .targetId(id)
+                        .detail(
+                            Map.of(
+                                "payoutType",
+                                "TOP_LIKE",
+                                "scheduledAt",
+                                request.scheduledAt().toString()))
+                        .build());
+              },
+              () ->
+                  baseRewardPayoutRepository
+                      .findById(id)
+                      .ifPresent(
+                          p -> {
+                            p.updateSchedule(request.scheduledAt());
+                            auditLogRepository.save(
+                                ZoneEventAuditLog.builder()
+                                    .actorId(user.id())
+                                    .action("SCHEDULE_PAYOUT")
+                                    .targetType("REWARD_PAYOUT")
+                                    .targetId(id)
+                                    .detail(
+                                        Map.of(
+                                            "payoutType",
+                                            "BASE",
+                                            "scheduledAt",
+                                            request.scheduledAt().toString()))
+                                    .build());
+                          }));
+    }
+
+    AdminRewardPayoutBulkResultResDto result =
+        new AdminRewardPayoutBulkResultResDto(ids.stream().map(UUID::toString).toList());
+    idempotencyService.save(idempotencyKey, BULK_SCHEDULE_ENDPOINT, fingerprint, result);
     return result;
   }
 

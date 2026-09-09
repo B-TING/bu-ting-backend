@@ -703,6 +703,70 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
         .isInstanceOf(com.butingbe.global.error.exception.BulkPayoutConflictException.class);
   }
 
+  @Test
+  @DisplayName("일괄 일정: CONFIRMED인 건들의 scheduledAt을 한 번에 바꾼다")
+  void bulkSchedulesConfirmedPayouts() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+    OffsetDateTime schedule = OffsetDateTime.now().plusDays(3);
+
+    var result =
+        payoutService.bulkSchedule(
+            operator,
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto(
+                List.of(payout.getId().toString()),
+                schedule,
+                Map.of(payout.getId().toString(), payout.getRevision())),
+            null);
+
+    assertThat(result.processedPayoutIds()).containsExactly(payout.getId().toString());
+    assertThat(baseRewardPayoutRepository.findById(payout.getId()).orElseThrow().getScheduledAt())
+        .isEqualTo(schedule);
+  }
+
+  @Test
+  @DisplayName("일괄 일정: 아직 CONFIRMED가 아닌 건이 섞여 있으면 전부 반영하지 않고 409다")
+  void bulkScheduleRejectsNotYetConfirmed() {
+    ZoneEventParticipation p1 = participation();
+    ZoneEventParticipation p2 = participation();
+    BaseRewardPayout confirmed =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p1.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    confirmed.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(confirmed);
+    BaseRewardPayout notConfirmed =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p2.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.bulkSchedule(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto(
+                        List.of(confirmed.getId().toString(), notConfirmed.getId().toString()),
+                        OffsetDateTime.now().plusDays(1),
+                        Map.of(
+                            confirmed.getId().toString(), confirmed.getRevision(),
+                            notConfirmed.getId().toString(), notConfirmed.getRevision())),
+                    null))
+        .isInstanceOf(com.butingbe.global.error.exception.BulkPayoutConflictException.class);
+    assertThat(baseRewardPayoutRepository.findById(confirmed.getId()).orElseThrow().getScheduledAt())
+        .isNull();
+  }
+
   private ZoneEventParticipation participation() {
     return participationRepository.save(
         ZoneEventParticipation.builder()

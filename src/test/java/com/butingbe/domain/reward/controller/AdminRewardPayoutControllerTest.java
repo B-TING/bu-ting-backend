@@ -190,6 +190,23 @@ class AdminRewardPayoutControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  @Test
+  @DisplayName("일괄 일정 200")
+  void bulkSchedule() throws Exception {
+    when(adminRewardPayoutService.bulkSchedule(any(), any(), any()))
+        .thenReturn(new AdminRewardPayoutBulkResultResDto(List.of()));
+
+    mockMvc
+        .perform(
+            post("/admin/reward-payouts/bulk-schedule")
+                .contentType("application/json")
+                .content(
+                    "{\"payoutIds\":[\""
+                        + UUID.randomUUID()
+                        + "\"],\"scheduledAt\":\"2026-10-01T00:00:00Z\",\"expectedRevisions\":{}}"))
+        .andExpect(status().isOk());
+  }
+
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
     return new HandlerMethodArgumentResolver() {
       @Override
