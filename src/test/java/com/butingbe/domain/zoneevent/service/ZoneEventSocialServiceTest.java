@@ -31,6 +31,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
@@ -106,6 +107,39 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
         participationRepository.save(ZoneEventParticipation.join(event, authorId, 35.1, 129.1));
     assertThatThrownBy(() -> socialService.like(viewer, joined.getId()))
         .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("이벤트가 CLOSED면 좋아요는 409다")
+  void likeAfterEventClosedConflicts() {
+    ZoneEventParticipation p = publicSuccess();
+    ReflectionTestUtils.setField(p.getEvent(), "status", ZoneEventStatus.CLOSED);
+
+    assertThatThrownBy(() -> socialService.like(viewer, p.getId()))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("이벤트가 CLOSED면 좋아요 취소도 409다(좋아요는 종료 전에 이미 있었다고 가정)")
+  void unlikeAfterEventClosedConflicts() {
+    ZoneEventParticipation p = publicSuccess();
+    socialService.like(viewer, p.getId());
+    ReflectionTestUtils.setField(p.getEvent(), "status", ZoneEventStatus.CLOSED);
+
+    assertThatThrownBy(() -> socialService.unlike(viewer, p.getId()))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("이벤트가 ACTIVE면 좋아요·취소가 그대로 동작한다")
+  void likeAndUnlikeStillWorkWhileActive() {
+    ZoneEventParticipation p = publicSuccess();
+
+    socialService.like(viewer, p.getId());
+    assertThat(participationRepository.findById(p.getId()).orElseThrow().getLikeCount()).isEqualTo(1);
+
+    socialService.unlike(viewer, p.getId());
+    assertThat(participationRepository.findById(p.getId()).orElseThrow().getLikeCount()).isZero();
   }
 
   @Test
