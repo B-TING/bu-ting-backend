@@ -179,6 +179,17 @@ class AdminRewardPayoutControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  @Test
+  @DisplayName("일괄 확정: expectedRevisions가 없으면 400")
+  void bulkConfirmMissingExpectedRevisionsValidation() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/reward-payouts/bulk-confirm")
+                .contentType("application/json")
+                .content("{\"payoutIds\":[\"" + UUID.randomUUID() + "\"]}"))
+        .andExpect(status().isBadRequest());
+  }
+
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
     return new HandlerMethodArgumentResolver() {
       @Override
