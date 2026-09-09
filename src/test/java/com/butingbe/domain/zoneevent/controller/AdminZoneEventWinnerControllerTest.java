@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.dto.response.PayoutGenerateResDto;
+import com.butingbe.domain.reward.service.RewardPayoutService;
 import com.butingbe.domain.zoneevent.dto.response.WinnerConfirmResDto;
 import com.butingbe.domain.zoneevent.service.AdminZoneEventWinnerService;
 import com.butingbe.global.error.GlobalExceptionHandler;
@@ -41,6 +43,7 @@ class AdminZoneEventWinnerControllerTest {
   private static final UUID USER_ID = UUID.fromString("22222222-0000-0000-0000-000000000001");
 
   @Mock private AdminZoneEventWinnerService winnerService;
+  @Mock private RewardPayoutService payoutService;
   @InjectMocks private AdminZoneEventWinnerController controller;
 
   private MockMvc mockMvc;
@@ -72,6 +75,17 @@ class AdminZoneEventWinnerControllerTest {
                 .contentType("application/json")
                 .content(
                     "{\"snapshotId\":\"11111111-0000-0000-0000-000000000001\",\"participationIds\":[\"22222222-0000-0000-0000-000000000002\"],\"selectionReason\":\"사유\",\"expectedRevision\":1}"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("지급 후보 생성 200")
+  void generatePayouts() throws Exception {
+    when(payoutService.generate(any(), eq(EVENT_ID)))
+        .thenReturn(new PayoutGenerateResDto(EVENT_ID.toString(), 1, 0, 0));
+
+    mockMvc
+        .perform(post("/admin/zone-events/{eventId}/payouts/generate", EVENT_ID))
         .andExpect(status().isOk());
   }
 

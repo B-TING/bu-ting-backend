@@ -1,6 +1,8 @@
 package com.butingbe.domain.zoneevent.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.dto.response.PayoutGenerateResDto;
+import com.butingbe.domain.reward.service.RewardPayoutService;
 import com.butingbe.domain.zoneevent.dto.request.WinnerConfirmReqDto;
 import com.butingbe.domain.zoneevent.dto.response.WinnerConfirmResDto;
 import com.butingbe.domain.zoneevent.service.AdminZoneEventWinnerService;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminZoneEventWinnerController {
 
   private final AdminZoneEventWinnerService winnerService;
+  private final RewardPayoutService payoutService;
 
   @PostMapping("/{eventId}/winners/confirm")
   public ResponseEntity<ApiResponse<WinnerConfirmResDto>> confirmWinners(
@@ -34,5 +37,12 @@ public class AdminZoneEventWinnerController {
     return ResponseEntity.ok(
         ApiResponse.success(
             "수상자 확정", winnerService.confirmWinners(user, eventId, request, idempotencyKey)));
+  }
+
+  @PostMapping("/{eventId}/payouts/generate")
+  public ResponseEntity<ApiResponse<PayoutGenerateResDto>> generatePayouts(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID eventId) {
+    return ResponseEntity.ok(
+        ApiResponse.success("지급 후보 생성", payoutService.generate(user, eventId)));
   }
 }

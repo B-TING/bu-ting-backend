@@ -115,4 +115,10 @@ public class RewardPayout extends TimestampEntity {
   public void releaseHold() {
     this.holdStatus = PayoutHoldStatus.NONE;
   }
+
+  /** 참여 회수 등으로 이 지급을 더 이상 진행하지 않는다. 이미 발송된 건은 호출부에서 걸러야 한다. */
+  public void fail(String failureCode) {
+    this.status = RewardPayoutStatus.FAILED;
+    this.failureCode = failureCode;
+  }
 }
