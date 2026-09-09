@@ -1,7 +1,6 @@
 package com.butingbe.domain.zoneevent.repository;
 
 import com.butingbe.domain.zoneevent.entity.ReportStatus;
-import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
 import java.util.Collection;
 import java.util.List;

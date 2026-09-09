@@ -2,8 +2,6 @@ package com.butingbe.domain.zoneevent.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
-import com.butingbe.domain.reward.entity.BaseRewardPayout;
-import com.butingbe.domain.reward.entity.RewardPayout;
 import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportDetailResDto;
@@ -72,7 +70,10 @@ public class AdminZoneEventReportService {
     Map<UUID, ZoneEventParticipation> participations =
         participationRepository
             .findAllById(
-                result.getContent().stream().map(ZoneEventReport::getParticipationId).distinct().toList())
+                result.getContent().stream()
+                    .map(ZoneEventReport::getParticipationId)
+                    .distinct()
+                    .toList())
             .stream()
             .collect(Collectors.toMap(ZoneEventParticipation::getId, Function.identity()));
     List<AdminZoneEventReportListItemResDto> items =
@@ -112,14 +113,20 @@ public class AdminZoneEventReportService {
             p ->
                 payouts.add(
                     new AdminZoneEventReportPayoutResDto(
-                        p.getId().toString(), "TOP_LIKE", p.getStatus().name(), p.getHoldStatus().name())));
+                        p.getId().toString(),
+                        "TOP_LIKE",
+                        p.getStatus().name(),
+                        p.getHoldStatus().name())));
     baseRewardPayoutRepository
         .findByParticipationId(report.getParticipationId())
         .ifPresent(
             p ->
                 payouts.add(
                     new AdminZoneEventReportPayoutResDto(
-                        p.getId().toString(), "BASE", p.getStatus().name(), p.getHoldStatus().name())));
+                        p.getId().toString(),
+                        "BASE",
+                        p.getStatus().name(),
+                        p.getHoldStatus().name())));
 
     return new AdminZoneEventReportDetailResDto(
         report.getId().toString(),

@@ -174,6 +174,25 @@ class AdminZoneEventReportServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("지급 건이 없는 참여의 신고 상세는 payouts가 빈 목록이다")
+  void detailWithNoPayouts() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .memo("도배")
+                .build());
+
+    var detail = reportService.detail(operator, report.getId());
+
+    assertThat(detail.reportId()).isEqualTo(report.getId().toString());
+    assertThat(detail.payouts()).isEmpty();
+  }
+
+  @Test
   @DisplayName("없는 신고 상세 조회는 404다")
   void detailNotFound() {
     assertThatThrownBy(() -> reportService.detail(operator, UUID.randomUUID()))

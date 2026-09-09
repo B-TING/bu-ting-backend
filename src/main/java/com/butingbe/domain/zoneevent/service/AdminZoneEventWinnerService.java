@@ -176,8 +176,7 @@ public class AdminZoneEventWinnerService {
             .map(
                 row ->
                     TopNCandidateResDto.of(
-                        row,
-                        reportRepository.hasUnresolvedReports(row.getParticipationId())))
+                        row, reportRepository.hasUnresolvedReports(row.getParticipationId())))
             .toList();
     return new TopNZoneGroupResDto(
         event.getId().toString(), event.getZoneId(), version, candidates);

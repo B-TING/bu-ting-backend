@@ -13,7 +13,6 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRankingSnapshotReposito
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
