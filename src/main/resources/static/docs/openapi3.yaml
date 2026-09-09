@@ -5979,6 +5979,130 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-rounds/{roundId}/top-n:
+    get:
+      tags:
+        - Zone Event
+      summary: "Top N 경계 동점 후보 조회"
+      description: "ROLE_ADMIN/MANAGER. 회차의 구역별 좋아요 마감 스냅샷과 Top N 경계 동점 후보 전체를 조회합니다(자동 전원 수상 아님)."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: eventId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTopNEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-events/{eventId}/winners/confirm:
+    post:
+      tags:
+        - Zone Event
+      summary: "수상자 확정"
+      description: "ROLE_ADMIN/MANAGER. Top N 경계 동점 후보 중 관리자가 선택한 참여만 최종 수상자로 확정합니다. 이미 확정된 참여는 유지되고, 새로 포함된 참여만 추가로 확정됩니다(재확정 가능)."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WinnerConfirmRequest"
+            example:
+              snapshotId: "11111111-0000-0000-0000-000000000001"
+              participationIds: ["22222222-0000-0000-0000-000000000002"]
+              selectionReason: "동점 중 최초 제출 시각 우선 선정"
+              expectedRevision: 1
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WinnerConfirmEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "순위 스냅샷 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "스냅샷 변경됨 / 미해결 신고로 보류"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-events/{eventId}/payouts/generate:
+    post:
+      tags:
+        - Zone Event
+      summary: "TOP_LIKE 지급 후보 생성"
+      description: "ROLE_ADMIN/MANAGER. 확정된 수상자만 대상으로 TOP_LIKE 지급 후보를 생성합니다(멱등 — 이미 생성된 건은 건너뜁니다). 생성 시점에 미해결 신고가 있으면 HELD_REPORT 상태로 만들어집니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayoutGenerateEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "이벤트 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/users/me/device-tokens:
     put:
       tags:
@@ -11454,6 +11578,80 @@ components:
         data:
           type: object
           description: 자유 형식 리포트(구역별 참여·성공·Top·실물 지급 등)
+    TopNCandidate:
+      type: object
+      properties:
+        snapshotId: { type: string, format: uuid }
+        participationId: { type: string, format: uuid }
+        rankN: { type: integer }
+        likeCountAtClose: { type: integer, format: int64 }
+        tied: { type: boolean }
+        heldByReport: { type: boolean }
+        finalized: { type: boolean }
+    TopNZoneGroup:
+      type: object
+      properties:
+        eventId: { type: string, format: uuid }
+        zoneId: { type: string }
+        version: { type: integer, nullable: true }
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopNCandidate"
+    AdminTopN:
+      type: object
+      properties:
+        roundId: { type: string, format: uuid }
+        zones:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopNZoneGroup"
+    AdminTopNEnvelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data:
+          $ref: "#/components/schemas/AdminTopN"
+    WinnerConfirmRequest:
+      type: object
+      required: [snapshotId, participationIds, selectionReason, expectedRevision]
+      properties:
+        snapshotId: { type: string, format: uuid }
+        participationIds:
+          type: array
+          items: { type: string, format: uuid }
+        selectionReason: { type: string }
+        expectedRevision: { type: integer }
+    WinnerConfirmResult:
+      type: object
+      properties:
+        eventId: { type: string, format: uuid }
+        version: { type: integer }
+        confirmedParticipationIds:
+          type: array
+          items: { type: string, format: uuid }
+    WinnerConfirmEnvelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data:
+          $ref: "#/components/schemas/WinnerConfirmResult"
+    PayoutGenerateResult:
+      type: object
+      properties:
+        eventId: { type: string, format: uuid }
+        created: { type: integer }
+        alreadyExists: { type: integer }
+        heldOnCreate: { type: integer }
+    PayoutGenerateEnvelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data:
+          $ref: "#/components/schemas/PayoutGenerateResult"
     DeviceTokenRequest:
       type: object
       properties:
