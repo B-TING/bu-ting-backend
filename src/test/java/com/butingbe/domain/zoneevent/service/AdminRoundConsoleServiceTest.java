@@ -4,9 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
-import com.butingbe.domain.reward.entity.RewardCatalog;
-import com.butingbe.domain.reward.entity.RewardType;
-import com.butingbe.domain.reward.repository.RewardCatalogRepository;
 import com.butingbe.domain.reward.repository.UserCouponRepository;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
@@ -71,7 +68,6 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private ZoneEventSettlementReportRepository settlementReportRepository;
   @Autowired private ZoneEventAuditLogRepository auditLogRepository;
-  @Autowired private RewardCatalogRepository rewardCatalogRepository;
   @Autowired private UserCouponRepository userCouponRepository;
   @Autowired private UserRepository userRepository;
 
@@ -345,17 +341,9 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("정산은 미완료 참여를 만료하고 TOP_LIKE 보상을 지급하며 리포트를 저장한다(멱등)")
+  @DisplayName("정산은 미완료 참여를 만료하고 리포트를 저장한다(멱등). TOP_LIKE 지급은 더 이상 settle에서 하지 않는다")
   void settle() {
     ZoneEventRound round = closedRound();
-    rewardCatalogRepository.save(
-        RewardCatalog.builder()
-            .rewardType(RewardType.COUPON)
-            .code("COUPON_CAFE")
-            .name("카페 쿠폰")
-            .stock(5)
-            .validDays(30)
-            .build());
     ZoneEvent event = eventWithExcellence(round.getId());
     ZoneEventParticipation winner = success(event, 10);
     ZoneEventParticipation joinedP = joined(event);
@@ -366,12 +354,11 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
         .isEqualTo(RoundStatus.SETTLED);
     assertThat(participationRepository.findById(joinedP.getId()).orElseThrow().getStatus())
         .isEqualTo(ParticipationStatus.CANCELLED);
-    assertThat(userCouponRepository.findAll()).hasSize(1);
+    assertThat(userCouponRepository.findAll()).isEmpty();
     assertThat(settlementReportRepository.findById(round.getId())).isPresent();
     assertThat(winner.getLikeCount()).isEqualTo(10);
 
     Map<String, Object> again = consoleService.settle(operator, round.getId());
-    assertThat(userCouponRepository.findAll()).hasSize(1);
     assertThat(again.get("roundId")).isEqualTo(round.getId().toString());
   }
 

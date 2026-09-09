@@ -3,7 +3,6 @@ package com.butingbe.domain.zoneevent.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.reward.dto.response.SettlementReportResDto;
-import com.butingbe.domain.reward.service.RewardSettlementService;
 import com.butingbe.domain.zoneevent.dto.request.BackupTargetReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCancelReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
@@ -75,7 +74,6 @@ public class AdminRoundConsoleService {
   private final ZoneEventAuditLogRepository auditLogRepository;
   private final RoundSlotSuggestionService suggestionService;
   private final RoundTransitionService transitionService;
-  private final RewardSettlementService settlementService;
 
   @Transactional
   public AdminRoundResDto createRound(AuthenticatedUser user, RoundCreateReqDto request) {
@@ -288,10 +286,10 @@ public class AdminRoundConsoleService {
       return settlementReport(user, roundId);
     }
     expireOpenParticipations(roundId);
-    SettlementReportResDto prizeReport = settlementService.settleTopLike(roundId);
     OffsetDateTime now = OffsetDateTime.now();
     round.settle(now);
-    Map<String, Object> report = assembleReport(roundId, now, prizeReport);
+    Map<String, Object> report =
+        assembleReport(roundId, now, new SettlementReportResDto(roundId.toString(), List.of()));
     settlementReportRepository.save(
         ZoneEventSettlementReport.builder().roundId(roundId).report(report).build());
     audit(user, "SETTLE_ROUND", "ROUND", roundId, null);
