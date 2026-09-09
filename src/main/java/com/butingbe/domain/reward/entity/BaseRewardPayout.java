@@ -69,6 +69,9 @@ public class BaseRewardPayout extends TimestampEntity {
   @Column(name = "failure_code", length = 50)
   private String failureCode;
 
+  @Column(columnDefinition = "text")
+  private String memo;
+
   @Version
   @Column(nullable = false)
   private Long revision;

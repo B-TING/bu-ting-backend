@@ -3,6 +3,7 @@ package com.butingbe.domain.reward.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutReleaseHoldResDto;
 import com.butingbe.domain.reward.entity.BaseRewardPayout;
 import com.butingbe.domain.reward.entity.PayoutHoldStatus;
@@ -10,7 +11,9 @@ import com.butingbe.domain.reward.entity.RewardPayout;
 import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
+import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.service.IdempotencyService;
 import com.butingbe.global.error.exception.ConflictException;
@@ -44,6 +47,27 @@ public class AdminRewardPayoutService {
   private final ZoneEventAuditLogRepository auditLogRepository;
   private final IdempotencyService idempotencyService;
   private final ObjectMapper objectMapper;
+  private final ZoneEventParticipationRepository participationRepository;
+
+  @Transactional(readOnly = true)
+  public AdminRewardPayoutDetailResDto detail(AuthenticatedUser user, UUID payoutId) {
+    operatorAuthorization.requireOperator(user);
+    Optional<RewardPayout> topLike = rewardPayoutRepository.findById(payoutId);
+    if (topLike.isPresent()) {
+      return AdminRewardPayoutDetailResDto.ofTopLike(topLike.get());
+    }
+    BaseRewardPayout base =
+        baseRewardPayoutRepository
+            .findById(payoutId)
+            .orElseThrow(() -> new ResourceNotFoundException("error.reward.payout.not_found"));
+    UUID eventId =
+        participationRepository
+            .findById(base.getParticipationId())
+            .map(ZoneEventParticipation::getEvent)
+            .map(com.butingbe.domain.zoneevent.entity.ZoneEvent::getId)
+            .orElse(null);
+    return AdminRewardPayoutDetailResDto.ofBase(base, eventId);
+  }
 
   @Transactional
   public AdminRewardPayoutReleaseHoldResDto releaseHold(

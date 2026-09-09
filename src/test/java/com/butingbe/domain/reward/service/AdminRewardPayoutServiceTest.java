@@ -404,6 +404,54 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
         .hasMessageContaining("Failed to deserialize");
   }
 
+  @Test
+  @DisplayName("TOP_LIKE 지급 상세를 조회한다")
+  void detailReturnsTopLike() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+
+    var result = payoutService.detail(operator, payout.getId());
+
+    assertThat(result.payoutType()).isEqualTo("TOP_LIKE");
+    assertThat(result.eventId()).isEqualTo(event.getId().toString());
+    assertThat(result.rankN()).isEqualTo(1);
+    assertThat(result.status()).isEqualTo("PENDING_ASSIGN");
+  }
+
+  @Test
+  @DisplayName("BASE 지급 상세는 참여를 통해 eventId를 채워 돌려준다")
+  void detailReturnsBaseWithEventId() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+
+    var result = payoutService.detail(operator, payout.getId());
+
+    assertThat(result.payoutType()).isEqualTo("BASE");
+    assertThat(result.eventId()).isEqualTo(event.getId().toString());
+    assertThat(result.rankN()).isNull();
+    assertThat(result.status()).isEqualTo("PENDING_CONFIRM");
+  }
+
+  @Test
+  @DisplayName("없는 지급 건 상세 조회는 404다")
+  void detailNotFound() {
+    assertThatThrownBy(() -> payoutService.detail(operator, UUID.randomUUID()))
+        .isInstanceOf(ResourceNotFoundException.class);
+  }
+
   private ZoneEventParticipation participation() {
     return participationRepository.save(
         ZoneEventParticipation.builder()

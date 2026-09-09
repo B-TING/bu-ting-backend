@@ -3,11 +3,13 @@ package com.butingbe.domain.reward.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutReleaseHoldResDto;
 import com.butingbe.domain.reward.service.AdminRewardPayoutService;
 import com.butingbe.global.error.GlobalExceptionHandler;
@@ -57,6 +59,23 @@ class AdminRewardPayoutControllerTest {
             .setControllerAdvice(
                 new GlobalExceptionHandler(messageSource, new FixedLocaleResolver(Locale.KOREAN)))
             .build();
+  }
+
+  @Test
+  @DisplayName("지급 상세 조회 200")
+  void detail() throws Exception {
+    UUID payoutId = UUID.randomUUID();
+    when(adminRewardPayoutService.detail(any(), eq(payoutId)))
+        .thenReturn(
+            new AdminRewardPayoutDetailResDto(
+                payoutId.toString(), "TOP_LIKE", UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(), 1, 3L, null, "PENDING_ASSIGN", "NONE",
+                null, null, null, null, null, null, null, null, null, null, 0L, null, null));
+
+    mockMvc
+        .perform(get("/admin/reward-payouts/{id}", payoutId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.payoutType").value("TOP_LIKE"));
   }
 
   @Test

@@ -2,6 +2,7 @@ package com.butingbe.domain.reward.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutReleaseHoldResDto;
 import com.butingbe.domain.reward.service.AdminRewardPayoutService;
 import com.butingbe.global.common.ApiResponse;
@@ -10,6 +11,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,6 +26,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminRewardPayoutController {
 
   private final AdminRewardPayoutService adminRewardPayoutService;
+
+  @GetMapping("/{payoutId}")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> detail(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID payoutId) {
+    return ResponseEntity.ok(
+        ApiResponse.success("지급 건 상세", adminRewardPayoutService.detail(user, payoutId)));
+  }
 
   @PostMapping("/{payoutId}/release-hold")
   public ResponseEntity<ApiResponse<AdminRewardPayoutReleaseHoldResDto>> releaseHold(
