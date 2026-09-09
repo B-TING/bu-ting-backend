@@ -75,7 +75,9 @@ public class AdminZoneEventWinnerService {
     operatorAuthorization.requireOperator(user);
     List<UUID> sortedIds = request.participationIds().stream().sorted().toList();
     String fingerprint =
-        request.snapshotId()
+        eventId
+            + ":"
+            + request.snapshotId()
             + ":"
             + sortedIds
             + ":"

@@ -303,12 +303,12 @@ class AdminZoneEventWinnerServiceTest extends AbstractContainerTest {
   @Test
   @DisplayName("보류 해제 후 다시 confirm하면 기존 확정자는 그대로 두고 새로 추가 확정한다")
   void confirmWinnersIsAdditiveAfterHoldResolved() {
-    ZoneEventParticipation clear = success(7);
-    ZoneEventParticipation held = success(7);
+    ZoneEventParticipation tiedClear = success(7);
+    ZoneEventParticipation tiedHeld = success(7);
     ZoneEventReport report =
         reportRepository.save(
             ZoneEventReport.builder()
-                .participationId(held.getId())
+                .participationId(tiedHeld.getId())
                 .reporterId(UUID.randomUUID())
                 .reasonCode(ReportReasonCode.SPAM)
                 .build());
@@ -316,34 +316,35 @@ class AdminZoneEventWinnerServiceTest extends AbstractContainerTest {
     snapshotService.freeze(event, OffsetDateTime.now());
     UUID anchor =
         snapshotRepository
-            .findByEventIdAndVersionAndParticipationId(event.getId(), 1, clear.getId())
+            .findByEventIdAndVersionAndParticipationId(event.getId(), 1, tiedClear.getId())
             .orElseThrow()
             .getId();
     winnerService.confirmWinners(
         operator,
         event.getId(),
-        new WinnerConfirmReqDto(anchor, List.of(clear.getId()), "사유", 1),
+        new WinnerConfirmReqDto(anchor, List.of(tiedClear.getId()), "사유", 1),
         null);
 
     report.resolveAs(com.butingbe.domain.zoneevent.entity.ReportStatus.DISMISSED);
     winnerService.confirmWinners(
         operator,
         event.getId(),
-        new WinnerConfirmReqDto(anchor, List.of(held.getId()), "보류 해제 후 확정", 1),
+        new WinnerConfirmReqDto(anchor, List.of(tiedHeld.getId()), "보류 해제 후 확정", 1),
         null);
 
     assertThat(
             snapshotRepository
-                .findByEventIdAndVersionAndParticipationId(event.getId(), 1, clear.getId())
+                .findByEventIdAndVersionAndParticipationId(event.getId(), 1, tiedClear.getId())
                 .orElseThrow()
                 .getFinalized())
         .isTrue();
     assertThat(
             snapshotRepository
-                .findByEventIdAndVersionAndParticipationId(event.getId(), 1, held.getId())
+                .findByEventIdAndVersionAndParticipationId(event.getId(), 1, tiedHeld.getId())
                 .orElseThrow()
                 .getFinalized())
         .isTrue();
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("EVENT", event.getId())).hasSize(2);
   }
 
   private ZoneEventParticipation success(long likeCount) {
