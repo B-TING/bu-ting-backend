@@ -98,4 +98,16 @@ public class BaseRewardPayout extends TimestampEntity {
   public void releaseHold() {
     this.holdStatus = PayoutHoldStatus.NONE;
   }
+
+  public void updateReward(RewardSnapshot reward) {
+    this.reward = reward;
+  }
+
+  public void updateMemo(String memo) {
+    this.memo = memo;
+  }
+
+  public void updateSchedule(OffsetDateTime scheduledAt) {
+    this.scheduledAt = scheduledAt;
+  }
 }

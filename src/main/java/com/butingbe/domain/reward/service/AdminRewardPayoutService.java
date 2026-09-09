@@ -2,6 +2,7 @@ package com.butingbe.domain.reward.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutListItemResDto;
@@ -51,6 +52,7 @@ import tools.jackson.databind.ObjectMapper;
 public class AdminRewardPayoutService {
 
   private static final String RELEASE_HOLD_ENDPOINT = "reward-payout-release-hold";
+  private static final String UPDATE_ENDPOINT = "reward-payout-update";
   private static final int DEFAULT_SIZE = 20;
   private static final int MAX_SIZE = 50;
 
@@ -267,6 +269,103 @@ public class AdminRewardPayoutService {
     }
     return new AdminRewardPayoutReleaseHoldResDto(
         payout.getId().toString(), "BASE", payout.getHoldStatus().name(), payout.getRevision());
+  }
+
+  @Transactional
+  public AdminRewardPayoutDetailResDto update(
+      AuthenticatedUser user,
+      UUID payoutId,
+      AdminRewardPayoutUpdateReqDto request,
+      String idempotencyKey) {
+    operatorAuthorization.requireOperator(user);
+    String fingerprint =
+        payoutId + ":" + request.reward() + ":" + request.memo() + ":" + request.scheduledAt()
+            + ":" + request.expectedRevision();
+    Optional<String> replay = idempotencyService.findReplay(idempotencyKey, UPDATE_ENDPOINT, fingerprint);
+    if (replay.isPresent()) {
+      return readJson(replay.get(), AdminRewardPayoutDetailResDto.class);
+    }
+
+    AdminRewardPayoutDetailResDto result;
+    Optional<RewardPayout> topLike = rewardPayoutRepository.findById(payoutId);
+    if (topLike.isPresent()) {
+      result = updateTopLike(topLike.get(), request);
+    } else {
+      BaseRewardPayout base =
+          baseRewardPayoutRepository
+              .findById(payoutId)
+              .orElseThrow(() -> new ResourceNotFoundException("error.reward.payout.not_found"));
+      result = updateBase(base, request);
+    }
+
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action("PATCH_PAYOUT")
+            .targetType("REWARD_PAYOUT")
+            .targetId(payoutId)
+            .detail(Map.of("payoutType", result.payoutType()))
+            .build());
+    idempotencyService.save(idempotencyKey, UPDATE_ENDPOINT, fingerprint, result);
+    return result;
+  }
+
+  private AdminRewardPayoutDetailResDto updateTopLike(
+      RewardPayout payout, AdminRewardPayoutUpdateReqDto request) {
+    if (!payout.getRevision().equals(request.expectedRevision())) {
+      throw new ConflictException("error.reward.payout.stale_revision");
+    }
+    if (request.reward() != null
+        && payout.getStatus() != RewardPayoutStatus.PENDING_ASSIGN
+        && payout.getStatus() != RewardPayoutStatus.PENDING_CONFIRM) {
+      throw new ConflictException("error.reward.payout.reward_locked");
+    }
+    if (request.reward() != null) {
+      payout.assignReward(request.reward());
+    }
+    if (request.memo() != null) {
+      payout.updateMemo(request.memo());
+    }
+    if (request.scheduledAt() != null) {
+      payout.updateSchedule(request.scheduledAt());
+    }
+    try {
+      rewardPayoutRepository.saveAndFlush(payout);
+    } catch (ObjectOptimisticLockingFailureException e) {
+      throw new ConflictException("error.reward.payout.stale_revision");
+    }
+    return AdminRewardPayoutDetailResDto.ofTopLike(payout);
+  }
+
+  private AdminRewardPayoutDetailResDto updateBase(
+      BaseRewardPayout payout, AdminRewardPayoutUpdateReqDto request) {
+    if (!payout.getRevision().equals(request.expectedRevision())) {
+      throw new ConflictException("error.reward.payout.stale_revision");
+    }
+    if (request.reward() != null && payout.getStatus() != BaseRewardPayoutStatus.PENDING_CONFIRM) {
+      throw new ConflictException("error.reward.payout.reward_locked");
+    }
+    if (request.reward() != null) {
+      payout.updateReward(request.reward());
+    }
+    if (request.memo() != null) {
+      payout.updateMemo(request.memo());
+    }
+    if (request.scheduledAt() != null) {
+      payout.updateSchedule(request.scheduledAt());
+    }
+    UUID eventId =
+        participationRepository
+            .findById(payout.getParticipationId())
+            .map(ZoneEventParticipation::getEvent)
+            .map(com.butingbe.domain.zoneevent.entity.ZoneEvent::getId)
+            .orElse(null);
+    try {
+      baseRewardPayoutRepository.saveAndFlush(payout);
+    } catch (ObjectOptimisticLockingFailureException e) {
+      throw new ConflictException("error.reward.payout.stale_revision");
+    }
+    return AdminRewardPayoutDetailResDto.ofBase(payout, eventId);
   }
 
   /**

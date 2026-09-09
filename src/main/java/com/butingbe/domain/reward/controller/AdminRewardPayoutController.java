@@ -1,6 +1,7 @@
 package com.butingbe.domain.reward.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutPageResDto;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -81,5 +83,16 @@ public class AdminRewardPayoutController {
         ApiResponse.success(
             "지급 보류 해제",
             adminRewardPayoutService.releaseHold(user, payoutId, request, idempotencyKey)));
+  }
+
+  @PatchMapping("/{payoutId}")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> update(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID payoutId,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutUpdateReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "지급 건 수정", adminRewardPayoutService.update(user, payoutId, request, idempotencyKey)));
   }
 }

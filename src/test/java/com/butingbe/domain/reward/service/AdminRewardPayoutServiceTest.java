@@ -533,6 +533,32 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
     assertThat(result.items().get(0).eventId()).isEqualTo(event.getId().toString());
   }
 
+  @Test
+  @DisplayName("PENDING_ASSIGN인 TOP_LIKE에 prizeRewardCode를 채우면 PENDING_CONFIRM으로 자동 전진한다")
+  void updateAssignsRewardAndAdvancesTopLikeToPendingConfirm() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, null))
+                .build());
+
+    var result =
+        payoutService.update(
+            operator,
+            payout.getId(),
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+                new RewardSnapshot(null, null, 1, "COUPON_TOP"), "1등 상품 확정", null, payout.getRevision()),
+            null);
+
+    assertThat(result.status()).isEqualTo("PENDING_CONFIRM");
+    assertThat(result.memo()).isEqualTo("1등 상품 확정");
+  }
+
   private ZoneEventParticipation participation() {
     return participationRepository.save(
         ZoneEventParticipation.builder()

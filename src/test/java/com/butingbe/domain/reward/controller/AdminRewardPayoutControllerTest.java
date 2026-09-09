@@ -119,6 +119,39 @@ class AdminRewardPayoutControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  @Test
+  @DisplayName("지급 수정 200")
+  void update() throws Exception {
+    UUID payoutId = UUID.randomUUID();
+    when(adminRewardPayoutService.update(any(), eq(payoutId), any(), any()))
+        .thenReturn(
+            new AdminRewardPayoutDetailResDto(
+                payoutId.toString(), "TOP_LIKE", UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(), 1, 3L, null, "PENDING_CONFIRM", "NONE",
+                null, null, null, null, null, null, null, null, "메모", null, 1L, null, null));
+
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/admin/reward-payouts/{id}", payoutId)
+                .contentType("application/json")
+                .content("{\"expectedRevision\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.memo").value("메모"));
+  }
+
+  @Test
+  @DisplayName("expectedRevision이 없으면 400")
+  void updateValidation() throws Exception {
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/admin/reward-payouts/{id}", UUID.randomUUID())
+                .contentType("application/json")
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+  }
+
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
     return new HandlerMethodArgumentResolver() {
       @Override

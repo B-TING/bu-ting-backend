@@ -135,4 +135,22 @@ public class RewardPayout extends TimestampEntity {
     this.status = RewardPayoutStatus.FAILED;
     this.failureCode = failureCode;
   }
+
+  /** 보상 항목을 설정·변경한다. PENDING_ASSIGN이었는데 상품 코드까지 채워지면 PENDING_CONFIRM으로 전진한다. */
+  public void assignReward(RewardSnapshot reward) {
+    this.reward = reward;
+    if (this.status == RewardPayoutStatus.PENDING_ASSIGN
+        && reward != null
+        && reward.prizeRewardCode() != null) {
+      this.status = RewardPayoutStatus.PENDING_CONFIRM;
+    }
+  }
+
+  public void updateMemo(String memo) {
+    this.memo = memo;
+  }
+
+  public void updateSchedule(OffsetDateTime scheduledAt) {
+    this.scheduledAt = scheduledAt;
+  }
 }
