@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutPageResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutReleaseHoldResDto;
 import com.butingbe.domain.reward.service.AdminRewardPayoutService;
 import com.butingbe.global.error.GlobalExceptionHandler;
@@ -59,6 +60,19 @@ class AdminRewardPayoutControllerTest {
             .setControllerAdvice(
                 new GlobalExceptionHandler(messageSource, new FixedLocaleResolver(Locale.KOREAN)))
             .build();
+  }
+
+  @Test
+  @DisplayName("지급 목록 조회 200")
+  void list() throws Exception {
+    when(adminRewardPayoutService.list(
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(new AdminRewardPayoutPageResDto(List.of(), 1, 20, 0, 1, false));
+
+    mockMvc
+        .perform(get("/admin/reward-payouts"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items").isArray());
   }
 
   @Test

@@ -452,6 +452,87 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
+  @Test
+  @DisplayName("rewardReason=BASE면 BASE 지급만 페이징 조회한다")
+  void listFiltersByBaseRewardReason() {
+    ZoneEventParticipation p1 = participation();
+    ZoneEventParticipation p2 = participation();
+    baseRewardPayoutRepository.save(
+        BaseRewardPayout.builder()
+            .participationId(p1.getId())
+            .reward(new RewardSnapshot(50, null, null, null))
+            .build());
+    baseRewardPayoutRepository.save(
+        BaseRewardPayout.builder()
+            .participationId(p2.getId())
+            .reward(new RewardSnapshot(50, null, null, null))
+            .build());
+    rewardPayoutRepository.save(
+        RewardPayout.builder()
+            .eventId(event.getId())
+            .participationId(participation().getId())
+            .rankN(1)
+            .likeCountAtClose(1L)
+            .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+            .build());
+
+    var result = payoutService.list(operator, null, null, "BASE", null, null, null, null, 1, 20);
+
+    assertThat(result.items()).hasSize(2);
+    assertThat(result.items()).allMatch(i -> i.payoutType().equals("BASE"));
+  }
+
+  @Test
+  @DisplayName("rewardReason 없이 조회하면 두 타입을 병합해서 돌려준다")
+  void listMergesBothTypesWhenRewardReasonOmitted() {
+    ZoneEventParticipation p1 = participation();
+    ZoneEventParticipation p2 = participation();
+    baseRewardPayoutRepository.save(
+        BaseRewardPayout.builder()
+            .participationId(p1.getId())
+            .reward(new RewardSnapshot(50, null, null, null))
+            .build());
+    rewardPayoutRepository.save(
+        RewardPayout.builder()
+            .eventId(event.getId())
+            .participationId(p2.getId())
+            .rankN(1)
+            .likeCountAtClose(1L)
+            .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+            .build());
+
+    var result = payoutService.list(operator, null, null, null, null, null, null, null, 1, 20);
+
+    assertThat(result.items()).hasSize(2);
+    assertThat(result.items().stream().map(i -> i.payoutType()).distinct().count()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("rewardReason 없이 status만 지정하면 400이다(타입별 상태 enum이 달라 모호함)")
+  void listRejectsStatusWithoutRewardReason() {
+    assertThatThrownBy(
+            () ->
+                payoutService.list(
+                    operator, null, null, null, "CONFIRMED", null, null, null, 1, 20))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.reward.payout.status_requires_reward_reason");
+  }
+
+  @Test
+  @DisplayName("BASE 목록 항목은 참여를 통해 eventId를 채운다")
+  void listBaseItemsIncludeEventId() {
+    ZoneEventParticipation p = participation();
+    baseRewardPayoutRepository.save(
+        BaseRewardPayout.builder()
+            .participationId(p.getId())
+            .reward(new RewardSnapshot(50, null, null, null))
+            .build());
+
+    var result = payoutService.list(operator, null, null, "BASE", null, null, null, null, 1, 20);
+
+    assertThat(result.items().get(0).eventId()).isEqualTo(event.getId().toString());
+  }
+
   private ZoneEventParticipation participation() {
     return participationRepository.save(
         ZoneEventParticipation.builder()

@@ -4,10 +4,14 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutListItemResDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutPageResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutReleaseHoldResDto;
 import com.butingbe.domain.reward.entity.BaseRewardPayout;
+import com.butingbe.domain.reward.entity.BaseRewardPayoutStatus;
 import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardPayout;
+import com.butingbe.domain.reward.entity.RewardPayoutStatus;
 import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
@@ -18,10 +22,18 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.service.IdempotencyService;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +51,8 @@ import tools.jackson.databind.ObjectMapper;
 public class AdminRewardPayoutService {
 
   private static final String RELEASE_HOLD_ENDPOINT = "reward-payout-release-hold";
+  private static final int DEFAULT_SIZE = 20;
+  private static final int MAX_SIZE = 50;
 
   private final OperatorAuthorization operatorAuthorization;
   private final RewardPayoutRepository rewardPayoutRepository;
@@ -67,6 +81,129 @@ public class AdminRewardPayoutService {
             .map(com.butingbe.domain.zoneevent.entity.ZoneEvent::getId)
             .orElse(null);
     return AdminRewardPayoutDetailResDto.ofBase(base, eventId);
+  }
+
+  @Transactional(readOnly = true)
+  public AdminRewardPayoutPageResDto list(
+      AuthenticatedUser user,
+      UUID roundId,
+      UUID eventId,
+      String rewardReason,
+      String status,
+      String holdStatus,
+      OffsetDateTime scheduledFrom,
+      OffsetDateTime scheduledTo,
+      Integer page,
+      Integer size) {
+    operatorAuthorization.requireOperator(user);
+    if (status != null && !status.isBlank() && (rewardReason == null || rewardReason.isBlank())) {
+      throw new IllegalArgumentException("error.reward.payout.status_requires_reward_reason");
+    }
+    int pageNumber = page == null || page < 1 ? 1 : page;
+    int pageSize = size == null || size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+    PayoutHoldStatus holdFilter =
+        holdStatus == null || holdStatus.isBlank() ? null : PayoutHoldStatus.valueOf(holdStatus);
+
+    if ("BASE".equals(rewardReason)) {
+      BaseRewardPayoutStatus statusFilter =
+          status == null || status.isBlank() ? null : BaseRewardPayoutStatus.valueOf(status);
+      Page<BaseRewardPayout> result =
+          baseRewardPayoutRepository.searchForAdmin(
+              eventId,
+              roundId,
+              statusFilter,
+              holdFilter,
+              scheduledFrom,
+              scheduledTo,
+              PageRequest.of(pageNumber - 1, pageSize));
+      List<AdminRewardPayoutListItemResDto> items = mapBaseItems(result.getContent());
+      return new AdminRewardPayoutPageResDto(
+          items,
+          pageNumber,
+          pageSize,
+          result.getTotalElements(),
+          result.getTotalPages(),
+          pageNumber < result.getTotalPages());
+    }
+    if ("TOP_LIKE".equals(rewardReason)) {
+      RewardPayoutStatus statusFilter =
+          status == null || status.isBlank() ? null : RewardPayoutStatus.valueOf(status);
+      Page<RewardPayout> result =
+          rewardPayoutRepository.searchForAdmin(
+              eventId,
+              roundId,
+              statusFilter,
+              holdFilter,
+              scheduledFrom,
+              scheduledTo,
+              PageRequest.of(pageNumber - 1, pageSize));
+      List<AdminRewardPayoutListItemResDto> items =
+          result.getContent().stream().map(AdminRewardPayoutListItemResDto::ofTopLike).toList();
+      return new AdminRewardPayoutPageResDto(
+          items,
+          pageNumber,
+          pageSize,
+          result.getTotalElements(),
+          result.getTotalPages(),
+          pageNumber < result.getTotalPages());
+    }
+
+    // rewardReason 미지정: 두 리포지토리를 각각 무페이징 조회 후 병합·정렬·인메모리 페이징.
+    List<RewardPayout> topLikeAll =
+        rewardPayoutRepository
+            .searchForAdmin(
+                eventId,
+                roundId,
+                null,
+                holdFilter,
+                scheduledFrom,
+                scheduledTo,
+                org.springframework.data.domain.Pageable.unpaged())
+            .getContent();
+    List<BaseRewardPayout> baseAll =
+        baseRewardPayoutRepository
+            .searchForAdmin(
+                eventId,
+                roundId,
+                null,
+                holdFilter,
+                scheduledFrom,
+                scheduledTo,
+                org.springframework.data.domain.Pageable.unpaged())
+            .getContent();
+    List<AdminRewardPayoutListItemResDto> merged = new ArrayList<>();
+    merged.addAll(topLikeAll.stream().map(AdminRewardPayoutListItemResDto::ofTopLike).toList());
+    merged.addAll(mapBaseItems(baseAll));
+    merged.sort(
+        Comparator.comparing(
+                AdminRewardPayoutListItemResDto::scheduledAt,
+                Comparator.nullsLast(Comparator.naturalOrder()))
+            .reversed());
+
+    int totalElements = merged.size();
+    int totalPages = Math.max(1, (int) Math.ceil(totalElements / (double) pageSize));
+    int fromIndex = Math.min((pageNumber - 1) * pageSize, totalElements);
+    int toIndex = Math.min(fromIndex + pageSize, totalElements);
+    List<AdminRewardPayoutListItemResDto> pageItems = merged.subList(fromIndex, toIndex);
+    return new AdminRewardPayoutPageResDto(
+        pageItems, pageNumber, pageSize, totalElements, totalPages, pageNumber < totalPages);
+  }
+
+  private List<AdminRewardPayoutListItemResDto> mapBaseItems(List<BaseRewardPayout> rows) {
+    var participations =
+        participationRepository
+            .findAllById(
+                rows.stream().map(BaseRewardPayout::getParticipationId).distinct().toList())
+            .stream()
+            .collect(Collectors.toMap(ZoneEventParticipation::getId, Function.identity()));
+    return rows.stream()
+        .map(
+            p -> {
+              ZoneEventParticipation participation = participations.get(p.getParticipationId());
+              UUID eventId = participation == null ? null : participation.getEvent().getId();
+              return AdminRewardPayoutListItemResDto.ofBase(p, eventId);
+            })
+        .toList();
   }
 
   @Transactional

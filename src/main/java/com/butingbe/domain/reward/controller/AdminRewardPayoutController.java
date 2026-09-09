@@ -3,10 +3,12 @@ package com.butingbe.domain.reward.controller;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutPageResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutReleaseHoldResDto;
 import com.butingbe.domain.reward.service.AdminRewardPayoutService;
 import com.butingbe.global.common.ApiResponse;
 import jakarta.validation.Valid;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** 신고로 보류된 지급의 최종 해제. ROLE_ADMIN/MANAGER 전용(서비스에서 검사). */
@@ -26,6 +29,40 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminRewardPayoutController {
 
   private final AdminRewardPayoutService adminRewardPayoutService;
+
+  @GetMapping
+  public ResponseEntity<ApiResponse<AdminRewardPayoutPageResDto>> list(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestParam(required = false) UUID roundId,
+      @RequestParam(required = false) UUID eventId,
+      @RequestParam(required = false) String rewardReason,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String holdStatus,
+      @RequestParam(required = false)
+          @org.springframework.format.annotation.DateTimeFormat(
+              iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
+          OffsetDateTime scheduledFrom,
+      @RequestParam(required = false)
+          @org.springframework.format.annotation.DateTimeFormat(
+              iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
+          OffsetDateTime scheduledTo,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "지급 목록",
+            adminRewardPayoutService.list(
+                user,
+                roundId,
+                eventId,
+                rewardReason,
+                status,
+                holdStatus,
+                scheduledFrom,
+                scheduledTo,
+                page,
+                size)));
+  }
 
   @GetMapping("/{payoutId}")
   public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> detail(
