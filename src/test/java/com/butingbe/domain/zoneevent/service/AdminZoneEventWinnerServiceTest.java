@@ -8,8 +8,10 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.dto.request.WinnerConfirmReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminTopNResDto;
 import com.butingbe.domain.zoneevent.dto.response.TopNZoneGroupResDto;
+import com.butingbe.domain.zoneevent.dto.response.WinnerConfirmResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
 import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
@@ -21,11 +23,14 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRankingSnapshotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
+import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
@@ -49,7 +54,10 @@ class AdminZoneEventWinnerServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private ZoneEventRankingSnapshotService snapshotService;
+  @Autowired private ZoneEventRankingSnapshotRepository snapshotRepository;
   @Autowired private ZoneEventReportRepository reportRepository;
+  @Autowired private ZoneEventAuditLogRepository auditLogRepository;
+  @Autowired private IdempotencyService idempotencyService;
   @Autowired private UserRepository userRepository;
 
   private ZoneEventRound round;
@@ -204,6 +212,138 @@ class AdminZoneEventWinnerServiceTest extends AbstractContainerTest {
     TopNZoneGroupResDto zone = result.zones().get(0);
     assertThat(zone.eventId()).isEqualTo(event.getId().toString());
     assertThat(zone.zoneId()).isEqualTo("SUYEONG_NAMGU");
+  }
+
+  @Test
+  @DisplayName("동점 후보 중 선택한 참여만 finalized로 확정하고 감사 로그를 남긴다")
+  void confirmWinnersFinalizesSelectedOnly() {
+    ZoneEventParticipation tie1 = success(7);
+    ZoneEventParticipation tie2 = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID anchorSnapshotId =
+        snapshotRepository
+            .findByEventIdAndVersionAndParticipationId(event.getId(), 1, tie1.getId())
+            .orElseThrow()
+            .getId();
+
+    WinnerConfirmResDto result =
+        winnerService.confirmWinners(
+            operator,
+            event.getId(),
+            new WinnerConfirmReqDto(anchorSnapshotId, List.of(tie1.getId()), "먼저 제출한 참여자 우선 선정", 1),
+            null);
+
+    assertThat(result.confirmedParticipationIds()).containsExactly(tie1.getId().toString());
+    assertThat(
+            snapshotRepository
+                .findByEventIdAndVersionAndParticipationId(event.getId(), 1, tie1.getId())
+                .orElseThrow()
+                .getFinalized())
+        .isTrue();
+    assertThat(
+            snapshotRepository
+                .findByEventIdAndVersionAndParticipationId(event.getId(), 1, tie2.getId())
+                .orElseThrow()
+                .getFinalized())
+        .isFalse();
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("EVENT", event.getId())).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("expectedRevision이 스냅샷 version과 다르면 409")
+  void confirmWinnersStaleRevisionConflicts() {
+    ZoneEventParticipation p = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID snapshotId =
+        snapshotRepository
+            .findByEventIdAndVersionAndParticipationId(event.getId(), 1, p.getId())
+            .orElseThrow()
+            .getId();
+
+    assertThatThrownBy(
+            () ->
+                winnerService.confirmWinners(
+                    operator,
+                    event.getId(),
+                    new WinnerConfirmReqDto(snapshotId, List.of(p.getId()), "사유", 99),
+                    null))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("미해결 신고가 있는 참여는 확정할 수 없다(409)")
+  void confirmWinnersHeldByReportConflicts() {
+    ZoneEventParticipation p = success(7);
+    reportRepository.save(
+        ZoneEventReport.builder()
+            .participationId(p.getId())
+            .reporterId(UUID.randomUUID())
+            .reasonCode(ReportReasonCode.SPAM)
+            .build());
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID snapshotId =
+        snapshotRepository
+            .findByEventIdAndVersionAndParticipationId(event.getId(), 1, p.getId())
+            .orElseThrow()
+            .getId();
+
+    assertThatThrownBy(
+            () ->
+                winnerService.confirmWinners(
+                    operator,
+                    event.getId(),
+                    new WinnerConfirmReqDto(snapshotId, List.of(p.getId()), "사유", 1),
+                    null))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("보류 해제 후 다시 confirm하면 기존 확정자는 그대로 두고 새로 추가 확정한다")
+  void confirmWinnersIsAdditiveAfterHoldResolved() {
+    ZoneEventParticipation clear = success(7);
+    ZoneEventParticipation held = success(7);
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(held.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID anchor =
+        snapshotRepository
+            .findByEventIdAndVersionAndParticipationId(event.getId(), 1, clear.getId())
+            .orElseThrow()
+            .getId();
+    winnerService.confirmWinners(
+        operator,
+        event.getId(),
+        new WinnerConfirmReqDto(anchor, List.of(clear.getId()), "사유", 1),
+        null);
+
+    report.resolveAs(com.butingbe.domain.zoneevent.entity.ReportStatus.DISMISSED);
+    winnerService.confirmWinners(
+        operator,
+        event.getId(),
+        new WinnerConfirmReqDto(anchor, List.of(held.getId()), "보류 해제 후 확정", 1),
+        null);
+
+    assertThat(
+            snapshotRepository
+                .findByEventIdAndVersionAndParticipationId(event.getId(), 1, clear.getId())
+                .orElseThrow()
+                .getFinalized())
+        .isTrue();
+    assertThat(
+            snapshotRepository
+                .findByEventIdAndVersionAndParticipationId(event.getId(), 1, held.getId())
+                .orElseThrow()
+                .getFinalized())
+        .isTrue();
   }
 
   private ZoneEventParticipation success(long likeCount) {
