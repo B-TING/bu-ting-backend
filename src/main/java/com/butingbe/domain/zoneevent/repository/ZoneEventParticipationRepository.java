@@ -47,4 +47,17 @@ public interface ZoneEventParticipationRepository
           + "AND p.hidden = false ORDER BY p.likeCount DESC, p.completedAt ASC")
   List<ZoneEventParticipation> findTopPublicSuccessByEvent(
       @Param("eventId") UUID eventId, org.springframework.data.domain.Pageable pageable);
+
+  /**
+   * 마감 순위 스냅샷 대상 전체 — 신고 누적으로 자동 숨김된 참여({@code hidden = true})도 포함한다.
+   *
+   * <p>숨김 참여를 제외하면 마감 시점에 스냅샷 행 자체가 생기지 않아, 나중에 신고가 기각(숨김 해제)되어도 수상자로 확정할 수 없고 컷오프도 조용히 밀린다. 보류 여부는
+   * 스냅샷이 아니라 신고 상태(OPEN/REVIEWING)로 조회·확정 시점에 판단한다.
+   */
+  @Query(
+      "SELECT p FROM ZoneEventParticipation p WHERE p.event.id = :eventId "
+          + "AND p.status = com.butingbe.domain.zoneevent.entity.ParticipationStatus.SUCCESS "
+          + "AND p.visibility = com.butingbe.domain.zoneevent.entity.ParticipationVisibility.PUBLIC "
+          + "ORDER BY p.likeCount DESC, p.completedAt ASC")
+  List<ZoneEventParticipation> findRankedPublicSuccessByEvent(@Param("eventId") UUID eventId);
 }

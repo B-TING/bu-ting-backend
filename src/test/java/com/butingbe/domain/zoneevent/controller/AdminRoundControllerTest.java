@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -14,10 +15,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundPageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminRoundResDto;
+import com.butingbe.domain.zoneevent.dto.response.AdminTopNResDto;
 import com.butingbe.domain.zoneevent.dto.response.SlotSuggestionResDto;
 import com.butingbe.domain.zoneevent.entity.RoundStatus;
 import com.butingbe.domain.zoneevent.entity.RoundType;
 import com.butingbe.domain.zoneevent.service.AdminRoundConsoleService;
+import com.butingbe.domain.zoneevent.service.AdminZoneEventWinnerService;
 import com.butingbe.global.error.GlobalExceptionHandler;
 import com.butingbe.global.error.exception.ForbiddenException;
 import java.time.OffsetDateTime;
@@ -51,6 +54,7 @@ class AdminRoundControllerTest {
   private static final UUID ROUND = UUID.fromString("44444444-0000-0000-0000-000000000001");
 
   @Mock private AdminRoundConsoleService consoleService;
+  @Mock private AdminZoneEventWinnerService winnerService;
   @InjectMocks private AdminRoundController controller;
 
   private MockMvc mockMvc;
@@ -200,6 +204,18 @@ class AdminRoundControllerTest {
     mockMvc.perform(post("/admin/zone-event-rounds/{id}/settle", ROUND)).andExpect(status().isOk());
     mockMvc
         .perform(get("/admin/zone-event-rounds/{id}/settlement-report", ROUND))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("top-n 조회 200")
+  void topN() throws Exception {
+    UUID roundId = UUID.randomUUID();
+    when(winnerService.topN(any(), eq(roundId), isNull()))
+        .thenReturn(new AdminTopNResDto(roundId.toString(), List.of()));
+
+    mockMvc
+        .perform(get("/admin/zone-event-rounds/{roundId}/top-n", roundId))
         .andExpect(status().isOk());
   }
 

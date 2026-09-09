@@ -48,8 +48,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 구역 이벤트 전 구간 해피패스 스모크: 회차 확정(schedule)·자동 시작 → 참여 → 제출(AUTO 성공+보상+칭호) → 자동 종료·정산(TOP_LIKE 쿠폰+리포트)
- * → 운영 푸시.
+ * 구역 이벤트 전 구간 해피패스 스모크: 회차 확정(schedule)·자동 시작 → 참여 → 제출(AUTO 성공+보상+칭호) → 자동 종료·정산(리포트) → 운영 푸시.
  *
  * <p>도메인(zoneevent·reward·zonetitle·notification) 경계를 가로지르는 서비스 배선과 상태 전이를 한 번에 지키는 회귀 방어망이다. 외부
  * 연동은 실제 목 없이 안전한 기본 빈(LoggingPushSender)을 그대로 쓰고, 미디어·보상 카탈로그·칭호 정의는 테스트에서 시드한다.
@@ -138,7 +137,7 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("회차 확정→자동 시작→참여→제출(성공·보상·칭호)→자동 종료→정산(쿠폰·리포트)→운영 푸시가 한 흐름으로 이어진다")
+  @DisplayName("회차 확정→자동 시작→참여→제출(성공·보상·칭호)→자동 종료→정산(리포트)→운영 푸시가 한 흐름으로 이어진다")
   void lifecycle() {
     // 1) 회차 초안 생성(DRAFT)
     AdminRoundResDto round =
@@ -214,11 +213,11 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
     assertThat(submitted.newlyEarnedTitles()).isNotEmpty();
     assertThat(userPointService.getBalance(participant.id())).isEqualTo(50);
 
-    // 6) 자동 종료(ACTIVE→CLOSED, 시각을 종료 이후로 주입) → 정산(TOP_LIKE 쿠폰 + 리포트)
+    // 6) 자동 종료(ACTIVE→CLOSED, 시각을 종료 이후로 주입) → 정산(리포트)
     transitionService.sync(persistedRound, OffsetDateTime.now().plusHours(3));
     consoleService.settle(operator, roundId);
     assertThat(settlementReportRepository.findById(roundId)).isPresent();
-    assertThat(userCouponRepository.findAll()).hasSize(1);
+    assertThat(userCouponRepository.findAll()).isEmpty();
     assertThat(zoneEventRepository.findById(eventId).orElseThrow().getStatus())
         .isEqualTo(ZoneEventStatus.CLOSED);
 

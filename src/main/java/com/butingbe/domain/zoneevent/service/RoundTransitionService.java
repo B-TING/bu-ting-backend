@@ -27,6 +27,7 @@ public class RoundTransitionService {
   private final ZoneEventRoundRepository roundRepository;
   private final ZoneEventRoundSlotRepository slotRepository;
   private final ZoneEventRepository zoneEventRepository;
+  private final ZoneEventRankingSnapshotService snapshotService;
 
   /**
    * 주어진 시각 기준으로 이 회차 하나를 필요하면 전환한다. 조건이 안 맞으면 아무 것도 하지 않는다.
@@ -38,11 +39,11 @@ public class RoundTransitionService {
   public void sync(ZoneEventRound round, OffsetDateTime now) {
     if (round.getStatus() == RoundStatus.SCHEDULED && !round.getStartsAt().isAfter(now)) {
       round.activate();
-      transitionSlotEvents(round, ZoneEventStatus.SCHEDULED, ZoneEventStatus.ACTIVE);
+      transitionSlotEvents(round, ZoneEventStatus.SCHEDULED, ZoneEventStatus.ACTIVE, now);
     }
     if (round.getStatus() == RoundStatus.ACTIVE && !round.getEndsAt().isAfter(now)) {
       round.close();
-      transitionSlotEvents(round, ZoneEventStatus.ACTIVE, ZoneEventStatus.CLOSED);
+      transitionSlotEvents(round, ZoneEventStatus.ACTIVE, ZoneEventStatus.CLOSED, now);
     }
   }
 
@@ -60,7 +61,7 @@ public class RoundTransitionService {
   }
 
   private void transitionSlotEvents(
-      ZoneEventRound round, ZoneEventStatus from, ZoneEventStatus to) {
+      ZoneEventRound round, ZoneEventStatus from, ZoneEventStatus to, OffsetDateTime now) {
     List<UUID> eventIds =
         slotRepository.findByRound_Id(round.getId()).stream()
             .map(ZoneEventRoundSlot::getEventId)
@@ -77,6 +78,7 @@ public class RoundTransitionService {
         event.activate();
       } else {
         event.close();
+        snapshotService.freeze(event, now);
       }
     }
   }

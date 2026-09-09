@@ -3,6 +3,10 @@ package com.butingbe.domain.zoneevent.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.chat.entity.ChatZone;
+import com.butingbe.domain.reward.entity.PayoutHoldStatus;
+import com.butingbe.domain.reward.entity.RewardPayout;
+import com.butingbe.domain.reward.entity.RewardPayoutStatus;
+import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.reward.service.RewardRevokeService;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.zoneevent.dto.response.AdminParticipationListItemResDto;
@@ -40,6 +44,7 @@ public class AdminReviewService {
   private final ZoneEventParticipationRepository participationRepository;
   private final ZoneEventReportRepository reportRepository;
   private final RewardRevokeService rewardRevokeService;
+  private final RewardPayoutRepository rewardPayoutRepository;
   private final OperatorAuthorization operatorAuthorization;
 
   /** SUCCESS → REVOKED + 보상 회수(포인트 되돌림, 미사용 쿠폰 회수). */
@@ -51,6 +56,14 @@ public class AdminReviewService {
     participation.stampReview(user.id());
     participation.markRevoked();
     rewardRevokeService.revokeParticipationRewards(participationId);
+    rewardPayoutRepository
+        .findByParticipationId(participationId)
+        .filter(
+            payout ->
+                payout.getStatus() != RewardPayoutStatus.SENT
+                    && payout.getStatus() != RewardPayoutStatus.MAIL_SENT
+                    && payout.getStatus() != RewardPayoutStatus.INFO_COLLECTED)
+        .ifPresent(payout -> payout.fail("PARTICIPATION_REVOKED"));
   }
 
   /** 신고 자동 숨김 해제 + 신고 DISMISSED. */
@@ -66,6 +79,10 @@ public class AdminReviewService {
     for (ZoneEventReport report : reportRepository.findByParticipationId(participationId)) {
       report.resolveAs(ReportStatus.DISMISSED);
     }
+    rewardPayoutRepository
+        .findByParticipationId(participationId)
+        .filter(payout -> payout.getHoldStatus() == PayoutHoldStatus.HELD_REPORT)
+        .ifPresent(RewardPayout::releaseHold);
   }
 
   /** 전체 참여 목록. roundId/eventId/zoneId/userId/status/keyword(닉네임·이메일)로 필터링한다. */

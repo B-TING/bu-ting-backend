@@ -13,6 +13,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventComment;
 import com.butingbe.domain.zoneevent.entity.ZoneEventLike;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
+import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.repository.ZoneEventCommentRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventLikeRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
@@ -70,6 +71,7 @@ public class ZoneEventSocialService {
   public LikeResDto like(AuthenticatedUser user, UUID participationId) {
     UUID userId = requireUserId(user);
     ZoneEventParticipation participation = requireInteractable(participationId);
+    requireEventActive(participation);
     if (participation.getUserId().equals(userId)) {
       throw new IllegalArgumentException("error.zone_event.like.self");
     }
@@ -90,10 +92,13 @@ public class ZoneEventSocialService {
         likeRepository
             .findByParticipationIdAndUserId(participationId, userId)
             .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.like.duplicate"));
+    ZoneEventParticipation participation =
+        participationRepository.findById(participationId).orElse(null);
+    if (participation != null) {
+      requireEventActive(participation);
+      participation.decreaseLikeCount();
+    }
     likeRepository.delete(like);
-    participationRepository
-        .findById(participationId)
-        .ifPresent(ZoneEventParticipation::decreaseLikeCount);
   }
 
   @Transactional
@@ -213,6 +218,13 @@ public class ZoneEventSocialService {
       throw new ConflictException("error.zone_event.participation.invalid_state");
     }
     return participation;
+  }
+
+  /** 좋아요 생성·취소는 회차 종료 전(이벤트 ACTIVE)에만 허용한다 — 마감 후 소급 좋아요 금지. */
+  private void requireEventActive(ZoneEventParticipation participation) {
+    if (participation.getEvent().getStatus() != ZoneEventStatus.ACTIVE) {
+      throw new ConflictException("error.zone_event.like.event_closed");
+    }
   }
 
   private ZoneEventComment requireComment(UUID commentId) {
