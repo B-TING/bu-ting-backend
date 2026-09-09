@@ -732,6 +732,50 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("일괄 일정: BASE와 TOP_LIKE가 섞여 있어도 CONFIRMED인 건들의 scheduledAt을 한 번에 바꾼다")
+  void bulkSchedulesConfirmedPayoutsOfBothTypes() {
+    ZoneEventParticipation p1 = participation();
+    ZoneEventParticipation p2 = participation();
+    BaseRewardPayout base =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p1.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    base.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(base);
+    RewardPayout topLike =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p2.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    topLike.confirm(operator.id());
+    rewardPayoutRepository.saveAndFlush(topLike);
+    OffsetDateTime schedule = OffsetDateTime.now().plusDays(3);
+
+    var result =
+        payoutService.bulkSchedule(
+            operator,
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto(
+                List.of(base.getId().toString(), topLike.getId().toString()),
+                schedule,
+                Map.of(
+                    base.getId().toString(), base.getRevision(),
+                    topLike.getId().toString(), topLike.getRevision())),
+            null);
+
+    assertThat(result.processedPayoutIds()).hasSize(2);
+    assertThat(baseRewardPayoutRepository.findById(base.getId()).orElseThrow().getScheduledAt())
+        .isEqualTo(schedule);
+    assertThat(rewardPayoutRepository.findById(topLike.getId()).orElseThrow().getScheduledAt())
+        .isEqualTo(schedule);
+  }
+
+  @Test
   @DisplayName("일괄 일정: 아직 CONFIRMED가 아닌 건이 섞여 있으면 전부 반영하지 않고 409다")
   void bulkScheduleRejectsNotYetConfirmed() {
     ZoneEventParticipation p1 = participation();
