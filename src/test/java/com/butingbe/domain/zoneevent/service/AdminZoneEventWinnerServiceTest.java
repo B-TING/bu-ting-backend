@@ -27,6 +27,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -143,6 +144,66 @@ class AdminZoneEventWinnerServiceTest extends AbstractContainerTest {
         new AuthenticatedUser(savedUser("normal").getId(), "n@example.com", "n", List.of());
     assertThatThrownBy(() -> winnerService.topN(normal, round.getId(), null))
         .isInstanceOf(ForbiddenException.class);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 roundId는 404")
+  void topNRoundNotFound() {
+    assertThatThrownBy(() -> winnerService.topN(operator, UUID.randomUUID(), null))
+        .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("eventId를 지정하면 해당 이벤트의 구역만 돌려준다")
+  void topNFiltersByEventId() {
+    ZoneEventType otherType =
+        zoneEventTypeRepository.save(
+            ZoneEventType.builder()
+                .typeCode("PLACE_AUTH_2")
+                .name("장소 인증2")
+                .requiresUpload(true)
+                .build());
+    ZoneEvent otherEvent =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("HAEUNDAE_GIJANG")
+                .type(otherType)
+                .roundId(round.getId())
+                .title("다른 이벤트")
+                .startsAt(OffsetDateTime.now().minusDays(1))
+                .durationMinutes(1440)
+                .status(ZoneEventStatus.ACTIVE)
+                .baseReward(new RewardSnapshot(50, null, null, null))
+                .excellenceReward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .successLimitPerUser(10)
+                .build());
+
+    success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+
+    ZoneEventParticipation otherParticipation =
+        participationRepository.save(
+            ZoneEventParticipation.builder()
+                .event(otherEvent)
+                .userId(UUID.randomUUID())
+                .status(ParticipationStatus.SUCCESS)
+                .gpsLat(35.1)
+                .gpsLng(129.1)
+                .joinedAt(OffsetDateTime.now())
+                .visibility(ParticipationVisibility.PUBLIC)
+                .build());
+    ReflectionTestUtils.setField(otherParticipation, "likeCount", 3L);
+    participationRepository.save(otherParticipation);
+    otherEvent.close();
+    snapshotService.freeze(otherEvent, OffsetDateTime.now());
+
+    AdminTopNResDto result = winnerService.topN(operator, round.getId(), event.getId());
+
+    assertThat(result.zones()).hasSize(1);
+    TopNZoneGroupResDto zone = result.zones().get(0);
+    assertThat(zone.eventId()).isEqualTo(event.getId().toString());
+    assertThat(zone.zoneId()).isEqualTo("SUYEONG_NAMGU");
   }
 
   private ZoneEventParticipation success(long likeCount) {

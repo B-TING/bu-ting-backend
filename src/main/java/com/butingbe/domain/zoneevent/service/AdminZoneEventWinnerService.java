@@ -11,6 +11,8 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventRankingSnapshot;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRankingSnapshotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class AdminZoneEventWinnerService {
       List.of(ReportStatus.OPEN, ReportStatus.REVIEWING);
 
   private final OperatorAuthorization operatorAuthorization;
+  private final ZoneEventRoundRepository roundRepository;
   private final ZoneEventRepository zoneEventRepository;
   private final ZoneEventRankingSnapshotRepository snapshotRepository;
   private final ZoneEventReportRepository reportRepository;
@@ -34,6 +37,7 @@ public class AdminZoneEventWinnerService {
   @Transactional(readOnly = true)
   public AdminTopNResDto topN(AuthenticatedUser user, UUID roundId, UUID eventId) {
     operatorAuthorization.requireOperator(user);
+    requireRound(roundId);
     List<ZoneEvent> events = zoneEventRepository.findByRoundId(roundId);
     List<TopNZoneGroupResDto> zones =
         events.stream()
@@ -41,6 +45,12 @@ public class AdminZoneEventWinnerService {
             .map(this::zoneGroupOf)
             .toList();
     return new AdminTopNResDto(roundId.toString(), zones);
+  }
+
+  private void requireRound(UUID roundId) {
+    if (!roundRepository.existsById(roundId)) {
+      throw new ResourceNotFoundException("error.zone_event.not_found");
+    }
   }
 
   private TopNZoneGroupResDto zoneGroupOf(ZoneEvent event) {
