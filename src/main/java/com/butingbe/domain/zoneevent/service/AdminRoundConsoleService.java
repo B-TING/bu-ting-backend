@@ -2,7 +2,6 @@ package com.butingbe.domain.zoneevent.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
-import com.butingbe.domain.reward.dto.response.SettlementReportResDto;
 import com.butingbe.domain.zoneevent.dto.request.BackupTargetReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCancelReqDto;
 import com.butingbe.domain.zoneevent.dto.request.RoundCreateReqDto;
@@ -288,8 +287,7 @@ public class AdminRoundConsoleService {
     expireOpenParticipations(roundId);
     OffsetDateTime now = OffsetDateTime.now();
     round.settle(now);
-    Map<String, Object> report =
-        assembleReport(roundId, now, new SettlementReportResDto(roundId.toString(), List.of()));
+    Map<String, Object> report = assembleReport(roundId, now);
     settlementReportRepository.save(
         ZoneEventSettlementReport.builder().roundId(roundId).report(report).build());
     audit(user, "SETTLE_ROUND", "ROUND", roundId, null);
@@ -321,26 +319,7 @@ public class AdminRoundConsoleService {
     }
   }
 
-  private Map<String, Object> assembleReport(
-      UUID roundId, OffsetDateTime settledAt, SettlementReportResDto prizeReport) {
-    Map<String, List<Map<String, Object>>> prizesByEvent = new LinkedHashMap<>();
-    for (SettlementReportResDto.EventPrizes ep : prizeReport.events()) {
-      List<Map<String, Object>> prizes = new ArrayList<>();
-      for (SettlementReportResDto.Prize prize : ep.prizes()) {
-        prizes.add(
-            Map.of(
-                "userId",
-                prize.userId(),
-                "participationId",
-                prize.participationId(),
-                "rewardCode",
-                prize.rewardCode(),
-                "status",
-                prize.status()));
-      }
-      prizesByEvent.put(ep.eventId(), prizes);
-    }
-
+  private Map<String, Object> assembleReport(UUID roundId, OffsetDateTime settledAt) {
     List<Map<String, Object>> events = new ArrayList<>();
     for (ZoneEvent event : zoneEventRepository.findByRoundId(roundId)) {
       long participants = participationRepository.countByEvent_Id(event.getId());
@@ -357,7 +336,7 @@ public class AdminRoundConsoleService {
       eventReport.put("successRate", participants == 0 ? 0.0 : (double) success / participants);
       eventReport.put(
           "topContentParticipationId", top.isEmpty() ? null : top.get(0).getId().toString());
-      eventReport.put("prizes", prizesByEvent.getOrDefault(event.getId().toString(), List.of()));
+      eventReport.put("prizes", List.of());
       events.add(eventReport);
     }
 
