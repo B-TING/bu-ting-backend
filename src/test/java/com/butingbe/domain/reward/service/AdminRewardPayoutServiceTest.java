@@ -14,6 +14,7 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.entity.IdempotencyRecord;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
 import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
@@ -24,6 +25,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.IdempotencyRecordRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
@@ -31,6 +33,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
+import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -52,6 +55,8 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private IdempotencyRecordRepository idempotencyRecordRepository;
+  @Autowired private EntityManager entityManager;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
@@ -253,6 +258,150 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
                 payoutService.releaseHold(
                     operator, UUID.randomUUID(), new ReleaseHoldReqDto("확인", 0L), null))
         .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("expectedRevision이 다르면 매뉴얼 체크에서 바로 409다(DB 경합 없이)")
+  void releaseHoldStaleExpectedRevisionConflicts() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.hold();
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.releaseHold(
+                    operator,
+                    payout.getId(),
+                    new ReleaseHoldReqDto("확인", payout.getRevision() + 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("매뉴얼 체크 통과 후에도 실제 flush 시점에 다른 트랜잭션이 이미 revision을 올렸다면 409다(TOP_LIKE, 진짜 낙관적 락 충돌)")
+  void releaseTopLikeHoldFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.hold();
+    rewardPayoutRepository.saveAndFlush(payout);
+    Long revisionSeenByCaller = payout.getRevision();
+
+    // 이 서비스 호출이 붙잡고 있는 영속성 컨텍스트가 모르는 사이, 다른 트랜잭션이 같은 row의 revision을 이미 올렸다고 가정한다.
+    // 네이티브 쿼리로 DB만 바꾸면 1차 캐시에 남아있는 payout 엔티티는 여전히 예전 revision을 들고 있으므로,
+    // 매뉴얼 체크(expectedRevision)는 통과하지만 실제 saveAndFlush의 버전 체크는 실패한다.
+    entityManager
+        .createNativeQuery("UPDATE reward_payout SET revision = revision + 1 WHERE payout_id = :id")
+        .setParameter("id", payout.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                payoutService.releaseHold(
+                    operator,
+                    payout.getId(),
+                    new ReleaseHoldReqDto("확인", revisionSeenByCaller),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("매뉴얼 체크 통과 후에도 실제 flush 시점에 다른 트랜잭션이 이미 revision을 올렸다면 409다(BASE, 진짜 낙관적 락 충돌)")
+  void releaseBaseHoldFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.hold();
+    baseRewardPayoutRepository.saveAndFlush(payout);
+    Long revisionSeenByCaller = payout.getRevision();
+
+    entityManager
+        .createNativeQuery(
+            "UPDATE base_reward_payout SET revision = revision + 1 WHERE payout_id = :id")
+        .setParameter("id", payout.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                payoutService.releaseHold(
+                    operator,
+                    payout.getId(),
+                    new ReleaseHoldReqDto("확인", revisionSeenByCaller),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("같은 Idempotency-Key로 release-hold를 재전송하면 두 번째 요청은 다시 처리하지 않고 같은 결과를 돌려준다")
+  void releaseHoldIsIdempotent() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.hold();
+    rewardPayoutRepository.saveAndFlush(payout);
+    String key = "idem-" + UUID.randomUUID();
+    ReleaseHoldReqDto request = new ReleaseHoldReqDto("확인", payout.getRevision());
+
+    var first = payoutService.releaseHold(operator, payout.getId(), request, key);
+    var replay = payoutService.releaseHold(operator, payout.getId(), request, key);
+
+    assertThat(replay).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("저장된 재생 응답이 손상된 JSON이면 500 대신 명확한 예외를 던진다")
+  void releaseHoldReplayWithCorruptedJsonThrows() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.hold();
+    rewardPayoutRepository.saveAndFlush(payout);
+    String key = "idem-corrupt-" + UUID.randomUUID();
+    ReleaseHoldReqDto request = new ReleaseHoldReqDto("확인", payout.getRevision());
+    String fingerprint = payout.getId() + ":" + request.note() + ":" + request.expectedRevision();
+    idempotencyRecordRepository.save(
+        new IdempotencyRecord(key, "reward-payout-release-hold", fingerprint, "not-a-json"));
+
+    assertThatThrownBy(() -> payoutService.releaseHold(operator, payout.getId(), request, key))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to deserialize");
   }
 
   private ZoneEventParticipation participation() {

@@ -18,6 +18,7 @@ import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.domain.zoneevent.dto.request.ReportDismissReqDto;
 import com.butingbe.domain.zoneevent.dto.request.ReportUpholdAction;
 import com.butingbe.domain.zoneevent.dto.request.ReportUpholdReqDto;
+import com.butingbe.domain.zoneevent.entity.IdempotencyRecord;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ParticipationVisibility;
 import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
@@ -28,6 +29,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.IdempotencyRecordRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
@@ -36,6 +38,7 @@ import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
+import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -58,6 +61,8 @@ class AdminZoneEventReportServiceTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
   @Autowired private RewardPayoutRepository rewardPayoutRepository;
   @Autowired private BaseRewardPayoutRepository baseRewardPayoutRepository;
+  @Autowired private IdempotencyRecordRepository idempotencyRecordRepository;
+  @Autowired private EntityManager entityManager;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
@@ -436,6 +441,167 @@ class AdminZoneEventReportServiceTest extends AbstractContainerTest {
                     new ReportDismissReqDto("사유", decided.getRevision()),
                     null))
         .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("status가 null이면 필터링 없이 전체 신고를 반환한다")
+  void listWithNullStatusReturnsAll() {
+    ZoneEventParticipation p1 = participation();
+    reportRepository.save(
+        ZoneEventReport.builder()
+            .participationId(p1.getId())
+            .reporterId(UUID.randomUUID())
+            .reasonCode(ReportReasonCode.SPAM)
+            .build());
+
+    var page = reportService.list(operator, null, null, null, null, 1, 20);
+
+    assertThat(page.items()).isNotEmpty();
+  }
+
+  @Test
+  @DisplayName("신고의 participationId가 존재하지 않는 참여를 가리키면 상세 조회는 404다")
+  void detailParticipationNotFound() {
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(UUID.randomUUID())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+
+    assertThatThrownBy(() -> reportService.detail(operator, report.getId()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.zone_event.participation.not_found");
+  }
+
+  @Test
+  @DisplayName("신고 상세는 BASE 지급 건도 함께 돌려준다")
+  void detailIncludesBasePayout() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    BaseRewardPayout basePayout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+
+    var detail = reportService.detail(operator, report.getId());
+
+    assertThat(detail.payouts()).hasSize(1);
+    assertThat(detail.payouts().get(0).payoutId()).isEqualTo(basePayout.getId().toString());
+    assertThat(detail.payouts().get(0).payoutType()).isEqualTo("BASE");
+  }
+
+  @Test
+  @DisplayName("신고 인정(uphold) 재생 응답이 손상된 JSON이면 500 대신 명확한 예외를 던진다")
+  void upholdReplayWithCorruptedJsonThrows() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    String key = "idem-corrupt-" + UUID.randomUUID();
+    ReportUpholdReqDto request =
+        new ReportUpholdReqDto("근거", ReportUpholdAction.HOLD, report.getRevision());
+    String fingerprint =
+        report.getId()
+            + ":"
+            + request.note()
+            + ":"
+            + request.action()
+            + ":"
+            + request.expectedRevision();
+    idempotencyRecordRepository.save(
+        new IdempotencyRecord(key, "zone-event-report-uphold", fingerprint, "not-a-json"));
+
+    assertThatThrownBy(() -> reportService.uphold(operator, report.getId(), request, key))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to deserialize");
+  }
+
+  @Test
+  @DisplayName("같은 Idempotency-Key로 신고 인정을 재전송하면 두 번째 요청은 다시 처리하지 않고 같은 결과를 돌려준다")
+  void upholdIsIdempotent() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    String key = "idem-" + UUID.randomUUID();
+    ReportUpholdReqDto request =
+        new ReportUpholdReqDto("근거", ReportUpholdAction.HOLD, report.getRevision());
+
+    var first = reportService.uphold(operator, report.getId(), request, key);
+    var replay = reportService.uphold(operator, report.getId(), request, key);
+
+    assertThat(replay).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("같은 Idempotency-Key로 신고 기각을 재전송하면 두 번째 요청은 다시 처리하지 않고 같은 결과를 돌려준다")
+  void dismissIsIdempotent() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    String key = "idem-" + UUID.randomUUID();
+    ReportDismissReqDto request = new ReportDismissReqDto("사유", report.getRevision());
+
+    var first = reportService.dismiss(operator, report.getId(), request, key);
+    var replay = reportService.dismiss(operator, report.getId(), request, key);
+
+    assertThat(replay).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("매뉴얼 체크 통과 후에도 실제 flush 시점에 다른 트랜잭션이 이미 revision을 올렸다면 409다(신고 기각, 진짜 낙관적 락 충돌)")
+  void dismissFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    Long revisionSeenByCaller = report.getRevision();
+
+    // 이 서비스 호출이 붙잡고 있는 영속성 컨텍스트가 모르는 사이, 다른 트랜잭션이 같은 row의 revision을 이미 올렸다고 가정한다.
+    // 네이티브 쿼리로 DB만 바꾸면 1차 캐시에 남아있는 report 엔티티는 여전히 예전 revision을 들고 있으므로,
+    // 매뉴얼 체크(expectedRevision)는 통과하지만 실제 saveAndFlush의 버전 체크는 실패한다.
+    entityManager
+        .createNativeQuery(
+            "UPDATE zone_event_report SET revision = revision + 1 WHERE report_id = :id")
+        .setParameter("id", report.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                reportService.dismiss(
+                    operator,
+                    report.getId(),
+                    new ReportDismissReqDto("사유", revisionSeenByCaller),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_event.report.stale_revision");
   }
 
   private ZoneEventParticipation participation() {
