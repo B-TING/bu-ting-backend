@@ -2,6 +2,13 @@ package com.butingbe.domain.zoneevent.service;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
+import com.butingbe.domain.reward.entity.BaseRewardPayout;
+import com.butingbe.domain.reward.entity.BaseRewardPayoutStatus;
+import com.butingbe.domain.reward.entity.PayoutHoldStatus;
+import com.butingbe.domain.reward.entity.RewardPayout;
+import com.butingbe.domain.reward.entity.RewardPayoutStatus;
+import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
+import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.domain.zoneevent.dto.response.CommentPageResDto;
@@ -63,6 +70,8 @@ public class ZoneEventSocialService {
   private final UserRepository userRepository;
   private final OperatorAuthorization operatorAuthorization;
   private final ZoneTitleService zoneTitleService;
+  private final RewardPayoutRepository rewardPayoutRepository;
+  private final BaseRewardPayoutRepository baseRewardPayoutRepository;
 
   @Value("${zone-event.report.auto-hide-threshold:3}")
   private long autoHideThreshold;
@@ -202,6 +211,7 @@ public class ZoneEventSocialService {
                 .reasonCode(parseReason(reasonCode))
                 .memo(memo)
                 .build());
+    holdUnpaidPayouts(participationId);
     if (reportRepository.countByParticipationId(participationId) >= autoHideThreshold) {
       participation.hide();
     }
@@ -225,6 +235,28 @@ public class ZoneEventSocialService {
     if (participation.getEvent().getStatus() != ZoneEventStatus.ACTIVE) {
       throw new ConflictException("error.zone_event.like.event_closed");
     }
+  }
+
+  /** 신고 접수 시 아직 확정 지급되지 않은 보상은 즉시 보류한다. 이미 보류 중이거나 발송·지급 완료면 손대지 않는다. */
+  private void holdUnpaidPayouts(UUID participationId) {
+    rewardPayoutRepository
+        .findByParticipationId(participationId)
+        .filter(payout -> payout.getHoldStatus() != PayoutHoldStatus.HELD_REPORT)
+        .filter(
+            payout ->
+                payout.getStatus() != RewardPayoutStatus.SENT
+                    && payout.getStatus() != RewardPayoutStatus.MAIL_SENT
+                    && payout.getStatus() != RewardPayoutStatus.INFO_COLLECTED
+                    && payout.getStatus() != RewardPayoutStatus.FAILED)
+        .ifPresent(RewardPayout::hold);
+    baseRewardPayoutRepository
+        .findByParticipationId(participationId)
+        .filter(payout -> payout.getHoldStatus() != PayoutHoldStatus.HELD_REPORT)
+        .filter(
+            payout ->
+                payout.getStatus() != BaseRewardPayoutStatus.PAID
+                    && payout.getStatus() != BaseRewardPayoutStatus.FAILED)
+        .ifPresent(BaseRewardPayout::hold);
   }
 
   private ZoneEventComment requireComment(UUID commentId) {

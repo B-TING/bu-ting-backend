@@ -4,6 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.entity.BaseRewardPayout;
+import com.butingbe.domain.reward.entity.BaseRewardPayoutStatus;
+import com.butingbe.domain.reward.entity.PayoutHoldStatus;
+import com.butingbe.domain.reward.entity.RewardPayout;
+import com.butingbe.domain.reward.entity.RewardPayoutStatus;
+import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
+import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
@@ -42,6 +49,8 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private ZoneEventParticipationRepository participationRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RewardPayoutRepository rewardPayoutRepository;
+  @Autowired private BaseRewardPayoutRepository baseRewardPayoutRepository;
 
   private ZoneEvent event;
   private UUID authorId;
@@ -259,6 +268,74 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> socialService.like(null, participationId))
         .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("신고가 접수되면 관련 미지급 보상이 HELD_REPORT로 전환된다")
+  void reportHoldsUnpaidPayouts() {
+    UUID participationId = publicSuccess().getId();
+    RewardPayout topLike =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(participationId)
+                .rankN(1)
+                .likeCountAtClose(10L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    BaseRewardPayout base =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(participationId)
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+
+    socialService.report(viewer, participationId, "SPAM", null);
+
+    assertThat(rewardPayoutRepository.findById(topLike.getId()).orElseThrow().getHoldStatus())
+        .isEqualTo(PayoutHoldStatus.HELD_REPORT);
+    assertThat(baseRewardPayoutRepository.findById(base.getId()).orElseThrow().getHoldStatus())
+        .isEqualTo(PayoutHoldStatus.HELD_REPORT);
+  }
+
+  @Test
+  @DisplayName("이미 발송·지급 완료된 보상은 신고가 접수돼도 보류하지 않는다")
+  void reportDoesNotHoldAlreadySentPayout() {
+    UUID participationId = publicSuccess().getId();
+    RewardPayout topLike =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(participationId)
+                .rankN(1)
+                .likeCountAtClose(10L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    ReflectionTestUtils.setField(topLike, "status", RewardPayoutStatus.SENT);
+    rewardPayoutRepository.saveAndFlush(topLike);
+    BaseRewardPayout base =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(participationId)
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    ReflectionTestUtils.setField(base, "status", BaseRewardPayoutStatus.PAID);
+    baseRewardPayoutRepository.saveAndFlush(base);
+
+    socialService.report(viewer, participationId, "SPAM", null);
+
+    assertThat(rewardPayoutRepository.findById(topLike.getId()).orElseThrow().getHoldStatus())
+        .isEqualTo(PayoutHoldStatus.NONE);
+    assertThat(baseRewardPayoutRepository.findById(base.getId()).orElseThrow().getHoldStatus())
+        .isEqualTo(PayoutHoldStatus.NONE);
+  }
+
+  @Test
+  @DisplayName("해당 참여에 지급 건이 없어도 신고 접수는 그대로 성공한다")
+  void reportSucceedsWithoutAnyPayout() {
+    UUID participationId = publicSuccess().getId();
+
+    assertThat(socialService.report(viewer, participationId, "SPAM", null).reportId()).isNotBlank();
   }
 
   private ZoneEventParticipation publicSuccess() {
