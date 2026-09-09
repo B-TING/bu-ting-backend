@@ -6024,7 +6024,7 @@ paths:
       tags:
         - Zone Event
       summary: "수상자 확정"
-      description: "ROLE_ADMIN/MANAGER. Top N 경계 동점 후보 중 관리자가 선택한 참여만 최종 수상자로 확정합니다. 이미 확정된 참여는 유지되고, 새로 포함된 참여만 추가로 확정됩니다(재확정 가능)."
+      description: "ROLE_ADMIN/MANAGER. Top N 경계 동점 후보 중 관리자가 선택한 참여만 최종 수상자로 확정합니다. 이미 확정된 참여는 유지되고, 새로 포함된 참여만 추가로 확정됩니다(재확정 가능). 확정 인원은 이벤트의 topN을 넘을 수 없습니다."
       security:
         - opaqueToken: [ ]
       parameters:
@@ -6070,7 +6070,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "409":
-          description: "스냅샷 변경됨 / 미해결 신고로 보류"
+          description: "스냅샷 변경됨 / 미해결 신고로 보류 / topN 초과"
           content:
             application/json:
               schema:
