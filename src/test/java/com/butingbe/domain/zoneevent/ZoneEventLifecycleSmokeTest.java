@@ -137,7 +137,7 @@ class ZoneEventLifecycleSmokeTest extends AbstractContainerTest {
   }
 
   @Test
-  @DisplayName("회차 확정→자동 시작→참여→제출(성공·보상·칭호)→자동 종료→정산(쿠폰·리포트)→운영 푸시가 한 흐름으로 이어진다")
+  @DisplayName("회차 확정→자동 시작→참여→제출(성공·보상·칭호)→자동 종료→정산(리포트)→운영 푸시가 한 흐름으로 이어진다")
   void lifecycle() {
     // 1) 회차 초안 생성(DRAFT)
     AdminRoundResDto round =
