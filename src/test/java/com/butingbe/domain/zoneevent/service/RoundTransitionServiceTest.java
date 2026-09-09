@@ -9,17 +9,22 @@ import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRoundSlot;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRankingSnapshotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
@@ -30,6 +35,8 @@ class RoundTransitionServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventRoundSlotRepository slotRepository;
   @Autowired private ZoneEventRepository zoneEventRepository;
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
+  @Autowired private ZoneEventParticipationRepository participationRepository;
+  @Autowired private ZoneEventRankingSnapshotRepository snapshotRepository;
 
   private ZoneEventType type;
   private static int roundNoSeq = 1000;
@@ -114,6 +121,19 @@ class RoundTransitionServiceTest extends AbstractContainerTest {
         .containsExactlyInAnyOrder(RoundStatus.ACTIVE, RoundStatus.CLOSED);
   }
 
+  @Test
+  @DisplayName("회차 종료 전환 시 이벤트별 좋아요 스냅샷이 얼려진다")
+  void syncFreezesRankingSnapshotOnClose() {
+    ZoneEventRound round = savedRound(RoundStatus.ACTIVE, -2, -1);
+    ZoneEvent event = savedEventWithExcellence(ZoneEventStatus.ACTIVE, 1);
+    savedSlot(round, "YEONGDO", event.getId());
+    success(event, 5);
+
+    transitionService.sync(round, OffsetDateTime.now());
+
+    assertThat(snapshotRepository.countByEventId(event.getId())).isEqualTo(1);
+  }
+
   private ZoneEventRound savedRound(RoundStatus status, int startsDaysOffset, int endsDaysOffset) {
     return roundRepository.save(
         ZoneEventRound.builder()
@@ -136,6 +156,38 @@ class RoundTransitionServiceTest extends AbstractContainerTest {
             .baseReward(new RewardSnapshot(50, null, null, null))
             .successLimitPerUser(1)
             .build());
+  }
+
+  private ZoneEvent savedEventWithExcellence(ZoneEventStatus status, int topN) {
+    return zoneEventRepository.save(
+        ZoneEvent.builder()
+            .zoneId("SUYEONG_NAMGU")
+            .type(type)
+            .title("이벤트")
+            .startsAt(OffsetDateTime.now())
+            .durationMinutes(1440)
+            .status(status)
+            .baseReward(new RewardSnapshot(50, null, null, null))
+            .excellenceReward(new RewardSnapshot(null, null, topN, "COUPON_TOP"))
+            .successLimitPerUser(10)
+            .build());
+  }
+
+  private ZoneEventParticipation success(ZoneEvent event, long likeCount) {
+    ZoneEventParticipation p =
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(UUID.randomUUID())
+            .status(com.butingbe.domain.zoneevent.entity.ParticipationStatus.SUCCESS)
+            .gpsLat(35.1)
+            .gpsLng(129.1)
+            .joinedAt(OffsetDateTime.now())
+            .visibility(com.butingbe.domain.zoneevent.entity.ParticipationVisibility.PUBLIC)
+            .build();
+    p = participationRepository.save(p);
+    ReflectionTestUtils.setField(p, "likeCount", likeCount);
+    ReflectionTestUtils.setField(p, "completedAt", OffsetDateTime.now());
+    return participationRepository.save(p);
   }
 
   private ZoneEventRoundSlot savedSlot(
