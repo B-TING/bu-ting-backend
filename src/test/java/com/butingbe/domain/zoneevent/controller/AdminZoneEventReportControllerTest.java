@@ -124,6 +124,34 @@ class AdminZoneEventReportControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  @Test
+  @DisplayName("신고 기각 200")
+  void dismiss() throws Exception {
+    UUID reportId = UUID.randomUUID();
+    when(adminZoneEventReportService.dismiss(any(), eq(reportId), any(), any()))
+        .thenReturn(
+            new AdminZoneEventReportDecisionResDto(
+                reportId.toString(), "DISMISSED", UUID.randomUUID().toString(), 1L));
+    mockMvc
+        .perform(
+            post("/admin/zone-event-reports/{id}/dismiss", reportId)
+                .contentType("application/json")
+                .content("{\"note\":\"근거 부족\",\"expectedRevision\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("DISMISSED"));
+  }
+
+  @Test
+  @DisplayName("신고 기각 요청에 note·expectedRevision이 없으면 400")
+  void dismissValidation() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/zone-event-reports/{id}/dismiss", UUID.randomUUID())
+                .contentType("application/json")
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+  }
+
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
     return new HandlerMethodArgumentResolver() {
       @Override

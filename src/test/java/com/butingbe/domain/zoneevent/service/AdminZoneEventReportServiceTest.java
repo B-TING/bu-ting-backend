@@ -12,6 +12,7 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.dto.request.ReportDismissReqDto;
 import com.butingbe.domain.zoneevent.dto.request.ReportUpholdAction;
 import com.butingbe.domain.zoneevent.dto.request.ReportUpholdReqDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
@@ -299,6 +300,68 @@ class AdminZoneEventReportServiceTest extends AbstractContainerTest {
                     operator,
                     report.getId(),
                     new ReportUpholdReqDto("근거", ReportUpholdAction.HOLD, decided.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class);
+  }
+
+  @Test
+  @DisplayName("신고 기각은 상태를 DISMISSED로 바꾸지만 지급 보류는 그대로 둔다(별도 release-hold 필요)")
+  void dismissMarksDismissedButDoesNotReleaseHold() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.hold();
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    var decision =
+        reportService.dismiss(
+            operator,
+            report.getId(),
+            new ReportDismissReqDto("촬영 조건 충족 확인, 신고 근거 부족", report.getRevision()),
+            null);
+
+    assertThat(decision.status()).isEqualTo("DISMISSED");
+    assertThat(reportRepository.findById(report.getId()).orElseThrow().getStatus())
+        .isEqualTo(ReportStatus.DISMISSED);
+    assertThat(rewardPayoutRepository.findById(payout.getId()).orElseThrow().getHoldStatus())
+        .isEqualTo(PayoutHoldStatus.HELD_REPORT);
+  }
+
+  @Test
+  @DisplayName("이미 처리된 신고 기각은 409다")
+  void dismissAlreadyDecidedConflicts() {
+    ZoneEventParticipation p = participation();
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(p.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    reportService.dismiss(
+        operator, report.getId(), new ReportDismissReqDto("사유", report.getRevision()), null);
+    ZoneEventReport decided = reportRepository.findById(report.getId()).orElseThrow();
+
+    assertThatThrownBy(
+            () ->
+                reportService.dismiss(
+                    operator,
+                    report.getId(),
+                    new ReportDismissReqDto("사유", decided.getRevision()),
                     null))
         .isInstanceOf(ConflictException.class);
   }

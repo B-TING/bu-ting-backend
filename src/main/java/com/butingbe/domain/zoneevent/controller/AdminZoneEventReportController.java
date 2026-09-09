@@ -1,6 +1,7 @@
 package com.butingbe.domain.zoneevent.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.zoneevent.dto.request.ReportDismissReqDto;
 import com.butingbe.domain.zoneevent.dto.request.ReportUpholdReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportDecisionResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportDetailResDto;
@@ -61,5 +62,16 @@ public class AdminZoneEventReportController {
     return ResponseEntity.ok(
         ApiResponse.success(
             "신고 인정", adminZoneEventReportService.uphold(user, reportId, request, idempotencyKey)));
+  }
+
+  @PostMapping("/{reportId}/dismiss")
+  public ResponseEntity<ApiResponse<AdminZoneEventReportDecisionResDto>> dismiss(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID reportId,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid ReportDismissReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "신고 기각", adminZoneEventReportService.dismiss(user, reportId, request, idempotencyKey)));
   }
 }

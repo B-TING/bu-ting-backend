@@ -7,6 +7,7 @@ import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardPayout;
 import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
+import com.butingbe.domain.zoneevent.dto.request.ReportDismissReqDto;
 import com.butingbe.domain.zoneevent.dto.request.ReportUpholdAction;
 import com.butingbe.domain.zoneevent.dto.request.ReportUpholdReqDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminZoneEventReportDecisionResDto;
@@ -47,6 +48,7 @@ public class AdminZoneEventReportService {
   private static final int DEFAULT_SIZE = 20;
   private static final int MAX_SIZE = 50;
   private static final String UPHOLD_ENDPOINT = "zone-event-report-uphold";
+  private static final String DISMISS_ENDPOINT = "zone-event-report-dismiss";
 
   private final ZoneEventReportRepository reportRepository;
   private final ZoneEventParticipationRepository participationRepository;
@@ -210,6 +212,45 @@ public class AdminZoneEventReportService {
             report.getParticipationId().toString(),
             report.getRevision());
     idempotencyService.save(idempotencyKey, UPHOLD_ENDPOINT, fingerprint, result);
+    return result;
+  }
+
+  /**
+   * 신고 기각. 다른 미해결 신고가 있으면 그 신고는 그대로 두고, 지급 보류도 절대 자동 해제하지 않는다 — 보류 해제는 {@code
+   * /admin/reward-payouts/{payoutId}/release-hold}로만 가능하다(issue #243).
+   */
+  @Transactional
+  public AdminZoneEventReportDecisionResDto dismiss(
+      AuthenticatedUser user, UUID reportId, ReportDismissReqDto request, String idempotencyKey) {
+    operatorAuthorization.requireOperator(user);
+    String fingerprint = reportId + ":" + request.note() + ":" + request.expectedRevision();
+    Optional<String> replay =
+        idempotencyService.findReplay(idempotencyKey, DISMISS_ENDPOINT, fingerprint);
+    if (replay.isPresent()) {
+      return readJson(replay.get(), AdminZoneEventReportDecisionResDto.class);
+    }
+
+    ZoneEventReport report = requireDecidable(reportId, request.expectedRevision());
+    report.stampDecision(user.id(), request.note());
+    report.resolveAs(ReportStatus.DISMISSED);
+    flushReport(report);
+
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action("DISMISS_REPORT")
+            .targetType("REPORT")
+            .targetId(reportId)
+            .detail(Map.of("note", request.note()))
+            .build());
+
+    AdminZoneEventReportDecisionResDto result =
+        new AdminZoneEventReportDecisionResDto(
+            report.getId().toString(),
+            report.getStatus().name(),
+            report.getParticipationId().toString(),
+            report.getRevision());
+    idempotencyService.save(idempotencyKey, DISMISS_ENDPOINT, fingerprint, result);
     return result;
   }
 
