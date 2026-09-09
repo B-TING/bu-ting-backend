@@ -6013,6 +6013,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "회차 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/admin/zone-events/{eventId}/winners/confirm:
     post:
       tags:
