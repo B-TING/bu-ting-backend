@@ -8,6 +8,7 @@ import com.butingbe.domain.zoneevent.dto.response.TopNCandidateResDto;
 import com.butingbe.domain.zoneevent.dto.response.TopNZoneGroupResDto;
 import com.butingbe.domain.zoneevent.dto.response.WinnerConfirmResDto;
 import com.butingbe.domain.zoneevent.entity.ReportStatus;
+import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRankingSnapshot;
@@ -100,7 +101,7 @@ public class AdminZoneEventWinnerService {
       throw new ConflictException("error.zone_event.winner.stale_revision");
     }
 
-    List<String> confirmed = new ArrayList<>();
+    List<ZoneEventRankingSnapshot> targets = new ArrayList<>();
     for (UUID participationId : request.participationIds()) {
       ZoneEventRankingSnapshot row =
           snapshotRepository
@@ -112,8 +113,14 @@ public class AdminZoneEventWinnerService {
       if (reportRepository.existsByParticipationIdAndStatusIn(participationId, UNRESOLVED)) {
         throw new ConflictException("error.zone_event.winner.held_by_report");
       }
+      targets.add(row);
+    }
+    requireWithinTopN(eventId, anchor.getVersion(), targets);
+
+    List<String> confirmed = new ArrayList<>();
+    for (ZoneEventRankingSnapshot row : targets) {
       row.markFinalized();
-      confirmed.add(participationId.toString());
+      confirmed.add(row.getParticipationId().toString());
     }
 
     Map<String, Object> detail = new LinkedHashMap<>();
@@ -133,6 +140,26 @@ public class AdminZoneEventWinnerService {
         new WinnerConfirmResDto(eventId.toString(), anchor.getVersion(), confirmed);
     idempotencyService.save(idempotencyKey, CONFIRM_ENDPOINT, fingerprint, result);
     return result;
+  }
+
+  /**
+   * 이미 확정된 수상자 수 + 이번에 새로 확정될 수 = 정원(topN)을 넘지 못하게 막는다.
+   *
+   * <p>{@code markFinalized()}에는 역연산이 없으므로, 초과 확정은 되돌릴 수 없고 {@code payouts/generate}가 그대로 지급 후보를
+   * 만든다. 이미 확정된 id를 다시 보내는 것은 멱등 no-op이라 정원에 새로 계산하지 않는다. 우수 보상이 없는 이벤트는 정원 0으로 본다(그런 이벤트는 스냅샷 자체가
+   * 생기지 않아 실제로는 도달하지 않는 방어 코드다).
+   */
+  private void requireWithinTopN(
+      UUID eventId, Integer version, List<ZoneEventRankingSnapshot> targets) {
+    RewardSnapshot excellence =
+        zoneEventRepository.findById(eventId).map(ZoneEvent::getExcellenceReward).orElse(null);
+    int topN = excellence == null || excellence.topN() == null ? 0 : excellence.topN();
+    long alreadyFinalized =
+        snapshotRepository.countByEventIdAndVersionAndFinalizedTrue(eventId, version);
+    long newlyFinalizing = targets.stream().filter(row -> !row.getFinalized()).count();
+    if (alreadyFinalized + newlyFinalizing > topN) {
+      throw new ConflictException("error.zone_event.winner.topn_exceeded");
+    }
   }
 
   private <T> T readJson(String json, Class<T> type) {

@@ -18,4 +18,7 @@ public interface ZoneEventRankingSnapshotRepository
       UUID eventId, Integer version, UUID participationId);
 
   List<ZoneEventRankingSnapshot> findByEventIdAndFinalizedTrue(UUID eventId);
+
+  /** 이 세대(version)에서 이미 확정된 수상자 수 — topN 정원 초과 확정을 막는 데 쓴다. */
+  long countByEventIdAndVersionAndFinalizedTrue(UUID eventId, Integer version);
 }

@@ -19,6 +19,7 @@ import com.butingbe.domain.zoneevent.entity.ReportReasonCode;
 import com.butingbe.domain.zoneevent.entity.RewardSnapshot;
 import com.butingbe.domain.zoneevent.entity.RoundType;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
 import com.butingbe.domain.zoneevent.entity.ZoneEventRound;
@@ -250,7 +251,14 @@ class AdminZoneEventWinnerServiceTest extends AbstractContainerTest {
                 .orElseThrow()
                 .getFinalized())
         .isFalse();
-    assertThat(auditLogRepository.findByTargetTypeAndTargetId("EVENT", event.getId())).hasSize(1);
+    List<ZoneEventAuditLog> logs =
+        auditLogRepository.findByTargetTypeAndTargetId("EVENT", event.getId());
+    assertThat(logs).hasSize(1);
+    assertThat(logs.get(0).getAction()).isEqualTo("CONFIRM_WINNERS");
+    assertThat(logs.get(0).getDetail())
+        .containsEntry("selectionReason", "먼저 제출한 참여자 우선 선정")
+        .containsEntry("version", 1)
+        .containsEntry("participationIds", List.of(tie1.getId().toString()));
   }
 
   @Test
@@ -306,6 +314,7 @@ class AdminZoneEventWinnerServiceTest extends AbstractContainerTest {
   @Test
   @DisplayName("보류 해제 후 다시 confirm하면 기존 확정자는 그대로 두고 새로 추가 확정한다")
   void confirmWinnersIsAdditiveAfterHoldResolved() {
+    setTopN(2);
     ZoneEventParticipation tiedClear = success(7);
     ZoneEventParticipation tiedHeld = success(7);
     ZoneEventReport report =
@@ -436,6 +445,192 @@ class AdminZoneEventWinnerServiceTest extends AbstractContainerTest {
                     new WinnerConfirmReqDto(anchorSnapshotId, List.of(UUID.randomUUID()), "사유", 1),
                     null))
         .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("정원(topN)만큼 한 번에 확정하는 것은 성공한다")
+  void confirmWinnersUpToTopNSucceeds() {
+    setTopN(2);
+    ZoneEventParticipation tie1 = success(7);
+    ZoneEventParticipation tie2 = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+
+    WinnerConfirmResDto result =
+        winnerService.confirmWinners(
+            operator,
+            event.getId(),
+            new WinnerConfirmReqDto(
+                snapshotIdOf(tie1), List.of(tie1.getId(), tie2.getId()), "정원만큼 확정", 1),
+            null);
+
+    assertThat(result.confirmedParticipationIds()).hasSize(2);
+    assertThat(snapshotRepository.countByEventIdAndVersionAndFinalizedTrue(event.getId(), 1))
+        .isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("한 번의 요청으로 정원(topN)을 넘겨 확정하면 409")
+  void confirmWinnersBeyondTopNInOneRequestConflicts() {
+    setTopN(2);
+    ZoneEventParticipation tie1 = success(7);
+    ZoneEventParticipation tie2 = success(7);
+    ZoneEventParticipation tie3 = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID anchor = snapshotIdOf(tie1);
+
+    assertThatThrownBy(
+            () ->
+                winnerService.confirmWinners(
+                    operator,
+                    event.getId(),
+                    new WinnerConfirmReqDto(
+                        anchor, List.of(tie1.getId(), tie2.getId(), tie3.getId()), "초과 확정", 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_event.winner.topn_exceeded");
+    assertThat(snapshotRepository.countByEventIdAndVersionAndFinalizedTrue(event.getId(), 1))
+        .isZero();
+  }
+
+  @Test
+  @DisplayName("두 번에 나눠 정원(topN)까지 확정하는 것은 성공한다")
+  void confirmWinnersAdditiveUpToTopNSucceeds() {
+    setTopN(2);
+    ZoneEventParticipation tie1 = success(7);
+    ZoneEventParticipation tie2 = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID anchor = snapshotIdOf(tie1);
+
+    winnerService.confirmWinners(
+        operator,
+        event.getId(),
+        new WinnerConfirmReqDto(anchor, List.of(tie1.getId()), "1차", 1),
+        null);
+    winnerService.confirmWinners(
+        operator,
+        event.getId(),
+        new WinnerConfirmReqDto(anchor, List.of(tie2.getId()), "2차", 1),
+        null);
+
+    assertThat(snapshotRepository.countByEventIdAndVersionAndFinalizedTrue(event.getId(), 1))
+        .isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("이미 정원(topN)을 채운 뒤 한 명을 더 추가 확정하면 409")
+  void confirmWinnersBeyondTopNAcrossCallsConflicts() {
+    setTopN(2);
+    ZoneEventParticipation tie1 = success(7);
+    ZoneEventParticipation tie2 = success(7);
+    ZoneEventParticipation tie3 = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID anchor = snapshotIdOf(tie1);
+    winnerService.confirmWinners(
+        operator,
+        event.getId(),
+        new WinnerConfirmReqDto(anchor, List.of(tie1.getId(), tie2.getId()), "정원 확정", 1),
+        null);
+
+    assertThatThrownBy(
+            () ->
+                winnerService.confirmWinners(
+                    operator,
+                    event.getId(),
+                    new WinnerConfirmReqDto(anchor, List.of(tie3.getId()), "초과 추가", 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_event.winner.topn_exceeded");
+    assertThat(snapshotRepository.countByEventIdAndVersionAndFinalizedTrue(event.getId(), 1))
+        .isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("이미 확정된 참여를 다시 보내도 정원을 새로 소모하지 않는다(멱등 no-op)")
+  void reconfirmingFinalizedIdDoesNotConsumeTopN() {
+    ZoneEventParticipation only = success(7);
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+    UUID anchor = snapshotIdOf(only);
+    winnerService.confirmWinners(
+        operator,
+        event.getId(),
+        new WinnerConfirmReqDto(anchor, List.of(only.getId()), "확정", 1),
+        null);
+
+    winnerService.confirmWinners(
+        operator,
+        event.getId(),
+        new WinnerConfirmReqDto(anchor, List.of(only.getId()), "재확정", 1),
+        null);
+
+    assertThat(snapshotRepository.countByEventIdAndVersionAndFinalizedTrue(event.getId(), 1))
+        .isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("신고 누적으로 숨겨진 참여도 스냅샷에 남아, 신고가 해제되면 수상자로 확정할 수 있다")
+  void autoHiddenParticipationSurvivesFreezeAndIsConfirmableAfterReportResolved() {
+    ZoneEventParticipation hidden = success(7);
+    hidden.hide();
+    participationRepository.save(hidden);
+    ZoneEventReport report =
+        reportRepository.save(
+            ZoneEventReport.builder()
+                .participationId(hidden.getId())
+                .reporterId(UUID.randomUUID())
+                .reasonCode(ReportReasonCode.SPAM)
+                .build());
+    event.close();
+    snapshotService.freeze(event, OffsetDateTime.now());
+
+    // 1) 숨김 상태여도 스냅샷 행은 존재한다.
+    UUID anchor = snapshotIdOf(hidden);
+    AdminTopNResDto topN = winnerService.topN(operator, round.getId(), event.getId());
+    assertThat(topN.zones().get(0).candidates()).hasSize(1);
+    // 2) 미해결 신고가 남아 있는 동안은 기존 heldByReport 판정으로 확정이 막힌다.
+    assertThat(topN.zones().get(0).candidates().get(0).heldByReport()).isTrue();
+    assertThatThrownBy(
+            () ->
+                winnerService.confirmWinners(
+                    operator,
+                    event.getId(),
+                    new WinnerConfirmReqDto(anchor, List.of(hidden.getId()), "보류 중", 1),
+                    null))
+        .isInstanceOf(ConflictException.class);
+
+    // 3) 신고가 기각되면 같은 스냅샷 행으로 확정할 수 있다.
+    report.resolveAs(com.butingbe.domain.zoneevent.entity.ReportStatus.DISMISSED);
+    hidden.unhide();
+    participationRepository.save(hidden);
+    winnerService.confirmWinners(
+        operator,
+        event.getId(),
+        new WinnerConfirmReqDto(anchor, List.of(hidden.getId()), "신고 기각 후 확정", 1),
+        null);
+
+    assertThat(
+            snapshotRepository
+                .findByEventIdAndVersionAndParticipationId(event.getId(), 1, hidden.getId())
+                .orElseThrow()
+                .getFinalized())
+        .isTrue();
+  }
+
+  /** 이 테스트 픽스처의 이벤트 우수 보상 정원(topN)을 바꾼다. */
+  private void setTopN(int topN) {
+    ReflectionTestUtils.setField(
+        event, "excellenceReward", new RewardSnapshot(null, null, topN, "COUPON_TOP"));
+  }
+
+  private UUID snapshotIdOf(ZoneEventParticipation participation) {
+    return snapshotRepository
+        .findByEventIdAndVersionAndParticipationId(event.getId(), 1, participation.getId())
+        .orElseThrow()
+        .getId();
   }
 
   private ZoneEventParticipation success(long likeCount) {
