@@ -20,7 +20,7 @@ CREATE TABLE zone_event (
     starts_at TIMESTAMPTZ NOT NULL,
     duration_minutes INTEGER NOT NULL,
     status VARCHAR(20) NOT NULL,
-    base_reward JSONB,
+    base_reward JSONB NOT NULL,
     excellence_reward JSONB,
     success_limit_per_user INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
