@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.entity.BaseRewardPayout;
+import com.butingbe.domain.reward.entity.BaseRewardPayoutStatus;
 import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardCatalog;
 import com.butingbe.domain.reward.entity.RewardPayout;
 import com.butingbe.domain.reward.entity.RewardPayoutStatus;
 import com.butingbe.domain.reward.entity.RewardType;
+import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardCatalogRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.reward.service.RewardService;
@@ -59,6 +62,7 @@ class AdminReviewServiceTest extends AbstractContainerTest {
   @Autowired private RewardService rewardService;
   @Autowired private UserRepository userRepository;
   @Autowired private RewardPayoutRepository payoutRepository;
+  @Autowired private BaseRewardPayoutRepository baseRewardPayoutRepository;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
@@ -181,6 +185,49 @@ class AdminReviewServiceTest extends AbstractContainerTest {
     RewardPayout reloaded = payoutRepository.findById(payout.getId()).orElseThrow();
     assertThat(reloaded.getStatus()).isEqualTo(RewardPayoutStatus.FAILED);
     assertThat(reloaded.getFailureCode()).isEqualTo("PARTICIPATION_REVOKED");
+  }
+
+  @Test
+  @DisplayName("회수 시 아직 지급 전인 BASE 지급 건도 FAILED로 바뀐다")
+  void revokeFailsUnpaidBasePayout() {
+    ZoneEventParticipation p =
+        participationRepository.save(participation(ParticipationStatus.SUCCESS, false));
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+
+    reviewService.revoke(operator, p.getId());
+
+    BaseRewardPayout reloaded = baseRewardPayoutRepository.findById(payout.getId()).orElseThrow();
+    assertThat(reloaded.getStatus()).isEqualTo(BaseRewardPayoutStatus.FAILED);
+    assertThat(reloaded.getFailureCode()).isEqualTo("PARTICIPATION_REVOKED");
+  }
+
+  @Test
+  @DisplayName("회수해도 이미 PAID인 BASE 지급 건은 건드리지 않는다")
+  void revokeLeavesPaidBasePayoutUntouched() {
+    ZoneEventParticipation p =
+        participationRepository.save(participation(ParticipationStatus.SUCCESS, false));
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    payout.markSent(OffsetDateTime.now(), null);
+    baseRewardPayoutRepository.saveAndFlush(payout);
+
+    reviewService.revoke(operator, p.getId());
+
+    BaseRewardPayout reloaded = baseRewardPayoutRepository.findById(payout.getId()).orElseThrow();
+    assertThat(reloaded.getStatus()).isEqualTo(BaseRewardPayoutStatus.PAID);
+    assertThat(reloaded.getFailureCode()).isNull();
   }
 
   @Test
