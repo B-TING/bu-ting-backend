@@ -169,6 +169,15 @@ public class RewardPayout extends TimestampEntity {
     }
   }
 
+  public void markSent(OffsetDateTime sentAt, String reference, String note) {
+    this.status = RewardPayoutStatus.SENT;
+    this.sentAt = sentAt;
+    this.reference = reference;
+    if (note != null) {
+      this.memo = note;
+    }
+  }
+
   public void updateMemo(String memo) {
     this.memo = memo;
   }

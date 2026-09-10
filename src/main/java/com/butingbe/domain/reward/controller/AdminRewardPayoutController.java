@@ -4,6 +4,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
@@ -139,5 +140,15 @@ public class AdminRewardPayoutController {
         ApiResponse.success(
             "개인정보 수집 기록",
             adminRewardPayoutService.markInfoCollected(user, request, idempotencyKey)));
+  }
+
+  @PostMapping("/mark-sent")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> markSent(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutMarkSentReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "발송 완료 기록", adminRewardPayoutService.markSent(user, request, idempotencyKey)));
   }
 }

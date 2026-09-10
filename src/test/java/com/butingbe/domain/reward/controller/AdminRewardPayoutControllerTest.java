@@ -260,6 +260,28 @@ class AdminRewardPayoutControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  @Test
+  @DisplayName("발송 완료 기록 200")
+  void markSent() throws Exception {
+    UUID payoutId = UUID.randomUUID();
+    when(adminRewardPayoutService.markSent(any(), any(), any()))
+        .thenReturn(
+            new AdminRewardPayoutDetailResDto(
+                payoutId.toString(), "BASE", UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(), null, null, null, "PAID", "NONE",
+                null, null, null, null, null, null,
+                java.time.OffsetDateTime.now(), null, null, null, 1L, null, null));
+
+    mockMvc
+        .perform(
+            post("/admin/reward-payouts/mark-sent")
+                .contentType("application/json")
+                .content(
+                    "{\"payoutId\":\"" + payoutId + "\",\"note\":\"완료\",\"expectedRevision\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("PAID"));
+  }
+
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
     return new HandlerMethodArgumentResolver() {
       @Override

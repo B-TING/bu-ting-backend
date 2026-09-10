@@ -5,6 +5,7 @@ import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
@@ -62,6 +63,7 @@ public class AdminRewardPayoutService {
   private static final String BULK_SCHEDULE_ENDPOINT = "reward-payout-bulk-schedule";
   private static final String MARK_MAIL_SENT_ENDPOINT = "reward-payout-mark-mail-sent";
   private static final String MARK_INFO_COLLECTED_ENDPOINT = "reward-payout-mark-info-collected";
+  private static final String MARK_SENT_ENDPOINT = "reward-payout-mark-sent";
   private static final int DEFAULT_SIZE = 20;
   private static final int MAX_SIZE = 50;
 
@@ -73,6 +75,7 @@ public class AdminRewardPayoutService {
   private final IdempotencyService idempotencyService;
   private final ObjectMapper objectMapper;
   private final ZoneEventParticipationRepository participationRepository;
+  private final RewardService rewardService;
 
   @Transactional(readOnly = true)
   public AdminRewardPayoutDetailResDto detail(AuthenticatedUser user, UUID payoutId) {
@@ -629,6 +632,100 @@ public class AdminRewardPayoutService {
     AdminRewardPayoutDetailResDto result = AdminRewardPayoutDetailResDto.ofTopLike(payout);
     idempotencyService.save(idempotencyKey, endpoint, fingerprint, result);
     return result;
+  }
+
+  @Transactional
+  public AdminRewardPayoutDetailResDto markSent(
+      AuthenticatedUser user, AdminRewardPayoutMarkSentReqDto request, String idempotencyKey) {
+    operatorAuthorization.requireOperator(user);
+    String fingerprint =
+        request.payoutId() + ":" + request.sentAt() + ":" + request.reference() + ":"
+            + request.note() + ":" + request.expectedRevision();
+    Optional<String> replay =
+        idempotencyService.findReplay(idempotencyKey, MARK_SENT_ENDPOINT, fingerprint);
+    if (replay.isPresent()) {
+      return readJson(replay.get(), AdminRewardPayoutDetailResDto.class);
+    }
+
+    AdminRewardPayoutDetailResDto result;
+    Optional<RewardPayout> topLike = rewardPayoutRepository.findById(request.payoutId());
+    if (topLike.isPresent()) {
+      result = markTopLikeSent(topLike.get(), request);
+    } else {
+      BaseRewardPayout base =
+          baseRewardPayoutRepository
+              .findById(request.payoutId())
+              .orElseThrow(() -> new ResourceNotFoundException("error.reward.payout.not_found"));
+      result = markBaseSent(base, request);
+    }
+
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action("MARK_SENT")
+            .targetType("REWARD_PAYOUT")
+            .targetId(request.payoutId())
+            .detail(Map.of("payoutType", result.payoutType()))
+            .build());
+    idempotencyService.save(idempotencyKey, MARK_SENT_ENDPOINT, fingerprint, result);
+    return result;
+  }
+
+  private AdminRewardPayoutDetailResDto markTopLikeSent(
+      RewardPayout payout, AdminRewardPayoutMarkSentReqDto request) {
+    if (!payout.getRevision().equals(request.expectedRevision())) {
+      throw new ConflictException("error.reward.payout.stale_revision");
+    }
+    if (payout.getHoldStatus() != PayoutHoldStatus.NONE) {
+      throw new ConflictException("error.reward.payout.invalid_state");
+    }
+    if (payout.getStatus() != RewardPayoutStatus.INFO_COLLECTED) {
+      throw new ConflictException("error.reward.payout.invalid_state");
+    }
+    payout.markSent(
+        request.sentAt() == null ? OffsetDateTime.now() : request.sentAt(),
+        request.reference(),
+        request.note());
+    try {
+      rewardPayoutRepository.saveAndFlush(payout);
+    } catch (ObjectOptimisticLockingFailureException e) {
+      throw new ConflictException("error.reward.payout.stale_revision");
+    }
+    return AdminRewardPayoutDetailResDto.ofTopLike(payout);
+  }
+
+  private AdminRewardPayoutDetailResDto markBaseSent(
+      BaseRewardPayout payout, AdminRewardPayoutMarkSentReqDto request) {
+    if (!payout.getRevision().equals(request.expectedRevision())) {
+      throw new ConflictException("error.reward.payout.stale_revision");
+    }
+    if (payout.getHoldStatus() != PayoutHoldStatus.NONE) {
+      throw new ConflictException("error.reward.payout.invalid_state");
+    }
+    if (payout.getStatus() != BaseRewardPayoutStatus.CONFIRMED) {
+      throw new ConflictException("error.reward.payout.invalid_state");
+    }
+    ZoneEventParticipation participation =
+        participationRepository
+            .findById(payout.getParticipationId())
+            .orElseThrow(
+                () -> new ResourceNotFoundException("error.zone_event.participation.not_found"));
+    UUID eventId = participation.getEvent().getId();
+    var reward = payout.getReward();
+    rewardService.grantBaseReward(
+        participation.getUserId(),
+        payout.getParticipationId(),
+        eventId,
+        reward == null ? null : reward.points(),
+        reward == null ? null : reward.badgeCode());
+    payout.markSent(
+        request.sentAt() == null ? OffsetDateTime.now() : request.sentAt(), request.note());
+    try {
+      baseRewardPayoutRepository.saveAndFlush(payout);
+    } catch (ObjectOptimisticLockingFailureException e) {
+      throw new ConflictException("error.reward.payout.stale_revision");
+    }
+    return AdminRewardPayoutDetailResDto.ofBase(payout, eventId);
   }
 
   @FunctionalInterface

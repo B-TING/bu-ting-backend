@@ -116,4 +116,12 @@ public class BaseRewardPayout extends TimestampEntity {
     this.confirmedBy = operatorId;
     this.confirmedAt = OffsetDateTime.now();
   }
+
+  public void markSent(OffsetDateTime paidAt, String note) {
+    this.status = BaseRewardPayoutStatus.PAID;
+    this.paidAt = paidAt;
+    if (note != null) {
+      this.memo = note;
+    }
+  }
 }

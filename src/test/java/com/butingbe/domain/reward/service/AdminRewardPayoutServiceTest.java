@@ -7,8 +7,10 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.entity.BaseRewardPayout;
 import com.butingbe.domain.reward.entity.PayoutHoldStatus;
+import com.butingbe.domain.reward.entity.RewardCatalog;
 import com.butingbe.domain.reward.entity.RewardPayout;
 import com.butingbe.domain.reward.entity.RewardPayoutStatus;
+import com.butingbe.domain.reward.entity.RewardType;
 import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.user.entity.Name;
@@ -59,12 +61,27 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
   @Autowired private IdempotencyRecordRepository idempotencyRecordRepository;
   @Autowired private EntityManager entityManager;
+  @Autowired private com.butingbe.domain.reward.repository.RewardGrantRepository rewardGrantRepository;
+  @Autowired
+  private com.butingbe.domain.reward.repository.UserPointBalanceRepository userPointBalanceRepository;
+  @Autowired
+  private com.butingbe.domain.reward.repository.RewardCatalogRepository rewardCatalogRepository;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
 
   @BeforeEach
   void setUp() {
+    // NOTE: 테스트 프로파일은 flyway.enabled=false(ddl-auto=create-drop)라 V33 카탈로그 시드가 적용되지
+    // 않는다. RewardServiceTest와 같은 방식으로 POINT_BASE 카탈로그를 직접 심어야 mark-sent(BASE)의
+    // rewardService.grantBaseReward 호출이 카탈로그를 찾을 수 있다.
+    rewardCatalogRepository.save(
+        RewardCatalog.builder()
+            .rewardType(RewardType.POINT)
+            .code("POINT_BASE")
+            .name("기본 포인트")
+            .pointAmount(50)
+            .build());
     ZoneEventType type =
         zoneEventTypeRepository.save(
             ZoneEventType.builder()
@@ -955,6 +972,104 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
                     null))
         .isInstanceOf(ConflictException.class)
         .hasMessage("error.reward.payout.invalid_state");
+  }
+
+  @Test
+  @DisplayName("mark-sent(BASE): CONFIRMED를 PAID로 바꾸고 같은 트랜잭션에서 reward_grant·포인트 잔액에 원자적으로 반영한다")
+  void marksBaseSentAndGrantsAtomically() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+
+    var result =
+        payoutService.markSent(
+            operator,
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                payout.getId(), null, null, "지급 완료", payout.getRevision()),
+            null);
+
+    assertThat(result.status()).isEqualTo("PAID");
+    assertThat(result.paidAt()).isNotNull();
+    assertThat(
+            rewardGrantRepository.existsByParticipationIdAndGrantReasonAndReward_Id(
+                p.getId(),
+                com.butingbe.domain.reward.entity.GrantReason.BASE,
+                rewardCatalogRepository.findByCode("POINT_BASE").orElseThrow().getId()))
+        .isTrue();
+    assertThat(userPointBalanceRepository.findById(p.getUserId()).orElseThrow().getBalance())
+        .isEqualTo(50);
+  }
+
+  @Test
+  @DisplayName("mark-sent(BASE): 재시도로 두 번 호출돼도 이중 지급되지 않는다(UK 가드)")
+  void marksBaseSentTwiceIsSafe() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+    payoutService.markSent(
+        operator,
+        new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+            payout.getId(), null, null, "1차 발송", payout.getRevision()),
+        null);
+    payout = baseRewardPayoutRepository.findById(payout.getId()).orElseThrow();
+    // FAILED로 되돌린 뒤 재시도 상황을 흉내낸다 (retry()는 Task 9에서 추가되므로 여기서는 직접 상태를 되돌린다).
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        payout, "status", com.butingbe.domain.reward.entity.BaseRewardPayoutStatus.CONFIRMED);
+    baseRewardPayoutRepository.saveAndFlush(payout);
+
+    payoutService.markSent(
+        operator,
+        new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+            payout.getId(), null, null, "2차 발송", payout.getRevision()),
+        null);
+
+    assertThat(
+            rewardGrantRepository.countByParticipationIdAndGrantReasonAndReward_Id(
+                p.getId(),
+                com.butingbe.domain.reward.entity.GrantReason.BASE,
+                rewardCatalogRepository.findByCode("POINT_BASE").orElseThrow().getId()))
+        .isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("mark-sent(TOP_LIKE): INFO_COLLECTED를 SENT로 바꾸고 reference를 저장한다")
+  void marksTopLikeSent() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    payout.markMailSent(OffsetDateTime.now(), null);
+    payout.markInfoCollected(OffsetDateTime.now(), null);
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    var result =
+        payoutService.markSent(
+            operator,
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                payout.getId(), null, "REF-001", "발송함", payout.getRevision()),
+            null);
+
+    assertThat(result.status()).isEqualTo("SENT");
+    assertThat(result.reference()).isEqualTo("REF-001");
   }
 
   private ZoneEventParticipation participation() {
