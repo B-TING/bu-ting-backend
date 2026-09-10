@@ -83,9 +83,28 @@ class AdminRewardPayoutControllerTest {
     when(adminRewardPayoutService.detail(any(), eq(payoutId)))
         .thenReturn(
             new AdminRewardPayoutDetailResDto(
-                payoutId.toString(), "TOP_LIKE", UUID.randomUUID().toString(),
-                UUID.randomUUID().toString(), 1, 3L, null, "PENDING_ASSIGN", "NONE",
-                null, null, null, null, null, null, null, null, null, null, 0L, null, null));
+                payoutId.toString(),
+                "TOP_LIKE",
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                1,
+                3L,
+                null,
+                "PENDING_ASSIGN",
+                "NONE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0L,
+                null,
+                null));
 
     mockMvc
         .perform(get("/admin/reward-payouts/{id}", payoutId))
@@ -127,9 +146,28 @@ class AdminRewardPayoutControllerTest {
     when(adminRewardPayoutService.update(any(), eq(payoutId), any(), any()))
         .thenReturn(
             new AdminRewardPayoutDetailResDto(
-                payoutId.toString(), "TOP_LIKE", UUID.randomUUID().toString(),
-                UUID.randomUUID().toString(), 1, 3L, null, "PENDING_CONFIRM", "NONE",
-                null, null, null, null, null, null, null, null, "메모", null, 1L, null, null));
+                payoutId.toString(),
+                "TOP_LIKE",
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                1,
+                3L,
+                null,
+                "PENDING_CONFIRM",
+                "NONE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "메모",
+                null,
+                1L,
+                null,
+                null));
 
     mockMvc
         .perform(
@@ -214,9 +252,28 @@ class AdminRewardPayoutControllerTest {
     when(adminRewardPayoutService.markMailSent(any(), any(), any()))
         .thenReturn(
             new AdminRewardPayoutDetailResDto(
-                payoutId.toString(), "TOP_LIKE", UUID.randomUUID().toString(),
-                UUID.randomUUID().toString(), 1, 3L, null, "MAIL_SENT", "NONE",
-                null, null, null, null, null, null, null, null, null, null, 1L, null, null));
+                payoutId.toString(),
+                "TOP_LIKE",
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                1,
+                3L,
+                null,
+                "MAIL_SENT",
+                "NONE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1L,
+                null,
+                null));
 
     mockMvc
         .perform(
@@ -235,9 +292,28 @@ class AdminRewardPayoutControllerTest {
     when(adminRewardPayoutService.markInfoCollected(any(), any(), any()))
         .thenReturn(
             new AdminRewardPayoutDetailResDto(
-                payoutId.toString(), "TOP_LIKE", UUID.randomUUID().toString(),
-                UUID.randomUUID().toString(), 1, 3L, null, "INFO_COLLECTED", "NONE",
-                null, null, null, null, null, null, null, null, null, null, 1L, null, null));
+                payoutId.toString(),
+                "TOP_LIKE",
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                1,
+                3L,
+                null,
+                "INFO_COLLECTED",
+                "NONE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1L,
+                null,
+                null));
 
     mockMvc
         .perform(
@@ -267,10 +343,28 @@ class AdminRewardPayoutControllerTest {
     when(adminRewardPayoutService.markSent(any(), any(), any()))
         .thenReturn(
             new AdminRewardPayoutDetailResDto(
-                payoutId.toString(), "BASE", UUID.randomUUID().toString(),
-                UUID.randomUUID().toString(), null, null, null, "PAID", "NONE",
-                null, null, null, null, null, null,
-                java.time.OffsetDateTime.now(), null, null, null, 1L, null, null));
+                payoutId.toString(),
+                "BASE",
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                null,
+                null,
+                null,
+                "PAID",
+                "NONE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                java.time.OffsetDateTime.now(),
+                null,
+                null,
+                null,
+                1L,
+                null,
+                null));
 
     mockMvc
         .perform(
@@ -289,9 +383,28 @@ class AdminRewardPayoutControllerTest {
     when(adminRewardPayoutService.retry(any(), eq(payoutId), any(), any()))
         .thenReturn(
             new AdminRewardPayoutDetailResDto(
-                payoutId.toString(), "BASE", UUID.randomUUID().toString(),
-                UUID.randomUUID().toString(), null, null, null, "CONFIRMED", "NONE",
-                null, null, null, null, null, null, null, null, null, null, 2L, null, null));
+                payoutId.toString(),
+                "BASE",
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                null,
+                null,
+                null,
+                "CONFIRMED",
+                "NONE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                2L,
+                null,
+                null));
 
     mockMvc
         .perform(

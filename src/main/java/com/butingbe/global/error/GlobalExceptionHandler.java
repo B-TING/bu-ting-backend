@@ -144,7 +144,8 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(
             ApiResponse.fail(
-                message(e.getMessage(), request), Map.of("problemPayoutIds", e.getProblemPayoutIds())));
+                message(e.getMessage(), request),
+                Map.of("problemPayoutIds", e.getProblemPayoutIds())));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

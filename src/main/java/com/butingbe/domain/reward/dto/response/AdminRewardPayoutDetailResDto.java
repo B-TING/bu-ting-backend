@@ -7,7 +7,10 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-/** payoutType은 TOP_LIKE 또는 BASE. 상대 타입에 없는 필드는 null(예: BASE는 rankN·likeCountAtClose·mailedAt 등이 null). */
+/**
+ * payoutType은 TOP_LIKE 또는 BASE. 상대 타입에 없는 필드는 null(예: BASE는 rankN·likeCountAtClose·mailedAt 등이
+ * null).
+ */
 public record AdminRewardPayoutDetailResDto(
     String payoutId,
     String payoutType,

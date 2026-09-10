@@ -5,4 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 
 public record AdminRewardPayoutUpdateReqDto(
-    RewardSnapshot reward, String memo, OffsetDateTime scheduledAt, @NotNull Long expectedRevision) {}
+    RewardSnapshot reward,
+    String memo,
+    OffsetDateTime scheduledAt,
+    @NotNull Long expectedRevision) {}

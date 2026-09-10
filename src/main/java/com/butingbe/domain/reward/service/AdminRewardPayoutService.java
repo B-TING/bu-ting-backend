@@ -293,9 +293,17 @@ public class AdminRewardPayoutService {
       String idempotencyKey) {
     operatorAuthorization.requireOperator(user);
     String fingerprint =
-        payoutId + ":" + request.reward() + ":" + request.memo() + ":" + request.scheduledAt()
-            + ":" + request.expectedRevision();
-    Optional<String> replay = idempotencyService.findReplay(idempotencyKey, UPDATE_ENDPOINT, fingerprint);
+        payoutId
+            + ":"
+            + request.reward()
+            + ":"
+            + request.memo()
+            + ":"
+            + request.scheduledAt()
+            + ":"
+            + request.expectedRevision();
+    Optional<String> replay =
+        idempotencyService.findReplay(idempotencyKey, UPDATE_ENDPOINT, fingerprint);
     if (replay.isPresent()) {
       return readJson(replay.get(), AdminRewardPayoutDetailResDto.class);
     }
@@ -581,7 +589,8 @@ public class AdminRewardPayoutService {
         MARK_INFO_COLLECTED_ENDPOINT,
         "MARK_INFO_COLLECTED",
         RewardPayoutStatus.MAIL_SENT,
-        (payout, at, note) -> payout.markInfoCollected(at == null ? OffsetDateTime.now() : at, note));
+        (payout, at, note) ->
+            payout.markInfoCollected(at == null ? OffsetDateTime.now() : at, note));
   }
 
   private AdminRewardPayoutDetailResDto applyTopLikeOnlyStep(
@@ -594,7 +603,13 @@ public class AdminRewardPayoutService {
       TopLikeStepAction action) {
     operatorAuthorization.requireOperator(user);
     String fingerprint =
-        request.payoutId() + ":" + request.at() + ":" + request.note() + ":" + request.expectedRevision();
+        request.payoutId()
+            + ":"
+            + request.at()
+            + ":"
+            + request.note()
+            + ":"
+            + request.expectedRevision();
     Optional<String> replay = idempotencyService.findReplay(idempotencyKey, endpoint, fingerprint);
     if (replay.isPresent()) {
       return readJson(replay.get(), AdminRewardPayoutDetailResDto.class);
@@ -641,8 +656,15 @@ public class AdminRewardPayoutService {
       AuthenticatedUser user, AdminRewardPayoutMarkSentReqDto request, String idempotencyKey) {
     operatorAuthorization.requireOperator(user);
     String fingerprint =
-        request.payoutId() + ":" + request.sentAt() + ":" + request.reference() + ":"
-            + request.note() + ":" + request.expectedRevision();
+        request.payoutId()
+            + ":"
+            + request.sentAt()
+            + ":"
+            + request.reference()
+            + ":"
+            + request.note()
+            + ":"
+            + request.expectedRevision();
     Optional<String> replay =
         idempotencyService.findReplay(idempotencyKey, MARK_SENT_ENDPOINT, fingerprint);
     if (replay.isPresent()) {
@@ -732,10 +754,14 @@ public class AdminRewardPayoutService {
 
   @Transactional
   public AdminRewardPayoutDetailResDto retry(
-      AuthenticatedUser user, UUID payoutId, AdminRewardPayoutRetryReqDto request, String idempotencyKey) {
+      AuthenticatedUser user,
+      UUID payoutId,
+      AdminRewardPayoutRetryReqDto request,
+      String idempotencyKey) {
     operatorAuthorization.requireOperator(user);
     String fingerprint = payoutId + ":" + request.note() + ":" + request.expectedRevision();
-    Optional<String> replay = idempotencyService.findReplay(idempotencyKey, RETRY_ENDPOINT, fingerprint);
+    Optional<String> replay =
+        idempotencyService.findReplay(idempotencyKey, RETRY_ENDPOINT, fingerprint);
     if (replay.isPresent()) {
       return readJson(replay.get(), AdminRewardPayoutDetailResDto.class);
     }
