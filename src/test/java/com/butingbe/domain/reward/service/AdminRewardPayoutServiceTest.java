@@ -1121,6 +1121,61 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
         .hasMessage("error.reward.payout.invalid_state");
   }
 
+  @Test
+  @DisplayName("retry: TOP_LIKE FAILED인 지급을 CONFIRMED로 되돌리고 failureCode를 지운다")
+  void retriesFailedTopLikePayout() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(3L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    payout.fail("BANK_ERROR");
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    var result =
+        payoutService.retry(
+            operator,
+            payout.getId(),
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto(
+                "재시도", payout.getRevision()),
+            null);
+
+    assertThat(result.status()).isEqualTo("CONFIRMED");
+    assertThat(result.failureCode()).isNull();
+  }
+
+  @Test
+  @DisplayName("retry: expectedRevision이 다르면 매뉴얼 체크에서 바로 409다(DB 경합 없이)")
+  void retryStaleExpectedRevisionConflicts() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    payout.fail("BANK_ERROR");
+    baseRewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.retry(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto(
+                        "재시도", payout.getRevision() + 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
   private ZoneEventParticipation participation() {
     return participationRepository.save(
         ZoneEventParticipation.builder()
