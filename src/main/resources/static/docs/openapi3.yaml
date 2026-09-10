@@ -5851,7 +5851,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "409":
-          description: "확정 후 보상 변경 시도, 또는 오래된 expectedRevision"
+          description: "확정 후 보상 변경 시도, 종료 상태(FAILED/SENT/PAID)에서 memo·scheduledAt 변경 시도, 또는 오래된 expectedRevision"
           content:
             application/json:
               schema:
@@ -6018,7 +6018,7 @@ paths:
     post:
       tags: [Zone Event]
       summary: "ROLE_ADMIN/MANAGER. 지급 재시도"
-      description: "FAILED인 지급을 CONFIRMED로 되돌립니다(failureCode 초기화). BASE 재시도 후 mark-sent를 다시 호출해도 reward_grant의 UK 가드로 이중 지급되지 않습니다."
+      description: "FAILED이고 holdStatus=NONE인 지급을 CONFIRMED로 되돌립니다(failureCode 초기화). 보류 중이면 409입니다. TOP_LIKE는 reward.prizeRewardCode가 아직 비어 있으면 재시도할 수 없습니다(409). BASE 재시도 후 mark-sent를 다시 호출해도 reward_grant의 UK 가드로 이중 지급되지 않습니다."
       security:
         - opaqueToken: [ ]
       parameters:
@@ -6044,7 +6044,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "409":
-          description: "FAILED가 아니거나 오래된 revision"
+          description: "FAILED가 아니거나 보류 중이거나 TOP_LIKE 품목 미배정, 또는 오래된 revision"
           content:
             application/json:
               schema:

@@ -342,6 +342,12 @@ public class AdminRewardPayoutService {
         && payout.getStatus() != RewardPayoutStatus.PENDING_CONFIRM) {
       throw new ConflictException("error.reward.payout.reward_locked");
     }
+    // memo·scheduledAt은 종료 상태(FAILED/SENT)에서는 잠긴다.
+    if ((request.memo() != null || request.scheduledAt() != null)
+        && (payout.getStatus() == RewardPayoutStatus.FAILED
+            || payout.getStatus() == RewardPayoutStatus.SENT)) {
+      throw new ConflictException("error.reward.payout.invalid_state");
+    }
     if (request.reward() != null) {
       payout.assignReward(request.reward());
     }
@@ -366,6 +372,12 @@ public class AdminRewardPayoutService {
     }
     if (request.reward() != null && payout.getStatus() != BaseRewardPayoutStatus.PENDING_CONFIRM) {
       throw new ConflictException("error.reward.payout.reward_locked");
+    }
+    // memo·scheduledAt은 종료 상태(FAILED/PAID)에서는 잠긴다.
+    if ((request.memo() != null || request.scheduledAt() != null)
+        && (payout.getStatus() == BaseRewardPayoutStatus.FAILED
+            || payout.getStatus() == BaseRewardPayoutStatus.PAID)) {
+      throw new ConflictException("error.reward.payout.invalid_state");
     }
     if (request.reward() != null) {
       payout.updateReward(request.reward());
@@ -436,35 +448,45 @@ public class AdminRewardPayoutService {
     }
 
     for (UUID id : ids) {
-      rewardPayoutRepository
-          .findById(id)
-          .ifPresentOrElse(
-              p -> {
-                p.confirm(user.id());
-                auditLogRepository.save(
-                    ZoneEventAuditLog.builder()
-                        .actorId(user.id())
-                        .action("CONFIRM_PAYOUT")
-                        .targetType("REWARD_PAYOUT")
-                        .targetId(id)
-                        .detail(Map.of("payoutType", "TOP_LIKE"))
-                        .build());
-              },
-              () ->
-                  baseRewardPayoutRepository
-                      .findById(id)
-                      .ifPresent(
-                          p -> {
-                            p.confirm(user.id());
-                            auditLogRepository.save(
-                                ZoneEventAuditLog.builder()
-                                    .actorId(user.id())
-                                    .action("CONFIRM_PAYOUT")
-                                    .targetType("REWARD_PAYOUT")
-                                    .targetId(id)
-                                    .detail(Map.of("payoutType", "BASE"))
-                                    .build());
-                          }));
+      Optional<RewardPayout> topLike = rewardPayoutRepository.findById(id);
+      if (topLike.isPresent()) {
+        RewardPayout p = topLike.get();
+        p.confirm(user.id());
+        try {
+          rewardPayoutRepository.saveAndFlush(p);
+        } catch (ObjectOptimisticLockingFailureException e) {
+          throw new BulkPayoutConflictException(
+              "error.reward.payout.bulk_conflict", List.of(id.toString()));
+        }
+        auditLogRepository.save(
+            ZoneEventAuditLog.builder()
+                .actorId(user.id())
+                .action("CONFIRM_PAYOUT")
+                .targetType("REWARD_PAYOUT")
+                .targetId(id)
+                .detail(Map.of("payoutType", "TOP_LIKE"))
+                .build());
+        continue;
+      }
+      BaseRewardPayout p =
+          baseRewardPayoutRepository
+              .findById(id)
+              .orElseThrow(() -> new ResourceNotFoundException("error.reward.payout.not_found"));
+      p.confirm(user.id());
+      try {
+        baseRewardPayoutRepository.saveAndFlush(p);
+      } catch (ObjectOptimisticLockingFailureException e) {
+        throw new BulkPayoutConflictException(
+            "error.reward.payout.bulk_conflict", List.of(id.toString()));
+      }
+      auditLogRepository.save(
+          ZoneEventAuditLog.builder()
+              .actorId(user.id())
+              .action("CONFIRM_PAYOUT")
+              .targetType("REWARD_PAYOUT")
+              .targetId(id)
+              .detail(Map.of("payoutType", "BASE"))
+              .build());
     }
 
     AdminRewardPayoutBulkResultResDto result =
@@ -519,45 +541,47 @@ public class AdminRewardPayoutService {
     }
 
     for (UUID id : ids) {
-      rewardPayoutRepository
-          .findById(id)
-          .ifPresentOrElse(
-              p -> {
-                p.updateSchedule(request.scheduledAt());
-                auditLogRepository.save(
-                    ZoneEventAuditLog.builder()
-                        .actorId(user.id())
-                        .action("SCHEDULE_PAYOUT")
-                        .targetType("REWARD_PAYOUT")
-                        .targetId(id)
-                        .detail(
-                            Map.of(
-                                "payoutType",
-                                "TOP_LIKE",
-                                "scheduledAt",
-                                request.scheduledAt().toString()))
-                        .build());
-              },
-              () ->
-                  baseRewardPayoutRepository
-                      .findById(id)
-                      .ifPresent(
-                          p -> {
-                            p.updateSchedule(request.scheduledAt());
-                            auditLogRepository.save(
-                                ZoneEventAuditLog.builder()
-                                    .actorId(user.id())
-                                    .action("SCHEDULE_PAYOUT")
-                                    .targetType("REWARD_PAYOUT")
-                                    .targetId(id)
-                                    .detail(
-                                        Map.of(
-                                            "payoutType",
-                                            "BASE",
-                                            "scheduledAt",
-                                            request.scheduledAt().toString()))
-                                    .build());
-                          }));
+      Optional<RewardPayout> topLike = rewardPayoutRepository.findById(id);
+      if (topLike.isPresent()) {
+        RewardPayout p = topLike.get();
+        p.updateSchedule(request.scheduledAt());
+        try {
+          rewardPayoutRepository.saveAndFlush(p);
+        } catch (ObjectOptimisticLockingFailureException e) {
+          throw new BulkPayoutConflictException(
+              "error.reward.payout.bulk_conflict", List.of(id.toString()));
+        }
+        auditLogRepository.save(
+            ZoneEventAuditLog.builder()
+                .actorId(user.id())
+                .action("SCHEDULE_PAYOUT")
+                .targetType("REWARD_PAYOUT")
+                .targetId(id)
+                .detail(
+                    Map.of(
+                        "payoutType", "TOP_LIKE", "scheduledAt", request.scheduledAt().toString()))
+                .build());
+        continue;
+      }
+      BaseRewardPayout p =
+          baseRewardPayoutRepository
+              .findById(id)
+              .orElseThrow(() -> new ResourceNotFoundException("error.reward.payout.not_found"));
+      p.updateSchedule(request.scheduledAt());
+      try {
+        baseRewardPayoutRepository.saveAndFlush(p);
+      } catch (ObjectOptimisticLockingFailureException e) {
+        throw new BulkPayoutConflictException(
+            "error.reward.payout.bulk_conflict", List.of(id.toString()));
+      }
+      auditLogRepository.save(
+          ZoneEventAuditLog.builder()
+              .actorId(user.id())
+              .action("SCHEDULE_PAYOUT")
+              .targetType("REWARD_PAYOUT")
+              .targetId(id)
+              .detail(Map.of("payoutType", "BASE", "scheduledAt", request.scheduledAt().toString()))
+              .build());
     }
 
     AdminRewardPayoutBulkResultResDto result =
@@ -773,8 +797,15 @@ public class AdminRewardPayoutService {
       if (!p.getRevision().equals(request.expectedRevision())) {
         throw new ConflictException("error.reward.payout.stale_revision");
       }
+      if (p.getHoldStatus() != PayoutHoldStatus.NONE) {
+        throw new ConflictException("error.reward.payout.invalid_state");
+      }
       if (p.getStatus() != RewardPayoutStatus.FAILED) {
         throw new ConflictException("error.reward.payout.invalid_state");
+      }
+      // 상품이 배정되지 않은 채 CONFIRMED로 되돌리면 그대로 SENT까지 걸어갈 수 있어 막는다.
+      if (p.getReward() == null || p.getReward().prizeRewardCode() == null) {
+        throw new ConflictException("error.reward.payout.reward_not_assigned");
       }
       p.retry();
       try {
@@ -790,6 +821,9 @@ public class AdminRewardPayoutService {
               .orElseThrow(() -> new ResourceNotFoundException("error.reward.payout.not_found"));
       if (!p.getRevision().equals(request.expectedRevision())) {
         throw new ConflictException("error.reward.payout.stale_revision");
+      }
+      if (p.getHoldStatus() != PayoutHoldStatus.NONE) {
+        throw new ConflictException("error.reward.payout.invalid_state");
       }
       if (p.getStatus() != BaseRewardPayoutStatus.FAILED) {
         throw new ConflictException("error.reward.payout.invalid_state");
