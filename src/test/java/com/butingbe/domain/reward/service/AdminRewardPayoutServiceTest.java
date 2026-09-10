@@ -61,9 +61,14 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
   @Autowired private IdempotencyRecordRepository idempotencyRecordRepository;
   @Autowired private EntityManager entityManager;
-  @Autowired private com.butingbe.domain.reward.repository.RewardGrantRepository rewardGrantRepository;
+
   @Autowired
-  private com.butingbe.domain.reward.repository.UserPointBalanceRepository userPointBalanceRepository;
+  private com.butingbe.domain.reward.repository.RewardGrantRepository rewardGrantRepository;
+
+  @Autowired
+  private com.butingbe.domain.reward.repository.UserPointBalanceRepository
+      userPointBalanceRepository;
+
   @Autowired
   private com.butingbe.domain.reward.repository.RewardCatalogRepository rewardCatalogRepository;
 
@@ -502,6 +507,32 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("rewardReason=TOP_LIKE면 TOP_LIKE 지급만 페이징 조회한다")
+  void listFiltersByTopLikeRewardReason() {
+    ZoneEventParticipation p1 = participation();
+    ZoneEventParticipation p2 = participation();
+    rewardPayoutRepository.save(
+        RewardPayout.builder()
+            .eventId(event.getId())
+            .participationId(p1.getId())
+            .rankN(1)
+            .likeCountAtClose(1L)
+            .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+            .build());
+    baseRewardPayoutRepository.save(
+        BaseRewardPayout.builder()
+            .participationId(p2.getId())
+            .reward(new RewardSnapshot(50, null, null, null))
+            .build());
+
+    var result =
+        payoutService.list(operator, null, null, "TOP_LIKE", null, null, null, null, 1, 20);
+
+    assertThat(result.items()).hasSize(1);
+    assertThat(result.items()).allMatch(i -> i.payoutType().equals("TOP_LIKE"));
+  }
+
+  @Test
   @DisplayName("rewardReason 없이 조회하면 두 타입을 병합해서 돌려준다")
   void listMergesBothTypesWhenRewardReasonOmitted() {
     ZoneEventParticipation p1 = participation();
@@ -571,7 +602,10 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
             operator,
             payout.getId(),
             new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
-                new RewardSnapshot(null, null, 1, "COUPON_TOP"), "1등 상품 확정", null, payout.getRevision()),
+                new RewardSnapshot(null, null, 1, "COUPON_TOP"),
+                "1등 상품 확정",
+                null,
+                payout.getRevision()),
             null);
 
     assertThat(result.status()).isEqualTo("PENDING_CONFIRM");
@@ -597,7 +631,10 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
                     operator,
                     payout.getId(),
                     new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
-                        new RewardSnapshot(100, null, null, null), null, null, payout.getRevision()),
+                        new RewardSnapshot(100, null, null, null),
+                        null,
+                        null,
+                        payout.getRevision()),
                     null))
         .isInstanceOf(ConflictException.class)
         .hasMessage("error.reward.payout.reward_locked");
@@ -630,13 +667,225 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("같은 Idempotency-Key로 update를 재전송하면 두 번째 요청은 다시 처리하지 않고 같은 결과를 돌려준다")
+  void updateIsIdempotent() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    String key = "idem-update-" + UUID.randomUUID();
+    var request =
+        new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+            null, "메모", null, payout.getRevision());
+
+    var first = payoutService.update(operator, payout.getId(), request, key);
+    var replay = payoutService.update(operator, payout.getId(), request, key);
+
+    assertThat(replay).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("update: TOP_LIKE의 expectedRevision이 다르면 409다")
+  void updateTopLikeStaleRevisionConflicts() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, null))
+                .build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.update(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+                        null, null, null, payout.getRevision() + 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("update: 이미 CONFIRMED인 TOP_LIKE의 reward를 바꾸려 하면 409다")
+  void updateTopLikeRewardLockedAfterConfirm() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.update(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+                        new RewardSnapshot(null, null, 1, "COUPON_TOP2"),
+                        null,
+                        null,
+                        payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.reward_locked");
+  }
+
+  @Test
+  @DisplayName("update: TOP_LIKE도 scheduledAt만 바꿀 수 있다")
+  void updateTopLikeScheduleOnly() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, null))
+                .build());
+    OffsetDateTime schedule = OffsetDateTime.now().plusDays(2);
+
+    var result =
+        payoutService.update(
+            operator,
+            payout.getId(),
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+                null, null, schedule, payout.getRevision()),
+            null);
+
+    assertThat(result.scheduledAt()).isEqualTo(schedule);
+  }
+
+  @Test
+  @DisplayName("update: 매뉴얼 체크 통과 후 flush 시점에 TOP_LIKE revision이 이미 올라갔다면 409다(진짜 낙관적 락 충돌)")
+  void updateTopLikeFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, null))
+                .build());
+    Long revisionSeenByCaller = payout.getRevision();
+    entityManager
+        .createNativeQuery("UPDATE reward_payout SET revision = revision + 1 WHERE payout_id = :id")
+        .setParameter("id", payout.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                payoutService.update(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+                        null, "메모", null, revisionSeenByCaller),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("update: BASE의 expectedRevision이 다르면 409다")
+  void updateBaseStaleRevisionConflicts() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.update(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+                        null, null, null, payout.getRevision() + 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("update: 아직 확정 전인 BASE는 reward를 바꿀 수 있다")
+  void updateBaseRewardWhilePendingConfirm() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+
+    var result =
+        payoutService.update(
+            operator,
+            payout.getId(),
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+                new RewardSnapshot(100, "BADGE1", null, null), null, null, payout.getRevision()),
+            null);
+
+    assertThat(result.reward().points()).isEqualTo(100);
+  }
+
+  @Test
+  @DisplayName("update: 매뉴얼 체크 통과 후 flush 시점에 BASE revision이 이미 올라갔다면 409다(진짜 낙관적 락 충돌)")
+  void updateBaseFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    Long revisionSeenByCaller = payout.getRevision();
+    entityManager
+        .createNativeQuery(
+            "UPDATE base_reward_payout SET revision = revision + 1 WHERE payout_id = :id")
+        .setParameter("id", payout.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                payoutService.update(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto(
+                        null, "메모", null, revisionSeenByCaller),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
   @DisplayName("일괄 확정: PENDING_CONFIRM인 건들을 모두 CONFIRMED로 바꾼다")
   void bulkConfirmsAllPendingConfirmPayouts() {
     ZoneEventParticipation p1 = participation();
     ZoneEventParticipation p2 = participation();
     BaseRewardPayout base =
         baseRewardPayoutRepository.save(
-            BaseRewardPayout.builder().participationId(p1.getId()).reward(new RewardSnapshot(50, null, null, null)).build());
+            BaseRewardPayout.builder()
+                .participationId(p1.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
     RewardPayout topLike =
         rewardPayoutRepository.save(
             RewardPayout.builder()
@@ -654,7 +903,11 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
             operator,
             new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto(
                 List.of(base.getId().toString(), topLike.getId().toString()),
-                Map.of(base.getId().toString(), base.getRevision(), topLike.getId().toString(), topLike.getRevision())),
+                Map.of(
+                    base.getId().toString(),
+                    base.getRevision(),
+                    topLike.getId().toString(),
+                    topLike.getRevision())),
             null);
 
     assertThat(result.processedPayoutIds()).hasSize(2);
@@ -671,10 +924,16 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
     ZoneEventParticipation p2 = participation();
     BaseRewardPayout ok =
         baseRewardPayoutRepository.save(
-            BaseRewardPayout.builder().participationId(p1.getId()).reward(new RewardSnapshot(50, null, null, null)).build());
+            BaseRewardPayout.builder()
+                .participationId(p1.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
     BaseRewardPayout held =
         baseRewardPayoutRepository.save(
-            BaseRewardPayout.builder().participationId(p2.getId()).reward(new RewardSnapshot(50, null, null, null)).build());
+            BaseRewardPayout.builder()
+                .participationId(p2.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
     held.hold();
     baseRewardPayoutRepository.saveAndFlush(held);
 
@@ -684,12 +943,18 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
                     operator,
                     new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto(
                         List.of(ok.getId().toString(), held.getId().toString()),
-                        Map.of(ok.getId().toString(), ok.getRevision(), held.getId().toString(), held.getRevision())),
+                        Map.of(
+                            ok.getId().toString(),
+                            ok.getRevision(),
+                            held.getId().toString(),
+                            held.getRevision())),
                     null))
         .isInstanceOf(com.butingbe.global.error.exception.BulkPayoutConflictException.class)
         .satisfies(
             e ->
-                assertThat(((com.butingbe.global.error.exception.BulkPayoutConflictException) e).getProblemPayoutIds())
+                assertThat(
+                        ((com.butingbe.global.error.exception.BulkPayoutConflictException) e)
+                            .getProblemPayoutIds())
                     .containsExactly(held.getId().toString()));
     assertThat(baseRewardPayoutRepository.findById(ok.getId()).orElseThrow().getStatus())
         .isEqualTo(com.butingbe.domain.reward.entity.BaseRewardPayoutStatus.PENDING_CONFIRM);
@@ -718,6 +983,110 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
                         Map.of(topLike.getId().toString(), topLike.getRevision())),
                     null))
         .isInstanceOf(com.butingbe.global.error.exception.BulkPayoutConflictException.class);
+  }
+
+  @Test
+  @DisplayName("같은 Idempotency-Key로 일괄 확정을 재전송하면 두 번째 요청은 다시 처리하지 않고 같은 결과를 돌려준다")
+  void bulkConfirmIsIdempotent() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    String key = "idem-bulk-confirm-" + UUID.randomUUID();
+    var request =
+        new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto(
+            List.of(payout.getId().toString()),
+            Map.of(payout.getId().toString(), payout.getRevision()));
+
+    var first = payoutService.bulkConfirm(operator, request, key);
+    var replay = payoutService.bulkConfirm(operator, request, key);
+
+    assertThat(replay).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("일괄 확정: TOP_LIKE·BASE 각각의 개별 실패 사유(오래된 revision·보류 중·존재하지 않음·상태 불일치)가 모두 문제 목록에 담긴다")
+  void bulkConfirmCollectsAllDistinctValidationFailures() {
+    ZoneEventParticipation p1 = participation();
+    ZoneEventParticipation p2 = participation();
+    ZoneEventParticipation p3 = participation();
+    ZoneEventParticipation p4 = participation();
+    RewardPayout topLikeStale =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p1.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    RewardPayout topLikeHeld =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p2.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    topLikeHeld.hold();
+    rewardPayoutRepository.saveAndFlush(topLikeHeld);
+    BaseRewardPayout baseStale =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p3.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    BaseRewardPayout baseWrongStatus =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p4.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    baseWrongStatus.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(baseWrongStatus);
+    UUID missingId = UUID.randomUUID();
+
+    var ids =
+        List.of(
+            topLikeStale.getId().toString(),
+            topLikeHeld.getId().toString(),
+            missingId.toString(),
+            baseStale.getId().toString(),
+            baseWrongStatus.getId().toString());
+    var expectedRevisions =
+        Map.of(
+            topLikeStale.getId().toString(),
+            topLikeStale.getRevision() + 1,
+            topLikeHeld.getId().toString(),
+            topLikeHeld.getRevision(),
+            baseStale.getId().toString(),
+            baseStale.getRevision() + 1,
+            baseWrongStatus.getId().toString(),
+            baseWrongStatus.getRevision());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.bulkConfirm(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto(
+                        ids, expectedRevisions),
+                    null))
+        .isInstanceOf(com.butingbe.global.error.exception.BulkPayoutConflictException.class)
+        .satisfies(
+            e ->
+                assertThat(
+                        ((com.butingbe.global.error.exception.BulkPayoutConflictException) e)
+                            .getProblemPayoutIds())
+                    .containsExactlyInAnyOrder(
+                        topLikeStale.getId().toString(),
+                        topLikeHeld.getId().toString(),
+                        missingId.toString(),
+                        baseStale.getId().toString(),
+                        baseWrongStatus.getId().toString()));
   }
 
   @Test
@@ -824,8 +1193,132 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
                             notConfirmed.getId().toString(), notConfirmed.getRevision())),
                     null))
         .isInstanceOf(com.butingbe.global.error.exception.BulkPayoutConflictException.class);
-    assertThat(baseRewardPayoutRepository.findById(confirmed.getId()).orElseThrow().getScheduledAt())
+    assertThat(
+            baseRewardPayoutRepository.findById(confirmed.getId()).orElseThrow().getScheduledAt())
         .isNull();
+  }
+
+  @Test
+  @DisplayName("같은 Idempotency-Key로 일괄 일정을 재전송하면 두 번째 요청은 다시 처리하지 않고 같은 결과를 돌려준다")
+  void bulkScheduleIsIdempotent() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+    String key = "idem-bulk-schedule-" + UUID.randomUUID();
+    OffsetDateTime schedule = OffsetDateTime.now().plusDays(1);
+    var request =
+        new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto(
+            List.of(payout.getId().toString()),
+            schedule,
+            Map.of(payout.getId().toString(), payout.getRevision()));
+
+    var first = payoutService.bulkSchedule(operator, request, key);
+    var replay = payoutService.bulkSchedule(operator, request, key);
+
+    assertThat(replay).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("일괄 일정: TOP_LIKE·BASE 각각의 개별 실패 사유(오래된 revision·보류 중·상태 불일치·존재하지 않음)가 모두 문제 목록에 담긴다")
+  void bulkScheduleCollectsAllDistinctValidationFailures() {
+    ZoneEventParticipation p1 = participation();
+    ZoneEventParticipation p2 = participation();
+    ZoneEventParticipation p3 = participation();
+    ZoneEventParticipation p4 = participation();
+    ZoneEventParticipation p5 = participation();
+    RewardPayout topLikeStale =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p1.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    topLikeStale.confirm(operator.id());
+    rewardPayoutRepository.saveAndFlush(topLikeStale);
+    RewardPayout topLikeHeld =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p2.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    topLikeHeld.confirm(operator.id());
+    topLikeHeld.hold();
+    rewardPayoutRepository.saveAndFlush(topLikeHeld);
+    RewardPayout topLikeWrongStatus =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p3.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    BaseRewardPayout baseStale =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p4.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    baseStale.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(baseStale);
+    BaseRewardPayout baseHeld =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p5.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    baseHeld.confirm(operator.id());
+    baseHeld.hold();
+    baseRewardPayoutRepository.saveAndFlush(baseHeld);
+    UUID missingId = UUID.randomUUID();
+
+    var ids =
+        List.of(
+            topLikeStale.getId().toString(),
+            topLikeHeld.getId().toString(),
+            topLikeWrongStatus.getId().toString(),
+            missingId.toString(),
+            baseStale.getId().toString(),
+            baseHeld.getId().toString());
+    var expectedRevisions =
+        Map.of(
+            topLikeStale.getId().toString(), topLikeStale.getRevision() + 1,
+            topLikeHeld.getId().toString(), topLikeHeld.getRevision(),
+            topLikeWrongStatus.getId().toString(), topLikeWrongStatus.getRevision(),
+            baseStale.getId().toString(), baseStale.getRevision() + 1,
+            baseHeld.getId().toString(), baseHeld.getRevision());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.bulkSchedule(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto(
+                        ids, OffsetDateTime.now().plusDays(1), expectedRevisions),
+                    null))
+        .isInstanceOf(com.butingbe.global.error.exception.BulkPayoutConflictException.class)
+        .satisfies(
+            e ->
+                assertThat(
+                        ((com.butingbe.global.error.exception.BulkPayoutConflictException) e)
+                            .getProblemPayoutIds())
+                    .containsExactlyInAnyOrder(
+                        topLikeStale.getId().toString(),
+                        topLikeHeld.getId().toString(),
+                        topLikeWrongStatus.getId().toString(),
+                        missingId.toString(),
+                        baseStale.getId().toString(),
+                        baseHeld.getId().toString()));
   }
 
   @Test
@@ -862,7 +1355,10 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
     ZoneEventParticipation p = participation();
     BaseRewardPayout payout =
         baseRewardPayoutRepository.save(
-            BaseRewardPayout.builder().participationId(p.getId()).reward(new RewardSnapshot(50, null, null, null)).build());
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
 
     assertThatThrownBy(
             () ->
@@ -901,6 +1397,119 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("같은 Idempotency-Key로 mark-mail-sent를 재전송하면 두 번째 요청은 다시 처리하지 않고 같은 결과를 돌려준다")
+  void markMailSentIsIdempotent() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    rewardPayoutRepository.saveAndFlush(payout);
+    String key = "idem-mark-mail-sent-" + UUID.randomUUID();
+    var request =
+        new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto(
+            payout.getId(), null, "발송", payout.getRevision());
+
+    var first = payoutService.markMailSent(operator, request, key);
+    var replay = payoutService.markMailSent(operator, request, key);
+
+    assertThat(replay).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("mark-mail-sent: expectedRevision이 다르면 409다")
+  void markMailSentStaleRevisionConflicts() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markMailSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto(
+                        payout.getId(), null, null, payout.getRevision() + 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("mark-mail-sent: 보류 중인 지급은 409(invalid_state)다")
+  void markMailSentBlockedWhileHeld() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    payout.hold();
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markMailSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto(
+                        payout.getId(), null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.invalid_state");
+  }
+
+  @Test
+  @DisplayName("mark-mail-sent: 매뉴얼 체크 통과 후 flush 시점에 revision이 이미 올라갔다면 409다(진짜 낙관적 락 충돌)")
+  void markMailSentFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    rewardPayoutRepository.saveAndFlush(payout);
+    Long revisionSeenByCaller = payout.getRevision();
+    entityManager
+        .createNativeQuery("UPDATE reward_payout SET revision = revision + 1 WHERE payout_id = :id")
+        .setParameter("id", payout.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markMailSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto(
+                        payout.getId(), null, null, revisionSeenByCaller),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
   @DisplayName("mark-info-collected: MAIL_SENT인 TOP_LIKE를 INFO_COLLECTED로 바꾼다")
   void marksInfoCollected() {
     ZoneEventParticipation p = participation();
@@ -934,7 +1543,10 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
     ZoneEventParticipation p = participation();
     BaseRewardPayout payout =
         baseRewardPayoutRepository.save(
-            BaseRewardPayout.builder().participationId(p.getId()).reward(new RewardSnapshot(50, null, null, null)).build());
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
 
     assertThatThrownBy(
             () ->
@@ -1073,6 +1685,272 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("같은 Idempotency-Key로 mark-sent를 재전송하면 두 번째 요청은 다시 처리하지 않고 같은 결과를 돌려준다")
+  void markSentIsIdempotent() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+    String key = "idem-mark-sent-" + UUID.randomUUID();
+    var request =
+        new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+            payout.getId(), null, null, "지급 완료", payout.getRevision());
+
+    var first = payoutService.markSent(operator, request, key);
+    var replay = payoutService.markSent(operator, request, key);
+
+    assertThat(replay).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("mark-sent(TOP_LIKE): expectedRevision이 다르면 409다")
+  void markTopLikeSentStaleRevisionConflicts() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    payout.markMailSent(OffsetDateTime.now(), null);
+    payout.markInfoCollected(OffsetDateTime.now(), null);
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                        payout.getId(), null, null, null, payout.getRevision() + 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("mark-sent(TOP_LIKE): 보류 중인 지급은 409(invalid_state)다")
+  void markTopLikeSentBlockedWhileHeld() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    payout.markMailSent(OffsetDateTime.now(), null);
+    payout.markInfoCollected(OffsetDateTime.now(), null);
+    payout.hold();
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                        payout.getId(), null, null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.invalid_state");
+  }
+
+  @Test
+  @DisplayName("mark-sent(TOP_LIKE): INFO_COLLECTED가 아니면 409(invalid_state)다")
+  void markTopLikeSentRejectsWrongStatus() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                        payout.getId(), null, null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.invalid_state");
+  }
+
+  @Test
+  @DisplayName("mark-sent(TOP_LIKE): 매뉴얼 체크 통과 후 flush 시점에 revision이 이미 올라갔다면 409다(진짜 낙관적 락 충돌)")
+  void markTopLikeSentFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    payout.markMailSent(OffsetDateTime.now(), null);
+    payout.markInfoCollected(OffsetDateTime.now(), null);
+    rewardPayoutRepository.saveAndFlush(payout);
+    Long revisionSeenByCaller = payout.getRevision();
+    entityManager
+        .createNativeQuery("UPDATE reward_payout SET revision = revision + 1 WHERE payout_id = :id")
+        .setParameter("id", payout.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                        payout.getId(), null, "REF", null, revisionSeenByCaller),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("mark-sent(BASE): expectedRevision이 다르면 409다")
+  void markBaseSentStaleRevisionConflicts() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                        payout.getId(), null, null, null, payout.getRevision() + 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("mark-sent(BASE): 보류 중인 지급은 409(invalid_state)다")
+  void markBaseSentBlockedWhileHeld() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    payout.hold();
+    baseRewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                        payout.getId(), null, null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.invalid_state");
+  }
+
+  @Test
+  @DisplayName("mark-sent(BASE): CONFIRMED가 아니면 409(invalid_state)다")
+  void markBaseSentRejectsWrongStatus() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                        payout.getId(), null, null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.invalid_state");
+  }
+
+  @Test
+  @DisplayName("mark-sent(BASE): 참여를 찾을 수 없으면 404다")
+  void markBaseSentParticipationNotFound() {
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(UUID.randomUUID())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                        payout.getId(), null, null, null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("mark-sent(BASE): 매뉴얼 체크 통과 후 flush 시점에 revision이 이미 올라갔다면 409다(진짜 낙관적 락 충돌)")
+  void markBaseSentFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    baseRewardPayoutRepository.saveAndFlush(payout);
+    Long revisionSeenByCaller = payout.getRevision();
+    entityManager
+        .createNativeQuery(
+            "UPDATE base_reward_payout SET revision = revision + 1 WHERE payout_id = :id")
+        .setParameter("id", payout.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                payoutService.markSent(
+                    operator,
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto(
+                        payout.getId(), null, null, null, revisionSeenByCaller),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
   @DisplayName("retry: FAILED인 지급을 CONFIRMED로 되돌리고 failureCode를 지운다")
   void retriesFailedPayout() {
     ZoneEventParticipation p = participation();
@@ -1171,6 +2049,151 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
                     payout.getId(),
                     new com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto(
                         "재시도", payout.getRevision() + 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("같은 Idempotency-Key로 retry를 재전송하면 두 번째 요청은 다시 처리하지 않고 같은 결과를 돌려준다")
+  void retryIsIdempotent() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    payout.fail("BANK_ERROR");
+    baseRewardPayoutRepository.saveAndFlush(payout);
+    String key = "idem-retry-" + UUID.randomUUID();
+    var request =
+        new com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto(
+            "재시도", payout.getRevision());
+
+    var first = payoutService.retry(operator, payout.getId(), request, key);
+    var replay = payoutService.retry(operator, payout.getId(), request, key);
+
+    assertThat(replay).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("retry: TOP_LIKE의 expectedRevision이 다르면 409다")
+  void retryTopLikeStaleRevisionConflicts() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    payout.fail("BANK_ERROR");
+    rewardPayoutRepository.saveAndFlush(payout);
+
+    assertThatThrownBy(
+            () ->
+                payoutService.retry(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto(
+                        "재시도", payout.getRevision() + 1),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("retry: TOP_LIKE가 FAILED가 아니면 409다")
+  void retryTopLikeRejectsNonFailedStatus() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.retry(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto(
+                        null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.invalid_state");
+  }
+
+  @Test
+  @DisplayName("retry: 매뉴얼 체크 통과 후 flush 시점에 TOP_LIKE revision이 이미 올라갔다면 409다(진짜 낙관적 락 충돌)")
+  void retryTopLikeFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = participation();
+    RewardPayout payout =
+        rewardPayoutRepository.save(
+            RewardPayout.builder()
+                .eventId(event.getId())
+                .participationId(p.getId())
+                .rankN(1)
+                .likeCountAtClose(1L)
+                .reward(new RewardSnapshot(null, null, 1, "COUPON_TOP"))
+                .build());
+    payout.confirm(operator.id());
+    payout.fail("BANK_ERROR");
+    rewardPayoutRepository.saveAndFlush(payout);
+    Long revisionSeenByCaller = payout.getRevision();
+    entityManager
+        .createNativeQuery("UPDATE reward_payout SET revision = revision + 1 WHERE payout_id = :id")
+        .setParameter("id", payout.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                payoutService.retry(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto(
+                        "재시도", revisionSeenByCaller),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.stale_revision");
+  }
+
+  @Test
+  @DisplayName("retry: 매뉴얼 체크 통과 후 flush 시점에 BASE revision이 이미 올라갔다면 409다(진짜 낙관적 락 충돌)")
+  void retryBaseFlushDetectsConcurrentRevisionBump() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    payout.fail("BANK_ERROR");
+    baseRewardPayoutRepository.saveAndFlush(payout);
+    Long revisionSeenByCaller = payout.getRevision();
+    entityManager
+        .createNativeQuery(
+            "UPDATE base_reward_payout SET revision = revision + 1 WHERE payout_id = :id")
+        .setParameter("id", payout.getId())
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                payoutService.retry(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto(
+                        "재시도", revisionSeenByCaller),
                     null))
         .isInstanceOf(ConflictException.class)
         .hasMessage("error.reward.payout.stale_revision");

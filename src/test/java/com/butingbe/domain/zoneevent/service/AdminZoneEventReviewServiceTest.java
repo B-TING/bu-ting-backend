@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.file.service.FileStorageService;
+import com.butingbe.domain.reward.entity.BaseRewardPayout;
 import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.user.entity.Name;
@@ -241,6 +242,30 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("이 참여의 BASE 지급 건이 이미 있으면 승인해도 중복 생성하지 않는다(참여당 유일 제약)")
+  void approveSkipsCreatingBasePayoutWhenOneAlreadyExists() {
+    ZoneEventParticipation p = underReviewWithSubmission();
+    ZoneEventSubmission submission =
+        submissionRepository.findByParticipation_IdOrderByAttemptNoDesc(p.getId()).get(0);
+    var existing =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(event.getBaseReward())
+                .build());
+
+    reviewService.approve(
+        operator,
+        p.getId(),
+        new ReviewApproveReqDto(submission.getId(), submission.getRevision()),
+        null);
+
+    assertThat(baseRewardPayoutRepository.count()).isEqualTo(1);
+    assertThat(baseRewardPayoutRepository.findByParticipationId(p.getId()).orElseThrow().getId())
+        .isEqualTo(existing.getId());
+  }
+
+  @Test
   @DisplayName("이벤트에 baseReward가 없으면 BASE 지급 건을 만들지 않는다")
   void approveWithoutBaseRewardCreatesNoPayout() {
     ZoneEvent noRewardEvent =
@@ -294,7 +319,10 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
     p = participationRepository.save(p);
 
     reviewService.approve(
-        operator, p.getId(), new ReviewApproveReqDto(submission.getId(), submission.getRevision()), null);
+        operator,
+        p.getId(),
+        new ReviewApproveReqDto(submission.getId(), submission.getRevision()),
+        null);
 
     assertThat(baseRewardPayoutRepository.findByParticipationId(p.getId())).isEmpty();
   }
@@ -313,7 +341,10 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
             .build());
 
     reviewService.approve(
-        operator, p.getId(), new ReviewApproveReqDto(submission.getId(), submission.getRevision()), null);
+        operator,
+        p.getId(),
+        new ReviewApproveReqDto(submission.getId(), submission.getRevision()),
+        null);
 
     var basePayout = baseRewardPayoutRepository.findByParticipationId(p.getId()).orElseThrow();
     assertThat(basePayout.getHoldStatus())
