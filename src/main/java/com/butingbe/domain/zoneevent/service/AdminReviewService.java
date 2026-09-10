@@ -3,9 +3,11 @@ package com.butingbe.domain.zoneevent.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.chat.entity.ChatZone;
+import com.butingbe.domain.reward.entity.BaseRewardPayoutStatus;
 import com.butingbe.domain.reward.entity.PayoutHoldStatus;
 import com.butingbe.domain.reward.entity.RewardPayout;
 import com.butingbe.domain.reward.entity.RewardPayoutStatus;
+import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.reward.repository.RewardPayoutRepository;
 import com.butingbe.domain.reward.service.RewardRevokeService;
 import com.butingbe.domain.user.entity.User;
@@ -45,6 +47,7 @@ public class AdminReviewService {
   private final ZoneEventReportRepository reportRepository;
   private final RewardRevokeService rewardRevokeService;
   private final RewardPayoutRepository rewardPayoutRepository;
+  private final BaseRewardPayoutRepository baseRewardPayoutRepository;
   private final OperatorAuthorization operatorAuthorization;
 
   /** SUCCESS → REVOKED + 보상 회수(포인트 되돌림, 미사용 쿠폰 회수). */
@@ -63,6 +66,14 @@ public class AdminReviewService {
                 payout.getStatus() != RewardPayoutStatus.SENT
                     && payout.getStatus() != RewardPayoutStatus.MAIL_SENT
                     && payout.getStatus() != RewardPayoutStatus.INFO_COLLECTED)
+        .ifPresent(payout -> payout.fail("PARTICIPATION_REVOKED"));
+    // BASE 지급도 같이 막는다. 이미 PAID면 실제 포인트가 나간 뒤라 사후 FAILED로 되돌리지 않는다(정산 정정은 별도 문제).
+    baseRewardPayoutRepository
+        .findByParticipationId(participationId)
+        .filter(
+            payout ->
+                payout.getStatus() != BaseRewardPayoutStatus.PAID
+                    && payout.getStatus() != BaseRewardPayoutStatus.FAILED)
         .ifPresent(payout -> payout.fail("PARTICIPATION_REVOKED"));
   }
 

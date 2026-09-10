@@ -86,6 +86,12 @@ public class RewardPayout extends TimestampEntity {
   @Column(name = "failure_code", length = 50)
   private String failureCode;
 
+  @Column(columnDefinition = "text")
+  private String memo;
+
+  @Column(length = 255)
+  private String reference;
+
   @Version
   @Column(nullable = false)
   private Long revision;
@@ -128,5 +134,60 @@ public class RewardPayout extends TimestampEntity {
   public void fail(String failureCode) {
     this.status = RewardPayoutStatus.FAILED;
     this.failureCode = failureCode;
+  }
+
+  /** 보상 항목을 설정·변경한다. PENDING_ASSIGN이었는데 상품 코드까지 채워지면 PENDING_CONFIRM으로 전진한다. */
+  public void assignReward(RewardSnapshot reward) {
+    this.reward = reward;
+    if (this.status == RewardPayoutStatus.PENDING_ASSIGN
+        && reward != null
+        && reward.prizeRewardCode() != null) {
+      this.status = RewardPayoutStatus.PENDING_CONFIRM;
+    }
+  }
+
+  /** PENDING_CONFIRM에서만 호출 가능(서비스가 상태를 먼저 검사한다). */
+  public void confirm(UUID operatorId) {
+    this.status = RewardPayoutStatus.CONFIRMED;
+    this.confirmedBy = operatorId;
+    this.confirmedAt = OffsetDateTime.now();
+  }
+
+  public void markMailSent(OffsetDateTime mailedAt, String note) {
+    this.status = RewardPayoutStatus.MAIL_SENT;
+    this.mailedAt = mailedAt;
+    if (note != null) {
+      this.memo = note;
+    }
+  }
+
+  public void markInfoCollected(OffsetDateTime informationCollectedAt, String note) {
+    this.status = RewardPayoutStatus.INFO_COLLECTED;
+    this.informationCollectedAt = informationCollectedAt;
+    if (note != null) {
+      this.memo = note;
+    }
+  }
+
+  public void markSent(OffsetDateTime sentAt, String reference, String note) {
+    this.status = RewardPayoutStatus.SENT;
+    this.sentAt = sentAt;
+    this.reference = reference;
+    if (note != null) {
+      this.memo = note;
+    }
+  }
+
+  public void retry() {
+    this.status = RewardPayoutStatus.CONFIRMED;
+    this.failureCode = null;
+  }
+
+  public void updateMemo(String memo) {
+    this.memo = memo;
+  }
+
+  public void updateSchedule(OffsetDateTime scheduledAt) {
+    this.scheduledAt = scheduledAt;
   }
 }

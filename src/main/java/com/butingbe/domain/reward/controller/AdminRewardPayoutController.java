@@ -1,20 +1,33 @@
 package com.butingbe.domain.reward.controller;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutDetailResDto;
+import com.butingbe.domain.reward.dto.response.AdminRewardPayoutPageResDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutReleaseHoldResDto;
 import com.butingbe.domain.reward.service.AdminRewardPayoutService;
 import com.butingbe.global.common.ApiResponse;
 import jakarta.validation.Valid;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** 신고로 보류된 지급의 최종 해제. ROLE_ADMIN/MANAGER 전용(서비스에서 검사). */
@@ -24,6 +37,47 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminRewardPayoutController {
 
   private final AdminRewardPayoutService adminRewardPayoutService;
+
+  @GetMapping
+  public ResponseEntity<ApiResponse<AdminRewardPayoutPageResDto>> list(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestParam(required = false) UUID roundId,
+      @RequestParam(required = false) UUID eventId,
+      @RequestParam(required = false) String rewardReason,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String holdStatus,
+      @RequestParam(required = false)
+          @org.springframework.format.annotation.DateTimeFormat(
+              iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
+          OffsetDateTime scheduledFrom,
+      @RequestParam(required = false)
+          @org.springframework.format.annotation.DateTimeFormat(
+              iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
+          OffsetDateTime scheduledTo,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "지급 목록",
+            adminRewardPayoutService.list(
+                user,
+                roundId,
+                eventId,
+                rewardReason,
+                status,
+                holdStatus,
+                scheduledFrom,
+                scheduledTo,
+                page,
+                size)));
+  }
+
+  @GetMapping("/{payoutId}")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> detail(
+      @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID payoutId) {
+    return ResponseEntity.ok(
+        ApiResponse.success("지급 건 상세", adminRewardPayoutService.detail(user, payoutId)));
+  }
 
   @PostMapping("/{payoutId}/release-hold")
   public ResponseEntity<ApiResponse<AdminRewardPayoutReleaseHoldResDto>> releaseHold(
@@ -35,5 +89,78 @@ public class AdminRewardPayoutController {
         ApiResponse.success(
             "지급 보류 해제",
             adminRewardPayoutService.releaseHold(user, payoutId, request, idempotencyKey)));
+  }
+
+  @PatchMapping("/{payoutId}")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> update(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID payoutId,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutUpdateReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "지급 건 수정", adminRewardPayoutService.update(user, payoutId, request, idempotencyKey)));
+  }
+
+  @PostMapping("/bulk-confirm")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutBulkResultResDto>> bulkConfirm(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutBulkConfirmReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "지급 일괄 확정", adminRewardPayoutService.bulkConfirm(user, request, idempotencyKey)));
+  }
+
+  @PostMapping("/bulk-schedule")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutBulkResultResDto>> bulkSchedule(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutBulkScheduleReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "지급 일괄 일정", adminRewardPayoutService.bulkSchedule(user, request, idempotencyKey)));
+  }
+
+  @PostMapping("/mark-mail-sent")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> markMailSent(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutMarkReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "메일 발송 기록", adminRewardPayoutService.markMailSent(user, request, idempotencyKey)));
+  }
+
+  @PostMapping("/mark-info-collected")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> markInfoCollected(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutMarkReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "개인정보 수집 기록",
+            adminRewardPayoutService.markInfoCollected(user, request, idempotencyKey)));
+  }
+
+  @PostMapping("/mark-sent")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> markSent(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutMarkSentReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "발송 완료 기록", adminRewardPayoutService.markSent(user, request, idempotencyKey)));
+  }
+
+  @PostMapping("/{payoutId}/retry")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> retry(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID payoutId,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutRetryReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "지급 재시도", adminRewardPayoutService.retry(user, payoutId, request, idempotencyKey)));
   }
 }

@@ -5745,6 +5745,311 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/admin/reward-payouts:
+    get:
+      tags: [Zone Event]
+      summary: "ROLE_ADMIN/MANAGER. 지급 목록"
+      description: "roundId/eventId/rewardReason(BASE|TOP_LIKE)/status/holdStatus/scheduledFrom/scheduledTo/page/size로 필터링합니다. rewardReason을 지정하지 않으면 BASE·TOP_LIKE를 병합해 돌려줍니다. status는 타입별 상태 enum이 달라 rewardReason 없이 단독으로는 지정할 수 없습니다(400)."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - { name: roundId, in: query, schema: { type: string, format: uuid } }
+        - { name: eventId, in: query, schema: { type: string, format: uuid } }
+        - { name: rewardReason, in: query, schema: { type: string, enum: [BASE, TOP_LIKE] } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: holdStatus, in: query, schema: { type: string, enum: [NONE, HELD_REPORT] } }
+        - { name: scheduledFrom, in: query, schema: { type: string, format: date-time } }
+        - { name: scheduledTo, in: query, schema: { type: string, format: date-time } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: size, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardPayoutPageEnvelope"
+        "400":
+          description: "status를 rewardReason 없이 지정함"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/reward-payouts/{payoutId}:
+    get:
+      tags: [Zone Event]
+      summary: "ROLE_ADMIN/MANAGER. 지급 상세"
+      description: "payoutId는 TOP_LIKE(RewardPayout) 또는 BASE(BaseRewardPayout) 중 하나를 가리킵니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - { name: payoutId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardPayoutDetailEnvelope"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "지급 건을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    patch:
+      tags: [Zone Event]
+      summary: "ROLE_ADMIN/MANAGER. 지급 건 보상·메모·일정 수정"
+      description: "reward는 PENDING_ASSIGN(TOP_LIKE) 또는 PENDING_CONFIRM 상태에서만 변경 가능합니다(확정 후 변경 시 409). memo·scheduledAt은 FAILED/SENT/PAID가 아니면 언제든 변경 가능합니다. TOP_LIKE는 reward.prizeRewardCode가 채워지면 PENDING_ASSIGN에서 PENDING_CONFIRM으로 자동 전진합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - { name: payoutId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRewardPayoutUpdateRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardPayoutDetailEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "지급 건을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "확정 후 보상 변경 시도, 종료 상태(FAILED/SENT/PAID)에서 memo·scheduledAt 변경 시도, 또는 오래된 expectedRevision"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/reward-payouts/bulk-confirm:
+    post:
+      tags: [Zone Event]
+      summary: "ROLE_ADMIN/MANAGER. 지급 일괄 확정"
+      description: "PENDING_CONFIRM이고 holdStatus=NONE인 건만 CONFIRMED로 바꿉니다. 하나라도 조건을 충족하지 않으면(오래된 revision, 보류 중, 상태 불일치, TOP_LIKE 품목 미정 등) 아무 것도 반영하지 않고 409와 함께 문제 payoutIds를 반환합니다(all-or-nothing)."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRewardPayoutBulkConfirmRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardPayoutBulkResultEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "일부 건이 조건 미충족(all-or-nothing, problemPayoutIds 포함)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/reward-payouts/bulk-schedule:
+    post:
+      tags: [Zone Event]
+      summary: "ROLE_ADMIN/MANAGER. 지급 일괄 일정"
+      description: "CONFIRMED이고 holdStatus=NONE인 건만 scheduledAt을 일괄 변경합니다. 하나라도 조건 미충족이면 아무 것도 반영하지 않고 409(problemPayoutIds 포함)."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRewardPayoutBulkScheduleRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardPayoutBulkResultEnvelope"
+        "409":
+          description: "일부 건이 조건 미충족(all-or-nothing, problemPayoutIds 포함)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/reward-payouts/mark-mail-sent:
+    post:
+      tags: [Zone Event]
+      summary: "ROLE_ADMIN/MANAGER. 메일 발송 기록(TOP_LIKE 전용)"
+      description: "CONFIRMED인 TOP_LIKE 지급을 MAIL_SENT로 바꿉니다. BASE 지급 건에 호출하면 409(wrong_type)."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRewardPayoutMarkRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardPayoutDetailEnvelope"
+        "409":
+          description: "잘못된 지급 타입, 현재 단계에서 처리 불가, 또는 오래된 revision"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/reward-payouts/mark-info-collected:
+    post:
+      tags: [Zone Event]
+      summary: "ROLE_ADMIN/MANAGER. 개인정보 수집 기록(TOP_LIKE 전용)"
+      description: "MAIL_SENT인 TOP_LIKE 지급을 INFO_COLLECTED로 바꿉니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRewardPayoutMarkRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardPayoutDetailEnvelope"
+        "409":
+          description: "잘못된 지급 타입, 현재 단계에서 처리 불가, 또는 오래된 revision"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/reward-payouts/mark-sent:
+    post:
+      tags: [Zone Event]
+      summary: "ROLE_ADMIN/MANAGER. 실제 발송 완료 기록"
+      description: "TOP_LIKE는 INFO_COLLECTED를 SENT로 바꿉니다. BASE는 CONFIRMED를 PAID로 바꾸면서 같은 트랜잭션에서 실제 포인트·배지 원장(reward_grant)에 원자적으로 반영합니다 — UI 기록만으로 PAID 처리하지 않습니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRewardPayoutMarkSentRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardPayoutDetailEnvelope"
+        "409":
+          description: "현재 단계에서 처리 불가, 보류 중, 또는 오래된 revision"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/admin/reward-payouts/{payoutId}/retry:
+    post:
+      tags: [Zone Event]
+      summary: "ROLE_ADMIN/MANAGER. 지급 재시도"
+      description: "FAILED이고 holdStatus=NONE인 지급을 CONFIRMED로 되돌립니다(failureCode 초기화). 보류 중이면 409입니다. TOP_LIKE는 reward.prizeRewardCode가 아직 비어 있으면 재시도할 수 없습니다(409). BASE 재시도 후 mark-sent를 다시 호출해도 reward_grant의 UK 가드로 이중 지급되지 않습니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - { name: payoutId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRewardPayoutRetryRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRewardPayoutDetailEnvelope"
+        "404":
+          description: "지급 건을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "FAILED가 아니거나 보류 중이거나 TOP_LIKE 품목 미배정, 또는 오래된 revision"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/admin/reward-payouts/{payoutId}/release-hold:
     post:
       tags:
@@ -11741,6 +12046,158 @@ components:
           example: "지급 보류 해제"
         data:
           $ref: "#/components/schemas/AdminRewardPayoutReleaseHold"
+
+    AdminRewardPayoutDetail:
+      type: object
+      properties:
+        payoutId: { type: string, format: uuid }
+        payoutType: { type: string, enum: [TOP_LIKE, BASE] }
+        eventId: { type: string, format: uuid, nullable: true }
+        participationId: { type: string, format: uuid }
+        rankN: { type: integer, nullable: true }
+        likeCountAtClose: { type: integer, format: int64, nullable: true }
+        reward:
+          type: object
+          nullable: true
+          properties:
+            points: { type: integer, nullable: true }
+            badgeCode: { type: string, nullable: true }
+            topN: { type: integer, nullable: true }
+            prizeRewardCode: { type: string, nullable: true }
+        status: { type: string }
+        holdStatus: { type: string, enum: [NONE, HELD_REPORT] }
+        scheduledAt: { type: string, format: date-time, nullable: true }
+        confirmedBy: { type: string, format: uuid, nullable: true }
+        confirmedAt: { type: string, format: date-time, nullable: true }
+        mailedAt: { type: string, format: date-time, nullable: true }
+        informationCollectedAt: { type: string, format: date-time, nullable: true }
+        sentAt: { type: string, format: date-time, nullable: true }
+        paidAt: { type: string, format: date-time, nullable: true }
+        reference: { type: string, nullable: true }
+        memo: { type: string, nullable: true }
+        failureCode: { type: string, nullable: true }
+        revision: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AdminRewardPayoutDetailEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: "지급 건 상세" }
+        data:
+          $ref: "#/components/schemas/AdminRewardPayoutDetail"
+
+    AdminRewardPayoutListItem:
+      type: object
+      properties:
+        payoutId: { type: string, format: uuid }
+        payoutType: { type: string, enum: [TOP_LIKE, BASE] }
+        participationId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid, nullable: true }
+        status: { type: string }
+        holdStatus: { type: string, enum: [NONE, HELD_REPORT] }
+        scheduledAt: { type: string, format: date-time, nullable: true }
+        reward:
+          type: object
+          nullable: true
+        revision: { type: integer, format: int64 }
+
+    AdminRewardPayoutPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminRewardPayoutListItem"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+        hasNext: { type: boolean }
+
+    AdminRewardPayoutPageEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: "지급 목록" }
+        data:
+          $ref: "#/components/schemas/AdminRewardPayoutPage"
+
+    AdminRewardPayoutUpdateRequest:
+      type: object
+      properties:
+        reward:
+          type: object
+          nullable: true
+        memo: { type: string, nullable: true }
+        scheduledAt: { type: string, format: date-time, nullable: true }
+        expectedRevision: { type: integer, format: int64 }
+      required: [expectedRevision]
+
+    AdminRewardPayoutBulkConfirmRequest:
+      type: object
+      properties:
+        payoutIds:
+          type: array
+          items: { type: string, format: uuid }
+        expectedRevisions:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+      required: [payoutIds, expectedRevisions]
+
+    AdminRewardPayoutBulkScheduleRequest:
+      type: object
+      properties:
+        payoutIds:
+          type: array
+          items: { type: string, format: uuid }
+        scheduledAt: { type: string, format: date-time }
+        expectedRevisions:
+          type: object
+          additionalProperties: { type: integer, format: int64 }
+      required: [payoutIds, scheduledAt, expectedRevisions]
+
+    AdminRewardPayoutBulkResult:
+      type: object
+      properties:
+        processedPayoutIds:
+          type: array
+          items: { type: string, format: uuid }
+
+    AdminRewardPayoutBulkResultEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: "지급 일괄 확정" }
+        data:
+          $ref: "#/components/schemas/AdminRewardPayoutBulkResult"
+
+    AdminRewardPayoutMarkRequest:
+      type: object
+      properties:
+        payoutId: { type: string, format: uuid }
+        at: { type: string, format: date-time, nullable: true }
+        note: { type: string, nullable: true }
+        expectedRevision: { type: integer, format: int64 }
+      required: [payoutId, expectedRevision]
+
+    AdminRewardPayoutMarkSentRequest:
+      type: object
+      properties:
+        payoutId: { type: string, format: uuid }
+        sentAt: { type: string, format: date-time, nullable: true }
+        reference: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        expectedRevision: { type: integer, format: int64 }
+      required: [payoutId, expectedRevision]
+
+    AdminRewardPayoutRetryRequest:
+      type: object
+      properties:
+        note: { type: string, nullable: true }
+        expectedRevision: { type: integer, format: int64 }
+      required: [expectedRevision]
 
     ReviewRejectRequest:
       type: object

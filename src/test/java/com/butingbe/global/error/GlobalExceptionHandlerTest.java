@@ -6,13 +6,16 @@ import com.butingbe.domain.place.exception.PlaceKeywordNotFoundException;
 import com.butingbe.domain.travel.ai.PlaceKey;
 import com.butingbe.domain.travel.ai.TravelPlanValidationException;
 import com.butingbe.global.common.ApiResponse;
+import com.butingbe.global.error.exception.BulkPayoutConflictException;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -100,6 +103,19 @@ class GlobalExceptionHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     assertThat(response.getBody().getMessage()).isEqualTo("상태가 충돌합니다.");
+  }
+
+  @Test
+  @DisplayName("일괄 지급 처리 충돌은 409와 문제 payoutIds를 반환한다")
+  void bulkPayoutConflictReturnsConflictWithProblemIds() {
+    ResponseEntity<ApiResponse<Map<String, Object>>> response =
+        handler.handleBulkPayoutConflict(
+            new BulkPayoutConflictException("일부 처리 불가", List.of("id-1", "id-2")), request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    assertThat(response.getBody().getMessage()).isEqualTo("일부 처리 불가");
+    assertThat(response.getBody().getData())
+        .containsEntry("problemPayoutIds", List.of("id-1", "id-2"));
   }
 
   @Test

@@ -144,6 +144,12 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // 운영 JVM 은 ButingBeApplication.main 에서 기본 타임존을 Asia/Seoul 로 고정한다. 테스트는 main 을
+    // 거치지 않아 러너 OS 타임존을 그대로 쓴다 -- 로컬(KST)과 GitHub Actions(UTC)가 달라진다.
+    // 이때 spring.jackson.time-zone(Asia/Seoul)과 JVM 기본 타임존이 어긋나면 OffsetDateTime 이
+    // JSON 직렬화/역직렬화를 거치며 같은 시각인데 오프셋만 바뀌어(Z -> +09:00) equals 비교가 깨진다.
+    // 테스트 JVM 도 운영과 같은 타임존으로 고정한다.
+    systemProperty("user.timezone", "Asia/Seoul")
     outputs.dir(layout.buildDirectory.dir("generated-snippets"))
     finalizedBy(tasks.jacocoTestReport)
 }

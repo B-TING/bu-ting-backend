@@ -4,6 +4,8 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.file.service.FileStorageService;
+import com.butingbe.domain.reward.entity.BaseRewardPayout;
+import com.butingbe.domain.reward.repository.BaseRewardPayoutRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.domain.zoneevent.dto.request.ReviewApproveReqDto;
@@ -17,6 +19,7 @@ import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.domain.zonetitle.dto.response.EquippedTitleResDto;
 import com.butingbe.domain.zonetitle.service.ZoneTitleService;
@@ -56,6 +59,8 @@ public class AdminZoneEventReviewService {
   private final ZoneTitleService zoneTitleService;
   private final IdempotencyService idempotencyService;
   private final ObjectMapper objectMapper;
+  private final BaseRewardPayoutRepository baseRewardPayoutRepository;
+  private final ZoneEventReportRepository reportRepository;
 
   /** 검수 큐: UNDER_REVIEW 참여만, roundId/eventId/zoneId로 필터링, joinedAt 오름차순(먼저 온 순). */
   @Transactional(readOnly = true)
@@ -147,6 +152,7 @@ public class AdminZoneEventReviewService {
 
     participation.stampReview(user.id());
     participation.markSuccess();
+    createBaseRewardPayoutIfNeeded(participation);
     submission.approve(user.id());
     flushSubmission(submission);
 
@@ -227,6 +233,26 @@ public class AdminZoneEventReviewService {
     } catch (ObjectOptimisticLockingFailureException e) {
       throw new ConflictException("error.zone_event.review.stale_revision");
     }
+  }
+
+  /** 이벤트에 baseReward가 있고 아직 이 참여의 BASE 지급 건이 없으면 PENDING_CONFIRM으로 생성한다. 미해결 신고가 있으면 즉시 보류. */
+  private void createBaseRewardPayoutIfNeeded(ZoneEventParticipation participation) {
+    var baseReward = participation.getEvent().getBaseReward();
+    if (baseReward == null) {
+      return;
+    }
+    if (baseRewardPayoutRepository.findByParticipationId(participation.getId()).isPresent()) {
+      return;
+    }
+    BaseRewardPayout payout =
+        BaseRewardPayout.builder()
+            .participationId(participation.getId())
+            .reward(baseReward)
+            .build();
+    if (reportRepository.hasUnresolvedReports(participation.getId())) {
+      payout.hold();
+    }
+    baseRewardPayoutRepository.save(payout);
   }
 
   private <T> T readJson(String json, Class<T> type) {

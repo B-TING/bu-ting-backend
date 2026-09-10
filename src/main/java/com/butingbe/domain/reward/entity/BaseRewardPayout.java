@@ -69,6 +69,9 @@ public class BaseRewardPayout extends TimestampEntity {
   @Column(name = "failure_code", length = 50)
   private String failureCode;
 
+  @Column(columnDefinition = "text")
+  private String memo;
+
   @Version
   @Column(nullable = false)
   private Long revision;
@@ -94,5 +97,42 @@ public class BaseRewardPayout extends TimestampEntity {
   /** 미해결 신고가 없음을 확인한 뒤 보류를 해제한다. */
   public void releaseHold() {
     this.holdStatus = PayoutHoldStatus.NONE;
+  }
+
+  public void updateReward(RewardSnapshot reward) {
+    this.reward = reward;
+  }
+
+  public void updateMemo(String memo) {
+    this.memo = memo;
+  }
+
+  public void updateSchedule(OffsetDateTime scheduledAt) {
+    this.scheduledAt = scheduledAt;
+  }
+
+  /** 지급 처리 실패(외부 발송/원장 반영 실패 등). */
+  public void fail(String failureCode) {
+    this.status = BaseRewardPayoutStatus.FAILED;
+    this.failureCode = failureCode;
+  }
+
+  public void confirm(UUID operatorId) {
+    this.status = BaseRewardPayoutStatus.CONFIRMED;
+    this.confirmedBy = operatorId;
+    this.confirmedAt = OffsetDateTime.now();
+  }
+
+  public void markSent(OffsetDateTime paidAt, String note) {
+    this.status = BaseRewardPayoutStatus.PAID;
+    this.paidAt = paidAt;
+    if (note != null) {
+      this.memo = note;
+    }
+  }
+
+  public void retry() {
+    this.status = BaseRewardPayoutStatus.CONFIRMED;
+    this.failureCode = null;
   }
 }
