@@ -282,6 +282,26 @@ class AdminRewardPayoutControllerTest {
         .andExpect(jsonPath("$.data.status").value("PAID"));
   }
 
+  @Test
+  @DisplayName("재시도 200")
+  void retry() throws Exception {
+    UUID payoutId = UUID.randomUUID();
+    when(adminRewardPayoutService.retry(any(), eq(payoutId), any(), any()))
+        .thenReturn(
+            new AdminRewardPayoutDetailResDto(
+                payoutId.toString(), "BASE", UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(), null, null, null, "CONFIRMED", "NONE",
+                null, null, null, null, null, null, null, null, null, null, 2L, null, null));
+
+    mockMvc
+        .perform(
+            post("/admin/reward-payouts/{id}/retry", payoutId)
+                .contentType("application/json")
+                .content("{\"expectedRevision\":1}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("CONFIRMED"));
+  }
+
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
     return new HandlerMethodArgumentResolver() {
       @Override

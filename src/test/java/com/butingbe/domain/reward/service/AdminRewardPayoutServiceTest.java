@@ -1072,6 +1072,55 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
     assertThat(result.reference()).isEqualTo("REF-001");
   }
 
+  @Test
+  @DisplayName("retry: FAILED인 지급을 CONFIRMED로 되돌리고 failureCode를 지운다")
+  void retriesFailedPayout() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+    payout.confirm(operator.id());
+    payout.fail("BANK_ERROR");
+    baseRewardPayoutRepository.saveAndFlush(payout);
+
+    var result =
+        payoutService.retry(
+            operator,
+            payout.getId(),
+            new com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto(
+                "재시도", payout.getRevision()),
+            null);
+
+    assertThat(result.status()).isEqualTo("CONFIRMED");
+    assertThat(result.failureCode()).isNull();
+  }
+
+  @Test
+  @DisplayName("retry: FAILED가 아니면 409다")
+  void retryRejectsNonFailedStatus() {
+    ZoneEventParticipation p = participation();
+    BaseRewardPayout payout =
+        baseRewardPayoutRepository.save(
+            BaseRewardPayout.builder()
+                .participationId(p.getId())
+                .reward(new RewardSnapshot(50, null, null, null))
+                .build());
+
+    assertThatThrownBy(
+            () ->
+                payoutService.retry(
+                    operator,
+                    payout.getId(),
+                    new com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto(
+                        null, payout.getRevision()),
+                    null))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.reward.payout.invalid_state");
+  }
+
   private ZoneEventParticipation participation() {
     return participationRepository.save(
         ZoneEventParticipation.builder()

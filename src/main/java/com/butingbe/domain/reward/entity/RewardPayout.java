@@ -178,6 +178,11 @@ public class RewardPayout extends TimestampEntity {
     }
   }
 
+  public void retry() {
+    this.status = RewardPayoutStatus.CONFIRMED;
+    this.failureCode = null;
+  }
+
   public void updateMemo(String memo) {
     this.memo = memo;
   }

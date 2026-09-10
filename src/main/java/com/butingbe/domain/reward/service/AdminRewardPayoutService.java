@@ -6,6 +6,7 @@ import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
@@ -64,6 +65,7 @@ public class AdminRewardPayoutService {
   private static final String MARK_MAIL_SENT_ENDPOINT = "reward-payout-mark-mail-sent";
   private static final String MARK_INFO_COLLECTED_ENDPOINT = "reward-payout-mark-info-collected";
   private static final String MARK_SENT_ENDPOINT = "reward-payout-mark-sent";
+  private static final String RETRY_ENDPOINT = "reward-payout-retry";
   private static final int DEFAULT_SIZE = 20;
   private static final int MAX_SIZE = 50;
 
@@ -726,6 +728,71 @@ public class AdminRewardPayoutService {
       throw new ConflictException("error.reward.payout.stale_revision");
     }
     return AdminRewardPayoutDetailResDto.ofBase(payout, eventId);
+  }
+
+  @Transactional
+  public AdminRewardPayoutDetailResDto retry(
+      AuthenticatedUser user, UUID payoutId, AdminRewardPayoutRetryReqDto request, String idempotencyKey) {
+    operatorAuthorization.requireOperator(user);
+    String fingerprint = payoutId + ":" + request.note() + ":" + request.expectedRevision();
+    Optional<String> replay = idempotencyService.findReplay(idempotencyKey, RETRY_ENDPOINT, fingerprint);
+    if (replay.isPresent()) {
+      return readJson(replay.get(), AdminRewardPayoutDetailResDto.class);
+    }
+
+    AdminRewardPayoutDetailResDto result;
+    Optional<RewardPayout> topLike = rewardPayoutRepository.findById(payoutId);
+    if (topLike.isPresent()) {
+      RewardPayout p = topLike.get();
+      if (!p.getRevision().equals(request.expectedRevision())) {
+        throw new ConflictException("error.reward.payout.stale_revision");
+      }
+      if (p.getStatus() != RewardPayoutStatus.FAILED) {
+        throw new ConflictException("error.reward.payout.invalid_state");
+      }
+      p.retry();
+      try {
+        rewardPayoutRepository.saveAndFlush(p);
+      } catch (ObjectOptimisticLockingFailureException e) {
+        throw new ConflictException("error.reward.payout.stale_revision");
+      }
+      result = AdminRewardPayoutDetailResDto.ofTopLike(p);
+    } else {
+      BaseRewardPayout p =
+          baseRewardPayoutRepository
+              .findById(payoutId)
+              .orElseThrow(() -> new ResourceNotFoundException("error.reward.payout.not_found"));
+      if (!p.getRevision().equals(request.expectedRevision())) {
+        throw new ConflictException("error.reward.payout.stale_revision");
+      }
+      if (p.getStatus() != BaseRewardPayoutStatus.FAILED) {
+        throw new ConflictException("error.reward.payout.invalid_state");
+      }
+      p.retry();
+      UUID eventId =
+          participationRepository
+              .findById(p.getParticipationId())
+              .map(ZoneEventParticipation::getEvent)
+              .map(com.butingbe.domain.zoneevent.entity.ZoneEvent::getId)
+              .orElse(null);
+      try {
+        baseRewardPayoutRepository.saveAndFlush(p);
+      } catch (ObjectOptimisticLockingFailureException e) {
+        throw new ConflictException("error.reward.payout.stale_revision");
+      }
+      result = AdminRewardPayoutDetailResDto.ofBase(p, eventId);
+    }
+
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action("RETRY_PAYOUT")
+            .targetType("REWARD_PAYOUT")
+            .targetId(payoutId)
+            .detail(Map.of("payoutType", result.payoutType()))
+            .build());
+    idempotencyService.save(idempotencyKey, RETRY_ENDPOINT, fingerprint, result);
+    return result;
   }
 
   @FunctionalInterface

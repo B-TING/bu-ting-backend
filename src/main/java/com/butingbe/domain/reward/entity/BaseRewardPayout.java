@@ -111,6 +111,12 @@ public class BaseRewardPayout extends TimestampEntity {
     this.scheduledAt = scheduledAt;
   }
 
+  /** 지급 처리 실패(외부 발송/원장 반영 실패 등). */
+  public void fail(String failureCode) {
+    this.status = BaseRewardPayoutStatus.FAILED;
+    this.failureCode = failureCode;
+  }
+
   public void confirm(UUID operatorId) {
     this.status = BaseRewardPayoutStatus.CONFIRMED;
     this.confirmedBy = operatorId;
@@ -123,5 +129,10 @@ public class BaseRewardPayout extends TimestampEntity {
     if (note != null) {
       this.memo = note;
     }
+  }
+
+  public void retry() {
+    this.status = BaseRewardPayoutStatus.CONFIRMED;
+    this.failureCode = null;
   }
 }

@@ -5,6 +5,7 @@ import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkConfirmReqDto
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutBulkScheduleReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutMarkSentReqDto;
+import com.butingbe.domain.reward.dto.request.AdminRewardPayoutRetryReqDto;
 import com.butingbe.domain.reward.dto.request.AdminRewardPayoutUpdateReqDto;
 import com.butingbe.domain.reward.dto.request.ReleaseHoldReqDto;
 import com.butingbe.domain.reward.dto.response.AdminRewardPayoutBulkResultResDto;
@@ -150,5 +151,16 @@ public class AdminRewardPayoutController {
     return ResponseEntity.ok(
         ApiResponse.success(
             "발송 완료 기록", adminRewardPayoutService.markSent(user, request, idempotencyKey)));
+  }
+
+  @PostMapping("/{payoutId}/retry")
+  public ResponseEntity<ApiResponse<AdminRewardPayoutDetailResDto>> retry(
+      @AuthenticationPrincipal AuthenticatedUser user,
+      @PathVariable UUID payoutId,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+      @RequestBody @Valid AdminRewardPayoutRetryReqDto request) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            "지급 재시도", adminRewardPayoutService.retry(user, payoutId, request, idempotencyKey)));
   }
 }
