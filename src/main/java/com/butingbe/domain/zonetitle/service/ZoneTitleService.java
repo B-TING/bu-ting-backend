@@ -80,6 +80,37 @@ public class ZoneTitleService {
     return newlyEarned.stream().map(EquippedTitleResDto::from).toList();
   }
 
+  /**
+   * 요건(달성 기준)이 낮아진 뒤 이미 조건을 충족한 유저에게 소급 발급한다. 자동 장착은 하지 않는다(운영자 액션이 대표 칭호를 바꾸면 안 된다). 새로 발급된 건수를
+   * 돌려준다.
+   */
+  @Transactional
+  public int backfillGrants(ZoneTitleDef def) {
+    int granted = 0;
+    for (UUID userId : participationRepository.findDistinctSuccessUserIdsByZone(def.getZoneId())) {
+      if (userZoneTitleRepository.existsByUserIdAndTitleDef_Id(userId, def.getId())) {
+        continue;
+      }
+      long successCount =
+          participationRepository.countSuccessByUserAndZone(userId, def.getZoneId());
+      if (successCount >= def.getRequiredSuccessCount()) {
+        userZoneTitleRepository.save(
+            UserZoneTitle.builder()
+                .userId(userId)
+                .titleDef(def)
+                .zoneId(def.getZoneId())
+                .equipped(false)
+                .build());
+        granted++;
+      }
+    }
+    if (granted > 0) {
+      // 소급 발급도 등급(도시 등급) 재계산 대상이다 — 개별 유저 단위 recordIfRisen 호출은
+      // 대량 처리 시 비용이 크므로 이번 이슈 범위에서는 건너뛴다(운영 정책 확정 후 별도 이슈에서 처리).
+    }
+    return granted;
+  }
+
   /** 대표 칭호를 장착한다. 보유하지 않은 칭호면 403. */
   @Transactional
   public EquippedTitleResDto equip(AuthenticatedUser user, UUID userTitleId) {

@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -16,7 +17,16 @@ import lombok.NoArgsConstructor;
 
 /** 구역별 칭호 정의(tier 1/2/3). 6구역 × 3단 = 18개를 시드한다. */
 @Entity
-@Table(name = "zone_title_def")
+@Table(
+    name = "zone_title_def",
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = "uk_zone_title_def_zone_tier",
+          columnNames = {"zone_id", "tier"}),
+      @UniqueConstraint(
+          name = "uk_zone_title_def_zone_required_count",
+          columnNames = {"zone_id", "required_success_count"})
+    })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ZoneTitleDef extends TimestampEntity {
@@ -67,5 +77,15 @@ public class ZoneTitleDef extends TimestampEntity {
     this.titleName = titleName;
     this.style = style;
     this.color = color;
+  }
+
+  /** 이름·달성 기준을 수정한다. null은 건너뛴다. */
+  public void applyEditable(String titleName, Integer requiredSuccessCount) {
+    if (titleName != null) {
+      this.titleName = titleName;
+    }
+    if (requiredSuccessCount != null) {
+      this.requiredSuccessCount = requiredSuccessCount;
+    }
   }
 }
