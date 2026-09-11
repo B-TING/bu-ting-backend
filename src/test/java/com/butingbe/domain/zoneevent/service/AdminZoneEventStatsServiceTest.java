@@ -24,6 +24,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -75,6 +76,14 @@ class AdminZoneEventStatsServiceTest extends AbstractContainerTest {
     assertThatThrownBy(() -> service.stats(operator, null, null, null))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("error.zone_event.stats.round_or_range_required");
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 roundId면 404")
+  void unknownRoundIdIs404() {
+    assertThatThrownBy(() -> service.stats(operator, UUID.randomUUID(), null, null))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.zone_event.not_found");
   }
 
   @Test
