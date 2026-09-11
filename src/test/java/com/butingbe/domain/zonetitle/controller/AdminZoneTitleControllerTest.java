@@ -1,8 +1,11 @@
 package com.butingbe.domain.zonetitle.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -103,6 +106,46 @@ class AdminZoneTitleControllerTest {
     mockMvc
         .perform(post("/admin/zone-titles").contentType("application/json").content("{}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("칭호 정의 수정 200")
+  void update() throws Exception {
+    UUID titleDefId = UUID.randomUUID();
+    when(adminZoneTitleService.update(any(), eq(titleDefId), any()))
+        .thenReturn(
+            new AdminZoneTitleDefResDto(
+                titleDefId.toString(),
+                "SUYEONG_NAMGU_T1",
+                "SUYEONG_NAMGU",
+                1,
+                3,
+                "탐방가",
+                "chip",
+                "#000000",
+                2L,
+                1L,
+                null,
+                null));
+
+    mockMvc
+        .perform(
+            patch("/admin/zone-titles/{id}", titleDefId)
+                .contentType("application/json")
+                .content(
+                    "{\"requiredSuccessCount\":3,\"retroactive\":true,\"expectedRevision\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.requiredSuccessCount").value(3));
+  }
+
+  @Test
+  @DisplayName("칭호 정의 삭제 204")
+  void deleteReturnsNoContent() throws Exception {
+    UUID titleDefId = UUID.randomUUID();
+
+    mockMvc
+        .perform(delete("/admin/zone-titles/{id}", titleDefId))
+        .andExpect(status().isNoContent());
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {

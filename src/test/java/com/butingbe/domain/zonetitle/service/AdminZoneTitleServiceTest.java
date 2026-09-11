@@ -8,13 +8,22 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEvent;
+import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
+import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleCreateReqDto;
 import com.butingbe.domain.zonetitle.entity.ZoneTitleDef;
 import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
 import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.support.AbstractContainerTest;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +41,9 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
   @Autowired private UserZoneTitleRepository userZoneTitleRepository;
   @Autowired private ZoneEventAuditLogRepository auditLogRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
+  @Autowired private ZoneEventRepository zoneEventRepository;
+  @Autowired private ZoneEventParticipationRepository participationRepository;
 
   private AuthenticatedUser operator;
 
@@ -155,5 +167,150 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
 
     assertThat(result).hasSize(1);
     assertThat(result.get(0).holderCount()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("update: retroactive=true면 이미 충족한 유저에게 소급 발급한다")
+  void updateWithRetroactiveBackfills() {
+    var created =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 5, "탐방가", "chip", "#000000"));
+    UUID titleDefId = UUID.fromString(created.titleDefId());
+    var holder = savedUser("소급대상");
+    successfulParticipation(holder.getId(), "SUYEONG_NAMGU");
+
+    var result =
+        service.update(
+            operator,
+            titleDefId,
+            new com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto(
+                null, 1, true, created.revision()));
+
+    assertThat(result.requiredSuccessCount()).isEqualTo(1);
+    assertThat(result.holderCount()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("update: retroactive=false면 소급 발급하지 않는다")
+  void updateWithoutRetroactiveDoesNotBackfill() {
+    var created =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 5, "탐방가", "chip", "#000000"));
+    UUID titleDefId = UUID.fromString(created.titleDefId());
+    var holder = savedUser("소급대상2");
+    successfulParticipation(holder.getId(), "SUYEONG_NAMGU");
+
+    var result =
+        service.update(
+            operator,
+            titleDefId,
+            new com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto(
+                null, 1, false, created.revision()));
+
+    assertThat(result.holderCount()).isZero();
+  }
+
+  @Test
+  @DisplayName("update: expectedRevision이 다르면 409")
+  void updateRejectsStaleRevision() {
+    var created =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 5, "탐방가", "chip", "#000000"));
+
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    operator,
+                    UUID.fromString(created.titleDefId()),
+                    new com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto(
+                        "새이름", null, false, created.revision() + 1)))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_title.stale_revision");
+  }
+
+  @Test
+  @DisplayName("delete: 보유자가 없으면 삭제된다")
+  void deletesDefWithoutHolders() {
+    var created =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 1, "탐방가", "chip", "#000000"));
+
+    service.delete(operator, UUID.fromString(created.titleDefId()));
+
+    assertThat(titleDefRepository.findById(UUID.fromString(created.titleDefId()))).isEmpty();
+  }
+
+  @Test
+  @DisplayName("delete: 보유자가 있으면 409")
+  void deleteRejectsWhenHoldersExist() {
+    var created =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 1, "탐방가", "chip", "#000000"));
+    UUID titleDefId = UUID.fromString(created.titleDefId());
+    var holder = savedUser("보유자");
+    successfulParticipation(holder.getId(), "SUYEONG_NAMGU");
+    var def = titleDefRepository.findById(titleDefId).orElseThrow();
+    userZoneTitleRepository.save(
+        com.butingbe.domain.zonetitle.entity.UserZoneTitle.builder()
+            .userId(holder.getId())
+            .titleDef(def)
+            .zoneId("SUYEONG_NAMGU")
+            .equipped(false)
+            .build());
+
+    assertThatThrownBy(() -> service.delete(operator, titleDefId))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_title.has_holders");
+  }
+
+  private User savedUser(String nickname) {
+    return userRepository.save(
+        User.builder()
+            .email(nickname + "-" + UUID.randomUUID() + "@example.com")
+            .provider("google")
+            .providerId("google-" + UUID.randomUUID())
+            .name(new Name("Kim", nickname))
+            .nickname(nickname)
+            .role(UserRole.USER)
+            .build());
+  }
+
+  private void successfulParticipation(UUID userId, String zoneId) {
+    ZoneEventType type =
+        zoneEventTypeRepository.findAll().stream()
+            .findFirst()
+            .orElseGet(
+                () ->
+                    zoneEventTypeRepository.save(
+                        ZoneEventType.builder()
+                            .typeCode("PLACE_AUTH")
+                            .name("장소 인증")
+                            .requiresUpload(true)
+                            .build()));
+    ZoneEvent event =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId(zoneId)
+                .type(type)
+                .title("이벤트")
+                .startsAt(OffsetDateTime.now().minusHours(1))
+                .durationMinutes(1440)
+                .status(ZoneEventStatus.ACTIVE)
+                .successLimitPerUser(1)
+                .build());
+    participationRepository.save(
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(userId)
+            .status(ParticipationStatus.SUCCESS)
+            .gpsLat(35.1)
+            .gpsLng(129.1)
+            .joinedAt(OffsetDateTime.now())
+            .build());
   }
 }

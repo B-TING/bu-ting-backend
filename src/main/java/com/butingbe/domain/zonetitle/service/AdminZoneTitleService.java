@@ -6,16 +6,19 @@ import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleCreateReqDto;
+import com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto;
 import com.butingbe.domain.zonetitle.dto.response.AdminZoneTitleDefResDto;
 import com.butingbe.domain.zonetitle.entity.ZoneTitleDef;
 import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
 import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,6 +76,73 @@ public class AdminZoneTitleService {
     detail.put("requiredSuccessCount", request.requiredSuccessCount());
     audit(user, "CREATE_TITLE_DEF", def.getId(), detail);
     return AdminZoneTitleDefResDto.of(def, 0L);
+  }
+
+  @Transactional
+  public AdminZoneTitleDefResDto update(
+      AuthenticatedUser user, UUID titleDefId, AdminZoneTitleUpdateReqDto request) {
+    operatorAuthorization.requireOperator(user);
+    ZoneTitleDef def =
+        titleDefRepository
+            .findById(titleDefId)
+            .orElseThrow(() -> new ResourceNotFoundException("error.zone_title.def_not_found"));
+    if (!def.getRevision().equals(request.expectedRevision())) {
+      throw new ConflictException("error.zone_title.stale_revision");
+    }
+
+    Map<String, Object> before = snapshot(def);
+    if (request.requiredSuccessCount() != null) {
+      if (!request.requiredSuccessCount().equals(def.getRequiredSuccessCount())
+          && titleDefRepository.existsByZoneIdAndRequiredSuccessCountAndIdNot(
+              def.getZoneId(), request.requiredSuccessCount(), titleDefId)) {
+        throw new ConflictException("error.zone_title.duplicate_required_success_count");
+      }
+      requireMonotonic(def.getZoneId(), titleDefId, def.getTier(), request.requiredSuccessCount());
+    }
+    def.applyEditable(request.titleName(), request.requiredSuccessCount());
+    try {
+      titleDefRepository.saveAndFlush(def);
+    } catch (ObjectOptimisticLockingFailureException e) {
+      throw new ConflictException("error.zone_title.stale_revision");
+    }
+
+    int backfilled = 0;
+    if (Boolean.TRUE.equals(request.retroactive()) && request.requiredSuccessCount() != null) {
+      backfilled = zoneTitleService.backfillGrants(def);
+    }
+
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("before", before);
+    detail.put("after", snapshot(def));
+    detail.put("retroactive", request.retroactive());
+    detail.put("backfilledCount", backfilled);
+    audit(user, "PATCH_TITLE_DEF", def.getId(), detail);
+    return AdminZoneTitleDefResDto.of(def, userZoneTitleRepository.countByTitleDef_Id(def.getId()));
+  }
+
+  @Transactional
+  public void delete(AuthenticatedUser user, UUID titleDefId) {
+    operatorAuthorization.requireOperator(user);
+    ZoneTitleDef def =
+        titleDefRepository
+            .findById(titleDefId)
+            .orElseThrow(() -> new ResourceNotFoundException("error.zone_title.def_not_found"));
+    if (userZoneTitleRepository.countByTitleDef_Id(titleDefId) > 0) {
+      throw new ConflictException("error.zone_title.has_holders");
+    }
+    titleDefRepository.delete(def);
+
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("zoneId", def.getZoneId());
+    detail.put("tier", def.getTier());
+    audit(user, "DELETE_TITLE_DEF", titleDefId, detail);
+  }
+
+  private Map<String, Object> snapshot(ZoneTitleDef def) {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("titleName", def.getTitleName());
+    map.put("requiredSuccessCount", def.getRequiredSuccessCount());
+    return map;
   }
 
   /**
