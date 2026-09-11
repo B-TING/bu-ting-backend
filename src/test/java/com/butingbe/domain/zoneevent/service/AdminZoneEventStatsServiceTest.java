@@ -145,6 +145,10 @@ class AdminZoneEventStatsServiceTest extends AbstractContainerTest {
     assertThat(item.joinedCount()).isEqualTo(1);
     assertThat(item.successCount()).isEqualTo(1);
     assertThat(item.basePaidCount()).isEqualTo(1);
+    // successRate 분모는 submittedCount(제출 기준)다. 이 참여는 SUCCESS지만 제출 이력을 연결하지 않아
+    // submittedCount=0이므로, successCount가 1이어도 successRate는 NaN이 아니라 0.0이어야 한다.
+    assertThat(item.submittedCount()).isZero();
+    assertThat(item.successRate()).isEqualTo(0.0);
   }
 
   @Test
