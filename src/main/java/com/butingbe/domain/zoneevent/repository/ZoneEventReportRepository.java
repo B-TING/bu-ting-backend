@@ -31,6 +31,17 @@ public interface ZoneEventReportRepository extends JpaRepository<ZoneEventReport
   }
 
   @Query(
+      "SELECT COUNT(r) FROM ZoneEventReport r, ZoneEventParticipation p "
+          + "WHERE r.participationId = p.id AND p.event.id = :eventId AND r.status IN :statuses")
+  long countByEventIdAndStatusIn(
+      @Param("eventId") UUID eventId, @Param("statuses") Collection<ReportStatus> statuses);
+
+  /** {@link #countByEventIdAndStatusIn}을 {@link #UNRESOLVED_STATUSES}로 고정한 편의 메서드. */
+  default long countUnresolvedByEventId(UUID eventId) {
+    return countByEventIdAndStatusIn(eventId, UNRESOLVED_STATUSES);
+  }
+
+  @Query(
       value =
           "select r from ZoneEventReport r, ZoneEventParticipation p "
               + "where r.participationId = p.id "

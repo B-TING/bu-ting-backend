@@ -15,6 +15,8 @@ public interface ZoneEventSubmissionRepository extends JpaRepository<ZoneEventSu
 
   long countByParticipation_Id(UUID participationId);
 
+  long countByParticipation_Event_Id(UUID eventId);
+
   /** 파일이 이미 다른 제출에 쓰였는지(재사용 방지). */
   boolean existsByMediaFileKey(String mediaFileKey);
 

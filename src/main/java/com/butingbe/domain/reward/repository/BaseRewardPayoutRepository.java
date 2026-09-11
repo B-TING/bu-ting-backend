@@ -44,4 +44,10 @@ public interface BaseRewardPayoutRepository extends JpaRepository<BaseRewardPayo
       @Param("scheduledFrom") OffsetDateTime scheduledFrom,
       @Param("scheduledTo") OffsetDateTime scheduledTo,
       Pageable pageable);
+
+  @Query(
+      "SELECT COUNT(b) FROM BaseRewardPayout b, ZoneEventParticipation p "
+          + "WHERE b.participationId = p.id AND p.event.id = :eventId AND b.status = :status")
+  long countByEventIdAndStatus(
+      @Param("eventId") UUID eventId, @Param("status") BaseRewardPayoutStatus status);
 }

@@ -65,4 +65,6 @@ public interface ZoneEventParticipationRepository
       "SELECT DISTINCT p.userId FROM ZoneEventParticipation p WHERE p.event.zoneId = :zoneId "
           + "AND p.status = com.butingbe.domain.zoneevent.entity.ParticipationStatus.SUCCESS")
   List<UUID> findDistinctSuccessUserIdsByZone(@Param("zoneId") String zoneId);
+
+  long countByEvent_IdAndCurrentSubmissionIdIsNotNull(UUID eventId);
 }
