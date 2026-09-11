@@ -268,6 +268,82 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
         .hasMessage("error.zone_title.has_holders");
   }
 
+  @Test
+  @DisplayName("holders: earnedAt 내림차순으로 페이징하고 닉네임을 채운다")
+  void holdersReturnsPagedItemsWithNickname() {
+    var created =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 1, "탐방가", "chip", "#000000"));
+    UUID titleDefId = UUID.fromString(created.titleDefId());
+    var def = titleDefRepository.findById(titleDefId).orElseThrow();
+    var holder = savedUser("보유자1");
+    userZoneTitleRepository.save(
+        com.butingbe.domain.zonetitle.entity.UserZoneTitle.builder()
+            .userId(holder.getId())
+            .titleDef(def)
+            .zoneId("SUYEONG_NAMGU")
+            .equipped(true)
+            .build());
+
+    var result = service.holders(operator, titleDefId, 1, 20);
+
+    assertThat(result.items()).hasSize(1);
+    assertThat(result.items().get(0).nickname()).isEqualTo("보유자1");
+    assertThat(result.items().get(0).equipped()).isTrue();
+    assertThat(result.totalElements()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("holders: 없는 정의면 404")
+  void holdersNotFound() {
+    assertThatThrownBy(() -> service.holders(operator, UUID.randomUUID(), 1, 20))
+        .isInstanceOf(com.butingbe.global.error.exception.ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("holders: earnedAt 내림차순 정렬과 페이지 크기를 지킨다")
+  void holdersOrdersByEarnedAtDescAndPaginates() throws InterruptedException {
+    var created =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 1, "탐방가", "chip", "#000000"));
+    UUID titleDefId = UUID.fromString(created.titleDefId());
+    var def = titleDefRepository.findById(titleDefId).orElseThrow();
+    var first = savedUser("먼저획득");
+    userZoneTitleRepository.save(
+        com.butingbe.domain.zonetitle.entity.UserZoneTitle.builder()
+            .userId(first.getId())
+            .titleDef(def)
+            .zoneId("SUYEONG_NAMGU")
+            .equipped(false)
+            .build());
+    Thread.sleep(5);
+    var second = savedUser("나중획득");
+    userZoneTitleRepository.save(
+        com.butingbe.domain.zonetitle.entity.UserZoneTitle.builder()
+            .userId(second.getId())
+            .titleDef(def)
+            .zoneId("SUYEONG_NAMGU")
+            .equipped(false)
+            .build());
+
+    var page1 = service.holders(operator, titleDefId, 1, 1);
+
+    assertThat(page1.items()).hasSize(1);
+    assertThat(page1.items().get(0).nickname()).isEqualTo("나중획득");
+    assertThat(page1.items().get(0).email()).isEqualTo(second.getEmail());
+    assertThat(page1.totalElements()).isEqualTo(2);
+    assertThat(page1.totalPages()).isEqualTo(2);
+    assertThat(page1.hasNext()).isTrue();
+
+    var page2 = service.holders(operator, titleDefId, 2, 1);
+
+    assertThat(page2.items()).hasSize(1);
+    assertThat(page2.items().get(0).nickname()).isEqualTo("먼저획득");
+    assertThat(page2.hasNext()).isFalse();
+  }
+
   private User savedUser(String nickname) {
     return userRepository.save(
         User.builder()

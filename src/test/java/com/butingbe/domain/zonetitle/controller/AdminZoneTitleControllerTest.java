@@ -148,6 +148,21 @@ class AdminZoneTitleControllerTest {
         .andExpect(status().isNoContent());
   }
 
+  @Test
+  @DisplayName("칭호 보유자 목록 200")
+  void holders() throws Exception {
+    UUID titleDefId = UUID.randomUUID();
+    when(adminZoneTitleService.holders(any(), eq(titleDefId), any(), any()))
+        .thenReturn(
+            new com.butingbe.domain.zonetitle.dto.response.AdminZoneTitleHolderPageResDto(
+                List.of(), 1, 20, 0, 1, false));
+
+    mockMvc
+        .perform(get("/admin/zone-titles/{id}/holders", titleDefId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items").isArray());
+  }
+
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
     return new HandlerMethodArgumentResolver() {
       @Override

@@ -3,11 +3,16 @@ package com.butingbe.domain.zonetitle.service;
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.auth.security.OperatorAuthorization;
 import com.butingbe.domain.chat.entity.ChatZone;
+import com.butingbe.domain.user.entity.User;
+import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleCreateReqDto;
 import com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto;
 import com.butingbe.domain.zonetitle.dto.response.AdminZoneTitleDefResDto;
+import com.butingbe.domain.zonetitle.dto.response.AdminZoneTitleHolderItemResDto;
+import com.butingbe.domain.zonetitle.dto.response.AdminZoneTitleHolderPageResDto;
+import com.butingbe.domain.zonetitle.entity.UserZoneTitle;
 import com.butingbe.domain.zonetitle.entity.ZoneTitleDef;
 import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
 import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
@@ -17,7 +22,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,11 +37,15 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AdminZoneTitleService {
 
+  private static final int DEFAULT_SIZE = 20;
+  private static final int MAX_SIZE = 50;
+
   private final ZoneTitleDefRepository titleDefRepository;
   private final UserZoneTitleRepository userZoneTitleRepository;
   private final ZoneTitleService zoneTitleService;
   private final ZoneEventAuditLogRepository auditLogRepository;
   private final OperatorAuthorization operatorAuthorization;
+  private final UserRepository userRepository;
 
   @Transactional(readOnly = true)
   public List<AdminZoneTitleDefResDto> list(AuthenticatedUser user) {
@@ -136,6 +150,39 @@ public class AdminZoneTitleService {
     detail.put("zoneId", def.getZoneId());
     detail.put("tier", def.getTier());
     audit(user, "DELETE_TITLE_DEF", titleDefId, detail);
+  }
+
+  @Transactional(readOnly = true)
+  public AdminZoneTitleHolderPageResDto holders(
+      AuthenticatedUser user, UUID titleDefId, Integer page, Integer size) {
+    operatorAuthorization.requireOperator(user);
+    if (!titleDefRepository.existsById(titleDefId)) {
+      throw new ResourceNotFoundException("error.zone_title.def_not_found");
+    }
+    int pageNumber = page == null || page < 1 ? 1 : page;
+    int pageSize = size == null || size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);
+    Page<UserZoneTitle> result =
+        userZoneTitleRepository.findByTitleDef_Id(
+            titleDefId,
+            PageRequest.of(pageNumber - 1, pageSize, Sort.by(Sort.Order.desc("earnedAt"))));
+
+    Map<UUID, User> usersById =
+        userRepository
+            .findAllById(
+                result.getContent().stream().map(UserZoneTitle::getUserId).distinct().toList())
+            .stream()
+            .collect(Collectors.toMap(User::getId, Function.identity()));
+    List<AdminZoneTitleHolderItemResDto> items =
+        result.getContent().stream()
+            .map(t -> AdminZoneTitleHolderItemResDto.of(t, usersById.get(t.getUserId())))
+            .toList();
+    return new AdminZoneTitleHolderPageResDto(
+        items,
+        pageNumber,
+        pageSize,
+        result.getTotalElements(),
+        result.getTotalPages(),
+        pageNumber < result.getTotalPages());
   }
 
   private Map<String, Object> snapshot(ZoneTitleDef def) {
