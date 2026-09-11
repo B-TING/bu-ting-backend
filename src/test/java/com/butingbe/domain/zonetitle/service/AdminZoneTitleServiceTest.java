@@ -23,6 +23,7 @@ import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
 import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.support.AbstractContainerTest;
+import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -44,6 +45,7 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
   @Autowired private ZoneEventTypeRepository zoneEventTypeRepository;
   @Autowired private ZoneEventRepository zoneEventRepository;
   @Autowired private ZoneEventParticipationRepository participationRepository;
+  @Autowired private EntityManager entityManager;
 
   private AuthenticatedUser operator;
 
@@ -127,6 +129,22 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
                     operator,
                     new AdminZoneTitleCreateReqDto(
                         "SUYEONG_NAMGU", 2, 3, "다른이름", "chip", "#111111")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.zone_title.invalid_required_success_count");
+  }
+
+  @Test
+  @DisplayName("낮은 단계인데 달성 기준이 이미 있는 높은 단계보다 높거나 같으면 400")
+  void rejectsNonMonotonicRequiredSuccessCountForHigherTierSibling() {
+    service.create(
+        operator, new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 3, 5, "탐방가", "chip", "#000000"));
+
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    operator,
+                    new AdminZoneTitleCreateReqDto(
+                        "SUYEONG_NAMGU", 1, 10, "다른이름", "chip", "#111111")))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("error.zone_title.invalid_required_success_count");
   }
@@ -227,6 +245,94 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
                     UUID.fromString(created.titleDefId()),
                     new com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto(
                         "새이름", null, false, created.revision() + 1)))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_title.stale_revision");
+  }
+
+  @Test
+  @DisplayName("update: titleName만 바꾸면 이름만 바뀌고 소급 발급은 일어나지 않는다")
+  void updateChangesTitleNameOnly() {
+    var created =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 5, "탐방가", "chip", "#000000"));
+
+    var result =
+        service.update(
+            operator,
+            UUID.fromString(created.titleDefId()),
+            new com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto(
+                "새이름", null, false, created.revision()));
+
+    assertThat(result.titleName()).isEqualTo("새이름");
+    assertThat(result.requiredSuccessCount()).isEqualTo(5);
+  }
+
+  @Test
+  @DisplayName("update: 다른 정의와 달성 기준이 중복되면 409")
+  void updateRejectsDuplicateRequiredSuccessCount() {
+    service.create(
+        operator, new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 1, "탐방가", "chip", "#000000"));
+    var second =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 2, 5, "다른이름", "chip", "#111111"));
+
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    operator,
+                    UUID.fromString(second.titleDefId()),
+                    new com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto(
+                        null, 1, false, second.revision())))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.zone_title.duplicate_required_success_count");
+  }
+
+  @Test
+  @DisplayName("update: 달성 기준을 0 이하로 바꾸면 400")
+  void updateRejectsNonPositiveRequiredSuccessCount() {
+    var created =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 5, "탐방가", "chip", "#000000"));
+
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    operator,
+                    UUID.fromString(created.titleDefId()),
+                    new com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto(
+                        null, 0, false, created.revision())))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("error.zone_title.invalid_required_success_count");
+  }
+
+  @Test
+  @DisplayName("매뉴얼 체크 통과 후에도 실제 flush 시점에 다른 트랜잭션이 이미 revision을 올렸다면 409다(진짜 낙관적 락 충돌)")
+  void updateFlushDetectsConcurrentRevisionBump() {
+    var created =
+        service.create(
+            operator,
+            new AdminZoneTitleCreateReqDto("SUYEONG_NAMGU", 1, 5, "탐방가", "chip", "#000000"));
+    UUID titleDefId = UUID.fromString(created.titleDefId());
+
+    // 이 서비스 호출이 붙잡고 있는 영속성 컨텍스트가 모르는 사이, 다른 트랜잭션이 같은 row의 revision을 이미 올렸다고 가정한다.
+    // 네이티브 쿼리로 DB만 바꾸면 1차 캐시에 남아있는 def 엔티티는 여전히 예전 revision을 들고 있으므로,
+    // 매뉴얼 체크(expectedRevision)는 통과하지만 실제 saveAndFlush의 버전 체크는 실패한다.
+    entityManager
+        .createNativeQuery(
+            "UPDATE zone_title_def SET revision = revision + 1 WHERE title_def_id = :id")
+        .setParameter("id", titleDefId)
+        .executeUpdate();
+
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    operator,
+                    titleDefId,
+                    new com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto(
+                        "새이름", null, false, created.revision())))
         .isInstanceOf(ConflictException.class)
         .hasMessage("error.zone_title.stale_revision");
   }

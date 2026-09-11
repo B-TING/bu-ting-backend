@@ -158,6 +158,52 @@ class AdminZoneEventStatsServiceTest extends AbstractContainerTest {
     // submittedCount=0이므로, successCount가 1이어도 successRate는 NaN이 아니라 0.0이어야 한다.
     assertThat(item.submittedCount()).isZero();
     assertThat(item.successRate()).isEqualTo(0.0);
+    assertThat(item.topContent()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("공개 성공 참여가 없으면 topContent는 null이다")
+  void topContentIsNullWhenNoPublicSuccessParticipation() {
+    OffsetDateTime now = OffsetDateTime.now();
+    ZoneEventRound round =
+        roundRepository.save(
+            ZoneEventRound.builder()
+                .roundNo(3)
+                .startsAt(now.minusHours(2))
+                .endsAt(now.plusHours(22))
+                .status(RoundStatus.ACTIVE)
+                .build());
+    ZoneEventType type =
+        zoneEventTypeRepository.save(
+            ZoneEventType.builder()
+                .typeCode("PLACE_AUTH")
+                .name("장소 인증")
+                .requiresUpload(true)
+                .build());
+    ZoneEvent event =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId("SUYEONG_NAMGU")
+                .type(type)
+                .roundId(round.getId())
+                .title("이벤트")
+                .startsAt(now.minusHours(1))
+                .durationMinutes(1440)
+                .status(ZoneEventStatus.ACTIVE)
+                .successLimitPerUser(1)
+                .build());
+    slotRepository.save(
+        ZoneEventRoundSlot.builder()
+            .round(round)
+            .slotKind(SlotKind.AUTH)
+            .zoneId("SUYEONG_NAMGU")
+            .eventId(event.getId())
+            .build());
+
+    var result = service.stats(operator, round.getId(), null, null);
+
+    assertThat(result.slots()).hasSize(1);
+    assertThat(result.slots().get(0).topContent()).isNull();
   }
 
   @Test
