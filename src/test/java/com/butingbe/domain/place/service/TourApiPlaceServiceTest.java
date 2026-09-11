@@ -1332,4 +1332,79 @@ class TourApiPlaceServiceTest {
 
     assertThat(placeService.getPlaceSummary("GHOST")).isNull();
   }
+
+  @Test
+  @DisplayName("상세 조회 응답의 items 객체에 item이 없으면 빈 details로 응답한다")
+  void getPlaceDetailTreatsItemsObjectWithoutItemAsEmptyDetails() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":{}}}}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", null);
+
+    assertThat(response.contentId()).isEqualTo("2651318");
+    assertThat(response.details()).isEmpty();
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("공공데이터가 빈 문자열 items를 반환해도 상세 조회는 빈 details로 처리한다")
+  void getPlaceDetailTreatsEmptyStringItemsAsEmptyDetails() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":""}}}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    PlaceDetailResDto response = placeService.getPlaceDetail("2651318", "32", null);
+
+    assertThat(response.contentId()).isEqualTo("2651318");
+    assertThat(response.contentTypeId()).isEqualTo("32");
+    assertThat(response.details()).isEmpty();
+    assertThat(response.googlePlace()).isNull();
+    server.verify();
+  }
+
+  @Test
+  @DisplayName("공공데이터가 빈 문자열 items를 반환하면 존재하지 않는 contentId로 처리한다")
+  void getPlaceSummaryReturnsNullWhenTourApiItemsAreEmptyString() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    TourApiPlaceService placeService =
+        new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
+
+    server
+        .expect(requestTo(org.hamcrest.Matchers.containsString("/detailCommon2")))
+        .andExpect(method(HttpMethod.GET))
+        .andRespond(
+            withSuccess(
+                """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+                 "body":{"items":""}}}
+                """,
+                MediaType.APPLICATION_JSON));
+
+    assertThat(placeService.getPlaceSummary("GHOST")).isNull();
+    server.verify();
+  }
 }

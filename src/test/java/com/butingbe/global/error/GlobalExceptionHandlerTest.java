@@ -29,6 +29,7 @@ import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.servlet.i18n.FixedLocaleResolver;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -44,6 +45,8 @@ class GlobalExceptionHandlerTest {
     messageSource.addMessage("error.resource.not_found", Locale.KOREAN, "리소스를 찾을 수 없습니다.");
     messageSource.addMessage("error.place.keyword_not_found", Locale.KOREAN, "장소를 찾을 수 없습니다.");
     messageSource.addMessage("error.travel.ai.low_quality_plan", Locale.KOREAN, "생성된 일정 품질이 낮습니다.");
+    messageSource.addMessage(
+        "error.request.missing_parameter", Locale.KOREAN, "필수 요청 파라미터가 누락되었습니다.");
 
     handler = new GlobalExceptionHandler(messageSource, new FixedLocaleResolver(Locale.KOREAN));
     request = new MockHttpServletRequest();
@@ -192,6 +195,17 @@ class GlobalExceptionHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
     assertThat(response.getBody().getMessage()).isEqualTo("서버 오류가 발생했습니다.");
+  }
+
+  @Test
+  @DisplayName("필수 요청 파라미터 누락은 400을 반환한다")
+  void missingServletRequestParameterReturnsBadRequest() {
+    ResponseEntity<ApiResponse<Void>> response =
+        handler.handleMissingServletRequestParameterException(
+            new MissingServletRequestParameterException("contentTypeId", "String"), request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody().getMessage()).isEqualTo("필수 요청 파라미터가 누락되었습니다.");
   }
 
   @Test

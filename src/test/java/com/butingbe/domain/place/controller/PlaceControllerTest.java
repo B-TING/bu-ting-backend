@@ -253,4 +253,12 @@ class PlaceControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.contentTypeId").value("39"));
   }
+
+  @Test
+  @DisplayName("contentTypeId 파라미터가 없으면 400을 반환한다")
+  void getPlaceDetailRejectsMissingContentTypeId() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/places/{contentId}/detail", "12345"))
+        .andExpect(status().isBadRequest());
+  }
 }
