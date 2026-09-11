@@ -22,6 +22,7 @@ import com.butingbe.domain.zonetitle.entity.ZoneTitleDef;
 import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
 import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.support.AbstractContainerTest;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
@@ -48,6 +49,7 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
   @Autowired private EntityManager entityManager;
 
   private AuthenticatedUser operator;
+  private AuthenticatedUser normalUser;
 
   @BeforeEach
   void setUp() {
@@ -67,6 +69,28 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
             "op@example.com",
             "op",
             List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+    normalUser =
+        new AuthenticatedUser(
+            userRepository
+                .save(
+                    User.builder()
+                        .email("user-" + UUID.randomUUID() + "@example.com")
+                        .provider("google")
+                        .providerId("google-" + UUID.randomUUID())
+                        .name(new Name("Kim", "User"))
+                        .nickname("user")
+                        .role(UserRole.USER)
+                        .build())
+                .getId(),
+            "user@example.com",
+            "user",
+            List.of(new SimpleGrantedAuthority("ROLE_USER")));
+  }
+
+  @Test
+  @DisplayName("운영자가 아니면 403이다")
+  void nonOperatorForbidden() {
+    assertThatThrownBy(() -> service.list(normalUser)).isInstanceOf(ForbiddenException.class);
   }
 
   @Test

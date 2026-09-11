@@ -109,6 +109,19 @@ class AdminZoneTitleControllerTest {
   }
 
   @Test
+  @DisplayName("tier가 1~3 범위를 벗어나면 400")
+  void createRejectsOutOfRangeTier() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/zone-titles")
+                .contentType("application/json")
+                .content(
+                    "{\"zoneId\":\"SUYEONG_NAMGU\",\"tier\":4,\"requiredSuccessCount\":1,"
+                        + "\"titleName\":\"탐방가\",\"style\":\"chip\",\"color\":\"#000000\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   @DisplayName("칭호 정의 수정 200")
   void update() throws Exception {
     UUID titleDefId = UUID.randomUUID();

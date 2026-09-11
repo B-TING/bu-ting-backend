@@ -24,6 +24,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
+import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
@@ -49,6 +50,7 @@ class AdminZoneEventStatsServiceTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
 
   private AuthenticatedUser operator;
+  private AuthenticatedUser normalUser;
 
   @BeforeEach
   void setUp() {
@@ -68,6 +70,29 @@ class AdminZoneEventStatsServiceTest extends AbstractContainerTest {
             "op@example.com",
             "op",
             List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+    normalUser =
+        new AuthenticatedUser(
+            userRepository
+                .save(
+                    User.builder()
+                        .email("user-" + UUID.randomUUID() + "@example.com")
+                        .provider("google")
+                        .providerId("google-" + UUID.randomUUID())
+                        .name(new Name("Kim", "User"))
+                        .nickname("user")
+                        .role(UserRole.USER)
+                        .build())
+                .getId(),
+            "user@example.com",
+            "user",
+            List.of(new SimpleGrantedAuthority("ROLE_USER")));
+  }
+
+  @Test
+  @DisplayName("운영자가 아니면 403이다")
+  void nonOperatorForbidden() {
+    assertThatThrownBy(() -> service.stats(normalUser, null, null, null))
+        .isInstanceOf(ForbiddenException.class);
   }
 
   @Test

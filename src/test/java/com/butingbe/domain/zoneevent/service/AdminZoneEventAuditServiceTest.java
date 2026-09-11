@@ -1,6 +1,7 @@
 package com.butingbe.domain.zoneevent.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.user.entity.Name;
@@ -9,6 +10,7 @@ import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
+import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.support.AbstractContainerTest;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,7 @@ class AdminZoneEventAuditServiceTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
 
   private AuthenticatedUser operator;
+  private AuthenticatedUser normalUser;
   private UUID actorId;
 
   @BeforeEach
@@ -46,6 +49,29 @@ class AdminZoneEventAuditServiceTest extends AbstractContainerTest {
     operator =
         new AuthenticatedUser(
             actorId, "op@example.com", "op", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+    var savedUser =
+        userRepository.save(
+            User.builder()
+                .email("user-" + UUID.randomUUID() + "@example.com")
+                .provider("google")
+                .providerId("google-" + UUID.randomUUID())
+                .name(new Name("Kim", "User"))
+                .nickname("user")
+                .role(UserRole.USER)
+                .build());
+    normalUser =
+        new AuthenticatedUser(
+            savedUser.getId(),
+            "user@example.com",
+            "user",
+            List.of(new SimpleGrantedAuthority("ROLE_USER")));
+  }
+
+  @Test
+  @DisplayName("운영자가 아니면 403이다")
+  void nonOperatorForbidden() {
+    assertThatThrownBy(() -> service.list(normalUser, null, null, null, null, null, 1, 20))
+        .isInstanceOf(ForbiddenException.class);
   }
 
   @Test
