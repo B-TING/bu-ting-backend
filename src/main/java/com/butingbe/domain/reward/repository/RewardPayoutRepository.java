@@ -49,4 +49,6 @@ public interface RewardPayoutRepository extends JpaRepository<RewardPayout, UUID
       @Param("scheduledFrom") OffsetDateTime scheduledFrom,
       @Param("scheduledTo") OffsetDateTime scheduledTo,
       Pageable pageable);
+
+  long countByEventIdAndStatus(UUID eventId, RewardPayoutStatus status);
 }

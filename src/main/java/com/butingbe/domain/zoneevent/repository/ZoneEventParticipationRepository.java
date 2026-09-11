@@ -60,4 +60,11 @@ public interface ZoneEventParticipationRepository
           + "AND p.visibility = com.butingbe.domain.zoneevent.entity.ParticipationVisibility.PUBLIC "
           + "ORDER BY p.likeCount DESC, p.completedAt ASC")
   List<ZoneEventParticipation> findRankedPublicSuccessByEvent(@Param("eventId") UUID eventId);
+
+  @Query(
+      "SELECT DISTINCT p.userId FROM ZoneEventParticipation p WHERE p.event.zoneId = :zoneId "
+          + "AND p.status = com.butingbe.domain.zoneevent.entity.ParticipationStatus.SUCCESS")
+  List<UUID> findDistinctSuccessUserIdsByZone(@Param("zoneId") String zoneId);
+
+  long countByEvent_IdAndCurrentSubmissionIdIsNotNull(UUID eventId);
 }

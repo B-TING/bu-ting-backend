@@ -5528,6 +5528,348 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-titles:
+    get:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 구역 칭호 정의 목록 조회(보유자 수 포함)"
+      security:
+        - opaqueToken: [ ]
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneTitleDefListEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    post:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 구역 칭호 정의 생성"
+      security:
+        - opaqueToken: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminZoneTitleCreateRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneTitleDefEnvelope"
+        "400":
+          description: "달성 기준이 양의 정수가 아니거나 구역 내 단계 순서를 위반"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "같은 구역·단계 또는 같은 구역·달성 기준의 정의가 이미 존재"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-titles/{titleDefId}:
+    patch:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 구역 칭호 정의 수정(이름·달성 기준, 소급 발급 여부 명시)"
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: titleDefId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminZoneTitleUpdateRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneTitleDefEnvelope"
+        "400":
+          description: "유효성 실패"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "칭호 정의를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "expectedRevision 불일치 또는 달성 기준 중복"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+    delete:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 구역 칭호 정의 삭제(보유자가 있으면 409)"
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: titleDefId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: "No Content"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "칭호 정의를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: "보유자가 있는 정의는 삭제 불가"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-titles/{titleDefId}/holders:
+    get:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 구역 칭호 보유자 목록(페이징)"
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: titleDefId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneTitleHolderPageEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "칭호 정의를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-stats:
+    get:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 회차·슬롯별 운영 통계(roundId 또는 from/to 중 하나 필수)"
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: roundId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventStatsEnvelope"
+        "400":
+          description: "roundId와 from/to가 모두 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "roundId로 지정한 회차가 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/zone-event-audits:
+    get:
+      tags:
+        - Zone Event
+      summary: "ROLE_ADMIN/MANAGER. 운영자 행위 감사 이력 조회(페이징)"
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: resourceType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: resourceId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: actorId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminZoneEventAuditPageEnvelope"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/admin/zone-event-reports:
     get:
       tags:
@@ -12198,6 +12540,159 @@ components:
         note: { type: string, nullable: true }
         expectedRevision: { type: integer, format: int64 }
       required: [expectedRevision]
+
+    AdminZoneTitleCreateRequest:
+      type: object
+      required: [zoneId, tier, requiredSuccessCount, titleName, style, color]
+      properties:
+        zoneId: { type: string, example: "SUYEONG_NAMGU" }
+        tier: { type: integer, example: 1 }
+        requiredSuccessCount: { type: integer, example: 1 }
+        titleName: { type: string, example: "탐방가" }
+        style: { type: string, example: "chip" }
+        color: { type: string, example: "#000000" }
+    AdminZoneTitleUpdateRequest:
+      type: object
+      required: [retroactive, expectedRevision]
+      properties:
+        titleName: { type: string, nullable: true, example: "탐방왕" }
+        requiredSuccessCount: { type: integer, nullable: true, example: 3 }
+        retroactive: { type: boolean, example: true }
+        expectedRevision: { type: integer, format: int64, example: 0 }
+    AdminZoneTitleDef:
+      type: object
+      properties:
+        titleDefId: { type: string, format: uuid }
+        titleCode: { type: string, example: "SUYEONG_NAMGU_T1" }
+        zoneId: { type: string }
+        tier: { type: integer }
+        requiredSuccessCount: { type: integer }
+        titleName: { type: string }
+        style: { type: string }
+        color: { type: string }
+        holderCount: { type: integer, format: int64 }
+        revision: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AdminZoneTitleDefEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: "칭호 정의 생성" }
+        data:
+          $ref: "#/components/schemas/AdminZoneTitleDef"
+    AdminZoneTitleDefListEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: "칭호 정의 목록" }
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminZoneTitleDef"
+    AdminZoneTitleHolderItem:
+      type: object
+      properties:
+        userTitleId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        nickname: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        earnedAt: { type: string, format: date-time }
+        equipped: { type: boolean }
+        revokedAt: { type: string, format: date-time, nullable: true }
+    AdminZoneTitleHolderPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminZoneTitleHolderItem"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+        hasNext: { type: boolean }
+    AdminZoneTitleHolderPageEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: "칭호 보유자 목록" }
+        data:
+          $ref: "#/components/schemas/AdminZoneTitleHolderPage"
+    AdminZoneEventStatsTopContent:
+      type: object
+      nullable: true
+      properties:
+        participationId: { type: string, format: uuid }
+        likeCount: { type: integer, format: int64 }
+    AdminZoneEventStatsItem:
+      type: object
+      properties:
+        roundId: { type: string, format: uuid }
+        slotId: { type: string, format: uuid }
+        zoneId: { type: string }
+        eventId: { type: string, format: uuid, nullable: true }
+        joinedCount: { type: integer, format: int64 }
+        submittedCount: { type: integer, format: int64 }
+        submissionAttemptCount: { type: integer, format: int64 }
+        successCount: { type: integer, format: int64 }
+        failCount: { type: integer, format: int64 }
+        pendingReviewCount: { type: integer, format: int64 }
+        successRate:
+          type: number
+          format: double
+          description: "successCount / submittedCount (submittedCount가 0이면 0)"
+        openReportCount: { type: integer, format: int64 }
+        basePaidCount: { type: integer, format: int64 }
+        specialSentCount: { type: integer, format: int64 }
+        topContent:
+          $ref: "#/components/schemas/AdminZoneEventStatsTopContent"
+        newTitleGrantCount: { type: integer, format: int64 }
+    AdminZoneEventStats:
+      type: object
+      properties:
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminZoneEventStatsItem"
+    AdminZoneEventStatsEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: "운영 통계" }
+        data:
+          $ref: "#/components/schemas/AdminZoneEventStats"
+    AdminZoneEventAuditItem:
+      type: object
+      properties:
+        auditId: { type: string, format: uuid }
+        actorId: { type: string, format: uuid }
+        action: { type: string, example: "PATCH_TITLE_DEF" }
+        targetType: { type: string, example: "ZONE_TITLE_DEF" }
+        targetId: { type: string, format: uuid, nullable: true }
+        detail:
+          type: object
+          additionalProperties: true
+        createdAt: { type: string, format: date-time }
+    AdminZoneEventAuditPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminZoneEventAuditItem"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+        hasNext: { type: boolean }
+    AdminZoneEventAuditPageEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: "감사 이력 목록" }
+        data:
+          $ref: "#/components/schemas/AdminZoneEventAuditPage"
 
     ReviewRejectRequest:
       type: object

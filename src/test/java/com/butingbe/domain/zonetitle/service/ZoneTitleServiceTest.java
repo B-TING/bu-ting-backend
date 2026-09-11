@@ -26,6 +26,7 @@ import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
 import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.support.AbstractContainerTest;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -189,6 +190,92 @@ class ZoneTitleServiceTest extends AbstractContainerTest {
 
     assertThat(awarded).isNotEmpty();
     assertThat(userZoneTitleRepository.countByUserIdAndEquippedIsTrue(userId)).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("backfillGrants: 요건을 낮춘 뒤 이미 충족한 유저에게 소급 발급하고 자동 장착하지 않는다")
+  void backfillGrantsAwardsQualifyingUsersWithoutAutoEquip() {
+    // setUp()의 seedTitleDefs()가 이미 SUYEONG_NAMGU tier1(requiredSuccessCount=1)을 심어 두므로,
+    // (zone_id, tier) UK 제약과 충돌하지 않도록 새로 만들지 않고 그 def를 그대로 재사용한다(요건이 1로
+    // 낮아진 뒤 상태를 그대로 나타낸다).
+    ZoneTitleDef def =
+        titleDefRepository.findByZoneIdOrderByTierAsc("SUYEONG_NAMGU").stream()
+            .filter(d -> d.getTier() == 1)
+            .findFirst()
+            .orElseThrow();
+    var user = savedUser("유저");
+    successfulParticipation(user.getId(), "SUYEONG_NAMGU");
+
+    int granted = zoneTitleService.backfillGrants(def);
+
+    assertThat(granted).isEqualTo(1);
+    var title = userZoneTitleRepository.findByUserIdAndRevokedAtIsNull(user.getId()).get(0);
+    assertThat(title.getEquipped()).isFalse();
+  }
+
+  @Test
+  @DisplayName("backfillGrants: 이미 보유한 유저는 다시 발급하지 않는다(멱등)")
+  void backfillGrantsIsIdempotent() {
+    // 위 테스트와 동일한 이유로 새로 만들지 않고 setUp()이 심어 둔 tier1 def를 재사용한다.
+    ZoneTitleDef def =
+        titleDefRepository.findByZoneIdOrderByTierAsc("SUYEONG_NAMGU").stream()
+            .filter(d -> d.getTier() == 1)
+            .findFirst()
+            .orElseThrow();
+    var user = savedUser("유저");
+    successfulParticipation(user.getId(), "SUYEONG_NAMGU");
+    zoneTitleService.backfillGrants(def);
+
+    int secondRun = zoneTitleService.backfillGrants(def);
+
+    assertThat(secondRun).isZero();
+    assertThat(userZoneTitleRepository.countByTitleDef_Id(def.getId())).isEqualTo(1);
+  }
+
+  private User savedUser(String nickname) {
+    return userRepository.save(
+        User.builder()
+            .email(nickname + "-" + UUID.randomUUID() + "@example.com")
+            .provider("google")
+            .providerId("google-" + UUID.randomUUID())
+            .name(new Name("Kim", nickname))
+            .nickname(nickname)
+            .role(UserRole.USER)
+            .build());
+  }
+
+  private void successfulParticipation(UUID userId, String zoneId) {
+    ZoneEventType type =
+        zoneEventTypeRepository.findAll().stream()
+            .findFirst()
+            .orElseGet(
+                () ->
+                    zoneEventTypeRepository.save(
+                        ZoneEventType.builder()
+                            .typeCode("PLACE_AUTH")
+                            .name("장소 인증")
+                            .requiresUpload(true)
+                            .build()));
+    ZoneEvent event =
+        zoneEventRepository.save(
+            ZoneEvent.builder()
+                .zoneId(zoneId)
+                .type(type)
+                .title("이벤트")
+                .startsAt(OffsetDateTime.now().minusHours(1))
+                .durationMinutes(1440)
+                .status(ZoneEventStatus.ACTIVE)
+                .successLimitPerUser(1)
+                .build());
+    participationRepository.save(
+        ZoneEventParticipation.builder()
+            .event(event)
+            .userId(userId)
+            .status(ParticipationStatus.SUCCESS)
+            .gpsLat(35.1)
+            .gpsLng(129.1)
+            .joinedAt(OffsetDateTime.now())
+            .build());
   }
 
   private void successInZone(String zoneId, int count) {

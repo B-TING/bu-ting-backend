@@ -16,8 +16,10 @@ import com.butingbe.domain.zoneevent.dto.response.AdminReviewQueueItemResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminReviewQueuePageResDto;
 import com.butingbe.domain.zoneevent.dto.response.AdminSubmissionDetailResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
@@ -27,7 +29,9 @@ import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +65,7 @@ public class AdminZoneEventReviewService {
   private final ObjectMapper objectMapper;
   private final BaseRewardPayoutRepository baseRewardPayoutRepository;
   private final ZoneEventReportRepository reportRepository;
+  private final ZoneEventAuditLogRepository auditLogRepository;
 
   /** 검수 큐: UNDER_REVIEW 참여만, roundId/eventId/zoneId로 필터링, joinedAt 오름차순(먼저 온 순). */
   @Transactional(readOnly = true)
@@ -162,6 +167,18 @@ public class AdminZoneEventReviewService {
                 participation.getUserId(), participation.getEvent().getZoneId(), false));
     AdminReviewDecisionResDto result =
         AdminReviewDecisionResDto.of(participation, submission, titles);
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("submissionId", submission.getId().toString());
+    detail.put("before", Map.of("status", "UNDER_REVIEW"));
+    detail.put("after", Map.of("status", "SUCCESS"));
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action("APPROVE_SUBMISSION")
+            .targetType("PARTICIPATION")
+            .targetId(participationId)
+            .detail(detail)
+            .build());
     idempotencyService.save(idempotencyKey, APPROVE_ENDPOINT, fingerprint, result);
     return result;
   }
@@ -198,6 +215,19 @@ public class AdminZoneEventReviewService {
     submission.reject(user.id(), request.reason());
     flushSubmission(submission);
 
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("submissionId", submission.getId().toString());
+    detail.put("reason", request.reason());
+    detail.put("before", Map.of("status", "UNDER_REVIEW"));
+    detail.put("after", Map.of("status", "FAIL"));
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action("REJECT_SUBMISSION")
+            .targetType("PARTICIPATION")
+            .targetId(participationId)
+            .detail(detail)
+            .build());
     idempotencyService.save(idempotencyKey, REJECT_ENDPOINT, fingerprint, null);
   }
 

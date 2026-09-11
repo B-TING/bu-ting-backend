@@ -29,6 +29,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
 import com.butingbe.domain.zoneevent.entity.ZoneEventTargetKind;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.IdempotencyRecordRepository;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
@@ -72,6 +73,7 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
   @Autowired private UserZoneTitleRepository userZoneTitleRepository;
   @Autowired private IdempotencyRecordRepository idempotencyRecordRepository;
   @Autowired private ZoneEventReportRepository reportRepository;
+  @Autowired private ZoneEventAuditLogRepository auditLogRepository;
   @Autowired private EntityManager entityManager;
   @MockitoBean private FileStorageService fileStorageService;
 
@@ -239,6 +241,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
     assertThat(basePayout.getReward()).isEqualTo(event.getBaseReward());
     assertThat(result.newlyAwardedTitles()).isNotEmpty();
     assertThat(userZoneTitleRepository.countByUserIdAndEquippedIsTrue(p.getUserId())).isZero();
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("PARTICIPATION", p.getId()))
+        .hasSize(1);
   }
 
   @Test
@@ -432,6 +436,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
     AdminReviewDecisionResDto replay = reviewService.approve(operator, p.getId(), request, key);
 
     assertThat(replay).isEqualTo(first);
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("PARTICIPATION", p.getId()))
+        .hasSize(1); // 재생 경로는 감사 로그를 남기지 않는다
   }
 
   @Test
@@ -476,6 +482,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
     assertThat(after.getFailReason()).isEqualTo("NOT_ON_SITE");
     assertThat(submissionRepository.findById(submission.getId()).orElseThrow().getReviewStatus())
         .isEqualTo(com.butingbe.domain.zoneevent.entity.SubmissionReviewStatus.REJECTED);
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("PARTICIPATION", p.getId()))
+        .hasSize(1);
   }
 
   @Test
@@ -517,6 +525,8 @@ class AdminZoneEventReviewServiceTest extends AbstractContainerTest {
 
     assertThat(submissionRepository.findById(submission.getId()).orElseThrow().getRevision())
         .isEqualTo(revisionBeforeReject + 1); // 딱 한 번만 처리됨
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("PARTICIPATION", p.getId()))
+        .hasSize(1); // 재생 경로는 감사 로그를 남기지 않는다
   }
 
   @Test

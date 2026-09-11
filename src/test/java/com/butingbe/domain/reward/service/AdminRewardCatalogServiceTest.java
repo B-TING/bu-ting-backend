@@ -17,11 +17,15 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +40,7 @@ class AdminRewardCatalogServiceTest extends AbstractContainerTest {
   @Autowired private RewardCatalogRepository rewardCatalogRepository;
   @Autowired private RewardGrantRepository rewardGrantRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private ZoneEventAuditLogRepository auditLogRepository;
 
   private AuthenticatedUser operator;
   private AuthenticatedUser normalUser;
@@ -55,6 +60,10 @@ class AdminRewardCatalogServiceTest extends AbstractContainerTest {
     assertThat(created.code()).isEqualTo("COUPON_CAFE");
     assertThat(created.rewardType()).isEqualTo("COUPON");
     assertThat(created.stock()).isEqualTo(100);
+    assertThat(
+            auditLogRepository.findByTargetTypeAndTargetId(
+                "REWARD_CATALOG", UUID.fromString(created.rewardId())))
+        .hasSize(1);
 
     assertThatThrownBy(
             () -> adminRewardCatalogService.create(operator, createRequest("COUPON_CAFE")))
@@ -94,6 +103,27 @@ class AdminRewardCatalogServiceTest extends AbstractContainerTest {
     assertThat(updated.stock()).isEqualTo(5);
     assertThat(updated.monthlyCap()).isEqualTo(3);
     assertThat(updated.active()).isFalse();
+
+    List<ZoneEventAuditLog> logs =
+        auditLogRepository.findByTargetTypeAndTargetId("REWARD_CATALOG", rewardId);
+    // create()도 이 task에서 감사 로그를 남기므로, 같은 targetId에 CREATE 1건 + PATCH 1건, 총 2건이 쌓인다.
+    assertThat(logs).hasSize(2);
+    ZoneEventAuditLog patchLog =
+        logs.stream()
+            .filter(log -> "PATCH_REWARD_CATALOG".equals(log.getAction()))
+            .findFirst()
+            .orElseThrow();
+    @SuppressWarnings("unchecked")
+    Map<String, Object> before = (Map<String, Object>) patchLog.getDetail().get("before");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> after = (Map<String, Object>) patchLog.getDetail().get("after");
+    // before는 생성 시 값(수정 전 상태), after는 수정된 값이어야 한다 — 둘이 같다면
+    // catalog.update(...) 호출 이후에 before를 캡처한 버그(스냅샷 순서 오류)다.
+    assertThat(before.get("name")).isEqualTo("카페 쿠폰");
+    assertThat(before.get("stock")).isEqualTo(100);
+    assertThat(after.get("name")).isEqualTo("새 이름");
+    assertThat(after.get("stock")).isEqualTo(5);
+    assertThat(before).isNotEqualTo(after);
   }
 
   @Test
