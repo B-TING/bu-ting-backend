@@ -15,8 +15,10 @@ import com.butingbe.domain.zoneevent.dto.response.AdminParticipationListItemResD
 import com.butingbe.domain.zoneevent.dto.response.AdminParticipationPageResDto;
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.entity.ReportStatus;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.global.error.exception.ConflictException;
@@ -24,8 +26,10 @@ import com.butingbe.global.error.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -49,6 +53,7 @@ public class AdminReviewService {
   private final RewardPayoutRepository rewardPayoutRepository;
   private final BaseRewardPayoutRepository baseRewardPayoutRepository;
   private final OperatorAuthorization operatorAuthorization;
+  private final ZoneEventAuditLogRepository auditLogRepository;
 
   /** SUCCESS → REVOKED + 보상 회수(포인트 되돌림, 미사용 쿠폰 회수). */
   @Transactional
@@ -75,6 +80,17 @@ public class AdminReviewService {
                 payout.getStatus() != BaseRewardPayoutStatus.PAID
                     && payout.getStatus() != BaseRewardPayoutStatus.FAILED)
         .ifPresent(payout -> payout.fail("PARTICIPATION_REVOKED"));
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("before", Map.of("status", "SUCCESS"));
+    detail.put("after", Map.of("status", "REVOKED"));
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action("REVOKE_PARTICIPATION")
+            .targetType("PARTICIPATION")
+            .targetId(participationId)
+            .detail(detail)
+            .build());
   }
 
   /** 신고 자동 숨김 해제 + 신고 DISMISSED. */
@@ -94,6 +110,17 @@ public class AdminReviewService {
         .findByParticipationId(participationId)
         .filter(payout -> payout.getHoldStatus() == PayoutHoldStatus.HELD_REPORT)
         .ifPresent(RewardPayout::releaseHold);
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("before", Map.of("hidden", true));
+    detail.put("after", Map.of("hidden", false));
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action("UNHIDE_PARTICIPATION")
+            .targetType("PARTICIPATION")
+            .targetId(participationId)
+            .detail(detail)
+            .build());
   }
 
   /** 전체 참여 목록. roundId/eventId/zoneId/userId/status/keyword(닉네임·이메일)로 필터링한다. */

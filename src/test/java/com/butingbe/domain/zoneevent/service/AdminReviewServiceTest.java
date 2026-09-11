@@ -31,6 +31,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventReport;
 import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
@@ -63,6 +64,7 @@ class AdminReviewServiceTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
   @Autowired private RewardPayoutRepository payoutRepository;
   @Autowired private BaseRewardPayoutRepository baseRewardPayoutRepository;
+  @Autowired private ZoneEventAuditLogRepository auditLogRepository;
 
   private ZoneEvent event;
   private AuthenticatedUser operator;
@@ -116,6 +118,8 @@ class AdminReviewServiceTest extends AbstractContainerTest {
     assertThat(participationRepository.findById(p.getId()).orElseThrow().getStatus())
         .isEqualTo(ParticipationStatus.REVOKED);
     assertThat(userPointService.getBalance(p.getUserId())).isZero();
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("PARTICIPATION", p.getId()))
+        .hasSize(1);
   }
 
   @Test
@@ -135,6 +139,8 @@ class AdminReviewServiceTest extends AbstractContainerTest {
     assertThat(participationRepository.findById(p.getId()).orElseThrow().getHidden()).isFalse();
     assertThat(reportRepository.findByParticipationId(p.getId()).get(0).getStatus())
         .isEqualTo(ReportStatus.DISMISSED);
+    assertThat(auditLogRepository.findByTargetTypeAndTargetId("PARTICIPATION", p.getId()))
+        .hasSize(1);
   }
 
   @Test
