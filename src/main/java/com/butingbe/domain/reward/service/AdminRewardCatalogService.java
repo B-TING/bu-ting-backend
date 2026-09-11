@@ -12,6 +12,8 @@ import com.butingbe.domain.reward.entity.RewardGrant;
 import com.butingbe.domain.reward.entity.RewardType;
 import com.butingbe.domain.reward.repository.RewardCatalogRepository;
 import com.butingbe.domain.reward.repository.RewardGrantRepository;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
@@ -19,7 +21,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -39,6 +43,7 @@ public class AdminRewardCatalogService {
   private final RewardCatalogRepository rewardCatalogRepository;
   private final RewardGrantRepository rewardGrantRepository;
   private final OperatorAuthorization operatorAuthorization;
+  private final ZoneEventAuditLogRepository auditLogRepository;
 
   @Transactional
   public RewardCatalogResDto create(
@@ -60,6 +65,17 @@ public class AdminRewardCatalogService {
                 .validDays(request.validDays())
                 .active(request.active())
                 .build());
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("code", catalog.getCode());
+    detail.put("rewardType", catalog.getRewardType().name());
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action("CREATE_REWARD_CATALOG")
+            .targetType("REWARD_CATALOG")
+            .targetId(catalog.getId())
+            .detail(detail)
+            .build());
     return RewardCatalogResDto.from(catalog);
   }
 
@@ -92,8 +108,30 @@ public class AdminRewardCatalogService {
         rewardCatalogRepository
             .findById(rewardId)
             .orElseThrow(() -> new ResourceNotFoundException("error.reward.catalog_not_found"));
+    Map<String, Object> before = snapshot(catalog);
     catalog.update(request.name(), request.stock(), request.monthlyCap(), request.active());
+
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("before", before);
+    detail.put("after", snapshot(catalog));
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action("PATCH_REWARD_CATALOG")
+            .targetType("REWARD_CATALOG")
+            .targetId(catalog.getId())
+            .detail(detail)
+            .build());
     return RewardCatalogResDto.from(catalog);
+  }
+
+  private Map<String, Object> snapshot(RewardCatalog catalog) {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("name", catalog.getName());
+    map.put("stock", catalog.getStock());
+    map.put("monthlyCap", catalog.getMonthlyCap());
+    map.put("active", catalog.getActive());
+    return map;
   }
 
   @Transactional(readOnly = true)
