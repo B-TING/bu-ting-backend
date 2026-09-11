@@ -514,6 +514,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PlaceDetailResponse"
+        "400":
+          description: contentTypeId 파라미터 누락
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/users/signup:
     post:
       tags:
