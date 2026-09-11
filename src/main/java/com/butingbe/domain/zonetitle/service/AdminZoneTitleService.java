@@ -1,0 +1,109 @@
+package com.butingbe.domain.zonetitle.service;
+
+import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.auth.security.OperatorAuthorization;
+import com.butingbe.domain.chat.entity.ChatZone;
+import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
+import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
+import com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleCreateReqDto;
+import com.butingbe.domain.zonetitle.dto.response.AdminZoneTitleDefResDto;
+import com.butingbe.domain.zonetitle.entity.ZoneTitleDef;
+import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
+import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
+import com.butingbe.global.error.exception.ConflictException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** 구역 칭호 정의 관리(CRUD)와 보유자 조회. ROLE_ADMIN/MANAGER 전용. */
+@Service
+@RequiredArgsConstructor
+public class AdminZoneTitleService {
+
+  private final ZoneTitleDefRepository titleDefRepository;
+  private final UserZoneTitleRepository userZoneTitleRepository;
+  private final ZoneTitleService zoneTitleService;
+  private final ZoneEventAuditLogRepository auditLogRepository;
+  private final OperatorAuthorization operatorAuthorization;
+
+  @Transactional(readOnly = true)
+  public List<AdminZoneTitleDefResDto> list(AuthenticatedUser user) {
+    operatorAuthorization.requireOperator(user);
+    return titleDefRepository.findAllByOrderByZoneIdAscTierAsc().stream()
+        .map(
+            def ->
+                AdminZoneTitleDefResDto.of(
+                    def, userZoneTitleRepository.countByTitleDef_Id(def.getId())))
+        .toList();
+  }
+
+  @Transactional
+  public AdminZoneTitleDefResDto create(
+      AuthenticatedUser user, AdminZoneTitleCreateReqDto request) {
+    operatorAuthorization.requireOperator(user);
+    String zoneId = ChatZone.fromString(request.zoneId()).name();
+    if (titleDefRepository.existsByZoneIdAndTier(zoneId, request.tier())) {
+      throw new ConflictException("error.zone_title.duplicate_tier");
+    }
+    if (titleDefRepository.existsByZoneIdAndRequiredSuccessCount(
+        zoneId, request.requiredSuccessCount())) {
+      throw new ConflictException("error.zone_title.duplicate_required_success_count");
+    }
+    requireMonotonic(zoneId, null, request.tier(), request.requiredSuccessCount());
+
+    ZoneTitleDef def =
+        titleDefRepository.save(
+            ZoneTitleDef.builder()
+                .titleCode(zoneId + "_T" + request.tier())
+                .zoneId(zoneId)
+                .tier(request.tier())
+                .requiredSuccessCount(request.requiredSuccessCount())
+                .titleName(request.titleName())
+                .style(request.style())
+                .color(request.color())
+                .build());
+
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("zoneId", zoneId);
+    detail.put("tier", request.tier());
+    detail.put("requiredSuccessCount", request.requiredSuccessCount());
+    audit(user, "CREATE_TITLE_DEF", def.getId(), detail);
+    return AdminZoneTitleDefResDto.of(def, 0L);
+  }
+
+  /**
+   * 같은 구역 안에서 단계(tier)가 높을수록 달성 기준(requiredSuccessCount)도 커야 한다. excludeId는 수정 시 자기 자신을 비교 대상에서 빼기
+   * 위한 것(생성 시에는 null).
+   */
+  void requireMonotonic(String zoneId, UUID excludeId, Integer tier, Integer requiredSuccessCount) {
+    if (requiredSuccessCount <= 0) {
+      throw new IllegalArgumentException("error.zone_title.invalid_required_success_count");
+    }
+    for (ZoneTitleDef sibling : titleDefRepository.findByZoneIdOrderByTierAsc(zoneId)) {
+      if (excludeId != null && sibling.getId().equals(excludeId)) {
+        continue;
+      }
+      if (sibling.getTier() < tier && sibling.getRequiredSuccessCount() >= requiredSuccessCount) {
+        throw new IllegalArgumentException("error.zone_title.invalid_required_success_count");
+      }
+      if (sibling.getTier() > tier && sibling.getRequiredSuccessCount() <= requiredSuccessCount) {
+        throw new IllegalArgumentException("error.zone_title.invalid_required_success_count");
+      }
+    }
+  }
+
+  void audit(AuthenticatedUser user, String action, UUID targetId, Map<String, Object> detail) {
+    auditLogRepository.save(
+        ZoneEventAuditLog.builder()
+            .actorId(user.id())
+            .action(action)
+            .targetType("ZONE_TITLE_DEF")
+            .targetId(targetId)
+            .detail(detail)
+            .build());
+  }
+}
