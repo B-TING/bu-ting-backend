@@ -196,4 +196,29 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
         .filter(token -> user.getId().equals(token.getUser().getId()))
         .toList();
   }
+
+  @Test
+  @DisplayName("Bearer 형식이 아니거나 토큰이 빈 Authorization 헤더는 재사용하지 않고 새로 발급한다")
+  void issuesNewTokenWhenAuthorizationHeaderIsUnusable() {
+    User user =
+        userRepository.save(
+            User.builder()
+                .email("unusable-header@example.com")
+                .provider("google")
+                .providerId("google-unusable")
+                .name(new Name("홍", "길동"))
+                .nickname("unusable-user")
+                .role(UserRole.USER)
+                .build());
+
+    OpaqueTokenService.IssuedOpaqueToken fromNull = opaqueTokenService.issue(user, null);
+    OpaqueTokenService.IssuedOpaqueToken fromBasic =
+        opaqueTokenService.issue(user, "Basic dXNlcjpwYXNz");
+    OpaqueTokenService.IssuedOpaqueToken fromEmptyBearer =
+        opaqueTokenService.issue(user, "Bearer  ");
+
+    assertThat(fromNull.accessToken()).isNotBlank();
+    assertThat(fromBasic.accessToken()).isNotBlank();
+    assertThat(fromEmptyBearer.accessToken()).isNotBlank();
+  }
 }

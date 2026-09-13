@@ -1,6 +1,7 @@
 package com.butingbe.domain.travel.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -21,6 +22,7 @@ import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
 import com.butingbe.domain.travel.dto.response.TravelResDto;
 import com.butingbe.domain.travel.entity.TravelStatus;
 import com.butingbe.domain.travel.service.TravelService;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.List;
@@ -152,6 +154,24 @@ class TravelControllerTest {
         return new AuthenticatedUser(UUID.randomUUID(), "user@example.com", "tester", List.of());
       }
     };
+  }
+
+  @Test
+  @DisplayName("인증되지 않은 사용자의 요청은 모두 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    UUID travelId = FakeTravelService.TRAVEL_ID;
+    UUID planId = UUID.fromString("20000000-0000-0000-0000-000000000001");
+
+    assertThatThrownBy(() -> travelController.createTravel(null, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelController.getTravelPlans(null, travelId))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelController.createPlan(null, travelId, null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelController.deletePlan(null, travelId, planId))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> travelController.updateTravelStatus(null, travelId, null))
+        .isInstanceOf(UnauthenticatedException.class);
   }
 
   private AuthenticatedUser authenticatedUser() {

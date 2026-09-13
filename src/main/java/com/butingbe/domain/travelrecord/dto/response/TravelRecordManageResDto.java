@@ -24,13 +24,17 @@ public record TravelRecordManageResDto(
     LocalDateTime updatedAt) {
 
   public static TravelRecordManageResDto from(TravelRecord travelRecord) {
+    return from(travelRecord, travelRecord.getCoverImageUrl());
+  }
+
+  public static TravelRecordManageResDto from(TravelRecord travelRecord, String coverImageUrl) {
     return new TravelRecordManageResDto(
         travelRecord.getId(),
         travelRecord.getOriginalTravel() == null ? null : travelRecord.getOriginalTravel().getId(),
         travelRecord.getAuthor().getId(),
         travelRecord.getTitle(),
         travelRecord.getContent(),
-        travelRecord.getCoverImageUrl(),
+        coverImageUrl,
         travelRecord.getOverallRating(),
         travelRecord.getTravelStartDate(),
         travelRecord.getTravelEndDate(),

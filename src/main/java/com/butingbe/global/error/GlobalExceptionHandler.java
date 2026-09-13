@@ -2,7 +2,10 @@ package com.butingbe.global.error;
 
 import com.butingbe.domain.place.exception.PlaceKeywordNotFoundException;
 import com.butingbe.domain.travel.ai.TravelPlanValidationException;
+import com.butingbe.domain.zoneevent.exception.OpenParticipationExistsException;
+import com.butingbe.domain.zoneevent.exception.ZoneEventOutOfRangeException;
 import com.butingbe.global.common.ApiResponse;
+import com.butingbe.global.error.exception.BulkPayoutConflictException;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
@@ -10,12 +13,14 @@ import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.LocaleResolver;
@@ -62,19 +67,21 @@ public class GlobalExceptionHandler {
 
   /** ❌ 2. 잘못된 비즈니스 요청 예외 (400 Bad Request) IllegalArgumentException 등이 터졌을 때 처리합니다. */
   @ExceptionHandler(ConflictException.class)
-  public ResponseEntity<ApiResponse<Void>> handleConflictException(ConflictException e) {
+  public ResponseEntity<ApiResponse<Void>> handleConflictException(
+      ConflictException e, HttpServletRequest request) {
     log.warn("Conflict Exception: {}", e.getMessage());
 
-    return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.fail(e.getMessage()));
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(
-      IllegalArgumentException e) {
+      IllegalArgumentException e, HttpServletRequest request) {
     log.warn("Bad Request Exception 발생: {}", e.getMessage());
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST) // HTTP 상태코드 400 세팅
-        .body(ApiResponse.fail(e.getMessage()));
+        .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
   /**
@@ -82,18 +89,21 @@ public class GlobalExceptionHandler {
    * 작동합니다.
    */
   @ExceptionHandler(ForbiddenException.class)
-  public ResponseEntity<ApiResponse<Void>> handleForbiddenException(ForbiddenException e) {
+  public ResponseEntity<ApiResponse<Void>> handleForbiddenException(
+      ForbiddenException e, HttpServletRequest request) {
     log.warn("Forbidden Exception: {}", e.getMessage());
 
-    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail(e.getMessage()));
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
   @ExceptionHandler(ResourceNotFoundException.class)
   public ResponseEntity<ApiResponse<Void>> handleResourceNotFoundException(
-      ResourceNotFoundException e) {
+      ResourceNotFoundException e, HttpServletRequest request) {
     log.warn("Resource Not Found Exception: {}", e.getMessage());
 
-    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
   @ExceptionHandler(PlaceKeywordNotFoundException.class)
@@ -101,6 +111,42 @@ public class GlobalExceptionHandler {
       PlaceKeywordNotFoundException e, HttpServletRequest request) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(ApiResponse.fail(message(e.getMessage(), request)));
+  }
+
+  @ExceptionHandler(ZoneEventOutOfRangeException.class)
+  public ResponseEntity<ApiResponse<Map<String, Object>>> handleZoneEventOutOfRange(
+      ZoneEventOutOfRangeException e, HttpServletRequest request) {
+    log.warn("Zone event out of range: distance={}m", e.getDistanceMeters());
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(
+            ApiResponse.fail(
+                message(e.getMessage(), request), Map.of("distanceMeters", e.getDistanceMeters())));
+  }
+
+  @ExceptionHandler(OpenParticipationExistsException.class)
+  public ResponseEntity<ApiResponse<Map<String, Object>>> handleOpenParticipationExists(
+      OpenParticipationExistsException e, HttpServletRequest request) {
+    log.warn("Open participation exists: participationId={}", e.getParticipationId());
+
+    Map<String, Object> data =
+        e.getParticipationId() == null
+            ? Map.of()
+            : Map.of("participationId", e.getParticipationId().toString());
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(ApiResponse.fail(message(e.getMessage(), request), data));
+  }
+
+  @ExceptionHandler(BulkPayoutConflictException.class)
+  public ResponseEntity<ApiResponse<Map<String, Object>>> handleBulkPayoutConflict(
+      BulkPayoutConflictException e, HttpServletRequest request) {
+    log.warn("Bulk payout conflict: problemPayoutIds={}", e.getProblemPayoutIds());
+
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(
+            ApiResponse.fail(
+                message(e.getMessage(), request),
+                Map.of("problemPayoutIds", e.getProblemPayoutIds())));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -111,6 +157,15 @@ public class GlobalExceptionHandler {
     log.warn("Validation Exception 발생: {}", errorMessage);
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(errorMessage));
+  }
+
+  @ExceptionHandler(MissingServletRequestParameterException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestParameterException(
+      MissingServletRequestParameterException e, HttpServletRequest request) {
+    log.warn("Missing Request Parameter: {}", e.getParameterName());
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(ApiResponse.fail(message("error.request.missing_parameter", request)));
   }
 
   @ExceptionHandler(NoResourceFoundException.class)

@@ -15,7 +15,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 class TravelSurveyMigrationTest {
 
   @Test
-  @DisplayName("Flyway 마이그레이션은 travel_survey CHECK 제약조건과 GIN 인덱스를 생성한다")
+  @DisplayName("Flyway 마이그레이션은 설문 제약조건과 락커 초기 데이터를 생성한다")
   void migrateTravelSurveySchema() throws Exception {
     try (PostgreSQLContainer<?> postgres =
         new PostgreSQLContainer<>("postgres:16-alpine")
@@ -38,6 +38,19 @@ class TravelSurveyMigrationTest {
         assertThat(invalidSkippedAllInsert(connection))
             .isInstanceOf(SQLException.class)
             .hasMessageContaining("chk_skipped_all_consistency");
+        assertThat(count(connection, "station")).isGreaterThanOrEqualTo(114);
+        assertThat(count(connection, "locker_location")).isGreaterThanOrEqualTo(71);
+        assertThat(count(connection, "locker_fee")).isGreaterThanOrEqualTo(315);
+      }
+    }
+  }
+
+  private long count(java.sql.Connection connection, String tableName) throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement("SELECT count(*) FROM " + tableName)) {
+      try (ResultSet resultSet = statement.executeQuery()) {
+        resultSet.next();
+        return resultSet.getLong(1);
       }
     }
   }

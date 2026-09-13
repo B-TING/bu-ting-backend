@@ -45,6 +45,20 @@ class UserServiceImplTest {
     return new AuthenticatedUser(userId, "me@example.com", "테스터", java.util.List.of());
   }
 
+  @Test
+  @DisplayName("인증 정보가 없거나 id가 없으면 UnauthenticatedException을 던진다")
+  void rejectsUnauthenticatedUser() {
+    AuthenticatedUser withoutId =
+        new AuthenticatedUser(null, "me@example.com", "테스터", java.util.List.of());
+
+    assertThatThrownBy(() -> userService.getMyProfile(null))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> userService.getMyProfile(withoutId))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> userService.deleteMyAccount(null))
+        .isInstanceOf(UnauthenticatedException.class);
+  }
+
   @Nested
   @DisplayName("signUp() - 회원가입 테스트")
   class SignUpTest {

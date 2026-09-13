@@ -21,6 +21,7 @@ import com.butingbe.domain.user.repository.UserRepository;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 @ExtendWith(MockitoExtension.class)
 class LocalChatroomServiceTest {
@@ -38,6 +40,7 @@ class LocalChatroomServiceTest {
   @Mock private ChatMemberRepository chatMemberRepository;
   @Mock private ChatMessageRepository chatMessageRepository;
   @Mock private UserRepository userRepository;
+  @Mock private SimpMessagingTemplate messagingTemplate;
 
   @InjectMocks private LocalChatroomService localChatroomService;
 
@@ -293,5 +296,73 @@ class LocalChatroomServiceTest {
     assertThatThrownBy(() -> localChatroomService.exitChatroom(roomId, userId))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("참여하고 있지 않은 채팅방입니다.");
+  }
+
+  // ==========================================
+  // 📍 LIVE MEMBER COUNT TESTS (실시간 인원 수)
+  // ==========================================
+
+  @Test
+  @DisplayName("실시간 입장 시 인원이 1 증가하고 상태 채널로 브로드캐스트한다")
+  void enterLiveChatroom_incrementsAndBroadcasts() {
+    when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(mockChatroom));
+
+    localChatroomService.enterLiveChatroom(roomId);
+
+    assertThat(mockChatroom.getCurrentMembers()).isEqualTo(11);
+    verify(messagingTemplate)
+        .convertAndSend(
+            eq("/sub/chat/room/" + roomId + "/status"),
+            (Object) eq(Map.of("roomId", roomId, "currentMembers", 11)));
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 방에 실시간 입장하면 IllegalArgumentException을 던진다")
+  void enterLiveChatroom_rejectsUnknownRoom() {
+    when(localChatroomRepository.findById(roomId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> localChatroomService.enterLiveChatroom(roomId))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("존재하지 않는 채팅방입니다.");
+  }
+
+  @Test
+  @DisplayName("실시간 퇴장 시 인원이 1 감소하고 상태 채널로 브로드캐스트한다")
+  void exitLiveChatroom_decrementsAndBroadcasts() {
+    when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(mockChatroom));
+
+    localChatroomService.exitLiveChatroom(roomId);
+
+    assertThat(mockChatroom.getCurrentMembers()).isEqualTo(9);
+    verify(messagingTemplate)
+        .convertAndSend(
+            eq("/sub/chat/room/" + roomId + "/status"),
+            (Object) eq(Map.of("roomId", roomId, "currentMembers", 9)));
+  }
+
+  @Test
+  @DisplayName("인원이 0인 방에서 실시간 퇴장해도 음수로 내려가지 않는다")
+  void exitLiveChatroom_doesNotGoBelowZero() {
+    LocalChatroom emptyRoom =
+        LocalChatroom.builder().chatZone(ChatZone.SUYEONG_NAMGU).maxMembers(30).build();
+    when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(emptyRoom));
+
+    localChatroomService.exitLiveChatroom(roomId);
+
+    assertThat(emptyRoom.getCurrentMembers()).isZero();
+    verify(messagingTemplate)
+        .convertAndSend(
+            eq("/sub/chat/room/" + roomId + "/status"),
+            (Object) eq(Map.of("roomId", roomId, "currentMembers", 0)));
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 방에서 실시간 퇴장하면 IllegalArgumentException을 던진다")
+  void exitLiveChatroom_rejectsUnknownRoom() {
+    when(localChatroomRepository.findById(roomId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> localChatroomService.exitLiveChatroom(roomId))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("존재하지 않는 채팅방입니다.");
   }
 }

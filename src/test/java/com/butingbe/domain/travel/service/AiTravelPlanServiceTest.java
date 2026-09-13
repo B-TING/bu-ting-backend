@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -201,5 +203,18 @@ class AiTravelPlanServiceTest {
                     .isEqualTo(TravelPlanValidationException.Reason.LOW_QUALITY_PLAN));
     org.mockito.Mockito.verify(ai, org.mockito.Mockito.times(2)).generate(anyString());
     verifyNoInteractions(plans, places);
+  }
+
+  @Test
+  @DisplayName("이미 같은 날짜에 일정이 있으면 생성 결과를 저장하지 않는다")
+  void rejectsWhenPlansAlreadyExistForGeneratedDates() {
+    when(ai.generate(anyString())).thenReturn(qualityResponse());
+    when(plans.existsByTravel_IdAndVisitDate(eq(travelId), any())).thenReturn(true);
+
+    assertThatThrownBy(() -> service.generate(principal, travelId, request()))
+        .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
+        .hasMessage("Travel plans already exist for one or more dates.");
+
+    verifyNoInteractions(places);
   }
 }

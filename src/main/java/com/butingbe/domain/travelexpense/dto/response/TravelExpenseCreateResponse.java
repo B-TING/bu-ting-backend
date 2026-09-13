@@ -40,16 +40,6 @@ public record TravelExpenseCreateResponse(
         shares.stream().map(ShareResponse::from).toList());
   }
 
-  @JsonIgnore
-  public UUID payerUserId() {
-    return payerId;
-  }
-
-  @JsonIgnore
-  public UUID createdByUserId() {
-    return creatorId;
-  }
-
   public record ShareResponse(UUID participantId, Long shareAmount) {
 
     private static ShareResponse from(TravelExpenseShare share) {

@@ -43,7 +43,7 @@ public class S3FileStorageService implements FileStorageService {
   private long presignedUrlExpiration;
 
   @Override
-  public FileUploadResDto upload(MultipartFile file) {
+  public FileUploadResDto upload(MultipartFile file, UUID uploaderId) {
     validate(file);
     String contentType = file.getContentType();
     String extension = StringUtils.getFilenameExtension(file.getOriginalFilename());
@@ -70,6 +70,7 @@ public class S3FileStorageService implements FileStorageService {
               .mediaType(contentType.startsWith("video/") ? "VIDEO" : "IMAGE")
               .fileSize(file.getSize())
               .bucket(bucket)
+              .uploaderId(uploaderId)
               .build());
     } catch (RuntimeException exception) {
       s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());

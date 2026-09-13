@@ -1,0 +1,1 @@
+ALTER TABLE zone_event ALTER COLUMN base_reward DROP NOT NULL;

@@ -8,9 +8,14 @@ public record TravelRecordBookmarkResDto(
     UUID bookmarkId, LocalDateTime bookmarkedAt, TravelRecordFeedResDto travelRecord) {
 
   public static TravelRecordBookmarkResDto from(TravelRecordBookmark bookmark) {
+    return from(bookmark, bookmark.getTravelRecord().getCoverImageUrl());
+  }
+
+  public static TravelRecordBookmarkResDto from(
+      TravelRecordBookmark bookmark, String coverImageUrl) {
     return new TravelRecordBookmarkResDto(
         bookmark.getId(),
         bookmark.getCreatedAt(),
-        TravelRecordFeedResDto.from(bookmark.getTravelRecord()));
+        TravelRecordFeedResDto.from(bookmark.getTravelRecord(), coverImageUrl, false));
   }
 }

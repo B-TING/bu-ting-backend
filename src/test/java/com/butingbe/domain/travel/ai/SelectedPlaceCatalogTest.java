@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto.WizardPickedPlaceReqDto;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -52,6 +53,15 @@ class SelectedPlaceCatalogTest {
         new WizardPickedPlaceReqDto("GOOGLE", "126083", "이름", "부산", Double.NaN, null, null));
     assertInvalid(new WizardPickedPlaceReqDto("GOOGLE", "126083", "이름", null, 35.0, 129.0, null));
     assertInvalid(new WizardPickedPlaceReqDto("GOOGLE", "126083", "", "부산", 35.0, 129.0, null));
+  }
+
+  @Test
+  @DisplayName("요청이 없거나 선택 장소가 비면 생성 전에 거부한다")
+  void emptyOrMissingRequestIsRejected() {
+    assertThatThrownBy(() -> SelectedPlaceCatalog.from(null))
+        .isInstanceOf(TravelPlanValidationException.class);
+    assertThatThrownBy(() -> SelectedPlaceCatalog.from(request(java.util.List.of())))
+        .isInstanceOf(TravelPlanValidationException.class);
   }
 
   private void assertInvalid(WizardPickedPlaceReqDto place) {

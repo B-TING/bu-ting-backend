@@ -345,24 +345,18 @@ public class TravelServiceImpl implements TravelService {
       return;
     }
 
-    if (nextStatus == TravelStatus.PLANNED) {
+    // 상태는 PLANNED/IN_PROGRESS/COMPLETED 셋뿐이고 currentStatus != nextStatus이므로,
+    // currentStatus는 nextStatus가 아닌 나머지 두 상태 중 하나다. 그 두 상태에서
+    // IN_PROGRESS·COMPLETED로의 전이는 모두 허용되고, PLANNED로 되돌리는 것만 막힌다.
+    // switch 식이라 상태가 추가되면 런타임이 아니라 컴파일 시점에 잡힌다.
+    boolean allowed =
+        switch (nextStatus) {
+          case PLANNED -> false;
+          case IN_PROGRESS, COMPLETED -> true;
+        };
+    if (!allowed) {
       throw new IllegalArgumentException("Travel status cannot be changed back to PLANNED.");
     }
-
-    if (currentStatus == TravelStatus.PLANNED
-        && (nextStatus == TravelStatus.IN_PROGRESS || nextStatus == TravelStatus.COMPLETED)) {
-      return;
-    }
-
-    if (currentStatus == TravelStatus.IN_PROGRESS && nextStatus == TravelStatus.COMPLETED) {
-      return;
-    }
-
-    if (currentStatus == TravelStatus.COMPLETED && nextStatus == TravelStatus.IN_PROGRESS) {
-      return;
-    }
-
-    throw new IllegalArgumentException("Invalid travel status transition.");
   }
 
   private Integer resolveSequence(UUID planId, Integer requestedSequence) {

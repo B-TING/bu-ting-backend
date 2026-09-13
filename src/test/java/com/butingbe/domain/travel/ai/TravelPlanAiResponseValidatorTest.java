@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class TravelPlanAiResponseValidatorTest {
@@ -94,6 +95,23 @@ class TravelPlanAiResponseValidatorTest {
             days.get(0).date(),
             List.of(new TravelPlanAiResponse.Place(2, "GOOGLE", IDS.get(0), "memo"))));
     assertFailure(new TravelPlanAiResponse(days), INVALID_SCHEDULE);
+  }
+
+  @Test
+  @DisplayName("날짜가 없거나 중복이거나 여행 기간을 벗어나면 일정으로 인정하지 않는다")
+  void rejectsInvalidDays() {
+    var valid = response(IDS);
+
+    assertFailure(withReplacedDay(valid, 1, null), INVALID_SCHEDULE);
+    assertFailure(withReplacedDay(valid, 1, valid.days().get(0).date()), INVALID_SCHEDULE);
+    assertFailure(withReplacedDay(valid, 1, java.time.LocalDate.of(1999, 1, 1)), INVALID_SCHEDULE);
+  }
+
+  private TravelPlanAiResponse withReplacedDay(
+      TravelPlanAiResponse source, int index, java.time.LocalDate date) {
+    var days = new ArrayList<>(source.days());
+    days.set(index, new TravelPlanAiResponse.Day(date, days.get(index).places()));
+    return new TravelPlanAiResponse(days);
   }
 
   private void validate(TravelPlanAiResponse result) {
