@@ -53,6 +53,12 @@ class ZoneEventCoreMigrationTest {
             .isInstanceOf(SQLException.class)
             .hasMessageContaining("ck_zone_event_auth_target_radius");
 
+        // V49로 완화된 상한 — 2000m는 허용, 2001m는 거부
+        insertAuthTarget(connection, eventId, 2000);
+        assertThat(catchThrowable(() -> insertAuthTarget(connection, eventId, 2001)))
+            .isInstanceOf(SQLException.class)
+            .hasMessageContaining("ck_zone_event_auth_target_radius");
+
         // 열린 참여는 유저·이벤트당 하나 — 두 번째 JOINED는 부분 UK로 거부
         UUID userId = insertUser(connection);
         insertParticipation(connection, eventId, userId, "JOINED");

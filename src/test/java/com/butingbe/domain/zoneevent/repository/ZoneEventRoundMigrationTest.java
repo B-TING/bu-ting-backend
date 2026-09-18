@@ -52,6 +52,12 @@ class ZoneEventRoundMigrationTest {
         assertThat(catchThrowable(() -> insertBackup(connection, roundId, 10)))
             .isInstanceOf(SQLException.class)
             .hasMessageContaining("ck_zone_event_backup_target_radius");
+
+        // V49로 완화된 상한 — 2000m는 허용, 2001m는 거부
+        insertBackup(connection, roundId, 2000);
+        assertThat(catchThrowable(() -> insertBackup(connection, roundId, 2001)))
+            .isInstanceOf(SQLException.class)
+            .hasMessageContaining("ck_zone_event_backup_target_radius");
       }
     }
   }

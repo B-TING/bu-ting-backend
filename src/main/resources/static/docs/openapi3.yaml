@@ -11453,7 +11453,7 @@ components:
 
         radiusM:
           type: integer
-          description: "30~500"
+          description: "30~2000"
 
     AdminZoneEventCreateRequest:
       type: object
@@ -11641,7 +11641,7 @@ components:
           description: "관리자가 원본 좌표를 수정했는지"
         radiusM:
           type: integer
-          description: "30~500"
+          description: "30~2000"
         status:
           type: string
           enum:
@@ -11719,7 +11719,7 @@ components:
           nullable: true
         radiusM:
           type: integer
-          description: "30~500"
+          description: "30~2000"
       example:
         targetKind: "PLACE"
         placeContentId: "126081"
@@ -11750,7 +11750,7 @@ components:
         radiusM:
           type: integer
           nullable: true
-          description: "30~500"
+          description: "30~2000"
         reason:
           type: string
           nullable: true
@@ -11781,7 +11781,7 @@ components:
           nullable: true
         radiusM:
           type: integer
-          description: "30~500"
+          description: "30~2000"
         reason:
           type: string
           nullable: true
