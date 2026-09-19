@@ -197,7 +197,7 @@ Environment variables referenced by `application.yaml` (and the AWS default cred
 | AWS creds     | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (local only; on EC2 use the instance IAM role)       |
 | Upload limits | `FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE`                                                          |
 | Invitations   | `TRAVEL_INVITE_BASE_URL`                                                                          |
-| Routing       | `ROUTE_GOOGLE_ENABLED` (off by default), `ROUTE_GOOGLE_API_KEY` (falls back to `GOOGLE_PLACES_API_KEY`), `ROUTE_CACHE_TTL_DAYS` (default 30) |
+| Routing       | `ROUTE_GOOGLE_ENABLED` (off by default), `ROUTE_GOOGLE_API_KEY` (falls back to `GOOGLE_PLACES_API_KEY`), `ROUTE_CACHE_TTL_DAYS` (default 30), `ROUTE_CACHE_EVICTION_ENABLED` / `ROUTE_CACHE_EVICTION_CRON` |
 | Admin         | `ADMIN_TOKEN` (optional operator bootstrap token; unset disables it)                              |
 | Zone Event    | `ZONE_EVENT_REVIEW_MODE`, `ZONE_EVENT_REPORT_AUTO_HIDE_THRESHOLD`, `ZONE_EVENT_REVIEW_CAPTURED_AT_THRESHOLD_MINUTES`, `ZONE_EVENT_ROUND_SCHEDULER_DELAY_MS`, `ZONE_EVENT_ROUND_SCHEDULER_INITIAL_DELAY_MS` (all optional, sensible defaults) |
 
