@@ -110,11 +110,22 @@ class TravelPlanCandidateFillerTest {
   }
 
   @Test
-  @DisplayName("권역 이름이 아닌 숙소 지역은 전체에서 고른다")
+  @DisplayName("모바일이 보내는 위저드 지역 아이디도 권역으로 좁힌다")
+  void narrowsToZoneFromWizardAreaId() {
+    when(placeCandidateFinder.findCandidates(any(), any(), anyInt())).thenReturn(List.of());
+
+    filler.fill(travel(TravelPace.BALANCED, "haeundae"), request());
+
+    verify(placeCandidateFinder)
+        .findCandidates(eq(Set.of(ChatZone.HAEUNDAE_GIJANG)), any(), anyInt());
+  }
+
+  @Test
+  @DisplayName("해석할 수 없는 숙소 지역은 전체에서 고른다")
   void fallsBackToAllZonesForUnknownArea() {
     when(placeCandidateFinder.findCandidates(any(), any(), anyInt())).thenReturn(List.of());
 
-    filler.fill(travel(TravelPace.BALANCED, "해운대"), request());
+    filler.fill(travel(TravelPace.BALANCED, "서울"), request());
 
     verify(placeCandidateFinder).findCandidates(eq(Set.of()), any(), anyInt());
   }

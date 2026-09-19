@@ -2,6 +2,7 @@ package com.butingbe.domain.travel.ai;
 
 import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.place.dto.response.PlaceCandidateResDto;
+import com.butingbe.domain.place.entity.AccommodationAreaZones;
 import com.butingbe.domain.place.service.PlaceCandidateFinder;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto.WizardPickedPlaceReqDto;
@@ -77,20 +78,13 @@ public class TravelPlanCandidateFiller {
   /**
    * 후보를 고를 권역.
    *
-   * <p>숙소 권역이 지정돼 있으면 그 권역에서만 고른다. 없으면 부산 전체에서 고른다. 사용자가 고른 장소의 권역까지 따지지 않는 것은, 선택 장소에 권역 정보가 없어
+   * <p>숙소 지역이 권역으로 해석되면 그 권역에서만 고르고, 아니면 부산 전체에서 고른다. 사용자가 고른 장소의 권역까지 따지지 않는 것은, 선택 장소에 권역 정보가 없어
    * 좌표로 역산해야 하기 때문이다. 필요해지면 그때 넓힌다.
    */
   private Set<ChatZone> zonesOf(Travel travel) {
-    String area = travel.getAccommodationArea();
-    if (area == null || area.isBlank()) {
-      return Set.of();
-    }
-    try {
-      return Set.of(ChatZone.fromString(area.trim()));
-    } catch (IllegalArgumentException e) {
-      // 숙소 권역은 위저드의 지역 아이디라 ChatZone 이름과 다를 수 있다. 그때는 전체에서 고른다.
-      return Set.of();
-    }
+    return AccommodationAreaZones.resolve(travel.getAccommodationArea())
+        .map(Set::of)
+        .orElseGet(Set::of);
   }
 
   private static WizardPickedPlaceReqDto toWizardPlace(PlaceCandidateResDto candidate) {
