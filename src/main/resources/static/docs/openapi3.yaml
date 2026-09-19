@@ -1138,8 +1138,9 @@ paths:
         selectedPlaces의 모든 (provider, providerPlaceId)를 전체 일정에 정확히 한 번씩 배치합니다.
         providerPlaceId는 관광데이터 검색 API 응답의 contentId를 그대로 전달합니다.
         LLM은 복합키·날짜·순서·memo만 결정하며 이름·주소·좌표는 요청 원본에서 채웁니다.
-        pace는 분배와 밀도만 조절하며 장소를 제외하지 않습니다.
-        서버가 좌표 기반으로 날짜별 장소를 묶으며, LLM은 해당 묶음 안에서 순서와 설명을 생성합니다.
+        pace는 하루에 담을 수 있는 시간을 정하며 선택 장소를 제외하지 않습니다.
+        서버가 이동 시간과 체류 시간으로 날짜별 장소를 묶고 순서를 정하며, LLM은 그 묶음 안에서 설명을 생성합니다.
+        selectedPlaces는 선택 입력입니다. 비어 있으면 서버가 카탈로그에서 후보를 채워 일정을 만듭니다.
         동선·설명 품질이 부족하면 피드백을 포함해 최대 1회 재생성합니다. 다시 실패하면 저장하지 않습니다.
         거리는 직선거리 기반 휴리스틱이며 실제 교통·숙소 좌표·이동 시간을 계산하지 않습니다.
         전체 결과를 검증한 뒤 저장하며 누락·추가·중복 장소가 있으면 저장하지 않습니다.
@@ -4507,6 +4508,125 @@ paths:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "403":
           description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/places/sync:
+    post:
+      tags:
+        - Place
+      summary: "장소 카탈로그 동기화"
+      description: "ROLE_ADMIN/MANAGER. TourAPI 부산 장소를 페이지 끝까지 훑어 적재합니다. contentId 기준 upsert라 여러 번 실행해도 행이 늘지 않으며, 체류 시간·평점·시간대 같은 보강 값은 덮지 않습니다. 자동 스케줄은 없고 운영이 직접 호출합니다."
+      security:
+        - opaqueToken: [ ]
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceSyncEnvelope"
+        "401":
+          description: "인증 필요"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/places/enrich:
+    post:
+      tags:
+        - Place
+      summary: "장소 인기도 보강"
+      description: "ROLE_ADMIN/MANAGER. Google Places에서 평점과 리뷰 수를 받아 채웁니다. 장소마다 외부 호출이 들어가므로 한 번에 처리할 수를 제한하며, 아직 보강하지 않은 장소부터 고릅니다. 평점이 없는 장소도 보강 시각을 남겨 매번 다시 조회하지 않습니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: "한 번에 처리할 장소 수. 1~300으로 보정되며 기본값은 50입니다."
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 300
+            default: 50
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceEnrichEnvelope"
+        "401":
+          description: "인증 필요"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/places/{placeId}:
+    patch:
+      tags:
+        - Place
+      summary: "장소 체류 시간·시간대 보정"
+      description: "ROLE_ADMIN/MANAGER. 유형별 기본값으로는 담기지 않는 값을 운영이 직접 넣습니다. null 필드는 바꾸지 않습니다. 시간대는 일정 배치에서 오전 장소를 앞으로, 저녁 장소를 뒤로 미는 데 쓰입니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceCurationRequest"
+            example:
+              dwellMinutes: 120
+              preferredTimeSlot: EVENING
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceCurationEnvelope"
+        "400":
+          description: "체류 시간이 허용 범위(10~480) 밖"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "인증 필요"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "장소를 찾을 수 없음"
           content:
             application/json:
               schema:
@@ -8650,13 +8770,13 @@ components:
           example: 해운대
     AiTravelPlanGenerateRequest:
       type: object
-      required:
-        - selectedPlaces
       properties:
         selectedPlaces:
           type: array
-          minItems: 1
-          description: 관광데이터 검색 결과 원본. 복합키 중복 없이 모든 장소를 정확히 한 번 배치합니다.
+          description: |
+            관광데이터 검색 결과 원본. 복합키 중복 없이 모든 장소를 정확히 한 번 배치합니다.
+            비워 두거나 적게 보내면 서버가 장소 카탈로그에서 인기순으로 후보를 채웁니다.
+            이때 채운 장소는 응답의 source가 AUTO_FILLED로 표시됩니다.
           items:
             $ref: "#/components/schemas/WizardPickedPlace"
         foodIds:
@@ -8901,6 +9021,125 @@ components:
           example:
             - 30000000-0000-0000-0000-000000000002
             - 30000000-0000-0000-0000-000000000001
+    PlaceSyncResult:
+      type: object
+      description: "적재 결과 요약. skipped는 contentId나 이름이 없어 저장할 수 없던 항목, failedPages는 외부 호출이 실패해 건너뛴 페이지입니다. 원인이 데이터인지 네트워크인지 구분하려고 나눠 보고합니다."
+      properties:
+        created:
+          type: integer
+          example: 1240
+        updated:
+          type: integer
+          example: 30
+        skipped:
+          type: integer
+          example: 2
+        failedPages:
+          type: integer
+          example: 0
+        totalCount:
+          type: integer
+          example: 1272
+    PlaceSyncEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "장소 카탈로그 동기화"
+        data:
+          $ref: "#/components/schemas/PlaceSyncResult"
+    PlaceEnrichResult:
+      type: object
+      description: "보강 결과 요약. withoutRating은 조회에는 성공했지만 구글에 평점이 없던 장소, failed는 외부 호출이 실패한 장소입니다. 전자는 다시 조회하지 않고 후자는 다음 호출에서 재시도됩니다."
+      properties:
+        targeted:
+          type: integer
+          example: 50
+        enriched:
+          type: integer
+          example: 46
+        withoutRating:
+          type: integer
+          example: 3
+        failed:
+          type: integer
+          example: 1
+    PlaceEnrichEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "장소 인기도 보강"
+        data:
+          $ref: "#/components/schemas/PlaceEnrichResult"
+    PlaceCurationRequest:
+      type: object
+      description: "null 필드는 기존 값을 유지합니다."
+      properties:
+        dwellMinutes:
+          type: integer
+          nullable: true
+          minimum: 10
+          maximum: 480
+          example: 120
+        preferredTimeSlot:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/PlaceTimeSlot"
+    PlaceTimeSlot:
+      type: string
+      description: "장소가 어울리는 시간대. 일정 배치에서 MORNING은 그날 앞으로, EVENING은 뒤로 갑니다."
+      enum:
+        - MORNING
+        - AFTERNOON
+        - EVENING
+      example: EVENING
+    PlaceCuration:
+      type: object
+      properties:
+        placeId:
+          type: string
+          format: uuid
+          example: 50000000-0000-0000-0000-000000000001
+        name:
+          type: string
+          example: 광안리해수욕장
+        contentTypeId:
+          type: string
+          nullable: true
+          example: "12"
+        dwellMinutes:
+          type: integer
+          nullable: true
+          example: 120
+        preferredTimeSlot:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/PlaceTimeSlot"
+    PlaceCurationEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "장소 보정"
+        data:
+          $ref: "#/components/schemas/PlaceCuration"
+    PlanPlaceSource:
+      type: string
+      description: "장소 출처. USER_PICKED는 사용자가 직접 고른 장소, AUTO_FILLED는 고른 장소가 모자라 서버가 카탈로그에서 채운 장소입니다."
+      enum:
+        - USER_PICKED
+        - AUTO_FILLED
+      example: USER_PICKED
     PlanPlaceResponse:
       type: object
       properties:
@@ -8953,6 +9192,8 @@ components:
           type: boolean
           nullable: true
           example: false
+        source:
+          $ref: "#/components/schemas/PlanPlaceSource"
     TravelPlansResponse:
       type: object
       properties:
@@ -9026,6 +9267,8 @@ components:
           type: boolean
           nullable: true
           example: false
+        source:
+          $ref: "#/components/schemas/PlanPlaceSource"
         routeToNext:
           nullable: true
           allOf:
