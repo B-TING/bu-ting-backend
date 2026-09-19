@@ -13,11 +13,24 @@ public final class SelectedPlaceCatalog {
   private SelectedPlaceCatalog() {}
 
   public static Map<PlaceKey, WizardPickedPlaceReqDto> from(AiTravelPlanGenerateReqDto request) {
-    if (request == null || request.selectedPlaces() == null || request.selectedPlaces().isEmpty()) {
+    if (request == null) {
+      throw invalid();
+    }
+    return fromPlaces(request.selectedPlaces());
+  }
+
+  /**
+   * 사용자가 고른 장소와 서버가 채운 후보를 합쳐 카탈로그를 만든다.
+   *
+   * <p>앞에 오는 목록이 우선이다. 같은 장소가 양쪽에 있으면 사용자가 고른 쪽이 남는다.
+   */
+  public static Map<PlaceKey, WizardPickedPlaceReqDto> fromPlaces(
+      java.util.List<WizardPickedPlaceReqDto> selected) {
+    if (selected == null || selected.isEmpty()) {
       throw invalid();
     }
     Map<PlaceKey, WizardPickedPlaceReqDto> places = new LinkedHashMap<>();
-    for (WizardPickedPlaceReqDto place : request.selectedPlaces()) {
+    for (WizardPickedPlaceReqDto place : selected) {
       if (place == null
           || !hasText(place.placeName())
           || !hasText(place.address())

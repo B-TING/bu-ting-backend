@@ -4,6 +4,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.ai.PlaceKey;
 import com.butingbe.domain.travel.ai.SelectedPlaceCatalog;
 import com.butingbe.domain.travel.ai.TravelPlanAiResponse;
+import com.butingbe.domain.travel.ai.TravelPlanCandidateFiller;
 import com.butingbe.domain.travel.ai.TravelPlanGenerator;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto.WizardPickedPlaceReqDto;
@@ -36,6 +37,7 @@ public class AiTravelPlanService {
   private final UserRepository userRepository;
   private final TravelMemberAuthorization authorization;
   private final TravelPlanGenerator generator;
+  private final TravelPlanCandidateFiller candidateFiller;
 
   @Transactional
   public TravelPlansResDto generate(
@@ -50,7 +52,9 @@ public class AiTravelPlanService {
             .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
     authorization.validateMember(travelId, user.getId());
 
-    Map<PlaceKey, WizardPickedPlaceReqDto> catalog = SelectedPlaceCatalog.from(request);
+    // 고른 장소가 모자라면 카탈로그에서 후보를 보탠다. 합쳐진 목록이 그대로 검증 경로를 탄다.
+    Map<PlaceKey, WizardPickedPlaceReqDto> catalog =
+        SelectedPlaceCatalog.fromPlaces(candidateFiller.fill(travel, request));
     TravelPlanAiResponse response = generator.generate(travel, request, catalog);
     if (response.days().stream()
         .anyMatch(day -> planRepository.existsByTravel_IdAndVisitDate(travelId, day.date()))) {
