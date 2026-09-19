@@ -92,6 +92,7 @@ class TravelPlanRoutePlannerTest {
             new com.butingbe.domain.route.VisitOrderOptimizer(
                 new com.butingbe.domain.route.HaversineRouteProvider()),
             new com.butingbe.domain.route.HaversineRouteProvider(),
+            new com.butingbe.domain.route.HaversineRouteProvider(),
             (provider, providerPlaceId) -> 300,
             (provider, providerPlaceId) -> java.util.Optional.empty());
     var places = new ArrayList<WizardPickedPlaceReqDto>();
@@ -131,6 +132,7 @@ class TravelPlanRoutePlannerTest {
             new com.butingbe.domain.route.VisitOrderOptimizer(
                 new com.butingbe.domain.route.HaversineRouteProvider()),
             new com.butingbe.domain.route.HaversineRouteProvider(),
+            new com.butingbe.domain.route.HaversineRouteProvider(),
             (provider, providerPlaceId) -> 300,
             (provider, providerPlaceId) -> java.util.Optional.empty());
     var places = new ArrayList<WizardPickedPlaceReqDto>();
@@ -166,6 +168,7 @@ class TravelPlanRoutePlannerTest {
             new com.butingbe.domain.route.VisitOrderOptimizer(
                 new com.butingbe.domain.route.HaversineRouteProvider()),
             new com.butingbe.domain.route.HaversineRouteProvider(),
+            new com.butingbe.domain.route.HaversineRouteProvider(),
             (provider, providerPlaceId) -> 600,
             (provider, providerPlaceId) -> java.util.Optional.empty());
     var places =
@@ -191,6 +194,7 @@ class TravelPlanRoutePlannerTest {
         new TravelPlanRoutePlanner(
             new com.butingbe.domain.route.VisitOrderOptimizer(
                 new com.butingbe.domain.route.HaversineRouteProvider()),
+            new com.butingbe.domain.route.HaversineRouteProvider(),
             new com.butingbe.domain.route.HaversineRouteProvider(),
             (provider, providerPlaceId) -> 100,
             (provider, providerPlaceId) -> java.util.Optional.empty());
@@ -229,6 +233,7 @@ class TravelPlanRoutePlannerTest {
         new TravelPlanRoutePlanner(
             new com.butingbe.domain.route.VisitOrderOptimizer(
                 new com.butingbe.domain.route.HaversineRouteProvider()),
+            new com.butingbe.domain.route.HaversineRouteProvider(),
             new com.butingbe.domain.route.HaversineRouteProvider(),
             (provider, providerPlaceId) -> 30,
             (provider, providerPlaceId) ->
@@ -275,5 +280,47 @@ class TravelPlanRoutePlannerTest {
             .build();
 
     assertThat(withSlots.plan(oneDay, catalog).get(TravelPlanFixtures.START)).hasSize(3);
+  }
+
+  @Test
+  @org.junit.jupiter.api.DisplayName("하루 예산은 대표 provider가 준 이동 시간으로 계산한다")
+  void usesRepresentativeProviderForDailyBudget() {
+    // 구간마다 400분이 걸린다고 답하는 provider를 주면 RELAXED(480분) 하루에 두 곳을 넣을 수 없다.
+    var slowProvider =
+        new com.butingbe.domain.route.RouteProvider() {
+          @Override
+          public com.butingbe.domain.route.dto.RouteLeg leg(
+              com.butingbe.domain.route.dto.RoutePoint from,
+              com.butingbe.domain.route.dto.RoutePoint to,
+              com.butingbe.domain.travel.entity.TransportType transportType) {
+            return new com.butingbe.domain.route.dto.RouteLeg(from, to, transportType, 1000, 400);
+          }
+        };
+    var planner =
+        new TravelPlanRoutePlanner(
+            new com.butingbe.domain.route.VisitOrderOptimizer(
+                new com.butingbe.domain.route.HaversineRouteProvider()),
+            slowProvider,
+            new com.butingbe.domain.route.HaversineRouteProvider(),
+            (provider, providerPlaceId) -> 60,
+            (provider, providerPlaceId) -> java.util.Optional.empty());
+    var places =
+        List.of(
+            new WizardPickedPlaceReqDto("GOOGLE", "1", "장소1", "주소", 35.10, 129.10, "TOURIST_SPOT"),
+            new WizardPickedPlaceReqDto("GOOGLE", "2", "장소2", "주소", 35.11, 129.11, "TOURIST_SPOT"));
+    var catalog = SelectedPlaceCatalog.from(TravelPlanFixtures.request(places));
+    var travel =
+        com.butingbe.domain.travel.entity.Travel.builder()
+            .destination("부산")
+            .startDate(TravelPlanFixtures.START)
+            .endDate(TravelPlanFixtures.START.plusDays(1))
+            .pace(com.butingbe.domain.travel.entity.TravelPace.RELAXED)
+            .build();
+
+    var routes = planner.plan(travel, catalog);
+
+    // 좌표상으로는 두 곳이 가까워 한 날에 묶이지만, 이동 시간이 커서 나뉜다.
+    assertThat(routes.get(TravelPlanFixtures.START)).hasSize(1);
+    assertThat(routes.get(TravelPlanFixtures.START.plusDays(1))).hasSize(1);
   }
 }
