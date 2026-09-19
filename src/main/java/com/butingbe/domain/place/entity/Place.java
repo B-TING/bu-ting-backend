@@ -110,4 +110,24 @@ public class Place extends TimestampEntity {
     this.reviewCount = reviewCount;
     this.preferredTimeSlot = preferredTimeSlot;
   }
+
+  /** 동기화로 다시 받은 원본 값을 반영한다. 보강 컬럼(체류 시간·평점·시간대)은 건드리지 않는다. */
+  public void applySync(
+      String name,
+      String address,
+      Double latitude,
+      Double longitude,
+      String contentTypeId,
+      String imageUrl,
+      ChatZone zoneId,
+      String districtCode) {
+    this.name = name;
+    this.address = address;
+    this.latitude = latitude;
+    this.longitude = longitude;
+    this.contentTypeId = contentTypeId;
+    this.imageUrl = imageUrl;
+    this.zoneId = zoneId;
+    this.districtCode = districtCode;
+  }
 }
