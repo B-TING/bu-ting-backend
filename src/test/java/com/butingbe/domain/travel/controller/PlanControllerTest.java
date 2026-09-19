@@ -307,7 +307,8 @@ class PlanControllerTest {
           30,
           null,
           null,
-          false);
+          false,
+          com.butingbe.domain.travel.entity.PlanPlaceSource.USER_PICKED);
     }
 
     @Override
@@ -329,7 +330,8 @@ class PlanControllerTest {
           30,
           null,
           null,
-          request.visited());
+          request.visited(),
+          com.butingbe.domain.travel.entity.PlanPlaceSource.USER_PICKED);
     }
 
     @Override
@@ -359,7 +361,8 @@ class PlanControllerTest {
           30,
           null,
           null,
-          false);
+          false,
+          com.butingbe.domain.travel.entity.PlanPlaceSource.USER_PICKED);
     }
   }
 }

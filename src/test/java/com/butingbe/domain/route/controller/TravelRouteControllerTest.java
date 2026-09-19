@@ -348,7 +348,8 @@ class TravelRouteControllerTest {
         30,
         null,
         null,
-        false);
+        false,
+        com.butingbe.domain.travel.entity.PlanPlaceSource.USER_PICKED);
   }
 
   private LocalValidatorFactoryBean validator() {
