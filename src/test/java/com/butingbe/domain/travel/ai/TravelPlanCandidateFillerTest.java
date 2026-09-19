@@ -40,11 +40,10 @@ class TravelPlanCandidateFillerTest {
     when(placeCandidateFinder.findCandidates(any(), any(), eq(8)))
         .thenReturn(List.of(candidate("1"), candidate("2")));
 
-    List<WizardPickedPlaceReqDto> merged =
-        filler.fill(travel(TravelPace.BALANCED, null), request());
+    var merged = filler.fill(travel(TravelPace.BALANCED, null), request());
 
-    assertThat(merged).hasSize(2);
-    assertThat(merged.get(0).providerPlaceId()).isEqualTo("1");
+    assertThat(merged.places()).hasSize(2);
+    assertThat(merged.places().get(0).providerPlaceId()).isEqualTo("1");
   }
 
   @Test
@@ -53,12 +52,11 @@ class TravelPlanCandidateFillerTest {
     when(placeCandidateFinder.findCandidates(any(), any(), eq(7)))
         .thenReturn(List.of(candidate("9")));
 
-    List<WizardPickedPlaceReqDto> merged =
-        filler.fill(travel(TravelPace.BALANCED, null), request(picked("user-1")));
+    var merged = filler.fill(travel(TravelPace.BALANCED, null), request(picked("user-1")));
 
-    assertThat(merged).hasSize(2);
-    assertThat(merged.get(0).providerPlaceId()).isEqualTo("user-1");
-    assertThat(merged.get(1).providerPlaceId()).isEqualTo("9");
+    assertThat(merged.places()).hasSize(2);
+    assertThat(merged.places().get(0).providerPlaceId()).isEqualTo("user-1");
+    assertThat(merged.places().get(1).providerPlaceId()).isEqualTo("9");
   }
 
   @Test
@@ -81,10 +79,9 @@ class TravelPlanCandidateFillerTest {
       picked[i] = picked("user-" + i);
     }
 
-    List<WizardPickedPlaceReqDto> merged =
-        filler.fill(travel(TravelPace.BALANCED, null), request(picked));
+    var merged = filler.fill(travel(TravelPace.BALANCED, null), request(picked));
 
-    assertThat(merged).hasSize(8);
+    assertThat(merged.places()).hasSize(8);
     verify(placeCandidateFinder, never()).findCandidates(any(), any(), anyInt());
   }
 
@@ -110,11 +107,22 @@ class TravelPlanCandidateFillerTest {
   }
 
   @Test
-  @DisplayName("권역 이름이 아닌 숙소 지역은 전체에서 고른다")
+  @DisplayName("모바일이 보내는 위저드 지역 아이디도 권역으로 좁힌다")
+  void narrowsToZoneFromWizardAreaId() {
+    when(placeCandidateFinder.findCandidates(any(), any(), anyInt())).thenReturn(List.of());
+
+    filler.fill(travel(TravelPace.BALANCED, "haeundae"), request());
+
+    verify(placeCandidateFinder)
+        .findCandidates(eq(Set.of(ChatZone.HAEUNDAE_GIJANG)), any(), anyInt());
+  }
+
+  @Test
+  @DisplayName("해석할 수 없는 숙소 지역은 전체에서 고른다")
   void fallsBackToAllZonesForUnknownArea() {
     when(placeCandidateFinder.findCandidates(any(), any(), anyInt())).thenReturn(List.of());
 
-    filler.fill(travel(TravelPace.BALANCED, "해운대"), request());
+    filler.fill(travel(TravelPace.BALANCED, "서울"), request());
 
     verify(placeCandidateFinder).findCandidates(eq(Set.of()), any(), anyInt());
   }
@@ -125,11 +133,13 @@ class TravelPlanCandidateFillerTest {
     when(placeCandidateFinder.findCandidates(any(), any(), eq(8)))
         .thenReturn(List.of(candidate("1")));
 
-    assertThat(filler.fill(travel(TravelPace.BALANCED, null), null)).hasSize(1);
+    assertThat(filler.fill(travel(TravelPace.BALANCED, null), null).places()).hasSize(1);
     assertThat(
-            filler.fill(
-                travel(TravelPace.BALANCED, null),
-                new AiTravelPlanGenerateReqDto(null, null, null, null, null, null)))
+            filler
+                .fill(
+                    travel(TravelPace.BALANCED, null),
+                    new AiTravelPlanGenerateReqDto(null, null, null, null, null, null))
+                .places())
         .hasSize(1);
   }
 
@@ -141,6 +151,32 @@ class TravelPlanCandidateFillerTest {
     filler.fill(travel(TravelPace.RELAXED, null), request());
 
     verify(placeCandidateFinder).findCandidates(any(), any(), eq(6));
+  }
+
+  @Test
+  @DisplayName("서버가 채운 장소만 출처로 표시한다")
+  void marksOnlyAutoFilledPlaces() {
+    when(placeCandidateFinder.findCandidates(any(), any(), eq(7)))
+        .thenReturn(List.of(candidate("server-1")));
+
+    var merged = filler.fill(travel(TravelPace.BALANCED, null), request(picked("user-1")));
+
+    assertThat(merged.autoFilled("server-1")).isTrue();
+    assertThat(merged.autoFilled("user-1")).isFalse();
+  }
+
+  @Test
+  @DisplayName("채울 필요가 없으면 표시할 후보도 없다")
+  void hasNoAutoFilledWhenNothingAdded() {
+    WizardPickedPlaceReqDto[] picked = new WizardPickedPlaceReqDto[8];
+    for (int i = 0; i < picked.length; i++) {
+      picked[i] = picked("user-" + i);
+    }
+
+    var merged = filler.fill(travel(TravelPace.BALANCED, null), request(picked));
+
+    assertThat(merged.autoFilledProviderPlaceIds()).isEmpty();
+    assertThat(merged.autoFilled("user-0")).isFalse();
   }
 
   private Travel travel(TravelPace pace, String accommodationArea) {

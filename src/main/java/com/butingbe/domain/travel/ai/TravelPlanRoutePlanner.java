@@ -1,6 +1,8 @@
 package com.butingbe.domain.travel.ai;
 
+import com.butingbe.domain.place.entity.PlaceTimeSlot;
 import com.butingbe.domain.place.service.PlaceDwellTimeProvider;
+import com.butingbe.domain.place.service.PlaceTimeSlotProvider;
 import com.butingbe.domain.route.HaversineRouteProvider;
 import com.butingbe.domain.route.VisitOrderOptimizer;
 import com.butingbe.domain.route.dto.RouteLeg;
@@ -41,6 +43,7 @@ public class TravelPlanRoutePlanner {
   private final VisitOrderOptimizer visitOrderOptimizer;
   private final HaversineRouteProvider haversineRouteProvider;
   private final PlaceDwellTimeProvider placeDwellTimeProvider;
+  private final PlaceTimeSlotProvider placeTimeSlotProvider;
 
   public Map<LocalDate, List<PlaceKey>> plan(
       Travel travel, Map<PlaceKey, WizardPickedPlaceReqDto> catalog) {
@@ -177,8 +180,40 @@ public class TravelPlanRoutePlanner {
             .map(point -> byPointId.get(point.placeId()))
             .filter(java.util.Objects::nonNull)
             .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-    ordered.addAll(unlocated);
-    return ordered;
+    List<PlaceKey> byTimeSlot = applyTimeSlots(ordered, catalog);
+    byTimeSlot.addAll(unlocated);
+    return byTimeSlot;
+  }
+
+  /**
+   * 시간대가 지정된 장소를 앞뒤로 민다. 오전 장소는 앞으로, 저녁 장소는 뒤로 간다.
+   *
+   * <p>이동 거리 최적화를 버리지 않는다. 같은 시간대 안에서는 최적화가 정한 순서를 그대로 둔다. 시간대가 없는 장소(대다수)도 원래 순서를 지킨다.
+   */
+  private List<PlaceKey> applyTimeSlots(
+      List<PlaceKey> ordered, Map<PlaceKey, WizardPickedPlaceReqDto> catalog) {
+    List<PlaceKey> morning = new ArrayList<>();
+    List<PlaceKey> unspecified = new ArrayList<>();
+    List<PlaceKey> evening = new ArrayList<>();
+
+    for (PlaceKey key : ordered) {
+      WizardPickedPlaceReqDto place = catalog.get(key);
+      PlaceTimeSlot slot =
+          placeTimeSlotProvider.timeSlot(place.provider(), place.providerPlaceId()).orElse(null);
+      if (slot == PlaceTimeSlot.MORNING) {
+        morning.add(key);
+      } else if (slot == PlaceTimeSlot.EVENING) {
+        evening.add(key);
+      } else {
+        unspecified.add(key);
+      }
+    }
+
+    List<PlaceKey> result = new ArrayList<>(ordered.size());
+    result.addAll(morning);
+    result.addAll(unspecified);
+    result.addAll(evening);
+    return result;
   }
 
   /** 앞 장소에서 이 장소까지의 이동 시간. 첫 장소이거나 좌표가 없으면 0이다. */

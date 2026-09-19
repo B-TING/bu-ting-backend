@@ -92,7 +92,8 @@ class TravelPlanRoutePlannerTest {
             new com.butingbe.domain.route.VisitOrderOptimizer(
                 new com.butingbe.domain.route.HaversineRouteProvider()),
             new com.butingbe.domain.route.HaversineRouteProvider(),
-            (provider, providerPlaceId) -> 300);
+            (provider, providerPlaceId) -> 300,
+            (provider, providerPlaceId) -> java.util.Optional.empty());
     var places = new ArrayList<WizardPickedPlaceReqDto>();
     for (int i = 0; i < 4; i++) {
       places.add(
@@ -130,7 +131,8 @@ class TravelPlanRoutePlannerTest {
             new com.butingbe.domain.route.VisitOrderOptimizer(
                 new com.butingbe.domain.route.HaversineRouteProvider()),
             new com.butingbe.domain.route.HaversineRouteProvider(),
-            (provider, providerPlaceId) -> 300);
+            (provider, providerPlaceId) -> 300,
+            (provider, providerPlaceId) -> java.util.Optional.empty());
     var places = new ArrayList<WizardPickedPlaceReqDto>();
     for (int i = 0; i < 4; i++) {
       places.add(
@@ -164,7 +166,8 @@ class TravelPlanRoutePlannerTest {
             new com.butingbe.domain.route.VisitOrderOptimizer(
                 new com.butingbe.domain.route.HaversineRouteProvider()),
             new com.butingbe.domain.route.HaversineRouteProvider(),
-            (provider, providerPlaceId) -> 600);
+            (provider, providerPlaceId) -> 600,
+            (provider, providerPlaceId) -> java.util.Optional.empty());
     var places =
         List.of(
             new WizardPickedPlaceReqDto("GOOGLE", "1", "장소1", "주소", 35.0, 129.0, "TOURIST_SPOT"),
@@ -189,7 +192,8 @@ class TravelPlanRoutePlannerTest {
             new com.butingbe.domain.route.VisitOrderOptimizer(
                 new com.butingbe.domain.route.HaversineRouteProvider()),
             new com.butingbe.domain.route.HaversineRouteProvider(),
-            (provider, providerPlaceId) -> 100);
+            (provider, providerPlaceId) -> 100,
+            (provider, providerPlaceId) -> java.util.Optional.empty());
     // 좌표 있는 장소 둘이 각각 하루를 차지하고, 좌표 없는 장소가 그중 한 날에 덧붙는다.
     var first =
         new WizardPickedPlaceReqDto("GOOGLE", "1", "장소1", "주소", 35.0, 129.0, "TOURIST_SPOT");
@@ -211,5 +215,65 @@ class TravelPlanRoutePlannerTest {
 
     assertThat(routes.values().stream().flatMap(List::stream).toList())
         .containsExactlyInAnyOrderElementsOf(catalog.keySet());
+  }
+
+  @Test
+  @org.junit.jupiter.api.DisplayName("야경 장소는 그날 마지막, 오전 장소는 처음으로 간다")
+  void movesTimeSlotPlacesToEdges() {
+    // 최적 순서에서 가운데 오던 장소들이 시간대 때문에 앞뒤로 밀려야 한다.
+    var slots =
+        java.util.Map.of(
+            "morning", com.butingbe.domain.place.entity.PlaceTimeSlot.MORNING,
+            "evening", com.butingbe.domain.place.entity.PlaceTimeSlot.EVENING);
+    var planner =
+        new TravelPlanRoutePlanner(
+            new com.butingbe.domain.route.VisitOrderOptimizer(
+                new com.butingbe.domain.route.HaversineRouteProvider()),
+            new com.butingbe.domain.route.HaversineRouteProvider(),
+            (provider, providerPlaceId) -> 30,
+            (provider, providerPlaceId) ->
+                java.util.Optional.ofNullable(slots.get(providerPlaceId)));
+    var places =
+        List.of(
+            new WizardPickedPlaceReqDto(
+                "GOOGLE", "evening", "광안리", "주소", 35.1532, 129.1186, "TOURIST_SPOT"),
+            new WizardPickedPlaceReqDto(
+                "GOOGLE", "plain", "그냥 장소", "주소", 35.1535, 129.119, "TOURIST_SPOT"),
+            new WizardPickedPlaceReqDto(
+                "GOOGLE", "morning", "자갈치", "주소", 35.1538, 129.1194, "TOURIST_SPOT"));
+    var catalog = SelectedPlaceCatalog.from(TravelPlanFixtures.request(places));
+    var oneDay =
+        com.butingbe.domain.travel.entity.Travel.builder()
+            .destination("부산")
+            .startDate(TravelPlanFixtures.START)
+            .endDate(TravelPlanFixtures.START)
+            .pace(com.butingbe.domain.travel.entity.TravelPace.TIGHT)
+            .build();
+
+    var ordered = planner.plan(oneDay, catalog).get(TravelPlanFixtures.START);
+
+    assertThat(ordered.get(0)).isEqualTo(PlaceKey.of("GOOGLE", "morning"));
+    assertThat(ordered.get(ordered.size() - 1)).isEqualTo(PlaceKey.of("GOOGLE", "evening"));
+  }
+
+  @Test
+  @org.junit.jupiter.api.DisplayName("시간대가 지정되지 않으면 최적화 순서를 그대로 둔다")
+  void keepsOptimizedOrderWithoutTimeSlots() {
+    var withSlots = TravelPlanFixtures.routePlanner();
+    var places =
+        List.of(
+            new WizardPickedPlaceReqDto("GOOGLE", "1", "장소1", "주소", 35.10, 129.10, "TOURIST_SPOT"),
+            new WizardPickedPlaceReqDto("GOOGLE", "2", "장소2", "주소", 35.11, 129.11, "TOURIST_SPOT"),
+            new WizardPickedPlaceReqDto("GOOGLE", "3", "장소3", "주소", 35.12, 129.12, "TOURIST_SPOT"));
+    var catalog = SelectedPlaceCatalog.from(TravelPlanFixtures.request(places));
+    var oneDay =
+        com.butingbe.domain.travel.entity.Travel.builder()
+            .destination("부산")
+            .startDate(TravelPlanFixtures.START)
+            .endDate(TravelPlanFixtures.START)
+            .pace(com.butingbe.domain.travel.entity.TravelPace.TIGHT)
+            .build();
+
+    assertThat(withSlots.plan(oneDay, catalog).get(TravelPlanFixtures.START)).hasSize(3);
   }
 }

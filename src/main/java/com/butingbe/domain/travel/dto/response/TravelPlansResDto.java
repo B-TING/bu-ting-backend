@@ -3,6 +3,7 @@ package com.butingbe.domain.travel.dto.response;
 import com.butingbe.domain.travel.entity.PlaceProvider;
 import com.butingbe.domain.travel.entity.Plan;
 import com.butingbe.domain.travel.entity.PlanPlace;
+import com.butingbe.domain.travel.entity.PlanPlaceSource;
 import com.butingbe.domain.travel.entity.PlanRoute;
 import com.butingbe.domain.travel.entity.TransportType;
 import com.butingbe.domain.travel.entity.Travel;
@@ -46,6 +47,7 @@ public record TravelPlansResDto(UUID travelId, String title, List<PlanDayResDto>
       String memo,
       LocalTime scheduledTime,
       Boolean visited,
+      PlanPlaceSource source,
       PlanRouteResDto routeToNext) {
 
     public static PlanPlaceResDto of(PlanPlace place, PlanRoute routeToNext) {
@@ -62,6 +64,7 @@ public record TravelPlansResDto(UUID travelId, String title, List<PlanDayResDto>
           place.getMemo(),
           place.getScheduledTime(),
           place.getVisited(),
+          place.getSource(),
           routeToNext == null ? null : PlanRouteResDto.from(routeToNext));
     }
   }

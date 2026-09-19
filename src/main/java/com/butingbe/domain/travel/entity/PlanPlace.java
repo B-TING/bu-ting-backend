@@ -72,6 +72,11 @@ public class PlanPlace {
   @Column(name = "is_visited", nullable = false)
   private Boolean visited = false;
 
+  /** 사용자가 고른 장소인지 서버가 채운 후보인지. 지정하지 않으면 사용자 선택으로 본다. */
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private PlanPlaceSource source = PlanPlaceSource.USER_PICKED;
+
   @Builder
   public PlanPlace(
       Plan plan,
@@ -85,7 +90,8 @@ public class PlanPlace {
       Integer durationMinutes,
       String memo,
       LocalTime scheduledTime,
-      Boolean visited) {
+      Boolean visited,
+      PlanPlaceSource source) {
     this.plan = plan;
     this.sequence = sequence;
     this.placeName = placeName;
@@ -98,6 +104,7 @@ public class PlanPlace {
     this.memo = memo;
     this.scheduledTime = scheduledTime;
     this.visited = visited != null ? visited : false;
+    this.source = source != null ? source : PlanPlaceSource.USER_PICKED;
   }
 
   public void changeSequence(Integer sequence) {

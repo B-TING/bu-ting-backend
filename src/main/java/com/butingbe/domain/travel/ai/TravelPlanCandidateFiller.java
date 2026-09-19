@@ -2,6 +2,7 @@ package com.butingbe.domain.travel.ai;
 
 import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.place.dto.response.PlaceCandidateResDto;
+import com.butingbe.domain.place.entity.AccommodationAreaZones;
 import com.butingbe.domain.place.service.PlaceCandidateFinder;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto.WizardPickedPlaceReqDto;
@@ -33,8 +34,21 @@ public class TravelPlanCandidateFiller {
 
   private final PlaceCandidateFinder placeCandidateFinder;
 
+  /**
+   * 고른 장소와 서버가 채운 후보.
+   *
+   * <p>어느 쪽에서 왔는지 호출자가 알아야 일정에 출처를 남길 수 있다. 순서는 고른 장소가 먼저다.
+   */
+  public record FilledPlaces(
+      List<WizardPickedPlaceReqDto> places, Set<String> autoFilledProviderPlaceIds) {
+
+    public boolean autoFilled(String providerPlaceId) {
+      return autoFilledProviderPlaceIds.contains(providerPlaceId);
+    }
+  }
+
   /** 고른 장소 + 부족분 후보. 순서는 고른 장소가 먼저다. */
-  public List<WizardPickedPlaceReqDto> fill(Travel travel, AiTravelPlanGenerateReqDto request) {
+  public FilledPlaces fill(Travel travel, AiTravelPlanGenerateReqDto request) {
     List<WizardPickedPlaceReqDto> selected =
         request == null || request.selectedPlaces() == null
             ? List.of()
@@ -42,7 +56,7 @@ public class TravelPlanCandidateFiller {
 
     int needed = requiredPlaceCount(travel) - selected.size();
     if (needed < 1) {
-      return selected;
+      return new FilledPlaces(selected, Set.of());
     }
 
     Set<String> alreadyPicked =
@@ -51,10 +65,15 @@ public class TravelPlanCandidateFiller {
             .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
     List<WizardPickedPlaceReqDto> merged = new ArrayList<>(selected);
+    Set<String> autoFilled = new LinkedHashSet<>();
     placeCandidateFinder.findCandidates(zonesOf(travel), alreadyPicked, needed).stream()
         .map(TravelPlanCandidateFiller::toWizardPlace)
-        .forEach(merged::add);
-    return merged;
+        .forEach(
+            place -> {
+              merged.add(place);
+              autoFilled.add(place.providerPlaceId());
+            });
+    return new FilledPlaces(merged, autoFilled);
   }
 
   /** 일수 × 하루 장소 수. 여행 속도가 빠를수록 더 많이 채운다. */
@@ -77,20 +96,13 @@ public class TravelPlanCandidateFiller {
   /**
    * 후보를 고를 권역.
    *
-   * <p>숙소 권역이 지정돼 있으면 그 권역에서만 고른다. 없으면 부산 전체에서 고른다. 사용자가 고른 장소의 권역까지 따지지 않는 것은, 선택 장소에 권역 정보가 없어
+   * <p>숙소 지역이 권역으로 해석되면 그 권역에서만 고르고, 아니면 부산 전체에서 고른다. 사용자가 고른 장소의 권역까지 따지지 않는 것은, 선택 장소에 권역 정보가 없어
    * 좌표로 역산해야 하기 때문이다. 필요해지면 그때 넓힌다.
    */
   private Set<ChatZone> zonesOf(Travel travel) {
-    String area = travel.getAccommodationArea();
-    if (area == null || area.isBlank()) {
-      return Set.of();
-    }
-    try {
-      return Set.of(ChatZone.fromString(area.trim()));
-    } catch (IllegalArgumentException e) {
-      // 숙소 권역은 위저드의 지역 아이디라 ChatZone 이름과 다를 수 있다. 그때는 전체에서 고른다.
-      return Set.of();
-    }
+    return AccommodationAreaZones.resolve(travel.getAccommodationArea())
+        .map(Set::of)
+        .orElseGet(Set::of);
   }
 
   private static WizardPickedPlaceReqDto toWizardPlace(PlaceCandidateResDto candidate) {
