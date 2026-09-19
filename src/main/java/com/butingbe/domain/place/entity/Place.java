@@ -11,6 +11,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -79,6 +80,10 @@ public class Place extends TimestampEntity {
   @Column(name = "preferred_time_slot", length = 20)
   private PlaceTimeSlot preferredTimeSlot;
 
+  /** 인기도를 외부에서 마지막으로 받아온 시각. 보강 대상 선정과 만료 판단에 쓴다. */
+  @Column(name = "enriched_at")
+  private LocalDateTime enrichedAt;
+
   @Builder
   private Place(
       String provider,
@@ -129,5 +134,16 @@ public class Place extends TimestampEntity {
     this.imageUrl = imageUrl;
     this.zoneId = zoneId;
     this.districtCode = districtCode;
+  }
+
+  /**
+   * 외부에서 받은 인기도를 반영한다. 평점이 없는 장소도 다시 조회하지 않도록 보강 시각은 항상 남긴다.
+   *
+   * <p>정렬 점수를 저장하지 않고 원자료만 둔다. 가중치를 바꿀 때 전체를 다시 계산하지 않아도 된다.
+   */
+  public void applyPopularity(BigDecimal rating, Integer reviewCount, LocalDateTime enrichedAt) {
+    this.rating = rating;
+    this.reviewCount = reviewCount;
+    this.enrichedAt = enrichedAt;
   }
 }
