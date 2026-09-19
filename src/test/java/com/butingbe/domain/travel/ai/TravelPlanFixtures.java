@@ -27,7 +27,8 @@ public final class TravelPlanFixtures {
     return new TravelPlanRoutePlanner(
         new com.butingbe.domain.route.VisitOrderOptimizer(haversine),
         haversine,
-        (provider, providerPlaceId) -> DEFAULT_DWELL_MINUTES);
+        (provider, providerPlaceId) -> DEFAULT_DWELL_MINUTES,
+        (provider, providerPlaceId) -> java.util.Optional.empty());
   }
 
   public static Travel travel() {
