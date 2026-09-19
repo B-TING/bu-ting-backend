@@ -4,6 +4,7 @@ import com.butingbe.domain.place.entity.PlaceTimeSlot;
 import com.butingbe.domain.place.service.PlaceDwellTimeProvider;
 import com.butingbe.domain.place.service.PlaceTimeSlotProvider;
 import com.butingbe.domain.route.HaversineRouteProvider;
+import com.butingbe.domain.route.RouteProvider;
 import com.butingbe.domain.route.VisitOrderOptimizer;
 import com.butingbe.domain.route.dto.RouteLeg;
 import com.butingbe.domain.route.dto.RoutePoint;
@@ -30,6 +31,10 @@ import org.springframework.stereotype.Component;
  * <p>가까운 장소끼리 날짜로 묶는 것은 좌표로 하고, 그 안의 순서와 하루에 담기는 양은 {@link VisitOrderOptimizer}와 이동·체류 시간으로 정한다. 경로
  * 계산을 여기서 새로 만들지 않고 {@code domain.route}의 것을 그대로 쓴다. 리부트가 쓰는 계산과 같은 것이라 두 기능의 결과가 어긋나지 않는다.
  *
+ * <p>하루 예산에 쓰는 이동 시간은 대표 provider를 거친다. 외부 경로 API를 켜면 실측값이 들어오고, 꺼져 있으면 좌표 추정값이 그대로 쓰인다. 반복 조회는 캐시가
+ * 받아내므로 생성할 때마다 외부 호출이 늘지 않는다. 반면 날짜를 나누는 거리 비교는 좌표 계산을 그대로 둔다. 상대적인 멀고 가까움만 필요한 곳에 외부 호출을 보낼 이유가
+ * 없다.
+ *
  * <p>하루 예산을 넘긴 장소는 다음 날로 넘긴다. 다만 선택 장소는 전부 배치해야 하므로 마지막 날은 넘치더라도 그대로 둔다. 빼는 것은 이 단계의 권한이 아니다.
  */
 @Component
@@ -41,7 +46,13 @@ public class TravelPlanRoutePlanner {
   private static final int TIGHT_DAILY_MINUTES = 720;
 
   private final VisitOrderOptimizer visitOrderOptimizer;
+
+  /** 하루 예산 계산에 쓰는 이동 시간. 외부 경로 API를 켜면 실측값이 들어온다. */
+  private final RouteProvider routeProvider;
+
+  /** 날짜를 나눌 때 쓰는 거리 비교. 상대 거리만 필요해 외부 호출을 보내지 않는다. */
   private final HaversineRouteProvider haversineRouteProvider;
+
   private final PlaceDwellTimeProvider placeDwellTimeProvider;
   private final PlaceTimeSlotProvider placeTimeSlotProvider;
 
@@ -228,7 +239,7 @@ public class TravelPlanRoutePlanner {
       return 0;
     }
     RouteLeg leg =
-        haversineRouteProvider.leg(
+        routeProvider.leg(
             RoutePoint.of(from.placeName(), from.latitude(), from.longitude()),
             RoutePoint.of(to.placeName(), to.latitude(), to.longitude()),
             TransportType.PUBLIC_TRANSPORT);
