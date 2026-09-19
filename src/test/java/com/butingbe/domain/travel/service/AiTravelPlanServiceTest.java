@@ -1,9 +1,11 @@
 package com.butingbe.domain.travel.service;
 
 import static com.butingbe.domain.travel.ai.TravelPlanFixtures.IDS;
+import static com.butingbe.domain.travel.ai.TravelPlanFixtures.START;
 import static com.butingbe.domain.travel.ai.TravelPlanFixtures.qualityResponse;
 import static com.butingbe.domain.travel.ai.TravelPlanFixtures.request;
 import static com.butingbe.domain.travel.ai.TravelPlanFixtures.response;
+import static com.butingbe.domain.travel.ai.TravelPlanFixtures.routePlanner;
 import static com.butingbe.domain.travel.ai.TravelPlanFixtures.travel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -63,9 +65,8 @@ class AiTravelPlanServiceTest {
               new TravelPlanPromptBuilder(),
               ai,
               new TravelPlanAiResponseValidator(),
-              com.butingbe.domain.travel.ai.TravelPlanFixtures.routePlanner(),
-              new TravelPlanQualityValidator(
-                  com.butingbe.domain.travel.ai.TravelPlanFixtures.routePlanner())),
+              routePlanner(),
+              new TravelPlanQualityValidator(routePlanner())),
           new com.butingbe.domain.travel.ai.TravelPlanCandidateFiller(
               (zones, excluded, limit) -> java.util.List.of()));
   private final UUID travelId = UUID.randomUUID();
@@ -80,6 +81,71 @@ class AiTravelPlanServiceTest {
     when(user.getId()).thenReturn(userId);
     when(travels.findById(travelId)).thenReturn(Optional.of(travel));
     when(users.findById(userId)).thenReturn(Optional.of(user));
+  }
+
+  @Test
+  @org.junit.jupiter.api.DisplayName("서버가 채운 장소는 출처가 AUTO_FILLED로 저장된다")
+  void marksServerFilledPlacesAsAutoFilled() {
+    // 고른 장소 없이 후보만으로 생성한다.
+    var candidate =
+        new com.butingbe.domain.place.dto.response.PlaceCandidateResDto(
+            "GOOGLE", IDS.get(0), "감천문화마을", "부산 원본 주소 0", 35.1, 129.0, "12");
+    var fillingService =
+        new AiTravelPlanService(
+            travels,
+            plans,
+            places,
+            users,
+            mock(TravelMemberAuthorization.class),
+            new TravelPlanGenerator(
+                new TravelPlanPromptBuilder(),
+                ai,
+                new TravelPlanAiResponseValidator(),
+                routePlanner(),
+                new TravelPlanQualityValidator(routePlanner())),
+            new com.butingbe.domain.travel.ai.TravelPlanCandidateFiller(
+                (zones, excluded, limit) -> List.of(candidate)));
+    when(ai.generate(anyString()))
+        .thenReturn(
+            new com.butingbe.domain.travel.ai.TravelPlanAiResponse(
+                List.of(
+                    new com.butingbe.domain.travel.ai.TravelPlanAiResponse.Day(
+                        START,
+                        List.of(
+                            new com.butingbe.domain.travel.ai.TravelPlanAiResponse.Place(
+                                1, "GOOGLE", IDS.get(0), "감천문화마을 알록달록한 골목을 천천히 둘러본다."))),
+                    new com.butingbe.domain.travel.ai.TravelPlanAiResponse.Day(
+                        START.plusDays(1), List.of()),
+                    new com.butingbe.domain.travel.ai.TravelPlanAiResponse.Day(
+                        START.plusDays(2), List.of()))));
+    List<PlanPlace> stored = new ArrayList<>();
+    when(plans.save(any()))
+        .thenAnswer(
+            call -> {
+              Plan plan = call.getArgument(0);
+              ReflectionTestUtils.setField(plan, "id", UUID.randomUUID());
+              return plan;
+            });
+    when(places.save(any()))
+        .thenAnswer(
+            call -> {
+              PlanPlace place = call.getArgument(0);
+              ReflectionTestUtils.setField(place, "id", UUID.randomUUID());
+              stored.add(place);
+              return place;
+            });
+    when(places.findByPlan_IdOrderBySequenceAsc(any())).thenReturn(List.of());
+
+    fillingService.generate(
+        principal,
+        travelId,
+        new com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto(
+            List.of(), null, null, null, null, null));
+
+    assertThat(stored)
+        .singleElement()
+        .extracting(PlanPlace::getSource)
+        .isEqualTo(com.butingbe.domain.travel.entity.PlanPlaceSource.AUTO_FILLED);
   }
 
   @ParameterizedTest
@@ -148,6 +214,8 @@ class AiTravelPlanServiceTest {
       assertThat(actual.longitude()).isEqualTo(original.longitude());
       assertThat(actual.provider().name()).isEqualTo(original.provider());
       assertThat(actual.providerPlaceId()).isEqualTo(original.providerPlaceId());
+      assertThat(actual.source())
+          .isEqualTo(com.butingbe.domain.travel.entity.PlanPlaceSource.USER_PICKED);
     }
   }
 
