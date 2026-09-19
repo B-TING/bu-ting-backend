@@ -1,13 +1,16 @@
 package com.butingbe.domain.place.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.place.dto.response.PlaceEnrichResDto;
 import com.butingbe.domain.place.dto.response.PlaceSyncResDto;
+import com.butingbe.domain.place.service.PlaceEnrichmentService;
 import com.butingbe.domain.place.service.PlaceSyncService;
 import com.butingbe.global.error.GlobalExceptionHandler;
 import com.butingbe.global.error.exception.ForbiddenException;
@@ -39,6 +42,7 @@ class AdminPlaceControllerTest {
   private static final UUID USER_ID = UUID.fromString("22222222-0000-0000-0000-000000000001");
 
   @Mock private PlaceSyncService placeSyncService;
+  @Mock private PlaceEnrichmentService placeEnrichmentService;
   @InjectMocks private AdminPlaceController controller;
 
   private MockMvc mockMvc;
@@ -79,6 +83,33 @@ class AdminPlaceControllerTest {
         .thenThrow(new ForbiddenException("error.operator.forbidden"));
 
     mockMvc.perform(post("/admin/places/sync")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  @DisplayName("인기도 보강은 200과 요약을 반환한다")
+  void enrich() throws Exception {
+    when(placeEnrichmentService.enrich(any(), eq(20)))
+        .thenReturn(new PlaceEnrichResDto(20, 18, 1, 1));
+
+    mockMvc
+        .perform(post("/admin/places/enrich").param("limit", "20"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.targeted").value(20))
+        .andExpect(jsonPath("$.data.enriched").value(18))
+        .andExpect(jsonPath("$.data.withoutRating").value(1))
+        .andExpect(jsonPath("$.data.failed").value(1));
+  }
+
+  @Test
+  @DisplayName("limit 없이 호출하면 서비스 기본값을 쓴다")
+  void enrichWithoutLimit() throws Exception {
+    when(placeEnrichmentService.enrich(any(), eq(null)))
+        .thenReturn(new PlaceEnrichResDto(50, 50, 0, 0));
+
+    mockMvc
+        .perform(post("/admin/places/enrich"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.targeted").value(50));
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {
