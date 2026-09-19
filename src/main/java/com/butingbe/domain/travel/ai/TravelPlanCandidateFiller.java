@@ -34,8 +34,21 @@ public class TravelPlanCandidateFiller {
 
   private final PlaceCandidateFinder placeCandidateFinder;
 
+  /**
+   * 고른 장소와 서버가 채운 후보.
+   *
+   * <p>어느 쪽에서 왔는지 호출자가 알아야 일정에 출처를 남길 수 있다. 순서는 고른 장소가 먼저다.
+   */
+  public record FilledPlaces(
+      List<WizardPickedPlaceReqDto> places, Set<String> autoFilledProviderPlaceIds) {
+
+    public boolean autoFilled(String providerPlaceId) {
+      return autoFilledProviderPlaceIds.contains(providerPlaceId);
+    }
+  }
+
   /** 고른 장소 + 부족분 후보. 순서는 고른 장소가 먼저다. */
-  public List<WizardPickedPlaceReqDto> fill(Travel travel, AiTravelPlanGenerateReqDto request) {
+  public FilledPlaces fill(Travel travel, AiTravelPlanGenerateReqDto request) {
     List<WizardPickedPlaceReqDto> selected =
         request == null || request.selectedPlaces() == null
             ? List.of()
@@ -43,7 +56,7 @@ public class TravelPlanCandidateFiller {
 
     int needed = requiredPlaceCount(travel) - selected.size();
     if (needed < 1) {
-      return selected;
+      return new FilledPlaces(selected, Set.of());
     }
 
     Set<String> alreadyPicked =
@@ -52,10 +65,15 @@ public class TravelPlanCandidateFiller {
             .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
     List<WizardPickedPlaceReqDto> merged = new ArrayList<>(selected);
+    Set<String> autoFilled = new LinkedHashSet<>();
     placeCandidateFinder.findCandidates(zonesOf(travel), alreadyPicked, needed).stream()
         .map(TravelPlanCandidateFiller::toWizardPlace)
-        .forEach(merged::add);
-    return merged;
+        .forEach(
+            place -> {
+              merged.add(place);
+              autoFilled.add(place.providerPlaceId());
+            });
+    return new FilledPlaces(merged, autoFilled);
   }
 
   /** 일수 × 하루 장소 수. 여행 속도가 빠를수록 더 많이 채운다. */
