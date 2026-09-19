@@ -8,6 +8,7 @@ import com.butingbe.domain.place.dto.response.PlaceResDto;
 import com.butingbe.domain.place.dto.response.PlaceSearchResDto;
 import com.butingbe.domain.place.dto.response.PlaceSyncResDto;
 import com.butingbe.domain.place.entity.Place;
+import com.butingbe.domain.place.entity.PlaceDwellDefaults;
 import com.butingbe.domain.place.entity.PlaceZoneResolver;
 import com.butingbe.domain.place.repository.PlaceRepository;
 import lombok.RequiredArgsConstructor;
@@ -99,6 +100,9 @@ public class PlaceSyncService {
         .findByProviderAndProviderPlaceId(PROVIDER, item.contentId())
         .map(
             existing -> {
+              // 체류 시간이 비어 있으면 이번 동기화에서 채운다. 이미 값이 있으면 건드리지 않는다.
+              existing.fillDwellMinutesIfAbsent(
+                  PlaceDwellDefaults.forContentType(item.contentTypeId()));
               existing.applySync(
                   item.title(),
                   item.address(),
@@ -124,6 +128,7 @@ public class PlaceSyncService {
                       .imageUrl(item.imageUrl())
                       .zoneId(zone)
                       .districtCode(item.districtCode())
+                      .dwellMinutes(PlaceDwellDefaults.forContentType(item.contentTypeId()))
                       .build());
               return true;
             });

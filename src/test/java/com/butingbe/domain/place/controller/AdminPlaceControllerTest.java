@@ -3,13 +3,18 @@ package com.butingbe.domain.place.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
+import com.butingbe.domain.place.dto.request.PlaceCurationReqDto;
+import com.butingbe.domain.place.dto.response.PlaceCurationResDto;
 import com.butingbe.domain.place.dto.response.PlaceEnrichResDto;
 import com.butingbe.domain.place.dto.response.PlaceSyncResDto;
+import com.butingbe.domain.place.entity.PlaceTimeSlot;
+import com.butingbe.domain.place.service.PlaceCurationService;
 import com.butingbe.domain.place.service.PlaceEnrichmentService;
 import com.butingbe.domain.place.service.PlaceSyncService;
 import com.butingbe.global.error.GlobalExceptionHandler;
@@ -30,6 +35,7 @@ import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -43,6 +49,7 @@ class AdminPlaceControllerTest {
 
   @Mock private PlaceSyncService placeSyncService;
   @Mock private PlaceEnrichmentService placeEnrichmentService;
+  @Mock private PlaceCurationService placeCurationService;
   @InjectMocks private AdminPlaceController controller;
 
   private MockMvc mockMvc;
@@ -51,10 +58,13 @@ class AdminPlaceControllerTest {
   void setUp() {
     StaticMessageSource messageSource = new StaticMessageSource();
     messageSource.addMessage("error.operator.forbidden", Locale.KOREAN, "운영 권한이 없습니다.");
+    LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+    validator.afterPropertiesSet();
     mockMvc =
         MockMvcBuilders.standaloneSetup(controller)
             .setCustomArgumentResolvers(authenticatedUserResolver())
             .setMessageConverters(new JacksonJsonHttpMessageConverter())
+            .setValidator(validator)
             .setControllerAdvice(
                 new GlobalExceptionHandler(messageSource, new FixedLocaleResolver(Locale.KOREAN)))
             .build();
@@ -110,6 +120,36 @@ class AdminPlaceControllerTest {
         .perform(post("/admin/places/enrich"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.targeted").value(50));
+  }
+
+  @Test
+  @DisplayName("보정은 200과 보정된 장소를 반환한다")
+  void curate() throws Exception {
+    UUID placeId = UUID.fromString("44444444-0000-0000-0000-000000000001");
+    when(placeCurationService.curate(any(), eq(placeId), any(PlaceCurationReqDto.class)))
+        .thenReturn(new PlaceCurationResDto(placeId, "광안리해수욕장", "12", 120, PlaceTimeSlot.EVENING));
+
+    mockMvc
+        .perform(
+            patch("/admin/places/{placeId}", placeId)
+                .contentType("application/json")
+                .content("{\"dwellMinutes\":120,\"preferredTimeSlot\":\"EVENING\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.dwellMinutes").value(120))
+        .andExpect(jsonPath("$.data.preferredTimeSlot").value("EVENING"));
+  }
+
+  @Test
+  @DisplayName("체류 시간이 허용 범위를 벗어나면 400이다")
+  void curateInvalidDwellMinutes() throws Exception {
+    UUID placeId = UUID.fromString("44444444-0000-0000-0000-000000000001");
+
+    mockMvc
+        .perform(
+            patch("/admin/places/{placeId}", placeId)
+                .contentType("application/json")
+                .content("{\"dwellMinutes\":1}"))
+        .andExpect(status().isBadRequest());
   }
 
   private HandlerMethodArgumentResolver authenticatedUserResolver() {

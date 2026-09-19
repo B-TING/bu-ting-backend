@@ -156,6 +156,45 @@ class PlaceSyncServiceTest {
     verify(placeService, never()).searchPlaces(any());
   }
 
+  @Test
+  @DisplayName("새 장소는 유형별 기본 체류 시간을 갖는다")
+  void fillsDefaultDwellMinutesOnCreate() {
+    when(placeService.searchPlaces(any())).thenReturn(page(List.of(item("126508", "26380")), 1));
+    when(placeRepository.findByProviderAndProviderPlaceId(any(), eq("126508")))
+        .thenReturn(Optional.empty());
+
+    placeSyncService.sync(ADMIN);
+
+    ArgumentCaptor<Place> saved = ArgumentCaptor.forClass(Place.class);
+    verify(placeRepository).save(saved.capture());
+    assertThat(saved.getValue().getDwellMinutes()).isEqualTo(90);
+  }
+
+  @Test
+  @DisplayName("체류 시간이 비어 있던 기존 장소는 기본값으로 채우고, 보정된 값은 덮지 않는다")
+  void fillsDwellMinutesOnlyWhenAbsent() {
+    when(placeService.searchPlaces(any()))
+        .thenReturn(page(List.of(item("126508", "26380"), item("126509", "26380")), 2));
+    Place empty =
+        Place.builder().provider("TOUR_API").providerPlaceId("126508").name("옛 이름").build();
+    Place curated =
+        Place.builder()
+            .provider("TOUR_API")
+            .providerPlaceId("126509")
+            .name("옛 이름")
+            .dwellMinutes(150)
+            .build();
+    when(placeRepository.findByProviderAndProviderPlaceId(any(), eq("126508")))
+        .thenReturn(Optional.of(empty));
+    when(placeRepository.findByProviderAndProviderPlaceId(any(), eq("126509")))
+        .thenReturn(Optional.of(curated));
+
+    placeSyncService.sync(ADMIN);
+
+    assertThat(empty.getDwellMinutes()).isEqualTo(90);
+    assertThat(curated.getDwellMinutes()).isEqualTo(150);
+  }
+
   private PlaceSearchResDto page(List<PlaceResDto> places, int totalCount) {
     return new PlaceSearchResDto(1, 100, totalCount, places);
   }

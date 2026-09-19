@@ -146,4 +146,27 @@ public class Place extends TimestampEntity {
     this.reviewCount = reviewCount;
     this.enrichedAt = enrichedAt;
   }
+
+  /**
+   * 체류 시간이 비어 있을 때만 기본값을 채운다. 운영이 보정한 값을 동기화가 덮지 않게 한다.
+   *
+   * @return 채웠으면 true
+   */
+  public boolean fillDwellMinutesIfAbsent(int defaultMinutes) {
+    if (this.dwellMinutes != null) {
+      return false;
+    }
+    this.dwellMinutes = defaultMinutes;
+    return true;
+  }
+
+  /** 운영자가 체류 시간과 시간대를 보정한다. null인 항목은 바꾸지 않는다. */
+  public void applyCuration(Integer dwellMinutes, PlaceTimeSlot preferredTimeSlot) {
+    if (dwellMinutes != null) {
+      this.dwellMinutes = dwellMinutes;
+    }
+    if (preferredTimeSlot != null) {
+      this.preferredTimeSlot = preferredTimeSlot;
+    }
+  }
 }
