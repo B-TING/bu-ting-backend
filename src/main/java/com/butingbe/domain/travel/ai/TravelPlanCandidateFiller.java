@@ -1,0 +1,106 @@
+package com.butingbe.domain.travel.ai;
+
+import com.butingbe.domain.chat.entity.ChatZone;
+import com.butingbe.domain.place.dto.response.PlaceCandidateResDto;
+import com.butingbe.domain.place.service.PlaceCandidateFinder;
+import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto;
+import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto.WizardPickedPlaceReqDto;
+import com.butingbe.domain.travel.entity.Travel;
+import com.butingbe.domain.travel.entity.TravelPace;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+/**
+ * 사용자가 고른 장소가 일정을 채우기에 모자라면 카탈로그에서 후보를 보탠다.
+ *
+ * <p>위저드에서 장소를 하나도 고르지 않아도 일정이 나오게 하려는 것이다. 고른 장소는 그대로 두고 부족한 만큼만 더한다.
+ *
+ * <p>후보를 더해도 기존 생성 경로는 바뀌지 않는다. 합쳐진 목록이 그대로 {@link SelectedPlaceCatalog}로 들어가므로, 카탈로그 밖 장소를 만들어내지
+ * 못하게 하는 검증이 후보에도 똑같이 걸린다.
+ */
+@Component
+@RequiredArgsConstructor
+public class TravelPlanCandidateFiller {
+
+  private static final int RELAXED_PLACES_PER_DAY = 3;
+  private static final int BALANCED_PLACES_PER_DAY = 4;
+  private static final int TIGHT_PLACES_PER_DAY = 5;
+
+  private final PlaceCandidateFinder placeCandidateFinder;
+
+  /** 고른 장소 + 부족분 후보. 순서는 고른 장소가 먼저다. */
+  public List<WizardPickedPlaceReqDto> fill(Travel travel, AiTravelPlanGenerateReqDto request) {
+    List<WizardPickedPlaceReqDto> selected =
+        request == null || request.selectedPlaces() == null
+            ? List.of()
+            : request.selectedPlaces().stream().filter(java.util.Objects::nonNull).toList();
+
+    int needed = requiredPlaceCount(travel) - selected.size();
+    if (needed < 1) {
+      return selected;
+    }
+
+    Set<String> alreadyPicked =
+        selected.stream()
+            .map(WizardPickedPlaceReqDto::providerPlaceId)
+            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+    List<WizardPickedPlaceReqDto> merged = new ArrayList<>(selected);
+    placeCandidateFinder.findCandidates(zonesOf(travel), alreadyPicked, needed).stream()
+        .map(TravelPlanCandidateFiller::toWizardPlace)
+        .forEach(merged::add);
+    return merged;
+  }
+
+  /** 일수 × 하루 장소 수. 여행 속도가 빠를수록 더 많이 채운다. */
+  private int requiredPlaceCount(Travel travel) {
+    int days =
+        Math.toIntExact(ChronoUnit.DAYS.between(travel.getStartDate(), travel.getEndDate()) + 1);
+    return Math.max(days, 0) * placesPerDay(travel.getPace());
+  }
+
+  private int placesPerDay(TravelPace pace) {
+    if (pace == TravelPace.RELAXED) {
+      return RELAXED_PLACES_PER_DAY;
+    }
+    if (pace == TravelPace.TIGHT) {
+      return TIGHT_PLACES_PER_DAY;
+    }
+    return BALANCED_PLACES_PER_DAY;
+  }
+
+  /**
+   * 후보를 고를 권역.
+   *
+   * <p>숙소 권역이 지정돼 있으면 그 권역에서만 고른다. 없으면 부산 전체에서 고른다. 사용자가 고른 장소의 권역까지 따지지 않는 것은, 선택 장소에 권역 정보가 없어
+   * 좌표로 역산해야 하기 때문이다. 필요해지면 그때 넓힌다.
+   */
+  private Set<ChatZone> zonesOf(Travel travel) {
+    String area = travel.getAccommodationArea();
+    if (area == null || area.isBlank()) {
+      return Set.of();
+    }
+    try {
+      return Set.of(ChatZone.fromString(area.trim()));
+    } catch (IllegalArgumentException e) {
+      // 숙소 권역은 위저드의 지역 아이디라 ChatZone 이름과 다를 수 있다. 그때는 전체에서 고른다.
+      return Set.of();
+    }
+  }
+
+  private static WizardPickedPlaceReqDto toWizardPlace(PlaceCandidateResDto candidate) {
+    return new WizardPickedPlaceReqDto(
+        candidate.provider(),
+        candidate.providerPlaceId(),
+        candidate.name(),
+        candidate.address(),
+        candidate.latitude(),
+        candidate.longitude(),
+        candidate.contentTypeId());
+  }
+}

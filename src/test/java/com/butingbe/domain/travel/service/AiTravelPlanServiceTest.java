@@ -65,7 +65,9 @@ class AiTravelPlanServiceTest {
               new TravelPlanAiResponseValidator(),
               com.butingbe.domain.travel.ai.TravelPlanFixtures.routePlanner(),
               new TravelPlanQualityValidator(
-                  com.butingbe.domain.travel.ai.TravelPlanFixtures.routePlanner())));
+                  com.butingbe.domain.travel.ai.TravelPlanFixtures.routePlanner())),
+          new com.butingbe.domain.travel.ai.TravelPlanCandidateFiller(
+              (zones, excluded, limit) -> java.util.List.of()));
   private final UUID travelId = UUID.randomUUID();
   private final UUID userId = UUID.randomUUID();
   private final AuthenticatedUser principal = new AuthenticatedUser(userId, null, null, List.of());
