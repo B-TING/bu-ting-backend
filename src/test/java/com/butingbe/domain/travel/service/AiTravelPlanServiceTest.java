@@ -20,7 +20,6 @@ import com.butingbe.domain.travel.ai.TravelPlanAiResponseValidator;
 import com.butingbe.domain.travel.ai.TravelPlanGenerator;
 import com.butingbe.domain.travel.ai.TravelPlanPromptBuilder;
 import com.butingbe.domain.travel.ai.TravelPlanQualityValidator;
-import com.butingbe.domain.travel.ai.TravelPlanRoutePlanner;
 import com.butingbe.domain.travel.ai.TravelPlanValidationException;
 import com.butingbe.domain.travel.entity.Plan;
 import com.butingbe.domain.travel.entity.PlanPlace;
@@ -64,8 +63,9 @@ class AiTravelPlanServiceTest {
               new TravelPlanPromptBuilder(),
               ai,
               new TravelPlanAiResponseValidator(),
-              new TravelPlanRoutePlanner(),
-              new TravelPlanQualityValidator(new TravelPlanRoutePlanner())));
+              com.butingbe.domain.travel.ai.TravelPlanFixtures.routePlanner(),
+              new TravelPlanQualityValidator(
+                  com.butingbe.domain.travel.ai.TravelPlanFixtures.routePlanner())));
   private final UUID travelId = UUID.randomUUID();
   private final UUID userId = UUID.randomUUID();
   private final AuthenticatedUser principal = new AuthenticatedUser(userId, null, null, List.of());
