@@ -9,7 +9,8 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 class TravelPlanQualityValidatorTest {
-  private final TravelPlanRoutePlanner planner = new TravelPlanRoutePlanner();
+  private final TravelPlanRoutePlanner planner =
+      com.butingbe.domain.travel.ai.TravelPlanFixtures.routePlanner();
   private final TravelPlanQualityValidator validator = new TravelPlanQualityValidator(planner);
 
   @Test

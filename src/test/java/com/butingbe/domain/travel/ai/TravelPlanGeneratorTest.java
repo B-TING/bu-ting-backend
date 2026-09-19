@@ -16,7 +16,8 @@ import org.mockito.ArgumentCaptor;
 
 class TravelPlanGeneratorTest {
   private final TravelPlanAiClient client = mock(TravelPlanAiClient.class);
-  private final TravelPlanRoutePlanner planner = new TravelPlanRoutePlanner();
+  private final TravelPlanRoutePlanner planner =
+      com.butingbe.domain.travel.ai.TravelPlanFixtures.routePlanner();
   private final TravelPlanGenerator generator =
       new TravelPlanGenerator(
           new TravelPlanPromptBuilder(),
