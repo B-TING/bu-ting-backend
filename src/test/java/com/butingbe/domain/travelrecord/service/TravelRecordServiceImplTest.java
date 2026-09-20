@@ -916,6 +916,39 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("latest feed filters by providerPlaceId")
+  void getLatestFeedFiltersByProviderPlaceId() {
+    User stationUser =
+        userRepository.save(createUser("record-filter-place@example.com", "record-filter-place"));
+    User beachUser =
+        userRepository.save(createUser("record-filter-beach@example.com", "record-filter-beach"));
+    AuthenticatedUser stationAuthenticatedUser = AuthenticatedUser.from(stationUser);
+    AuthenticatedUser beachAuthenticatedUser = AuthenticatedUser.from(beachUser);
+    // createPlace 는 providerPlaceId 를 장소명과 같은 값으로 넣는다.
+    TravelRecordResDto stationDraft =
+        createDraftWithOnePlace(stationAuthenticatedUser, "Station Route", "Busan Station");
+    TravelRecordResDto beachDraft =
+        createDraftWithOnePlace(beachAuthenticatedUser, "Beach Route", "Gwangalli Beach");
+    TravelRecordResDto stationPublished =
+        travelRecordService.publish(
+            stationAuthenticatedUser,
+            stationDraft.originalTravelId(),
+            stationDraft.travelRecordId());
+    TravelRecordResDto beachPublished =
+        travelRecordService.publish(
+            beachAuthenticatedUser, beachDraft.originalTravelId(), beachDraft.travelRecordId());
+
+    TravelRecordFeedPageResDto result =
+        travelRecordService.getLatestFeed(
+            null, null, null, PlaceProvider.GOOGLE, "Gwangalli Beach", null, null);
+
+    assertThat(result.items())
+        .extracting(TravelRecordFeedResDto::travelRecordId)
+        .contains(beachPublished.travelRecordId())
+        .doesNotContain(stationPublished.travelRecordId());
+  }
+
+  @Test
   @DisplayName("latest feed search rejects invalid filters")
   void getLatestFeedRejectsInvalidFilters() {
     assertThatThrownBy(
