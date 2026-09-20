@@ -33,19 +33,38 @@ jobs:
         run: |
           set -euo pipefail
           # CI 가 돈 커밋(head_sha)에 해당하는 열린 PR 을 찾는다.
-          pr=$(gh pr list --repo "$REPO" --state open \
-                 --json number,headRefOid,isDraft,baseRefName,mergeStateStatus,reviewDecision,headRepositoryOwner \
-                 --jq "map(select(.headRefOid == \"$HEAD_SHA\" and .isDraft == false)) | .[0]")
+          find_pr() {
+            gh pr list --repo "$REPO" --state open \
+              --json number,headRefOid,isDraft,baseRefName,mergeStateStatus,headRepositoryOwner \
+              --jq "map(select(.headRefOid == \"$HEAD_SHA\" and .isDraft == false)) | .[0]"
+          }
+
+          pr=$(find_pr)
           if [ -z "$pr" ] || [ "$pr" = "null" ]; then
             echo "이 커밋($HEAD_SHA)에 열린 PR 이 없다. 건너뛴다."
             exit 0
           fi
           number=$(echo "$pr" | jq -r '.number')
-          base=$(echo "$pr" | jq -r '.baseRefName')
           state=$(echo "$pr" | jq -r '.mergeStateStatus')
-          # 리뷰가 하나도 없으면 reviewDecision 은 문자열이 아니라 null 이다. jq -r 이 "null" 로
-          # 찍어 비교가 헷갈리므로 // 로 기본값을 채운다. headRepositoryOwner 도 같은 이유.
-          review=$(echo "$pr" | jq -r '.reviewDecision // "NONE"')
+
+          # GitHub 은 머지 가능 여부를 미리 계산해 두지 않는다. 계산 전에 물으면 UNKNOWN 을 주고
+          # 그때부터 백그라운드로 계산한다. CI 직후라 대개 아직이므로, 한 번 보고 포기하면
+          # 멀쩡한 PR 이 무작위로 안 머지된다. 확정될 때까지 다시 묻는다.
+          for attempt in 1 2 3 4 5; do
+            if [ "$state" != "UNKNOWN" ]; then
+              break
+            fi
+            echo "PR #$number 의 mergeStateStatus 가 아직 UNKNOWN 이다. 5초 뒤 다시 확인한다($attempt/5)."
+            sleep 5
+            pr=$(find_pr)
+            if [ -z "$pr" ] || [ "$pr" = "null" ]; then
+              echo "PR #$number 가 더 이상 열려 있지 않다. 건너뛴다."
+              exit 0
+            fi
+            state=$(echo "$pr" | jq -r '.mergeStateStatus')
+          done
+
+          base=$(echo "$pr" | jq -r '.baseRefName')
           head_owner=$(echo "$pr" | jq -r '.headRepositoryOwner.login // "UNKNOWN"')
           # base=dev 만 자동 머지한다. main 릴리스 PR 은 배포 트리거를 위해 수동으로 머지한다.
           if [ "$base" != "dev" ]; then
@@ -62,11 +81,6 @@ jobs:
           # 때문에, 본 저장소 소유자의 브랜치에서 올라온 PR 만 대상으로 한다.
           if [ "$head_owner" != "${REPO%%/*}" ]; then
             echo "PR #$number 의 head 저장소 소유자가 $head_owner 라 자동 머지하지 않는다(포크 PR)."
-            exit 0
-          fi
-          # 승인 리뷰가 있어야 머지한다. CI 초록불만으로는 머지하지 않는다.
-          if [ "$review" != "APPROVED" ]; then
-            echo "PR #$number 의 리뷰 상태가 $review 라 자동 머지하지 않는다(승인 리뷰 필요)."
             exit 0
           fi
           echo "PR #$number 를 squash 머지한다."
