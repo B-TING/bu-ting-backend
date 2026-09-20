@@ -69,3 +69,6 @@ postgres_data/
 
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# Claude Code agent worktrees
+.claude/worktrees/
