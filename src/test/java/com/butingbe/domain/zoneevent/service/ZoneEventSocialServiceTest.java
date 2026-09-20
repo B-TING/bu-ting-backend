@@ -86,13 +86,13 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
   void likeAndUnlike() {
     UUID participationId = publicSuccess().getId();
 
+    // 카운터는 벌크 update 로 오른다. 영속성 컨텍스트에 남은 엔티티는 갱신 전 값을 들고 있으므로
+    // 서비스가 응답을 만들 때와 같은 방식(DB 를 직접 읽는 조회)으로 확인한다.
     socialService.like(viewer, participationId);
-    assertThat(participationRepository.findById(participationId).orElseThrow().getLikeCount())
-        .isEqualTo(1);
+    assertThat(participationRepository.findLikeCount(participationId)).contains(1L);
 
     socialService.unlike(viewer, participationId);
-    assertThat(participationRepository.findById(participationId).orElseThrow().getLikeCount())
-        .isZero();
+    assertThat(participationRepository.findLikeCount(participationId)).contains(0L);
   }
 
   @Test
@@ -145,11 +145,10 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
     ZoneEventParticipation p = publicSuccess();
 
     socialService.like(viewer, p.getId());
-    assertThat(participationRepository.findById(p.getId()).orElseThrow().getLikeCount())
-        .isEqualTo(1);
+    assertThat(participationRepository.findLikeCount(p.getId())).contains(1L);
 
     socialService.unlike(viewer, p.getId());
-    assertThat(participationRepository.findById(p.getId()).orElseThrow().getLikeCount()).isZero();
+    assertThat(participationRepository.findLikeCount(p.getId())).contains(0L);
   }
 
   @Test

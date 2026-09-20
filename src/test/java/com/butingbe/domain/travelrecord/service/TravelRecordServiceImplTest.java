@@ -97,6 +97,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     }
   }
 
+  @Autowired private jakarta.persistence.EntityManager entityManager;
   @Autowired private TravelRecordService travelRecordService;
   @Autowired private TravelService travelService;
   @Autowired private UserRepository userRepository;
@@ -959,6 +960,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         AuthenticatedUser.from(likerOne), highPublished.travelRecordId());
     travelRecordService.likeTravelRecord(
         AuthenticatedUser.from(likerTwo), highPublished.travelRecordId());
+    clearPersistenceContext();
 
     TravelRecordFeedPageResDto firstPage =
         travelRecordService.getLatestFeed(
@@ -1694,12 +1696,14 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThat(like.likedAt()).isNotNull();
     assertThat(like.travelRecordId()).isEqualTo(published.travelRecordId());
     assertThat(like.likeCount()).isEqualTo(1);
+    clearPersistenceContext();
     assertThat(travelRecordService.getMyRecord(authorUser, published.travelRecordId()).likeCount())
         .isEqualTo(1);
 
     travelRecordService.unlikeTravelRecord(authenticatedUser, published.travelRecordId());
     travelRecordService.unlikeTravelRecord(authenticatedUser, published.travelRecordId());
 
+    clearPersistenceContext();
     assertThat(travelRecordService.getMyRecord(authorUser, published.travelRecordId()).likeCount())
         .isZero();
   }
@@ -3302,5 +3306,14 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         .nickname(nickname)
         .role(UserRole.USER)
         .build();
+  }
+
+  /**
+   * 카운터는 벌크 update 로 갱신된다. 운영에서는 요청마다 트랜잭션이 갈리므로 다음 조회가 DB 값을 새로 읽지만, 테스트는 하나의 트랜잭션을 공유해 영속성 컨텍스트에
+   * 남은 엔티티가 갱신 전 값을 돌려준다. 요청 경계를 흉내 내 컨텍스트를 비운다.
+   */
+  private void clearPersistenceContext() {
+    entityManager.flush();
+    entityManager.clear();
   }
 }
