@@ -52,7 +52,8 @@ spring:
         default_batch_fetch_size: 100
   flyway:
     enabled: true
-    baseline-on-migrate: true
+    # 최초 도입이 끝났다. 켜 두면 잘못된 DB 에 연결됐을 때 V1 을 건너뛰고 조용히 진행한다.
+    baseline-on-migrate: false
     baseline-version: 1
     locations: classpath:db/migration
 

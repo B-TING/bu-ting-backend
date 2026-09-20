@@ -17,6 +17,7 @@ invites, expense settlement, travel records with reviews and comments, regional 
 | AI            | Spring AI 2.0.0, OpenAI-compatible chat model                          |
 | File Storage  | AWS SDK v2 S3 (presigned URLs)                                         |
 | Realtime      | STOMP over WebSocket                                                   |
+| Scheduling    | Spring `@Scheduled`, ShedLock (JDBC) for distributed locks              |
 | i18n          | `messages.properties` — ko, en, ja, zh                                 |
 | Test          | JUnit 5, Mockito, Spring Boot Test, MockMvc, Spring REST Docs, Testcontainers |
 | Coverage      | JaCoCo 0.8.15                                                          |
@@ -172,6 +173,8 @@ at startup.
 - Migrations live in `src/main/resources/db/migration` as `V<n>__<description>.sql`.
 - Never edit a migration that has already been applied or shared. Add the next version number instead.
 - Change the entity and the migration in the same unit of work.
+- `baseline-on-migrate` is **off**. Pointing the application at a database that has no Flyway history now fails loudly
+  instead of silently skipping `V1`.
 
 ## Run The Application
 
@@ -331,6 +334,13 @@ workflow run. The workflow grants itself `contents` and
 A push to `main` runs `.github/workflows/deploy.yml`, which verifies the project, builds and pushes images tagged with
 the immutable commit SHA plus `latest` to Docker Hub, and replaces the application container on EC2. EC2 does not clone
 this repository. Do not push to `main` directly — release by merging a reviewed release PR from `dev`.
+
+The runtime image runs as the unprivileged `buting` user, sizes the heap from the container limit
+(`-XX:MaxRAMPercentage=75`) rather than host memory, and declares a `HEALTHCHECK` against `/actuator/health`. `bootJar`
+writes a fixed `app.jar`, so the image no longer depends on the project version string.
+
+Scheduled jobs (zone event rounds, travel status, route cache eviction, token cleanup) take a ShedLock lock in the
+`shedlock` table before running, so scaling past one instance will not run settlement — and pay rewards — twice.
 
 Configure these GitHub repository secrets:
 

@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ public class TravelStatusScheduler {
   private final Clock clock = Clock.system(java.time.ZoneId.of(SEOUL_ZONE));
 
   @Scheduled(cron = "${travel.status.scheduler.cron:0 5 0 * * *}", zone = SEOUL_ZONE)
+  @SchedulerLock(name = "travelStatusTransition", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
   @Transactional
   public void updateTravelStatusesDaily() {
     updateTravelStatuses(LocalDate.now(clock));

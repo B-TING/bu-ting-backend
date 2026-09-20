@@ -26,14 +26,24 @@ FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 ENV TZ=Asia/Seoul
-ENV JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Seoul"
+# 컨테이너에 할당된 메모리를 기준으로 힙을 잡는다. 없으면 호스트 전체 메모리를 기준으로 잡아
+# 컨테이너 한도를 넘기고 OOM 으로 죽는다.
+ENV JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Seoul -XX:MaxRAMPercentage=75"
 
-# 빌드 스테이지에서 생성된 껍데기 없는 순수 완제품 JAR 파일만 쏙 빼서 복사
-COPY --from=builder /build/build/libs/*-SNAPSHOT.jar app.jar
+# bootJar 이름을 app.jar 로 고정했으므로 글로브를 쓰지 않는다. 버전 규칙이 바뀌어도 깨지지 않는다.
+COPY --from=builder /build/build/libs/app.jar app.jar
 COPY --from=builder /build/src/main/resources/certs/global-bundle.pem /app/certs/global-bundle.pem
+
+# root 로 돌리지 않는다. 컨테이너가 뚫렸을 때 할 수 있는 일을 줄인다.
+RUN addgroup -S buting && adduser -S -G buting buting && chown -R buting:buting /app
+USER buting
 
 # 스프링 부트 컨테이너가 외부와 통신할 기본 포트 개방
 EXPOSE 8080
+
+# 배포 스크립트의 헬스체크와 별개로, 도커가 직접 컨테이너 상태를 판단할 수 있게 한다.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=90s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/actuator/health || exit 1
 
 # 애플리케이션 실행 명령어
 ENTRYPOINT ["java", "-jar", "app.jar"]

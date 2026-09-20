@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -39,6 +40,7 @@ public class RouteCacheEvictionScheduler {
   }
 
   @Scheduled(cron = "${route.cache.eviction.cron:0 30 4 * * *}", zone = SEOUL_ZONE)
+  @SchedulerLock(name = "routeCacheEviction", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
   public void evictExpiredDaily() {
     evictExpired(LocalDateTime.now(clock));
   }

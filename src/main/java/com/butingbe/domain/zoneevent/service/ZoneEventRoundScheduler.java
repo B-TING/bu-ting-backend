@@ -2,6 +2,7 @@ package com.butingbe.domain.zoneevent.service;
 
 import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,10 @@ public class ZoneEventRoundScheduler {
   @Scheduled(
       fixedDelayString = "${zone-event.round.scheduler.delay-ms:60000}",
       initialDelayString = "${zone-event.round.scheduler.initial-delay-ms:60000}")
+  @SchedulerLock(
+      name = "zoneEventRoundTransition",
+      lockAtMostFor = "PT5M",
+      lockAtLeastFor = "PT10S")
   @Transactional
   public void advanceRounds() {
     advance(OffsetDateTime.now(java.time.ZoneId.of(SEOUL_ZONE)));
