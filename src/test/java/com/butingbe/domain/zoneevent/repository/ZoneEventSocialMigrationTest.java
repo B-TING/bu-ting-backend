@@ -10,10 +10,12 @@ import java.sql.SQLException;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /** V35가 만드는 좋아요·신고 UK/CHECK 제약을 실제 PostgreSQL로 검증한다. */
+@Tag("integration")
 class ZoneEventSocialMigrationTest {
 
   @Test

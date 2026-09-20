@@ -11,10 +11,12 @@ import java.sql.SQLException;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /** V36가 18개 칭호 정의를 시드하고 대표 칭호 부분 UK를 만드는지 검증한다. */
+@Tag("integration")
 class ZoneTitleMigrationTest {
 
   @Test

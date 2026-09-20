@@ -11,10 +11,12 @@ import java.sql.SQLException;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /** V34가 만드는 회차·슬롯 제약을 실제 PostgreSQL로 검증한다. */
+@Tag("integration")
 class ZoneEventRoundMigrationTest {
 
   @Test

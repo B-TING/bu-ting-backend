@@ -10,10 +10,12 @@ import java.sql.SQLException;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /** V39가 만드는 토큰 UK·플랫폼 CHECK·구독 UK를 검증한다. */
+@Tag("integration")
 class NotificationMigrationTest {
 
   @Test

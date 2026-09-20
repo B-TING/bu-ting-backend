@@ -1,5 +1,6 @@
 package com.butingbe.support;
 
+import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -8,6 +9,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 @SpringBootTest
 @ActiveProfiles("test")
+// 도커 컨테이너를 띄우는 통합 테스트. JUnit 5 는 클래스 레벨 태그를 하위 클래스로 상속시키므로
+// 이 클래스를 상속하는 테스트는 모두 integration 으로 묶여 pre-push 의 unitTest 에서 제외된다.
+@Tag("integration")
 // ❌ 기존 @Testcontainers 어노테이션은 확실하게 지워줍니다! (수동 제어를 위해)
 public abstract class AbstractContainerTest {
 
