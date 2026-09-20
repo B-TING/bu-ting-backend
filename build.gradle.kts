@@ -70,10 +70,19 @@ tasks.jacocoTestCoverageVerification {
             enabled = true
             element = "BUNDLE"
 
+            // 라인 100%. 남은 미커버를 테스트로 덮기보다 도달 불가 코드를 없애는 방향으로 지켜 왔다(#218).
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
                 minimum = "1.00".toBigDecimal()
+            }
+
+            // 라인이 100%여도 분기는 한쪽만 타고 지나갈 수 있다. if 의 참/거짓 중 하나만 검증한
+            // 테스트는 라인 커버리지에서 통과한다. 현재 0.87 이며, 내려가지 않게만 막는다.
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.85".toBigDecimal()
             }
         }
     }
