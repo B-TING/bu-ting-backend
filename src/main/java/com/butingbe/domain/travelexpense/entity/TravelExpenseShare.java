@@ -52,7 +52,7 @@ public class TravelExpenseShare {
     this.expense = Objects.requireNonNull(expense, "Expense is required.");
     this.user = Objects.requireNonNull(user, "Expense participant is required.");
     if (shareAmount == null || shareAmount < 0) {
-      throw new InvalidRequestException("Share amount must not be negative.");
+      throw new InvalidRequestException("error.travel_expense.share_amount_negative");
     }
     this.shareAmount = shareAmount;
   }

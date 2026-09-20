@@ -167,7 +167,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     assertThatThrownBy(() -> travelRecordService.createDraft(authenticatedUser, travel.id(), null))
         .isInstanceOf(DuplicateResourceException.class)
-        .hasMessage("Travel record already exists.");
+        .hasMessage("error.travel_record.duplicate");
   }
 
   @Test
@@ -288,7 +288,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.getDraft(
                     AuthenticatedUser.from(outsider), travel.id(), draft.travelRecordId()))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not the travel record author.");
+        .hasMessage("error.travel_record.not_author");
   }
 
   @Test
@@ -415,7 +415,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     draft.travelRecordId(),
                     new TravelRecordUpdateReqDto(" ", null, null)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record title cannot be blank.");
+        .hasMessage("error.travel_record.title_blank");
   }
 
   @Test
@@ -438,7 +438,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.getDraft(
                     authenticatedUser, draft.originalTravelId(), draft.travelRecordId()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Only draft travel records can be accessed here.");
+        .hasMessage("error.travel_record.draft_only");
   }
 
   @Test
@@ -459,7 +459,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     draft.originalTravelId(),
                     draft.travelRecordId()))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not the travel record author.");
+        .hasMessage("error.travel_record.not_author");
   }
 
   @Test
@@ -477,7 +477,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.publish(
                     authenticatedUser, draft.originalTravelId(), draft.travelRecordId()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Only draft travel records can be accessed here.");
+        .hasMessage("error.travel_record.draft_only");
   }
 
   @Test
@@ -495,7 +495,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.publish(
                     authenticatedUser, draft.originalTravelId(), draft.travelRecordId()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record itinerary is required.");
+        .hasMessage("error.travel_record.itinerary_required");
   }
 
   @Test
@@ -520,7 +520,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.publish(
                     authenticatedUser, draft.originalTravelId(), draft.travelRecordId()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record overall rating is required.");
+        .hasMessage("error.travel_record.rating_required");
   }
 
   @Test
@@ -590,7 +590,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     assertThatThrownBy(() -> travelRecordService.getPublished(draft.travelRecordId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel record not found.");
+        .hasMessage("error.travel_record.not_found");
   }
 
   @Test
@@ -682,7 +682,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                         null,
                         null)))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel record not found.");
+        .hasMessage("error.travel_record.not_found");
   }
 
   @Test
@@ -963,7 +963,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     LocalDate.of(2026, 9, 3),
                     LocalDate.of(2026, 9, 1)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel end date cannot be before travel start date.");
+        .hasMessage("error.travel.end_date_before_start");
   }
 
   @Test
@@ -1127,7 +1127,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   void getPlaceReviewSummaryByProviderRejectsInvalidRequest() {
     assertThatThrownBy(() -> travelRecordService.getPlaceReviewSummary(null, "Busan Station"))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Place provider is required.");
+        .hasMessage("error.place.provider_required");
     assertThatThrownBy(() -> travelRecordService.getPlaceReviewSummary(PlaceProvider.GOOGLE, "  "))
         .isInstanceOf(InvalidRequestException.class);
   }
@@ -1167,7 +1167,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     null,
                     TravelRecordFeedSort.LATEST))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Feed cursor sort does not match requested sort.");
+        .hasMessage("error.travel_record.feed.cursor_sort_mismatch");
   }
 
   @Test
@@ -1248,7 +1248,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.getMyRecord(
                     AuthenticatedUser.from(outsider), draft.travelRecordId()))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not the travel record author.");
+        .hasMessage("error.travel_record.not_author");
   }
 
   @Test
@@ -1408,7 +1408,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     draft.travelRecordId(),
                     new TravelRecordUpdateReqDto("Hacked", null, null)))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not the travel record author.");
+        .hasMessage("error.travel_record.not_author");
   }
 
   @Test
@@ -1427,7 +1427,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     draft.travelRecordId(),
                     new TravelRecordUpdateReqDto(" ", null, null)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record title cannot be blank.");
+        .hasMessage("error.travel_record.title_blank");
   }
 
   @Test
@@ -1455,7 +1455,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         .isEqualTo(TravelRecordStatus.HIDDEN);
     assertThatThrownBy(() -> travelRecordService.getPublished(published.travelRecordId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel record not found.");
+        .hasMessage("error.travel_record.not_found");
     assertThat(travelRecordService.getLatestFeed(null, null).items())
         .extracting(TravelRecordFeedResDto::travelRecordId)
         .doesNotContain(published.travelRecordId());
@@ -1497,7 +1497,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.hideMyRecord(
                     AuthenticatedUser.from(outsider), draft.travelRecordId()))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not the travel record author.");
+        .hasMessage("error.travel_record.not_author");
   }
 
   @Test
@@ -1566,7 +1566,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.republishMyRecord(
                     AuthenticatedUser.from(outsider), published.travelRecordId()))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not the travel record author.");
+        .hasMessage("error.travel_record.not_author");
   }
 
   @Test
@@ -1616,7 +1616,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.bookmarkTravelRecord(
                     authenticatedUser, published.travelRecordId()))
         .isInstanceOf(DuplicateResourceException.class)
-        .hasMessage("Travel record bookmark already exists.");
+        .hasMessage("error.travel_record.bookmark.duplicate");
   }
 
   @Test
@@ -1632,7 +1632,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             () ->
                 travelRecordService.bookmarkTravelRecord(authenticatedUser, draft.travelRecordId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel record not found.");
+        .hasMessage("error.travel_record.not_found");
   }
 
   @Test
@@ -1806,7 +1806,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             () ->
                 travelRecordService.likeTravelRecord(authenticatedUser, published.travelRecordId()))
         .isInstanceOf(DuplicateResourceException.class)
-        .hasMessage("Travel record like already exists.");
+        .hasMessage("error.travel_record.like.duplicate");
   }
 
   @Test
@@ -1821,7 +1821,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThatThrownBy(
             () -> travelRecordService.likeTravelRecord(authenticatedUser, draft.travelRecordId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel record not found.");
+        .hasMessage("error.travel_record.not_found");
   }
 
   @Test
@@ -1874,7 +1874,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     draft.travelRecordId(),
                     new TravelRecordCommentCreateReqDto("Cannot comment")))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel record not found.");
+        .hasMessage("error.travel_record.not_found");
   }
 
   @Test
@@ -1895,7 +1895,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     published.travelRecordId(),
                     new TravelRecordCommentCreateReqDto("   ")))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record comment content is required.");
+        .hasMessage("error.travel_record.comment.content_required");
   }
 
   @Test
@@ -1970,7 +1970,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     created.commentId(),
                     new TravelRecordCommentUpdateReqDto("Nope")))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not the travel record comment author.");
+        .hasMessage("error.travel_record.comment.not_author");
   }
 
   @Test
@@ -2072,7 +2072,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     place.originalPlanPlaceId(),
                     new PlaceReviewCreateReqDto(5, "Again")))
         .isInstanceOf(DuplicateResourceException.class)
-        .hasMessage("Place review already exists.");
+        .hasMessage("error.travel_record.place_review.duplicate");
   }
 
   @Test
@@ -2091,7 +2091,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     place.originalPlanPlaceId(),
                     new PlaceReviewCreateReqDto(6, "Too high")))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Place review rating must be between 1 and 5.");
+        .hasMessage("error.travel_record.place_review.rating_range");
   }
 
   @Test
@@ -2133,7 +2133,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.getPlaceReview(
                     authenticatedUser, draft.originalTravelId(), place.originalPlanPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Place review not found.");
+        .hasMessage("error.travel_record.place_review.not_found");
   }
 
   @Test
@@ -2418,7 +2418,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     place.originalPlanPlaceId(),
                     new PlaceReviewUpdateReqDto(5, "Missing")))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Place review not found.");
+        .hasMessage("error.travel_record.place_review.not_found");
   }
 
   @Test
@@ -2443,7 +2443,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     place.originalPlanPlaceId(),
                     new PlaceReviewUpdateReqDto(0, "Invalid")))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Place review rating must be between 1 and 5.");
+        .hasMessage("error.travel_record.place_review.rating_range");
   }
 
   @Test
@@ -2471,7 +2471,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.getPlaceReview(
                     authenticatedUser, draft.originalTravelId(), place.originalPlanPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Place review not found.");
+        .hasMessage("error.travel_record.place_review.not_found");
   }
 
   @Test
@@ -2489,7 +2489,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.deletePlaceReview(
                     authenticatedUser, draft.originalTravelId(), place.originalPlanPlaceId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Place review not found.");
+        .hasMessage("error.travel_record.place_review.not_found");
   }
 
   @Test
@@ -2505,16 +2505,16 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.createDraft(
                     authenticatedUser, unknown, new TravelRecordCreateReqDto("t", null, null, 5)))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel not found.");
+        .hasMessage("error.travel.not_found");
     assertThatThrownBy(() -> travelRecordService.getDraft(authenticatedUser, travel.id(), unknown))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel record not found.");
+        .hasMessage("error.travel_record.not_found");
     assertThatThrownBy(() -> travelRecordService.getMyRecord(authenticatedUser, unknown))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel record not found.");
+        .hasMessage("error.travel_record.not_found");
     assertThatThrownBy(() -> travelRecordService.getPublished(unknown))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel record not found.");
+        .hasMessage("error.travel_record.not_found");
     assertThatThrownBy(
             () ->
                 travelRecordService.createPlaceReview(
@@ -2523,7 +2523,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     unknown,
                     new PlaceReviewCreateReqDto(5, "good")))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Plan place not found.");
+        .hasMessage("error.travel.plan_place.not_found");
     assertThatThrownBy(
             () -> travelRecordService.getPlaceReview(authenticatedUser, travel.id(), unknown))
         .isInstanceOf(ResourceNotFoundException.class);
@@ -2569,7 +2569,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     travel.id(),
                     new TravelRecordCreateReqDto("   ", null, null, null)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record title cannot be blank.");
+        .hasMessage("error.travel_record.title_blank");
     assertThatThrownBy(
             () ->
                 travelRecordService.createDraft(
@@ -2577,7 +2577,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     travel.id(),
                     new TravelRecordCreateReqDto("title", null, null, 6)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record overall rating must be between 1 and 5.");
+        .hasMessage("error.travel_record.rating_range");
 
     TravelRecordResDto draft = createDraftWithOnePlace(authenticatedUser, "Valid");
     assertThatThrownBy(
@@ -2588,7 +2588,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     draft.travelRecordId(),
                     new TravelRecordUpdateReqDto("  ", null, null, null)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record title cannot be blank.");
+        .hasMessage("error.travel_record.title_blank");
     assertThatThrownBy(
             () ->
                 travelRecordService.updateDraft(
@@ -2597,7 +2597,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     draft.travelRecordId(),
                     new TravelRecordUpdateReqDto("title", null, null, 0)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record overall rating must be between 1 and 5.");
+        .hasMessage("error.travel_record.rating_range");
 
     assertThatThrownBy(
             () ->
@@ -2607,7 +2607,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     draft.travelRecordId(),
                     new TravelRecordUpdateReqDto("title", null, null, 5)))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel record not found.");
+        .hasMessage("error.travel_record.not_found");
   }
 
   @Test
@@ -2623,7 +2623,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     assertThatThrownBy(() -> travelRecordService.cloneToTravel(authenticatedUser, recordId, null))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel clone request is required.");
+        .hasMessage("error.travel_record.clone_request_required");
     assertThatThrownBy(
             () ->
                 travelRecordService.cloneToTravel(
@@ -2632,7 +2632,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     new TravelRecordCloneToTravelReqDto(
                         "title", null, null, null, null, null, null, null, null, null, null)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel start date is required.");
+        .hasMessage("error.travel.start_date_required");
     assertThatThrownBy(
             () ->
                 travelRecordService.cloneToTravel(
@@ -2651,7 +2651,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                         null,
                         null)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel title cannot be blank.");
+        .hasMessage("error.travel.title_blank");
     assertThatThrownBy(
             () ->
                 travelRecordService.cloneToTravel(
@@ -2670,7 +2670,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                         null,
                         null)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel title must be 15 characters or less.");
+        .hasMessage("error.travel.title_too_long");
   }
 
   @Test
@@ -2690,7 +2690,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.createComment(
                     authenticatedUser, recordId, new TravelRecordCommentCreateReqDto("  ")))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record comment content is required.");
+        .hasMessage("error.travel_record.comment.content_required");
     assertThatThrownBy(
             () ->
                 travelRecordService.createComment(
@@ -2709,7 +2709,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     comment.commentId(),
                     new TravelRecordCommentUpdateReqDto("  ")))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record comment content is required.");
+        .hasMessage("error.travel_record.comment.content_required");
     assertThatThrownBy(
             () ->
                 travelRecordService.updateComment(
@@ -2740,7 +2740,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     place.planPlaceId(),
                     new PlaceReviewCreateReqDto(null, "no rating")))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Place review rating is required.");
+        .hasMessage("error.travel_record.place_review.rating_required");
     assertThatThrownBy(
             () ->
                 travelRecordService.createPlaceReview(
@@ -2749,7 +2749,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     place.planPlaceId(),
                     new PlaceReviewCreateReqDto(6, "too high")))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Place review rating must be between 1 and 5.");
+        .hasMessage("error.travel_record.place_review.rating_range");
     assertThatThrownBy(
             () ->
                 travelRecordService.createPlaceReview(
@@ -2758,7 +2758,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     place.planPlaceId(),
                     new PlaceReviewCreateReqDto(5, "negative stay", null, -1, null)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Stay minutes must be 0 or greater.");
+        .hasMessage("error.travel_record.stay_minutes_invalid");
 
     travelRecordService.createPlaceReview(
         authenticatedUser, travel.id(), place.planPlaceId(), new PlaceReviewCreateReqDto(5, "ok"));
@@ -2771,7 +2771,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     place.planPlaceId(),
                     new PlaceReviewUpdateReqDto(0, "too low")))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Place review rating must be between 1 and 5.");
+        .hasMessage("error.travel_record.place_review.rating_range");
   }
 
   @Test
@@ -2847,7 +2847,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                 travelRecordService.createDraft(
                     authenticatedUser, travel.id(), new TravelRecordCreateReqDto("t", null, null)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Only completed travels can be recorded.");
+        .hasMessage("error.travel_record.completed_only");
   }
 
   @Test
@@ -2855,10 +2855,10 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
   void rejectsFeedSizeOutOfRange() {
     assertThatThrownBy(() -> travelRecordService.getLatestFeed(null, 0))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Feed size must be between 1 and 50.");
+        .hasMessage("error.travel_record.feed.size_range");
     assertThatThrownBy(() -> travelRecordService.getLatestFeed(null, 51))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Feed size must be between 1 and 50.");
+        .hasMessage("error.travel_record.feed.size_range");
   }
 
   @Test
@@ -2871,7 +2871,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
     assertThatThrownBy(
             () -> travelRecordService.republishMyRecord(authenticatedUser, draft.travelRecordId()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Only hidden travel records can be republished.");
+        .hasMessage("error.travel_record.republish_hidden_only");
   }
 
   @Test
@@ -2891,7 +2891,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             () ->
                 travelRecordService.publish(authenticatedUser, travel.id(), draft.travelRecordId()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record overall rating is required.");
+        .hasMessage("error.travel_record.rating_required");
   }
 
   @Test
@@ -2908,7 +2908,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     travel.id(),
                     new TravelRecordCreateReqDto("t", null, null)))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not a travel member.");
+        .hasMessage("error.travel.not_member");
   }
 
   @Test
@@ -3008,10 +3008,10 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
 
     assertThatThrownBy(() -> travelRecordService.getLatestFeed(malformed, 10))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Invalid feed cursor.");
+        .hasMessage("error.travel_record.feed.cursor_invalid");
     assertThatThrownBy(() -> travelRecordService.getLatestFeed("not-base64!!", 10))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Invalid feed cursor.");
+        .hasMessage("error.travel_record.feed.cursor_invalid");
   }
 
   @Test
@@ -3208,7 +3208,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
                     placeInSecond.planPlaceId(),
                     new PlaceReviewCreateReqDto(5, "다른 여행")))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Plan place not found.");
+        .hasMessage("error.travel.plan_place.not_found");
   }
 
   private TravelResDto createCompletedTravel(AuthenticatedUser authenticatedUser) {

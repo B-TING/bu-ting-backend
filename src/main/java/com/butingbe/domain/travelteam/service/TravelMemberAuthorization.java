@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TravelMemberAuthorization {
 
-  private static final String NOT_MEMBER_MESSAGE = "User is not a travel member.";
+  private static final String NOT_MEMBER_MESSAGE = "error.travel.not_member";
 
   private final TravelMemberRepository travelMemberRepository;
 

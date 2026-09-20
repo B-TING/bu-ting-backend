@@ -153,7 +153,7 @@ public class TravelServiceImpl implements TravelService {
     Plan plan =
         planRepository
             .findById(planId)
-            .orElseThrow(() -> new ResourceNotFoundException("Plan not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan.not_found"));
     travelMemberAuthorization.validateMember(plan.getTravel().getId(), user.getId());
     Integer sequence = resolveSequence(planId, request.sequence());
 
@@ -183,7 +183,7 @@ public class TravelServiceImpl implements TravelService {
     Plan plan =
         planRepository
             .findById(planId)
-            .orElseThrow(() -> new ResourceNotFoundException("Plan not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan.not_found"));
     travelMemberAuthorization.validateMember(plan.getTravel().getId(), user.getId());
 
     return planPlaceRepository.findByPlan_IdOrderBySequenceAsc(planId).stream()
@@ -199,7 +199,7 @@ public class TravelServiceImpl implements TravelService {
     PlanPlace planPlace =
         planPlaceRepository
             .findById(planPlaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Plan place not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan_place.not_found"));
     travelMemberAuthorization.validateMember(planPlace.getPlan().getTravel().getId(), user.getId());
 
     planPlace.updateSchedule(request.durationMinutes(), request.scheduledTime(), request.memo());
@@ -214,7 +214,7 @@ public class TravelServiceImpl implements TravelService {
     PlanPlace planPlace =
         planPlaceRepository
             .findById(planPlaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Plan place not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan_place.not_found"));
     Plan plan = planPlace.getPlan();
     travelMemberAuthorization.validateMember(plan.getTravel().getId(), user.getId());
 
@@ -239,7 +239,7 @@ public class TravelServiceImpl implements TravelService {
     PlanPlace planPlace =
         planPlaceRepository
             .findById(planPlaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Plan place not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan_place.not_found"));
     travelMemberAuthorization.validateMember(planPlace.getPlan().getTravel().getId(), user.getId());
 
     planPlace.updateVisited(request.visited());
@@ -254,7 +254,7 @@ public class TravelServiceImpl implements TravelService {
     Plan plan =
         planRepository
             .findById(planId)
-            .orElseThrow(() -> new ResourceNotFoundException("Plan not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan.not_found"));
     travelMemberAuthorization.validateMember(plan.getTravel().getId(), user.getId());
 
     List<PlanPlace> places = planPlaceRepository.findByPlan_IdOrderBySequenceAsc(planId);
@@ -277,7 +277,7 @@ public class TravelServiceImpl implements TravelService {
     PlanPlace planPlace =
         planPlaceRepository
             .findById(planPlaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Plan place not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan_place.not_found"));
     Plan plan = planPlace.getPlan();
     UUID planId = plan.getId();
     travelMemberAuthorization.validateMember(plan.getTravel().getId(), user.getId());
@@ -314,32 +314,32 @@ public class TravelServiceImpl implements TravelService {
   private Travel findTravel(UUID travelId) {
     return travelRepository
         .findById(travelId)
-        .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("error.travel.not_found"));
   }
 
   private Plan findPlanInTravel(UUID travelId, UUID planId) {
     return planRepository
         .findById(planId)
         .filter(foundPlan -> foundPlan.getTravel().getId().equals(travelId))
-        .orElseThrow(() -> new ResourceNotFoundException("Plan not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan.not_found"));
   }
 
   private void validateTravelDate(TravelCreateReqDto request) {
     if (request.endDate().isBefore(request.startDate())) {
-      throw new InvalidRequestException("Travel end date cannot be before start date.");
+      throw new InvalidRequestException("error.travel.end_date_before_start");
     }
   }
 
   private void validatePlanDate(Travel travel, PlanCreateReqDto request) {
     if (request.visitDate().isBefore(travel.getStartDate())
         || request.visitDate().isAfter(travel.getEndDate())) {
-      throw new InvalidRequestException("Plan visit date must be within the travel period.");
+      throw new InvalidRequestException("error.travel.plan.date_out_of_range");
     }
   }
 
   private void validatePlanDayNumber(UUID travelId, Integer dayNumber) {
     if (planRepository.existsByTravel_IdAndDayNumber(travelId, dayNumber)) {
-      throw new InvalidRequestException("Plan day number already exists.");
+      throw new InvalidRequestException("error.travel.plan.day_number_duplicate");
     }
   }
 
@@ -358,7 +358,7 @@ public class TravelServiceImpl implements TravelService {
           case IN_PROGRESS, COMPLETED -> true;
         };
     if (!allowed) {
-      throw new InvalidRequestException("Travel status cannot be changed back to PLANNED.");
+      throw new InvalidRequestException("error.travel.status.cannot_revert");
     }
   }
 
@@ -372,7 +372,7 @@ public class TravelServiceImpl implements TravelService {
                 .orElse(1);
 
     if (planPlaceRepository.existsByPlan_IdAndSequence(planId, sequence)) {
-      throw new InvalidRequestException("Plan place sequence already exists.");
+      throw new InvalidRequestException("error.travel.plan_place.sequence_duplicate");
     }
 
     return sequence;
@@ -386,18 +386,18 @@ public class TravelServiceImpl implements TravelService {
 
   private void validateReorderRequest(List<PlanPlace> places, List<UUID> requestedIds) {
     if (places.size() != requestedIds.size()) {
-      throw new InvalidRequestException("All plan place ids must be included.");
+      throw new InvalidRequestException("error.travel.plan_place.ids_incomplete");
     }
 
     Set<UUID> existingIds = places.stream().map(PlanPlace::getId).collect(Collectors.toSet());
     Set<UUID> uniqueRequestedIds = requestedIds.stream().collect(Collectors.toSet());
 
     if (uniqueRequestedIds.size() != requestedIds.size()) {
-      throw new InvalidRequestException("Duplicated plan place id exists.");
+      throw new InvalidRequestException("error.travel.plan_place.duplicated_id");
     }
 
     if (!existingIds.equals(uniqueRequestedIds)) {
-      throw new InvalidRequestException("Plan place ids do not match this plan.");
+      throw new InvalidRequestException("error.travel.plan_place.id_mismatch");
     }
   }
 

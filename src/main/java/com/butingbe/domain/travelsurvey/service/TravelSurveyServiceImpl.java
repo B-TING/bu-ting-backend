@@ -57,7 +57,7 @@ public class TravelSurveyServiceImpl implements TravelSurveyService {
     return travelSurveyRepository
         .findById(user.getId())
         .map(TravelSurveyProfileResDto::from)
-        .orElseThrow(() -> new InvalidRequestException("travel survey profile not found."));
+        .orElseThrow(() -> new InvalidRequestException("error.travel_survey.not_found"));
   }
 
   private User findOrCreateAuthenticatedUser(AuthenticatedUser authenticatedUser) {

@@ -95,7 +95,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                 travelExpenseService.createEqualExpense(
                     AuthenticatedUser.from(creator), travel.getId(), request))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Expense participants must not be duplicated.");
+        .hasMessage("error.travel_expense.participant_duplicated");
     assertThat(travelExpenseRepository.count()).isZero();
   }
 
@@ -215,7 +215,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                     null,
                     PageRequest.of(0, 20)))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not a travel member.");
+        .hasMessage("error.travel.not_member");
   }
 
   @Test
@@ -292,7 +292,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                 travelExpenseService.getExpense(
                     AuthenticatedUser.from(user), otherTravel.getId(), created.expenseId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Expense not found.");
+        .hasMessage("error.travel_expense.not_found");
   }
 
   @Test
@@ -491,7 +491,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                 travelExpenseService.deleteExpense(
                     AuthenticatedUser.from(user), otherTravel.getId(), created.expenseId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Expense not found.");
+        .hasMessage("error.travel_expense.not_found");
     assertThat(travelExpenseRepository.existsById(created.expenseId())).isTrue();
   }
 
@@ -624,7 +624,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                 travelExpenseService.getExpenseSummary(
                     AuthenticatedUser.from(outsider), travel.getId(), null, null))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not a travel member.");
+        .hasMessage("error.travel.not_member");
   }
 
   @Test
@@ -680,19 +680,19 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
     assertThatThrownBy(
             () -> travelExpenseService.getExpense(authenticatedUser, unknownTravelId, expenseId))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel not found.");
+        .hasMessage("error.travel.not_found");
     assertThatThrownBy(
             () ->
                 travelExpenseService.getExpenses(
                     authenticatedUser, unknownTravelId, null, null, null, null, Pageable.unpaged()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel not found.");
+        .hasMessage("error.travel.not_found");
     assertThatThrownBy(
             () ->
                 travelExpenseService.getExpenseSummary(
                     authenticatedUser, unknownTravelId, null, null))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel not found.");
+        .hasMessage("error.travel.not_found");
   }
 
   @Test
@@ -710,7 +710,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                 travelExpenseService.getExpenses(
                     authenticatedUser, travel.getId(), null, from, to, null, Pageable.unpaged()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Expense search start time must not be after end time.");
+        .hasMessage("error.travel_expense.search_range_invalid");
   }
 
   @Test
@@ -739,10 +739,10 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
   void calculateEqualSharesRejectsInvalidInput() {
     assertThatThrownBy(() -> TravelExpenseService.calculateEqualShares(0L, 3))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Expense amount must be positive.");
+        .hasMessage("error.travel_expense.amount_invalid");
     assertThatThrownBy(() -> TravelExpenseService.calculateEqualShares(1000L, 0))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("At least one participant is required.");
+        .hasMessage("error.travel_expense.participant_required");
   }
 
   private TravelExpenseUpdateRequest updateRequest(

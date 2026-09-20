@@ -46,11 +46,11 @@ public class AiTravelPlanService {
     User user =
         userRepository
             .findById(authenticatedUser.id())
-            .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.user.not_found"));
     Travel travel =
         travelRepository
             .findById(travelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel.not_found"));
     authorization.validateMember(travelId, user.getId());
 
     // 고른 장소가 모자라면 카탈로그에서 후보를 보탠다. 합쳐진 목록이 그대로 검증 경로를 탄다.
@@ -73,7 +73,7 @@ public class AiTravelPlanService {
     if (response.days().stream()
         .anyMatch(
             day -> planRepository.existsByTravel_IdAndVisitDate(travel.getId(), day.date()))) {
-      throw new ConflictException("Travel plans already exist for one or more dates.");
+      throw new ConflictException("error.travel.plan.date_conflict");
     }
     List<Plan> plans =
         response.days().stream()

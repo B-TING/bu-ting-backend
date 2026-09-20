@@ -55,10 +55,10 @@ public class TravelSettlementTransfer {
     this.fromUser = Objects.requireNonNull(fromUser, "Settlement sender is required.");
     this.toUser = Objects.requireNonNull(toUser, "Settlement receiver is required.");
     if (Objects.equals(fromUser.getId(), toUser.getId())) {
-      throw new InvalidRequestException("Settlement sender and receiver must be different.");
+      throw new InvalidRequestException("error.travel_expense.settlement_same_user");
     }
     if (amount == null || amount <= 0) {
-      throw new InvalidRequestException("Settlement amount must be positive.");
+      throw new InvalidRequestException("error.travel_expense.settlement_amount_invalid");
     }
     this.amount = amount;
   }

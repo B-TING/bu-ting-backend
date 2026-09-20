@@ -35,7 +35,7 @@ class TravelExpenseTest {
   void rejectsNonPositiveExpenseAmount() {
     assertThatThrownBy(() -> createExpense(0L, "KRW"))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Expense amount must be positive.");
+        .hasMessage("error.travel_expense.amount_invalid");
   }
 
   @Test
@@ -46,7 +46,7 @@ class TravelExpenseTest {
             () ->
                 TravelExpenseShare.builder().expense(expense).user(payer).shareAmount(-1L).build())
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Share amount must not be negative.");
+        .hasMessage("error.travel_expense.share_amount_negative");
   }
 
   @Test
@@ -54,13 +54,13 @@ class TravelExpenseTest {
   void rejectsInvalidTitle() {
     assertThatThrownBy(() -> createExpense(10000L, "KRW", "  "))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Expense title is required.");
+        .hasMessage("error.travel_expense.title_required");
     assertThatThrownBy(() -> createExpense(10000L, "KRW", null))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Expense title is required.");
+        .hasMessage("error.travel_expense.title_required");
     assertThatThrownBy(() -> createExpense(10000L, "KRW", "a".repeat(51)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Expense title must be 50 characters or fewer.");
+        .hasMessage("error.travel_expense.title_too_long");
   }
 
   @Test
@@ -68,7 +68,7 @@ class TravelExpenseTest {
   void rejectsInvalidCurrencyCode() {
     assertThatThrownBy(() -> createExpense(10000L, "KRWW"))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Currency must be a 3-letter code.");
+        .hasMessage("error.travel_expense.currency_invalid");
   }
 
   @Test

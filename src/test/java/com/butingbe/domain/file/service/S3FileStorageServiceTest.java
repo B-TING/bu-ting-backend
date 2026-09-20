@@ -90,7 +90,7 @@ class S3FileStorageServiceTest {
 
     assertThatThrownBy(() -> service.upload(file, UPLOADER))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("파일 크기 제한을 초과했습니다.");
+        .hasMessage("error.file.too_large");
 
     verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
   }
@@ -156,7 +156,7 @@ class S3FileStorageServiceTest {
 
     assertThatThrownBy(() -> service.upload(file, UPLOADER))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("파일이 비어 있습니다.");
+        .hasMessage("error.file.empty");
 
     verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
   }
@@ -169,7 +169,7 @@ class S3FileStorageServiceTest {
 
     assertThatThrownBy(() -> service.upload(file, UPLOADER))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("지원하지 않는 파일 형식입니다.");
+        .hasMessage("error.file.unsupported_type");
 
     verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
   }
@@ -234,7 +234,7 @@ class S3FileStorageServiceTest {
   void rejectsUnsafeFileKey(String fileKey) {
     assertThatThrownBy(() -> service.delete(fileKey, UPLOADER))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("유효하지 않은 파일 키입니다.");
+        .hasMessage("error.file.invalid_key");
 
     verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
   }
@@ -247,7 +247,7 @@ class S3FileStorageServiceTest {
 
     assertThatThrownBy(() -> service.getPresignedUrl(fileKey))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("등록되지 않은 파일입니다.");
+        .hasMessage("error.file.not_found");
   }
 
   @Test

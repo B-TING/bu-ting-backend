@@ -360,7 +360,7 @@ class AiTravelPlanServiceTest {
 
     assertThatThrownBy(() -> service.generate(principal, travelId, request()))
         .isInstanceOf(com.butingbe.global.error.exception.ConflictException.class)
-        .hasMessage("Travel plans already exist for one or more dates.");
+        .hasMessage("error.travel.plan.date_conflict");
 
     verifyNoInteractions(places);
   }

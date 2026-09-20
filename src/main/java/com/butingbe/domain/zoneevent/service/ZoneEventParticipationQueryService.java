@@ -226,11 +226,11 @@ public class ZoneEventParticipationQueryService {
       String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
       String[] parts = raw.split("\\|");
       if (parts.length != 2) {
-        throw new InvalidRequestException("Invalid participation cursor.");
+        throw new InvalidRequestException("error.zone_event.participation.cursor_invalid");
       }
       return new Cursor(OffsetDateTime.parse(parts[0]), UUID.fromString(parts[1]));
     } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
-      throw new InvalidRequestException("Invalid participation cursor.");
+      throw new InvalidRequestException("error.zone_event.participation.cursor_invalid");
     }
   }
 

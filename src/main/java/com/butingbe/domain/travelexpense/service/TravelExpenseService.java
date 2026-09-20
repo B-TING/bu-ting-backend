@@ -104,7 +104,7 @@ public class TravelExpenseService {
     TravelExpense expense =
         travelExpenseRepository
             .findByIdAndTravel_Id(expenseId, travelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Expense not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel_expense.not_found"));
     validateExpenseManager(
         requester,
         expense,
@@ -133,7 +133,7 @@ public class TravelExpenseService {
     TravelExpense expense =
         travelExpenseRepository
             .findByIdAndTravel_Id(expenseId, travelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Expense not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel_expense.not_found"));
     validateExpenseManager(
         requester,
         expense,
@@ -183,14 +183,14 @@ public class TravelExpenseService {
       throw new UnauthenticatedException();
     }
     if (!travelRepository.existsById(travelId)) {
-      throw new ResourceNotFoundException("Travel not found.");
+      throw new ResourceNotFoundException("error.travel.not_found");
     }
     TravelMember requester =
         travelMemberAuthorization.requireMember(travelId, authenticatedUser.id());
     TravelExpense expense =
         travelExpenseRepository
             .findByIdAndTravel_Id(expenseId, travelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Expense not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel_expense.not_found"));
     List<TravelExpenseShare> shares =
         travelExpenseShareRepository.findByExpense_IdOrderByIdAsc(expenseId);
     boolean editable =
@@ -212,7 +212,7 @@ public class TravelExpenseService {
       throw new UnauthenticatedException();
     }
     if (!travelRepository.existsById(travelId)) {
-      throw new ResourceNotFoundException("Travel not found.");
+      throw new ResourceNotFoundException("error.travel.not_found");
     }
     travelMemberAuthorization.validateMember(travelId, authenticatedUser.id());
     validateExpensePeriod(from, to);
@@ -277,10 +277,10 @@ public class TravelExpenseService {
 
   static List<Long> calculateEqualShares(long amount, int participantCount) {
     if (amount <= 0) {
-      throw new InvalidRequestException("Expense amount must be positive.");
+      throw new InvalidRequestException("error.travel_expense.amount_invalid");
     }
     if (participantCount <= 0) {
-      throw new InvalidRequestException("At least one participant is required.");
+      throw new InvalidRequestException("error.travel_expense.participant_required");
     }
 
     long baseAmount = amount / participantCount;
@@ -293,7 +293,7 @@ public class TravelExpenseService {
   private void validateDistinctParticipants(List<UUID> participantIds) {
     Set<UUID> uniqueIds = new HashSet<>(participantIds);
     if (uniqueIds.size() != participantIds.size()) {
-      throw new InvalidRequestException("Expense participants must not be duplicated.");
+      throw new InvalidRequestException("error.travel_expense.participant_duplicated");
     }
   }
 
@@ -324,25 +324,25 @@ public class TravelExpenseService {
 
   private void validateExpensePeriod(LocalDateTime from, LocalDateTime to) {
     if (from != null && to != null && from.isAfter(to)) {
-      throw new InvalidRequestException("Expense search start time must not be after end time.");
+      throw new InvalidRequestException("error.travel_expense.search_range_invalid");
     }
   }
 
   private void validateSettlementOpen(UUID travelId) {
     if (travelSettlementRepository.existsByTravel_Id(travelId)) {
-      throw new ConflictException("SETTLEMENT_CONFIRMED");
+      throw new ConflictException("error.travel_expense.settlement_confirmed");
     }
   }
 
   private Travel lockTravel(UUID travelId) {
     return travelRepository
         .findByIdForUpdate(travelId)
-        .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("error.travel.not_found"));
   }
 
   private void requireTravel(UUID travelId) {
     if (!travelRepository.existsById(travelId)) {
-      throw new ResourceNotFoundException("Travel not found.");
+      throw new ResourceNotFoundException("error.travel.not_found");
     }
   }
 

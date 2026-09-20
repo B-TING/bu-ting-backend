@@ -121,17 +121,17 @@ public class TravelExpense {
 
   private static String requireTitle(String title) {
     if (title == null || title.isBlank()) {
-      throw new InvalidRequestException("Expense title is required.");
+      throw new InvalidRequestException("error.travel_expense.title_required");
     }
     if (title.length() > 50) {
-      throw new InvalidRequestException("Expense title must be 50 characters or fewer.");
+      throw new InvalidRequestException("error.travel_expense.title_too_long");
     }
     return title.trim();
   }
 
   private static Long requirePositiveAmount(Long amount) {
     if (amount == null || amount <= 0) {
-      throw new InvalidRequestException("Expense amount must be positive.");
+      throw new InvalidRequestException("error.travel_expense.amount_invalid");
     }
     return amount;
   }
@@ -140,7 +140,7 @@ public class TravelExpense {
     String normalized =
         currency == null || currency.isBlank() ? "KRW" : currency.trim().toUpperCase();
     if (normalized.length() != 3) {
-      throw new InvalidRequestException("Currency must be a 3-letter code.");
+      throw new InvalidRequestException("error.travel_expense.currency_invalid");
     }
     return normalized;
   }

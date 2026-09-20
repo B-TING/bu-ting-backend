@@ -80,7 +80,7 @@ public class LocalChatroomService {
   @Transactional
   public void sendMessage(UUID roomId, AuthenticatedUser sender, String content) {
     if (!chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.id())) {
-      throw new ForbiddenException("참여하지 않은 채팅방에는 메시지를 보낼 수 없습니다.");
+      throw new ForbiddenException("error.chat.message.not_joined");
     }
 
     ChatMessage savedMessage =

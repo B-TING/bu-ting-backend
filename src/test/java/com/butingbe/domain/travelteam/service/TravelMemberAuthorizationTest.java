@@ -32,7 +32,7 @@ class TravelMemberAuthorizationTest {
 
     assertThatThrownBy(() -> authorization.validateMember(travelId, userId))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not a travel member.");
+        .hasMessage("error.travel.not_member");
   }
 
   @Test

@@ -97,7 +97,7 @@ class TravelRecordServiceImplMockTest {
 
     assertThatThrownBy(() -> travelRecordService.publish(authenticatedUser, TRAVEL_ID, RECORD_ID))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record title is required.");
+        .hasMessage("error.travel_record.title_required");
   }
 
   @Test
@@ -128,7 +128,7 @@ class TravelRecordServiceImplMockTest {
                         null,
                         null)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel record itinerary is required.");
+        .hasMessage("error.travel_record.itinerary_required");
 
     verify(travelRepository, never()).save(any(Travel.class));
   }

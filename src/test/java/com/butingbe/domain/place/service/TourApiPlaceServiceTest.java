@@ -219,7 +219,7 @@ class TourApiPlaceServiceTest {
                 placeService.searchPlacesByLocation(
                     new PlaceLocationSearchReqDto(1, 20, 128.9084, 35.1487, 3000, "32", "E")))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("No places found for the requested location.");
+        .hasMessage("error.place.location_not_found");
     server.verify();
   }
 
@@ -744,7 +744,7 @@ class TourApiPlaceServiceTest {
 
     assertThatThrownBy(() -> placeService.getPlaceSummary("  "))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("contentId is required.");
+        .hasMessage("error.place.content_id_required");
 
     server.verify();
   }
@@ -759,10 +759,10 @@ class TourApiPlaceServiceTest {
 
     assertThatThrownBy(() -> placeService.getPlaceDetail("", "32", null))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("contentId and contentTypeId are required.");
+        .hasMessage("error.place.content_id_and_type_required");
     assertThatThrownBy(() -> placeService.getPlaceDetail("2651318", "  ", null))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("contentId and contentTypeId are required.");
+        .hasMessage("error.place.content_id_and_type_required");
 
     server.verify();
   }

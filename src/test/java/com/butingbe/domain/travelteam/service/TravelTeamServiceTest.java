@@ -129,7 +129,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                 travelTeamService.getTravelMembers(
                     AuthenticatedUser.from(outsider), travel.getId()))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not a travel member.");
+        .hasMessage("error.travel.not_member");
   }
 
   @Test
@@ -163,7 +163,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                 travelTeamService.removeMember(
                     AuthenticatedUser.from(leader), travel.getId(), coLeader.getId()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Leader cannot be removed.");
+        .hasMessage("error.travel_team.leader_cannot_be_removed");
 
     assertThat(travelMemberRepository.existsByTravel_IdAndUser_Id(travel.getId(), coLeader.getId()))
         .isTrue();
@@ -182,7 +182,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                 travelTeamService.removeMember(
                     AuthenticatedUser.from(leader), travel.getId(), outsider.getId()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Target user is not a travel member.");
+        .hasMessage("error.travel_team.target_not_member");
   }
 
   @Test
@@ -220,7 +220,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                 travelTeamService.removeMember(
                     AuthenticatedUser.from(leader), travel.getId(), leader.getId()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Leader cannot remove themselves.");
+        .hasMessage("error.travel_team.leader_self_remove");
   }
 
   @Test
@@ -290,7 +290,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                     travel.getId(),
                     new TravelLeaderTransferRequest(outsider.getId())))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("New leader is not a travel member.");
+        .hasMessage("error.travel_team.new_leader_not_member");
   }
 
   @Test
@@ -426,7 +426,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     assertThatThrownBy(
             () -> travelTeamService.acceptInvite(AuthenticatedUser.from(user), invite.getToken()))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("User already joined this travel.");
+        .hasMessage("error.travel_team.already_joined");
   }
 
   @Test
@@ -469,7 +469,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     assertThatThrownBy(
             () -> travelTeamService.exitTravel(AuthenticatedUser.from(leader), travel.getId()))
         .isInstanceOf(ConflictException.class)
-        .hasMessage("LEADER_TRANSFER_REQUIRED");
+        .hasMessage("error.travel_team.leader_transfer_required");
   }
 
   private Travel createTravel(String title) {
@@ -490,7 +490,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                     travel.getId(),
                     new TravelLeaderTransferRequest(leader.getId())))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("New leader must be another travel member.");
+        .hasMessage("error.travel_team.new_leader_must_differ");
   }
 
   @Test
@@ -504,10 +504,10 @@ class TravelTeamServiceTest extends AbstractContainerTest {
 
     assertThatThrownBy(() -> travelTeamService.verifyToken("expired-token"))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Invite link has expired.");
+        .hasMessage("error.travel_team.invite.expired");
     assertThatThrownBy(() -> travelTeamService.verifyToken("used-token"))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Invite link has already been used.");
+        .hasMessage("error.travel_team.invite.already_used");
   }
 
   @Test
@@ -519,7 +519,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     assertThatThrownBy(
             () -> travelTeamService.getTravelMembers(AuthenticatedUser.from(user), unknownTravelId))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel not found.");
+        .hasMessage("error.travel.not_found");
     assertThatThrownBy(() -> travelTeamService.getMyTravels(null, null))
         .isInstanceOf(UnauthenticatedException.class);
     assertThatThrownBy(

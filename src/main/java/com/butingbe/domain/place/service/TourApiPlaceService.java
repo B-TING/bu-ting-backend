@@ -263,7 +263,7 @@ public class TourApiPlaceService implements PlaceService {
       throw new IllegalStateException("Tour API service key is not configured.");
     }
     if (!StringUtils.hasText(contentId) || !StringUtils.hasText(contentTypeId)) {
-      throw new InvalidRequestException("contentId and contentTypeId are required.");
+      throw new InvalidRequestException("error.place.content_id_and_type_required");
     }
 
     TourApiDetailResponse response =
@@ -294,7 +294,7 @@ public class TourApiPlaceService implements PlaceService {
       throw new IllegalStateException("Tour API service key is not configured.");
     }
     if (!StringUtils.hasText(contentId)) {
-      throw new InvalidRequestException("contentId is required.");
+      throw new InvalidRequestException("error.place.content_id_required");
     }
 
     Optional<TourCommonItem> item = tourCommonInfo(contentId);
@@ -315,7 +315,7 @@ public class TourApiPlaceService implements PlaceService {
 
   private TourApiResponse.Body requireLocationSearchResults(TourApiResponse.Body body) {
     if (body.totalCount() == 0) {
-      throw new InvalidRequestException("No places found for the requested location.");
+      throw new InvalidRequestException("error.place.location_not_found");
     }
     return body;
   }

@@ -70,7 +70,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
 
     assertThatThrownBy(() -> travelService.createTravel(authenticatedUser, request))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel end date cannot be before start date.");
+        .hasMessage("error.travel.end_date_before_start");
     assertThat(travelRepository.findAll()).isEmpty();
   }
 
@@ -84,7 +84,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
     assertThatThrownBy(
             () -> travelService.getTravelPlans(AuthenticatedUser.from(outsider), travel.id()))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not a travel member.");
+        .hasMessage("error.travel.not_member");
   }
 
   @Test
@@ -97,7 +97,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                 travelService.getPlanPlaces(
                     AuthenticatedUser.from(user), java.util.UUID.randomUUID()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Plan not found.");
+        .hasMessage("error.travel.plan.not_found");
   }
 
   @Test
@@ -210,7 +210,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     travel.id(),
                     new TravelStatusUpdateReqDto(TravelStatus.COMPLETED)))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not a travel member.");
+        .hasMessage("error.travel.not_member");
   }
 
   @Test
@@ -229,7 +229,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     travel.id(),
                     new TravelStatusUpdateReqDto(TravelStatus.PLANNED)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel status cannot be changed back to PLANNED.");
+        .hasMessage("error.travel.status.cannot_revert");
   }
 
   @Test
@@ -484,7 +484,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     travel.id(),
                     new PlanCreateReqDto(1, LocalDate.of(2026, 7, 31))))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Plan visit date must be within the travel period.");
+        .hasMessage("error.travel.plan.date_out_of_range");
   }
 
   @Test
@@ -503,7 +503,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     travel.id(),
                     new PlanCreateReqDto(1, LocalDate.of(2026, 8, 2))))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Plan day number already exists.");
+        .hasMessage("error.travel.plan.day_number_duplicate");
   }
 
   @Test
@@ -542,7 +542,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     travel.id(),
                     new TravelStatusUpdateReqDto(TravelStatus.PLANNED)))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Travel status cannot be changed back to PLANNED.");
+        .hasMessage("error.travel.status.cannot_revert");
   }
 
   @Test
@@ -558,7 +558,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
 
     assertThatThrownBy(() -> createPlace(authenticatedUser, plan.planId(), 1, "Duplicate"))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Plan place sequence already exists.");
+        .hasMessage("error.travel.plan_place.sequence_duplicate");
   }
 
   @Test
@@ -596,7 +596,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     plan.planId(),
                     new PlanPlaceSequenceUpdateReqDto(List.of(first.planPlaceId()))))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("All plan place ids must be included.");
+        .hasMessage("error.travel.plan_place.ids_incomplete");
 
     assertThatThrownBy(
             () ->
@@ -606,7 +606,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     new PlanPlaceSequenceUpdateReqDto(
                         List.of(first.planPlaceId(), first.planPlaceId()))))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Duplicated plan place id exists.");
+        .hasMessage("error.travel.plan_place.duplicated_id");
 
     assertThatThrownBy(
             () ->
@@ -616,7 +616,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     new PlanPlaceSequenceUpdateReqDto(
                         List.of(first.planPlaceId(), java.util.UUID.randomUUID()))))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Plan place ids do not match this plan.");
+        .hasMessage("error.travel.plan_place.id_mismatch");
   }
 
   @Test

@@ -50,7 +50,7 @@ class TravelSettlementTransferTest {
                     .amount(15000L)
                     .build())
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Settlement sender and receiver must be different.");
+        .hasMessage("error.travel_expense.settlement_same_user");
   }
 
   @Test
@@ -69,7 +69,7 @@ class TravelSettlementTransferTest {
                     .amount(null)
                     .build())
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Settlement amount must be positive.");
+        .hasMessage("error.travel_expense.settlement_amount_invalid");
     assertThatThrownBy(
             () ->
                 TravelSettlementTransfer.builder()
@@ -80,7 +80,7 @@ class TravelSettlementTransferTest {
                     .amount(0L)
                     .build())
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Settlement amount must be positive.");
+        .hasMessage("error.travel_expense.settlement_amount_invalid");
   }
 
   @Test

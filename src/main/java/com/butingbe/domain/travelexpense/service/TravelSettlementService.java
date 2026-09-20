@@ -59,7 +59,7 @@ public class TravelSettlementService {
     Travel travel =
         travelRepository
             .findByIdForUpdate(travelId)
-            .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel.not_found"));
     TravelMember leader =
         travelMemberAuthorization.requireLeader(
             travelId, authenticatedUser.id(), "Only the travel leader can confirm settlement.");
@@ -188,7 +188,7 @@ public class TravelSettlementService {
   private Travel requireTravel(UUID travelId) {
     return travelRepository
         .findById(travelId)
-        .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("error.travel.not_found"));
   }
 
   private void validateAuthenticated(AuthenticatedUser authenticatedUser) {

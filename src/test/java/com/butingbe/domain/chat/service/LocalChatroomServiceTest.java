@@ -301,7 +301,7 @@ class LocalChatroomServiceTest {
 
     assertThatThrownBy(() -> localChatroomService.sendMessage(roomId, sender, "안녕하세요"))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessageContaining("참여하지 않은 채팅방");
+        .hasMessage("error.chat.message.not_joined");
 
     verify(chatMessageRepository, never()).save(any(ChatMessage.class));
   }

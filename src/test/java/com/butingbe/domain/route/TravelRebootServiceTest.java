@@ -184,7 +184,7 @@ class TravelRebootServiceTest {
     assertThatThrownBy(
             () -> travelRebootService.reboot(authenticatedUser, PLAN_ID, CURRENT, 300, null))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Plan not found.");
+        .hasMessage("error.travel.plan.not_found");
   }
 
   private Plan plan() {

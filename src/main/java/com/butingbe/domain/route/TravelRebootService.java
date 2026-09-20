@@ -151,6 +151,6 @@ public class TravelRebootService {
   private Plan findPlan(UUID planId) {
     return planRepository
         .findById(planId)
-        .orElseThrow(() -> new ResourceNotFoundException("Plan not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan.not_found"));
   }
 }

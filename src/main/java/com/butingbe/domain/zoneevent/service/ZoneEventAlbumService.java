@@ -284,17 +284,17 @@ public class ZoneEventAlbumService {
       String[] parts = raw.split("\\|");
       if (sort == AlbumSort.MOST_LIKED) {
         if (parts.length != 3) {
-          throw new InvalidRequestException("Invalid album cursor.");
+          throw new InvalidRequestException("error.zone_event.album.cursor_invalid");
         }
         return new Cursor(
             Long.parseLong(parts[0]), OffsetDateTime.parse(parts[1]), UUID.fromString(parts[2]));
       }
       if (parts.length != 2) {
-        throw new InvalidRequestException("Invalid album cursor.");
+        throw new InvalidRequestException("error.zone_event.album.cursor_invalid");
       }
       return new Cursor(0L, OffsetDateTime.parse(parts[0]), UUID.fromString(parts[1]));
     } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
-      throw new InvalidRequestException("Invalid album cursor.");
+      throw new InvalidRequestException("error.zone_event.album.cursor_invalid");
     }
   }
 

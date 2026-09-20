@@ -138,7 +138,7 @@ class TravelRouteServiceTest {
     assertThatThrownBy(
             () -> travelRouteService.getPlanRoute(authenticatedUser, PLAN_ID, TransportType.CAR))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Plan not found.");
+        .hasMessage("error.travel.plan.not_found");
   }
 
   @Test
@@ -292,7 +292,7 @@ class TravelRouteServiceTest {
     assertThatThrownBy(
             () -> travelRouteService.optimizeTravelVisitOrder(authenticatedUser, TRAVEL_ID, null))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel not found.");
+        .hasMessage("error.travel.not_found");
   }
 
   @Test
@@ -374,13 +374,13 @@ class TravelRouteServiceTest {
                 travelRouteService.applyOptimizedOrder(
                     authenticatedUser, PLAN_ID, List.of(UUID.randomUUID())))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Plan place ids do not match this plan.");
+        .hasMessage("error.travel.plan_place.id_mismatch");
     assertThatThrownBy(
             () ->
                 travelRouteService.applyOptimizedOrder(
                     authenticatedUser, PLAN_ID, List.of(onlyPlace.getId(), onlyPlace.getId())))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("Duplicated plan place id exists.");
+        .hasMessage("error.travel.plan_place.duplicated_id");
 
     verify(travelService, never())
         .updatePlanPlaceSequence(any(), any(), any(PlanPlaceSequenceUpdateReqDto.class));

@@ -112,7 +112,7 @@ class TravelSurveyServiceImplTest {
 
     assertThatThrownBy(() -> travelSurveyService.getProfile(authenticatedUser))
         .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("travel survey profile not found.");
+        .hasMessage("error.travel_survey.not_found");
   }
 
   @Test
