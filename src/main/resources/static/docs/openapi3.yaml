@@ -909,7 +909,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/chat/rooms/{roomId}/exit:
-    post:
+    delete:
       tags:
         - Chat
       summary: 특정 오픈채팅방 퇴장 (나가기)
@@ -4512,6 +4512,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/plans/{planId}/route:
+    get:
+      tags:
+        - Travel
+      summary: "일정 이동 경로 조회"
+      description: "일정에 담긴 장소를 현재 순서대로 이동할 때의 구간과 합계입니다. 좌표가 없는 장소는 계산에서 빠지며 skippedPlaceIds로 알려 줍니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: transportType
+          in: query
+          required: false
+          description: "생략하면 대중교통 기준입니다."
+          schema:
+            $ref: "#/components/schemas/TransportType"
   /api/v1/admin/places/sync:
     post:
       tags:
@@ -4563,6 +4584,7 @@ paths:
           content:
             application/json:
               schema:
+                $ref: "#/components/schemas/PlanRoute"
                 $ref: "#/components/schemas/PlaceEnrichEnvelope"
         "401":
           description: "인증 필요"
@@ -4571,11 +4593,129 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "403":
+          description: "여행 구성원이 아님"
           description: "운영 권한 없음"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "일정을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/plans/{planId}/route/optimize:
+    post:
+      tags:
+        - Travel
+      summary: "방문 순서 최적화 제안"
+      description: "이동 시간이 짧아지는 순서를 제안합니다. **일정을 바꾸지 않습니다.** 결과를 반영하려면 /route/apply를 호출합니다. originalDurationMinutes와 비교해 savedMinutes가 0이면 이미 최적입니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisitOrderOptimizeRequest"
+            example:
+              startLatitude: 35.1587
+              startLongitude: 129.1604
+              startName: "숙소"
+              transportType: PUBLIC_TRANSPORT
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisitOrder"
+        "401":
+          description: "인증 필요"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "여행 구성원이 아님"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "일정을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/plans/{planId}/route/alternatives:
+    post:
+      tags:
+        - Travel
+      summary: "장소를 제외한 대체 경로 제안"
+      description: "excludePlaceIds로 지정한 장소를 뺀 경로를 제안합니다. **일정을 바꾸지 않습니다.** 본문을 생략하면 제외 없이 계산합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlternativeRouteRequest"
+            example:
+              excludePlaceIds:
+                - 30000000-0000-0000-0000-000000000002
+              transportType: WALK
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlternativeRoute"
+        "401":
+          description: "인증 필요"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "여행 구성원이 아님"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "일정을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/plans/{planId}/route/apply:
+    post:
+      tags:
+        - Travel
+      summary: "최적화한 순서를 일정에 반영"
+      description: "제안받은 순서를 실제 일정에 적용합니다. **이 API만 일정을 변경합니다.** 요청에 빠진 장소는 기존 순서를 유지한 채 뒤에 붙습니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: planId
   /api/v1/admin/places/{placeId}:
     patch:
       tags:
@@ -4596,6 +4736,11 @@ paths:
         content:
           application/json:
             schema:
+              $ref: "#/components/schemas/ApplyOptimizedOrderRequest"
+            example:
+              planPlaceIds:
+                - 30000000-0000-0000-0000-000000000001
+                - 30000000-0000-0000-0000-000000000002
               $ref: "#/components/schemas/PlaceCurationRequest"
             example:
               dwellMinutes: 120
@@ -4606,6 +4751,11 @@ paths:
           content:
             application/json:
               schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlanPlaceResponse"
+        "400":
+          description: "planPlaceIds가 비었거나 이 일정의 장소가 아님"
                 $ref: "#/components/schemas/PlaceCurationEnvelope"
         "400":
           description: "체류 시간이 허용 범위(10~480) 밖"
@@ -4620,12 +4770,120 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "403":
+          description: "여행 구성원이 아님"
           description: "운영 권한 없음"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "404":
+          description: "일정을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/travels/{travelId}/route/optimize:
+    post:
+      tags:
+        - Travel
+      summary: "여행 전체 방문 순서 최적화 제안"
+      description: "여행의 모든 날짜를 일자별로 최적화해 제안합니다. **일정을 바꾸지 않습니다.** 날짜별 반영은 /plans/{planId}/route/apply로 합니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: travelId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: transportType
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TransportType"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRouteOptimize"
+        "401":
+          description: "인증 필요"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "여행 구성원이 아님"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "여행을 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/plans/{planId}/reboot:
+    post:
+      tags:
+        - Travel
+      summary: "여행 리부트 - 남은 일정 재구성"
+      description: |
+        계획에서 벗어났을 때 현재 위치와 남은 시간으로 그날의 남은 일정을 다시 짭니다. **일정을 바꾸지 않고 제안만 합니다.**
+        아직 가지 않은 장소만 현재 위치 기준으로 다시 정렬하고, 이동 시간과 체류 시간을 누적해 남은 시간에 담기는 만큼만 남깁니다.
+        빠진 장소는 이유가 셋으로 나뉩니다 - visitedPlaceIds(이미 다녀옴), droppedForTimePlaceIds(시간 부족), skippedNoCoordinatesPlaceIds(좌표 없음).
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRebootRequest"
+            example:
+              currentLatitude: 35.1532
+              currentLongitude: 129.1186
+              currentName: "광안리 해수욕장"
+              availableMinutes: 240
+              transportType: PUBLIC_TRANSPORT
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelReboot"
+        "400":
+          description: "좌표나 availableMinutes가 유효하지 않음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "인증 필요"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "여행 구성원이 아님"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "일정을 찾을 수 없음"
           description: "장소를 찾을 수 없음"
           content:
             application/json:
@@ -9331,6 +9589,327 @@ components:
         - NAVER
         - GOOGLE
       example: GOOGLE
+    RoutePoint:
+      type: object
+      description: "경로 계산의 한 지점. 여행 장소일 수도 있고 사용자의 현재 위치처럼 장소가 아닌 지점일 수도 있습니다."
+      properties:
+        placeId:
+          type: string
+          format: uuid
+          nullable: true
+          description: "일정 장소가 아니면 null입니다."
+          example: 30000000-0000-0000-0000-000000000001
+        name:
+          type: string
+          example: 광안리 해수욕장
+        latitude:
+          type: number
+          format: double
+          example: 35.1532
+        longitude:
+          type: number
+          format: double
+          example: 129.1186
+    RouteLeg:
+      type: object
+      description: "두 지점 사이의 한 구간."
+      properties:
+        from:
+          $ref: "#/components/schemas/RoutePoint"
+        to:
+          $ref: "#/components/schemas/RoutePoint"
+        transportType:
+          $ref: "#/components/schemas/TransportType"
+        distanceMeters:
+          type: integer
+          example: 3200
+        durationMinutes:
+          type: integer
+          example: 25
+    PlanRoute:
+      type: object
+      properties:
+        planId:
+          type: string
+          format: uuid
+          example: 20000000-0000-0000-0000-000000000001
+        transportType:
+          $ref: "#/components/schemas/TransportType"
+        legs:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteLeg"
+        totalDistanceMeters:
+          type: integer
+          example: 12400
+        totalDurationMinutes:
+          type: integer
+          example: 78
+        skippedPlaceIds:
+          type: array
+          description: "좌표가 없어 계산에서 빠진 장소."
+          items:
+            type: string
+            format: uuid
+    VisitOrder:
+      type: object
+      description: "최적화된 방문 순서와 그 근거. originalDurationMinutes는 입력 순서 그대로 이동했을 때의 시간이며, 이미 최적이면 savedMinutes가 0입니다."
+      properties:
+        transportType:
+          $ref: "#/components/schemas/TransportType"
+        orderedPoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutePoint"
+        legs:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteLeg"
+        totalDistanceMeters:
+          type: integer
+          example: 9800
+        totalDurationMinutes:
+          type: integer
+          example: 62
+        originalDurationMinutes:
+          type: integer
+          example: 78
+        savedMinutes:
+          type: integer
+          example: 16
+        skippedPlaceIds:
+          type: array
+          description: "좌표가 없어 순서 계산에서 빠진 장소. 최적화 결과를 그대로 반영하면 사라지므로 호출자가 따로 처리해야 합니다."
+          items:
+            type: string
+            format: uuid
+    AlternativeRoute:
+      type: object
+      properties:
+        transportType:
+          $ref: "#/components/schemas/TransportType"
+        alternative:
+          $ref: "#/components/schemas/VisitOrder"
+        alternativeDurationMinutes:
+          type: integer
+          example: 48
+        originalDurationMinutes:
+          type: integer
+          example: 78
+        reducedMinutes:
+          type: integer
+          example: 30
+        excludedPlaceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        skippedPlaceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+    TravelRouteOptimizeDay:
+      type: object
+      properties:
+        planId:
+          type: string
+          format: uuid
+          example: 20000000-0000-0000-0000-000000000001
+        dayNumber:
+          type: integer
+          example: 1
+        visitDate:
+          type: string
+          format: date
+          example: 2026-09-21
+        route:
+          $ref: "#/components/schemas/VisitOrder"
+        totalDurationMinutes:
+          type: integer
+          example: 62
+        originalDurationMinutes:
+          type: integer
+          example: 78
+        savedMinutes:
+          type: integer
+          example: 16
+    TravelRouteOptimize:
+      type: object
+      properties:
+        travelId:
+          type: string
+          format: uuid
+          example: 10000000-0000-0000-0000-000000000001
+        transportType:
+          $ref: "#/components/schemas/TransportType"
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/TravelRouteOptimizeDay"
+        totalDurationMinutes:
+          type: integer
+          example: 180
+        originalDurationMinutes:
+          type: integer
+          example: 220
+        savedMinutes:
+          type: integer
+          example: 40
+    TravelReboot:
+      type: object
+      description: "리부트로 다시 짠 남은 일정. orderedPoints는 현재 위치에서 시작합니다(현재 위치 포함)."
+      properties:
+        transportType:
+          $ref: "#/components/schemas/TransportType"
+        orderedPoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutePoint"
+        legs:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteLeg"
+        totalTravelMinutes:
+          type: integer
+          example: 55
+        totalStayMinutes:
+          type: integer
+          example: 150
+        totalMinutes:
+          type: integer
+          example: 205
+        availableMinutes:
+          type: integer
+          example: 240
+        reachablePlaceIds:
+          type: array
+          description: "남은 시간 안에 갈 수 있는 장소."
+          items:
+            type: string
+            format: uuid
+        droppedForTimePlaceIds:
+          type: array
+          description: "시간이 모자라 뺀 장소."
+          items:
+            type: string
+            format: uuid
+        visitedPlaceIds:
+          type: array
+          description: "이미 다녀온 장소."
+          items:
+            type: string
+            format: uuid
+        skippedNoCoordinatesPlaceIds:
+          type: array
+          description: "좌표가 없어 계산할 수 없는 장소."
+          items:
+            type: string
+            format: uuid
+    VisitOrderOptimizeRequest:
+      type: object
+      description: "출발 좌표는 위도와 경도가 모두 있을 때만 출발 지점으로 쓰입니다. 생략하면 첫 장소에서 시작합니다."
+      properties:
+        startLatitude:
+          type: number
+          format: double
+          nullable: true
+          minimum: -90
+          maximum: 90
+          example: 35.1587
+        startLongitude:
+          type: number
+          format: double
+          nullable: true
+          minimum: -180
+          maximum: 180
+          example: 129.1604
+        startName:
+          type: string
+          nullable: true
+          example: 숙소
+        transportType:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/TransportType"
+    AlternativeRouteRequest:
+      type: object
+      properties:
+        excludePlaceIds:
+          type: array
+          nullable: true
+          description: "경로에서 뺄 장소. 생략하면 제외 없이 계산합니다."
+          items:
+            type: string
+            format: uuid
+        startLatitude:
+          type: number
+          format: double
+          nullable: true
+          minimum: -90
+          maximum: 90
+          example: 35.1587
+        startLongitude:
+          type: number
+          format: double
+          nullable: true
+          minimum: -180
+          maximum: 180
+          example: 129.1604
+        startName:
+          type: string
+          nullable: true
+          example: 숙소
+        transportType:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/TransportType"
+    ApplyOptimizedOrderRequest:
+      type: object
+      required:
+        - planPlaceIds
+      properties:
+        planPlaceIds:
+          type: array
+          minItems: 1
+          description: "적용할 순서대로의 일정 장소 식별자. 여기 빠진 장소는 기존 순서를 유지한 채 뒤에 붙습니다."
+          items:
+            type: string
+            format: uuid
+    TravelRebootRequest:
+      type: object
+      required:
+        - currentLatitude
+        - currentLongitude
+        - availableMinutes
+      properties:
+        currentLatitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          example: 35.1532
+        currentLongitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          example: 129.1186
+        currentName:
+          type: string
+          nullable: true
+          description: "생략하면 \"현재 위치\"로 표시합니다."
+          example: 광안리 해수욕장
+        availableMinutes:
+          type: integer
+          minimum: 1
+          description: "앞으로 쓸 수 있는 시간(분)."
+          example: 240
+        transportType:
+          nullable: true
+          description: "생략하면 대중교통 기준입니다."
+          allOf:
+            - $ref: "#/components/schemas/TransportType"
     TransportType:
       type: string
       enum:
