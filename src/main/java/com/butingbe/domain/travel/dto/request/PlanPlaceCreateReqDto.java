@@ -14,6 +14,7 @@ public record PlanPlaceCreateReqDto(
     Double longitude,
     @NotNull(message = "Place provider is required.") PlaceProvider provider,
     @NotBlank(message = "Provider place id is required.") String providerPlaceId,
+    String contentTypeId,
     @Min(value = 0, message = "Duration minutes cannot be negative.") Integer durationMinutes,
     String memo,
     LocalTime scheduledTime,

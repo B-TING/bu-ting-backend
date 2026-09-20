@@ -10,4 +10,5 @@ public record PlanPlaceUpdatePlaceReqDto(
     Double latitude,
     Double longitude,
     @NotNull(message = "Place provider is required.") PlaceProvider provider,
-    @NotBlank(message = "Provider place id is required.") String providerPlaceId) {}
+    @NotBlank(message = "Provider place id is required.") String providerPlaceId,
+    String contentTypeId) {}

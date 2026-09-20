@@ -18,8 +18,7 @@ public class CatalogPlaceDwellTimeProvider implements PlaceDwellTimeProvider {
   @Override
   @Transactional(readOnly = true)
   public int dwellMinutes(String provider, String providerPlaceId) {
-    return placeRepository
-        .findByProviderAndProviderPlaceId(provider, providerPlaceId)
+    return CatalogPlaceLookup.find(placeRepository, provider, providerPlaceId)
         .map(Place::getDwellMinutes)
         .filter(Objects::nonNull)
         .orElseGet(() -> PlaceDwellDefaults.forContentType(null));

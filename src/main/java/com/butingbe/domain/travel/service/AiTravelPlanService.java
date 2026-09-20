@@ -112,6 +112,7 @@ public class AiTravelPlanService {
               .longitude(found.longitude())
               .provider(key.provider())
               .providerPlaceId(key.providerPlaceId())
+              .contentTypeId(found.type())
               .memo(place.memo())
               .source(
                   filled.autoFilled(key.providerPlaceId())

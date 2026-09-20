@@ -107,12 +107,24 @@ public class TravelPlanCandidateFiller {
 
   private static WizardPickedPlaceReqDto toWizardPlace(PlaceCandidateResDto candidate) {
     return new WizardPickedPlaceReqDto(
-        candidate.provider(),
+        // 카탈로그는 TOUR_API로 적재되지만, 일정 PlaceKey/앱 계약은 GOOGLE + contentId다.
+        toPlanProvider(candidate.provider()),
         candidate.providerPlaceId(),
         candidate.name(),
         candidate.address(),
         candidate.latitude(),
         candidate.longitude(),
         candidate.contentTypeId());
+  }
+
+  /** 관광 카탈로그 provider를 일정 생성용 PlaceProvider 이름으로 맞춘다. */
+  static String toPlanProvider(String catalogProvider) {
+    if (catalogProvider == null || catalogProvider.isBlank()) {
+      return "GOOGLE";
+    }
+    if ("TOUR_API".equalsIgnoreCase(catalogProvider.trim())) {
+      return "GOOGLE";
+    }
+    return catalogProvider.trim().toUpperCase(java.util.Locale.ROOT);
   }
 }

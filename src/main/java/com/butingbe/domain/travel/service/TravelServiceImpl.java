@@ -166,6 +166,7 @@ public class TravelServiceImpl implements TravelService {
             .longitude(request.longitude())
             .provider(request.provider())
             .providerPlaceId(request.providerPlaceId())
+            .contentTypeId(request.contentTypeId())
             .durationMinutes(request.durationMinutes())
             .memo(request.memo())
             .scheduledTime(request.scheduledTime())
@@ -222,7 +223,8 @@ public class TravelServiceImpl implements TravelService {
         request.latitude(),
         request.longitude(),
         request.provider(),
-        request.providerPlaceId());
+        request.providerPlaceId(),
+        request.contentTypeId());
     planRouteRepository.deleteByPlan_Id(plan.getId());
 
     return PlanPlaceResDto.from(planPlace);

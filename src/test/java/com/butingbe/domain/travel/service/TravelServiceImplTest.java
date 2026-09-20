@@ -281,7 +281,8 @@ class TravelServiceImplTest extends AbstractContainerTest {
                 35.153,
                 129.118,
                 PlaceProvider.KAKAO,
-                "kakao-gwangalli-id"));
+                "kakao-gwangalli-id",
+                null));
 
     assertThat(result.placeName()).isEqualTo("Gwangalli");
     assertThat(result.address()).isEqualTo("Busan Suyeong-gu");
@@ -366,7 +367,8 @@ class TravelServiceImplTest extends AbstractContainerTest {
                 35.158,
                 129.16,
                 PlaceProvider.GOOGLE,
-                "google-haeundae"));
+                "google-haeundae",
+                null));
 
     assertThat(updated.placeName()).isEqualTo("Haeundae Beach");
     assertThat(updated.address()).isEqualTo("Busan Haeundae-gu");
@@ -636,6 +638,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
             129.041,
             PlaceProvider.GOOGLE,
             name,
+            null,
             30,
             null,
             null,

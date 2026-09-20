@@ -18,8 +18,7 @@ public class CatalogPlaceTimeSlotProvider implements PlaceTimeSlotProvider {
   @Override
   @Transactional(readOnly = true)
   public Optional<PlaceTimeSlot> timeSlot(String provider, String providerPlaceId) {
-    return placeRepository
-        .findByProviderAndProviderPlaceId(provider, providerPlaceId)
+    return CatalogPlaceLookup.find(placeRepository, provider, providerPlaceId)
         .map(Place::getPreferredTimeSlot);
   }
 }

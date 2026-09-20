@@ -47,6 +47,17 @@ class CatalogPlaceDwellTimeProviderTest {
     assertThat(provider.dwellMinutes("TOUR_API", "126508")).isEqualTo(60);
   }
 
+  @Test
+  @DisplayName("GOOGLE + contentId로 조회해도 TOUR_API 카탈로그 체류 시간을 찾는다")
+  void findsTourApiCatalogViaGoogleContract() {
+    when(placeRepository.findByProviderAndProviderPlaceId("GOOGLE", "126508"))
+        .thenReturn(Optional.empty());
+    when(placeRepository.findByProviderAndProviderPlaceId("TOUR_API", "126508"))
+        .thenReturn(Optional.of(place(90)));
+
+    assertThat(provider.dwellMinutes("GOOGLE", "126508")).isEqualTo(90);
+  }
+
   private Place place(Integer dwellMinutes) {
     return Place.builder()
         .provider("TOUR_API")

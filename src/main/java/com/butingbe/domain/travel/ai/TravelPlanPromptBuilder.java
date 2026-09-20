@@ -71,8 +71,10 @@ public class TravelPlanPromptBuilder {
                 request == null ? "없음" : value(request.schedulePace()),
                 request == null ? "없음" : value(request.bookedAccommodation()),
                 request == null ? "없음" : value(request.accommodationAreaIds()),
-                request == null ? 0 : request.selectedPlaces().size(),
-                request == null
+                request == null || request.selectedPlaces() == null
+                    ? 0
+                    : request.selectedPlaces().size(),
+                request == null || request.selectedPlaces() == null
                     ? "없음"
                     : request.selectedPlaces().stream()
                         .map(
