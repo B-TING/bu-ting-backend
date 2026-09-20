@@ -316,9 +316,11 @@ Pull requests targeting `dev` or `main` run `.github/workflows/ci.yml`, which se
 `.github/workflows/automerge.yml` squash-merges a PR once its CI passes. It runs on `workflow_run` when the `CI`
 workflow completes for a `pull_request`, finds the open PR for that commit, and merges it (with branch delete) only
 when `mergeStateStatus == CLEAN` — a PR that is `BEHIND` dev, has conflicts (`DIRTY`), or is otherwise `BLOCKED` is
-skipped, so a stale green check never merges an out-of-date branch. A PR is also skipped unless its `reviewDecision`
-is `APPROVED` — a green CI alone never merges — and unless its head repository owner matches this repository's owner,
-so a fork PR is never auto-merged by the write-scoped `workflow_run` token. Only `dev`-targeted, non-draft PRs are
+skipped, so a stale green check never merges an out-of-date branch. `UNKNOWN` is not a skip reason: GitHub computes
+mergeability lazily, so right after CI the first query often returns `UNKNOWN`, and the workflow re-queries every five
+seconds (up to five times) until the status settles. A PR is skipped unless its head repository owner matches this
+repository's owner, so a fork PR is never auto-merged by the write-scoped `workflow_run` token. Review approval is
+not required — the `check` status check is the only gate. Only `dev`-targeted, non-draft PRs are
 eligible; `main` release PRs are merged manually so the deploy workflow triggers. Every skip logs its reason in the
 workflow run. The workflow grants itself `contents` and
 `pull-requests` write via its own `permissions:` block and merges with the built-in `GITHUB_TOKEN`.
