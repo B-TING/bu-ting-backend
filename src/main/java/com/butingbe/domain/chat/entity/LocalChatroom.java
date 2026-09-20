@@ -26,6 +26,7 @@ public class LocalChatroom {
   private String description;
 
   @Enumerated(EnumType.STRING)
+  @Column(name = "chat_zone", nullable = false, length = 50)
   private ChatZone chatZone;
 
   @Column(name = "max_members", nullable = false)
