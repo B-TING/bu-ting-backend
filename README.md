@@ -341,6 +341,15 @@ to accept connections before pruning old images.
 For an RDS connection using `sslmode=verify-full`, set the JDBC URL's certificate parameter to
 `sslrootcert=/app/certs/global-bundle.pem`. The AWS RDS global CA bundle ships at that path in the runtime image.
 
+### Manual dev deployment
+
+`.github/workflows/deploy-dev.yml` ("Deploy Dev (manual)") is `workflow_dispatch` only and builds a `:dev` tagged image.
+There is no separate dev server, so it deploys to the **same EC2 host as production** and replaces the running
+production container, applying any dev-only Flyway migration to the production database. Its deploy job therefore runs
+in the `production-dev-image` environment, which has a required reviewer: the run pauses after the image is pushed and
+waits for approval before touching EC2. The `production` environment used by `deploy.yml` is unchanged, so production
+releases still deploy without an approval pause.
+
 ## Branches
 
 | Branch      | Purpose                                    |
