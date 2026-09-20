@@ -106,6 +106,8 @@ class CachingRouteProviderTest {
     shortTtl.leg(GAMCHEON, JAGALCHI, MODE);
 
     verify(delegate, times(2)).leg(any(), any(), any());
+    // 갱신도 save 로 내보내야 한다. 더티 체킹에 기대면 트랜잭션 밖 호출에서 조용히 사라진다.
+    verify(repository, times(2)).save(any());
   }
 
   @Test

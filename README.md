@@ -187,8 +187,8 @@ Environment variables referenced by `application.yaml` (and the AWS default cred
 
 | Feature       | Variables                                                                                        |
 |---------------|--------------------------------------------------------------------------------------------------|
-| Database      | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (required)                                                 |
-| AI            | `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`                                                           |
+| Database      | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (required), `DB_POOL_MAX_SIZE` (default 20), `DB_CONNECTION_TIMEOUT_MS` (default 5000) |
+| AI            | `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`, `AI_CONNECT_TIMEOUT` (default 5s), `AI_READ_TIMEOUT` (default 60s) |
 | Google OAuth  | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_ALLOWED_AUDIENCES`, `GOOGLE_AND_DEBUG_CLIENT_ID`, `GOOGLE_AND_RELEASE_CLIENT_ID` |
 | Naver OAuth   | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `NAVER_REDIRECT_URI`                                    |
 | Kakao OAuth   | `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI`, `KAKAO_ALLOWED_AUDIENCES`, `KAKAO_AND_DEBUG_CLIENT_ID` |

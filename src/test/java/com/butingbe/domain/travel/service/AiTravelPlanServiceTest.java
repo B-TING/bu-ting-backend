@@ -49,6 +49,8 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class AiTravelPlanServiceTest {
   private final PlanRepository plans = mock(PlanRepository.class);
@@ -70,7 +72,8 @@ class AiTravelPlanServiceTest {
               routePlanner(),
               new TravelPlanQualityValidator(routePlanner())),
           new com.butingbe.domain.travel.ai.TravelPlanCandidateFiller(
-              (zones, excluded, limit) -> java.util.List.of()));
+              (zones, excluded, limit) -> java.util.List.of()),
+          transactionTemplate());
   private final UUID travelId = UUID.randomUUID();
   private final UUID userId = UUID.randomUUID();
   private final AuthenticatedUser principal = new AuthenticatedUser(userId, null, null, List.of());
@@ -106,7 +109,8 @@ class AiTravelPlanServiceTest {
                 routePlanner(),
                 new TravelPlanQualityValidator(routePlanner())),
             new com.butingbe.domain.travel.ai.TravelPlanCandidateFiller(
-                (zones, excluded, limit) -> List.of(candidate)));
+                (zones, excluded, limit) -> List.of(candidate)),
+            transactionTemplate());
     when(ai.generate(anyString()))
         .thenReturn(
             new com.butingbe.domain.travel.ai.TravelPlanAiResponse(
@@ -148,6 +152,43 @@ class AiTravelPlanServiceTest {
         .singleElement()
         .extracting(PlanPlace::getSource)
         .isEqualTo(com.butingbe.domain.travel.entity.PlanPlaceSource.AUTO_FILLED);
+  }
+
+  @Test
+  @org.junit.jupiter.api.DisplayName("AI 응답을 기다리는 동안에는 트랜잭션을 열지 않는다")
+  void opensTransactionOnlyAfterTheAiCallReturns() {
+    PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+    var timedService =
+        new AiTravelPlanService(
+            travels,
+            plans,
+            places,
+            users,
+            mock(TravelMemberAuthorization.class),
+            new TravelPlanGenerator(
+                new TravelPlanPromptBuilder(),
+                ai,
+                new TravelPlanAiResponseValidator(),
+                routePlanner(),
+                new TravelPlanQualityValidator(routePlanner())),
+            new com.butingbe.domain.travel.ai.TravelPlanCandidateFiller(
+                (zones, excluded, limit) -> java.util.List.of()),
+            new TransactionTemplate(transactionManager));
+    when(ai.generate(anyString())).thenReturn(qualityResponse());
+    when(plans.save(any()))
+        .thenAnswer(
+            call -> {
+              Plan plan = call.getArgument(0);
+              ReflectionTestUtils.setField(plan, "id", UUID.randomUUID());
+              return plan;
+            });
+
+    timedService.generate(principal, travelId, request());
+
+    // 순서가 뒤집히면 AI 응답을 기다리는 수 초~수십 초 동안 DB 커넥션을 쥐고 있게 된다.
+    var order = org.mockito.Mockito.inOrder(ai, transactionManager);
+    order.verify(ai).generate(anyString());
+    order.verify(transactionManager).getTransaction(any());
   }
 
   @Test
@@ -322,5 +363,10 @@ class AiTravelPlanServiceTest {
         .hasMessage("Travel plans already exist for one or more dates.");
 
     verifyNoInteractions(places);
+  }
+
+  /** 저장 단계만 트랜잭션으로 감싼다. 콜백이 실제로 실행되기만 하면 되므로 관리자는 목으로 충분하다. */
+  private static TransactionTemplate transactionTemplate() {
+    return new TransactionTemplate(mock(PlatformTransactionManager.class));
   }
 }

@@ -10,6 +10,12 @@ spring:
           type: JSON_OBJECT
   application:
     name: buting-be
+  http:
+    client:
+      # 자동 구성된 RestClient.Builder 를 쓰는 곳은 Spring AI 뿐이다. 도메인 클라이언트는
+      # 각자 RestClient 를 만들어 자기 타임아웃을 쓰므로 이 값에 영향받지 않는다.
+      connect-timeout: ${AI_CONNECT_TIMEOUT:5s}
+      read-timeout: ${AI_READ_TIMEOUT:60s}
   threads:
     virtual:
       enabled: true
@@ -26,6 +32,10 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      # 가상 스레드를 켜면 동시 요청 수에 제한이 없어 이 풀이 유일한 병목이 된다.
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -38,6 +48,10 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
     locations: classpath:db/migration
+
+server:
+  # 배포로 컨테이너가 교체될 때 처리 중인 요청을 끊지 않는다.
+  shutdown: graceful
 
 file-storage:
   s3:
