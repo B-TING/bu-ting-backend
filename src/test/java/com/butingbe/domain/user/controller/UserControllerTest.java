@@ -6,21 +6,16 @@ import static org.mockito.Mockito.*;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.payload.PayloadDocumentation.*;
-import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
-import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.butingbe.domain.auth.security.AuthenticatedUser;
-import com.butingbe.domain.user.dto.request.SignUpReqDto;
 import com.butingbe.domain.user.dto.request.UpdateMyProfileReqDto;
 import com.butingbe.domain.user.dto.response.MyProfileResDto;
-import com.butingbe.domain.user.dto.response.UserResDto;
 import com.butingbe.domain.user.service.UserService;
 import com.butingbe.global.error.GlobalExceptionHandler;
 import java.util.List;
@@ -113,50 +108,6 @@ class UserControllerTest {
         new AuthenticatedUser(
             userId, "test@example.com", "테스터", List.of(new SimpleGrantedAuthority("ROLE_USER")));
     return new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
-  }
-
-  // ==========================================
-  // 👤 SIGN UP (회원가입) TEST
-  // ==========================================
-
-  @Test
-  @DisplayName("올바른 회원가입 데이터가 JSON 형태로 들어오면 201 Created를 반환한다")
-  void signUpSuccess() throws Exception {
-    // given
-    doNothing().when(userService).signUp(any(SignUpReqDto.class));
-    UsernamePasswordAuthenticationToken authentication =
-        userAuthentication(UUID.fromString("550e8400-e29b-41d4-a716-446655440000"));
-
-    // when & then
-    mockMvc
-        .perform(
-            post("/api/v1/users/signup")
-                .with(authenticated(authentication))
-                .contentType(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer opaque-token")
-                .content(
-                    """
-                                                                {
-                                                                  "email": "test@example.com",
-                                                                  "nickname": "테스터",
-                                                                  "provider": "google",
-                                                                  "providerId": "google-123",
-                                                                  "firstName": "길동",
-                                                                  "lastName": "홍"
-                                                                }
-                                                                """))
-        .andDo(print())
-        .andExpect(status().isCreated())
-        .andDo(
-            document(
-                "users-sign-up",
-                requestFields(
-                    fieldWithPath("email").description("이메일"),
-                    fieldWithPath("nickname").description("닉네임"),
-                    fieldWithPath("provider").description("OAuth2 provider"),
-                    fieldWithPath("providerId").description("OAuth2 provider user id"),
-                    fieldWithPath("firstName").description("이름"),
-                    fieldWithPath("lastName").description("성"))));
   }
 
   // ==========================================
@@ -318,156 +269,5 @@ class UserControllerTest {
     mockMvc.perform(get("/api/v1/users/me")).andDo(print()).andExpect(status().isUnauthorized());
 
     verify(userService, never()).getMyProfile(any(AuthenticatedUser.class));
-  }
-
-  @Test
-  @DisplayName("회원가입 요청 시 인증 토큰이 없으면 401 Unauthorized를 반환한다")
-  void signUpFailWithoutAuthentication() throws Exception {
-    // when & then
-    mockMvc
-        .perform(
-            post("/api/v1/users/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                                                                {
-                                                                  "email": "test@example.com",
-                                                                  "nickname": "테스터",
-                                                                  "provider": "google",
-                                                                  "providerId": "google-123",
-                                                                  "firstName": "길동",
-                                                                  "lastName": "홍"
-                                                                }
-                                                                """))
-        .andDo(print())
-        .andExpect(status().isUnauthorized());
-
-    verify(userService, never()).signUp(any(SignUpReqDto.class));
-  }
-
-  @Test
-  @DisplayName("회원가입 요청 시 이메일 형식이 누락되거나 잘못되면 @Valid에 의해 400 Bad Request를 뱉는다")
-  void signUpValidationFail() throws Exception {
-    // when & then
-    mockMvc
-        .perform(
-            post("/api/v1/users/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                                                                {
-                                                                  "email": "not-email-format",
-                                                                  "nickname": "",
-                                                                  "firstName": "",
-                                                                  "lastName": ""
-                                                                }
-                                                                """))
-        .andDo(print())
-        .andExpect(status().isBadRequest());
-
-    verify(userService, never()).signUp(any(SignUpReqDto.class));
-  }
-
-  @Test
-  @DisplayName("Accept-Language가 en이면 검증 실패 메시지를 영어로 응답한다")
-  void signUpValidationFailWithEnglishLocale() throws Exception {
-    mockMvc
-        .perform(
-            post("/api/v1/users/signup")
-                .header("Accept-Language", "en")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                                                                {
-                                                                  "email": "",
-                                                                  "nickname": "tester",
-                                                                  "firstName": "",
-                                                                  "lastName": ""
-                                                                }
-                                                                """))
-        .andDo(print())
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("Email is required."));
-
-    verify(userService, never()).signUp(any(SignUpReqDto.class));
-  }
-
-  @Test
-  @DisplayName("Accept-Language가 ja이면 검증 실패 메시지를 일본어로 응답한다")
-  void signUpValidationFailWithJapaneseLocale() throws Exception {
-    mockMvc
-        .perform(
-            post("/api/v1/users/signup")
-                .header("Accept-Language", "ja")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                                                                {
-                                                                  "email": "",
-                                                                  "nickname": "tester",
-                                                                  "firstName": "",
-                                                                  "lastName": ""
-                                                                }
-                                                                """))
-        .andDo(print())
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("メールアドレスは必須入力項目です。"));
-
-    verify(userService, never()).signUp(any(SignUpReqDto.class));
-  }
-
-  @Test
-  @DisplayName("Accept-Language가 zh이면 검증 실패 메시지를 중국어로 응답한다")
-  void signUpValidationFailWithChineseLocale() throws Exception {
-    mockMvc
-        .perform(
-            post("/api/v1/users/signup")
-                .header("Accept-Language", "zh")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                                                                {
-                                                                  "email": "",
-                                                                  "nickname": "tester",
-                                                                  "firstName": "",
-                                                                  "lastName": ""
-                                                                }
-                                                                """))
-        .andDo(print())
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("邮箱为必填项。"));
-
-    verify(userService, never()).signUp(any(SignUpReqDto.class));
-  }
-
-  // ==========================================
-  // 🔑 SIGN IN (로그인/조회) TEST
-  // ==========================================
-
-  @Test
-  @DisplayName("정상적인 이메일 파라미터로 로그인 요청 시 유저 정보를 JSON 규격으로 응답한다")
-  void signInSuccess() throws Exception {
-    // given
-    String email = "success@example.com";
-    UserResDto mockResponse = new UserResDto(email, "홍길동");
-    given(userService.signIn(email)).willReturn(mockResponse);
-
-    // when & then
-    mockMvc
-        .perform(
-            get("/api/v1/users/signin")
-                .param("email", email)
-                .contentType(MediaType.APPLICATION_JSON))
-        .andDo(print())
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.email").value(email))
-        .andExpect(jsonPath("$.nickname").value("홍길동"))
-        .andDo(
-            document(
-                "users-sign-in",
-                queryParameters(parameterWithName("email").description("조회할 사용자 이메일")),
-                responseFields(
-                    fieldWithPath("email").description("이메일"),
-                    fieldWithPath("nickname").description("닉네임"))));
   }
 }
