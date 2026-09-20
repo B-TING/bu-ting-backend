@@ -86,7 +86,7 @@ Request flow:
 | Base path                                    | Controller                      | Description                                        |
 |----------------------------------------------|---------------------------------|----------------------------------------------------|
 | `/api/v1/auth`                               | `AuthController`                | OAuth login, access token refresh                  |
-| `/api/v1/users`                              | `UserController`                | Sign-up, profile read/update/delete                |
+| `/api/v1/users`                              | `UserController`                | Profile read/update/delete (sign-up happens through OAuth login) |
 | `/api/v1/travel-surveys`                      | `TravelSurveyController`        | Travel preference survey                           |
 | `/api/v1/places`                             | `PlaceController`               | Place search, nearby, festivals, detail            |
 | `/api/v1/places/reviews`                     | `PublicPlaceReviewController`   | Public place reviews                               |
@@ -130,6 +130,11 @@ The generated OpenAPI specification lives at `src/main/resources/static/docs/ope
 | Application prefix      | `/pub`               |
 | Broker prefix           | `/sub`               |
 | Message mapping         | `/pub/chat/message`  |
+
+CONNECT requires a valid opaque access token in the `Authorization: Bearer <token>` native header; the connection is
+rejected otherwise. Subscribing to `/sub/chat/room/{roomId}` and publishing to `/pub/chat/message` are allowed only for
+members of that room (`chat_member`). The handshake accepts the same origins as the HTTP CORS allow-list
+(`SecurityConfig.ALLOWED_ORIGINS`).
 
 ## Local Database
 
@@ -311,8 +316,11 @@ Pull requests targeting `dev` or `main` run `.github/workflows/ci.yml`, which se
 `.github/workflows/automerge.yml` squash-merges a PR once its CI passes. It runs on `workflow_run` when the `CI`
 workflow completes for a `pull_request`, finds the open PR for that commit, and merges it (with branch delete) only
 when `mergeStateStatus == CLEAN` — a PR that is `BEHIND` dev, has conflicts (`DIRTY`), or is otherwise `BLOCKED` is
-skipped, so a stale green check never merges an out-of-date branch. Only `dev`-targeted, non-draft PRs are eligible;
-`main` release PRs are merged manually so the deploy workflow triggers. The workflow grants itself `contents` and
+skipped, so a stale green check never merges an out-of-date branch. A PR is also skipped unless its `reviewDecision`
+is `APPROVED` — a green CI alone never merges — and unless its head repository owner matches this repository's owner,
+so a fork PR is never auto-merged by the write-scoped `workflow_run` token. Only `dev`-targeted, non-draft PRs are
+eligible; `main` release PRs are merged manually so the deploy workflow triggers. Every skip logs its reason in the
+workflow run. The workflow grants itself `contents` and
 `pull-requests` write via its own `permissions:` block and merges with the built-in `GITHUB_TOKEN`.
 
 ## Production Deployment

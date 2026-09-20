@@ -1,5 +1,6 @@
 package com.butingbe.domain.chat.service;
 
+import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.dto.ChatroomResponse;
 import com.butingbe.domain.chat.entity.*;
@@ -8,6 +9,8 @@ import com.butingbe.domain.chat.repository.ChatMessageRepository;
 import com.butingbe.domain.chat.repository.LocalChatroomRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.ForbiddenException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -72,19 +75,36 @@ public class LocalChatroomService {
         .toList();
   }
 
+  /** 참여 중인 방에만 메시지를 저장하고, 그 방 구독자에게 발행한다. */
+  @Transactional
+  public void sendMessage(UUID roomId, AuthenticatedUser sender, String content) {
+    if (!chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.id())) {
+      throw new ForbiddenException("참여하지 않은 채팅방에는 메시지를 보낼 수 없습니다.");
+    }
+
+    ChatMessage savedMessage =
+        chatMessageRepository.save(
+            ChatMessage.builder()
+                .roomId(roomId)
+                .userId(sender.id())
+                .senderNickname(sender.nickname())
+                .content(content)
+                .build());
+
+    messagingTemplate.convertAndSend(
+        "/sub/chat/room/" + roomId, ChatMessageResponse.from(savedMessage, null));
+  }
+
   @Transactional
   public void exitChatroom(UUID roomId, UUID userId) {
-    LocalChatroom chatroom =
-        localChatroomRepository
-            .findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채팅방입니다."));
+    requireRoom(roomId);
 
     if (!chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
       throw new IllegalArgumentException("참여하고 있지 않은 채팅방입니다.");
     }
 
     chatMemberRepository.deleteByIdRoomIdAndIdUserId(roomId, userId);
-    chatroom.decrementCurrentMembers();
+    localChatroomRepository.decreaseCurrentMembers(roomId);
   }
 
   @Transactional
@@ -98,44 +118,36 @@ public class LocalChatroomService {
         userRepository
             .findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
-    if (!chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
-      if (chatroom.getCurrentMembers() >= chatroom.getMaxMembers()) {
-        throw new IllegalStateException("채팅방 정원이 가득 찼습니다."); // GlobalHandler가 409(CONFLICT)로 처리
-      }
-
-      ChatMember newMember = ChatMember.builder().chatroom(chatroom).user(user).build();
-      chatMemberRepository.save(newMember);
-
-      // 채팅방 인원수 증가
-      chatroom.incrementCurrentMembers();
-    } else {
-      throw new IllegalStateException("이미 가입한 사용자입니다.");
+    if (chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
+      throw new ConflictException("error.chat.room.already_joined");
     }
+
+    // 정원 확인과 인원 증가를 한 문장으로 한다. 읽고 비교한 뒤 증가시키면 동시 입장에서 정원을 넘긴다.
+    // 갱신된 행이 없으면 그 사이 다른 사람이 마지막 자리를 채운 것이다.
+    if (localChatroomRepository.increaseCurrentMembers(roomId) == 0) {
+      throw new ConflictException("error.chat.room.full");
+    }
+
+    chatMemberRepository.save(ChatMember.builder().chatroom(chatroom).user(user).build());
   }
 
   @Transactional
   public void enterLiveChatroom(UUID roomId) {
-    LocalChatroom chatroom =
-        localChatroomRepository
-            .findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채팅방입니다."));
+    requireRoom(roomId);
 
-    chatroom.incrementCurrentMembers(); // 인원수 +1
+    if (localChatroomRepository.increaseCurrentMembers(roomId) == 0) {
+      throw new ConflictException("error.chat.room.full");
+    }
 
-    broadcastRoomStatus(roomId, chatroom.getCurrentMembers());
+    broadcastRoomStatus(roomId, currentMembers(roomId));
   }
 
   @Transactional
   public void exitLiveChatroom(UUID roomId) {
-    LocalChatroom chatroom =
-        localChatroomRepository
-            .findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채팅방입니다."));
-    if (chatroom.getCurrentMembers() > 0) {
-      chatroom.decrementCurrentMembers(); // 인원수 -1
-    }
+    requireRoom(roomId);
+    localChatroomRepository.decreaseCurrentMembers(roomId);
 
-    broadcastRoomStatus(roomId, chatroom.getCurrentMembers());
+    broadcastRoomStatus(roomId, currentMembers(roomId));
   }
 
   // 💡 실시간 브로드캐스팅 공통 메서드
@@ -146,5 +158,16 @@ public class LocalChatroomService {
             "currentMembers", currentMembers);
 
     messagingTemplate.convertAndSend("/sub/chat/room/" + roomId + "/status", statusPayload);
+  }
+
+  private LocalChatroom requireRoom(UUID roomId) {
+    return localChatroomRepository
+        .findById(roomId)
+        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채팅방입니다."));
+  }
+
+  /** 벌크 갱신 직후의 인원수. 영속성 컨텍스트에 남은 엔티티는 갱신 전 값을 들고 있다. */
+  private int currentMembers(UUID roomId) {
+    return localChatroomRepository.findCurrentMembers(roomId).orElse(0);
   }
 }

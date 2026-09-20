@@ -557,42 +557,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
-  /api/v1/users/signup:
-    post:
-      tags:
-        - User
-      summary: 사용자 회원가입
-      description: 인증된 B-TING opaque token을 확인한 뒤 이메일과 닉네임으로 사용자를 생성합니다.
-      security:
-        - opaqueToken: [ ]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SignUpRequest"
-            example:
-              email: test@example.com
-              nickname: 테스터
-              provider: google
-              providerId: google-123
-              firstName: 길동
-              lastName: 홍
-      responses:
-        "201":
-          description: Created
-        "400":
-          description: Validation failed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiErrorResponse"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/users/me:
     get:
       tags:
@@ -661,33 +625,6 @@ paths:
       responses:
         "204":
           description: No Content
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiErrorResponse"
-  /api/v1/users/signin:
-    get:
-      tags:
-        - User
-      summary: 사용자 이메일 조회
-      description: 이메일로 사용자 정보를 조회합니다. OAuth2 완료 전 임시 로그인/조회 API입니다.
-      parameters:
-        - name: email
-          in: query
-          required: true
-          description: 조회할 사용자 이메일
-          schema:
-            type: string
-            format: email
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserResponse"
         "401":
           description: Unauthorized
           content:
@@ -8892,31 +8829,6 @@ components:
           type: string
           description: 행사 종료일, YYYYMMDD
           example: "20260710"
-    SignUpRequest:
-      type: object
-      required:
-        - email
-        - nickname
-      properties:
-        email:
-          type: string
-          format: email
-          example: test@example.com
-        nickname:
-          type: string
-          example: 테스터
-        provider:
-          type: string
-          example: google
-        providerId:
-          type: string
-          example: google-123
-        firstName:
-          type: string
-          example: 길동
-        lastName:
-          type: string
-          example: 홍
     UpdateMyProfileRequest:
       type: object
       properties:
@@ -8962,16 +8874,6 @@ components:
         lastName:
           type: string
           example: 홍
-    UserResponse:
-      type: object
-      properties:
-        email:
-          type: string
-          format: email
-          example: test@example.com
-        nickname:
-          type: string
-          example: 테스터
     TravelSurveyProfileRequest:
       type: object
       properties:
