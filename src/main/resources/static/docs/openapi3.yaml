@@ -4512,27 +4512,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
-  /api/v1/plans/{planId}/route:
-    get:
-      tags:
-        - Travel
-      summary: "일정 이동 경로 조회"
-      description: "일정에 담긴 장소를 현재 순서대로 이동할 때의 구간과 합계입니다. 좌표가 없는 장소는 계산에서 빠지며 skippedPlaceIds로 알려 줍니다."
-      security:
-        - opaqueToken: [ ]
-      parameters:
-        - name: planId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: transportType
-          in: query
-          required: false
-          description: "생략하면 대중교통 기준입니다."
-          schema:
-            $ref: "#/components/schemas/TransportType"
   /api/v1/admin/places/sync:
     post:
       tags:
@@ -4584,7 +4563,6 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PlanRoute"
                 $ref: "#/components/schemas/PlaceEnrichEnvelope"
         "401":
           description: "인증 필요"
@@ -4593,8 +4571,102 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "403":
-          description: "여행 구성원이 아님"
           description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/places/{placeId}:
+    patch:
+      tags:
+        - Place
+      summary: "장소 체류 시간·시간대 보정"
+      description: "ROLE_ADMIN/MANAGER. 유형별 기본값으로는 담기지 않는 값을 운영이 직접 넣습니다. null 필드는 바꾸지 않습니다. 시간대는 일정 배치에서 오전 장소를 앞으로, 저녁 장소를 뒤로 미는 데 쓰입니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceCurationRequest"
+            example:
+              dwellMinutes: 120
+              preferredTimeSlot: EVENING
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceCurationEnvelope"
+        "400":
+          description: "체류 시간이 허용 범위(10~480) 밖"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: "인증 필요"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "운영 권한 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: "장소를 찾을 수 없음"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/plans/{planId}/route:
+    get:
+      tags:
+        - Travel
+      summary: "일정 이동 경로 조회"
+      description: "일정에 담긴 장소를 현재 순서대로 이동할 때의 구간과 합계입니다. 좌표가 없는 장소는 계산에서 빠지며 skippedPlaceIds로 알려 줍니다."
+      security:
+        - opaqueToken: [ ]
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: transportType
+          in: query
+          required: false
+          description: "생략하면 대중교통 기준입니다."
+          schema:
+            $ref: "#/components/schemas/TransportType"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanRoute"
+        "401":
+          description: "인증 필요"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: "여행 구성원이 아님"
           content:
             application/json:
               schema:
@@ -4716,16 +4788,6 @@ paths:
         - opaqueToken: [ ]
       parameters:
         - name: planId
-  /api/v1/admin/places/{placeId}:
-    patch:
-      tags:
-        - Place
-      summary: "장소 체류 시간·시간대 보정"
-      description: "ROLE_ADMIN/MANAGER. 유형별 기본값으로는 담기지 않는 값을 운영이 직접 넣습니다. null 필드는 바꾸지 않습니다. 시간대는 일정 배치에서 오전 장소를 앞으로, 저녁 장소를 뒤로 미는 데 쓰입니다."
-      security:
-        - opaqueToken: [ ]
-      parameters:
-        - name: placeId
           in: path
           required: true
           schema:
@@ -4741,10 +4803,6 @@ paths:
               planPlaceIds:
                 - 30000000-0000-0000-0000-000000000001
                 - 30000000-0000-0000-0000-000000000002
-              $ref: "#/components/schemas/PlaceCurationRequest"
-            example:
-              dwellMinutes: 120
-              preferredTimeSlot: EVENING
       responses:
         "200":
           description: "OK"
@@ -4756,9 +4814,6 @@ paths:
                   $ref: "#/components/schemas/PlanPlaceResponse"
         "400":
           description: "planPlaceIds가 비었거나 이 일정의 장소가 아님"
-                $ref: "#/components/schemas/PlaceCurationEnvelope"
-        "400":
-          description: "체류 시간이 허용 범위(10~480) 밖"
           content:
             application/json:
               schema:
@@ -4771,7 +4826,6 @@ paths:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "403":
           description: "여행 구성원이 아님"
-          description: "운영 권한 없음"
           content:
             application/json:
               schema:
@@ -4884,7 +4938,6 @@ paths:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           description: "일정을 찾을 수 없음"
-          description: "장소를 찾을 수 없음"
           content:
             application/json:
               schema:
