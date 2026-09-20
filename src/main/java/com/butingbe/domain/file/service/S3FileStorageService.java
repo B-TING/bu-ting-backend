@@ -3,6 +3,8 @@ package com.butingbe.domain.file.service;
 import com.butingbe.domain.file.dto.FileUploadResDto;
 import com.butingbe.domain.file.entity.FileMetadata;
 import com.butingbe.domain.file.repository.FileMetadataRepository;
+import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Set;
@@ -81,10 +83,19 @@ public class S3FileStorageService implements FileStorageService {
   }
 
   @Override
-  public void delete(String fileKey) {
+  public void delete(String fileKey, UUID requesterId) {
     validateFileKey(fileKey);
+    // 소유자 확인이 먼저다. S3 객체를 지운 뒤에 거절하면 이미 되돌릴 수 없다.
+    FileMetadata metadata =
+        fileMetadataRepository
+            .findByObjectKey(fileKey)
+            .orElseThrow(() -> new ResourceNotFoundException("error.file.not_found"));
+    // 인증 필수 이전에 올라간 파일은 uploader_id가 비어 있다. 그 경우도 소유자 불일치로 막는다.
+    if (!requesterId.equals(metadata.getUploaderId())) {
+      throw new ForbiddenException("error.file.forbidden");
+    }
     s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(fileKey).build());
-    fileMetadataRepository.findByObjectKey(fileKey).ifPresent(fileMetadataRepository::delete);
+    fileMetadataRepository.delete(metadata);
   }
 
   @Override
