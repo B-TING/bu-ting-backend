@@ -7,7 +7,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,14 +23,20 @@ public class OpaqueTokenAuthenticationFilter extends OncePerRequestFilter {
 
   private static final String BEARER_PREFIX = "Bearer ";
 
+  private static final String LOCAL_PROFILE = "local";
+
   private final OpaqueTokenService opaqueTokenService;
   private final String adminToken;
+  private final boolean adminTokenEnabled;
 
   public OpaqueTokenAuthenticationFilter(
       OpaqueTokenService opaqueTokenService,
-      @Value("${admin.token:${ADMIN_TOKEN:}}") String adminToken) {
+      Environment environment,
+      @Value("${admin.token:}") String adminToken) {
     this.opaqueTokenService = opaqueTokenService;
     this.adminToken = adminToken;
+    this.adminTokenEnabled =
+        environment.matchesProfiles(LOCAL_PROFILE) && StringUtils.hasText(adminToken);
   }
 
   @Override
@@ -61,6 +70,8 @@ public class OpaqueTokenAuthenticationFilter extends OncePerRequestFilter {
   }
 
   private boolean isAdminToken(String rawToken) {
-    return StringUtils.hasText(adminToken) && adminToken.equals(rawToken);
+    return adminTokenEnabled
+        && MessageDigest.isEqual(
+            adminToken.getBytes(StandardCharsets.UTF_8), rawToken.getBytes(StandardCharsets.UTF_8));
   }
 }
