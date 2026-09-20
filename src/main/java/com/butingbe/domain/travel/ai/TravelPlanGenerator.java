@@ -6,9 +6,11 @@ import com.butingbe.domain.travel.entity.Travel;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class TravelPlanGenerator {
   private static final int MAX_ATTEMPTS = 2;
@@ -40,9 +42,23 @@ public class TravelPlanGenerator {
         return response;
       }
       if (attempt == MAX_ATTEMPTS - 1) {
+        // 여기서 남기지 않으면 어떤 조건에 걸렸는지 아무 데도 남지 않는다. 예외에는 사유 enum만 실리고,
+        // 구체적인 지적은 재시도 프롬프트에만 붙었다가 사라진다.
+        log.warn(
+            "AI travel plan rejected after {} attempts. travelId={} places={} reasons={}",
+            MAX_ATTEMPTS,
+            travel.getId(),
+            catalog.size(),
+            feedback);
         throw new TravelPlanValidationException(
             TravelPlanValidationException.Reason.LOW_QUALITY_PLAN, true, Set.of());
       }
+      // 재시도가 얼마나 자주 일어나고 무엇 때문인지 알아야 품질 조건을 조정할 수 있다.
+      log.info(
+          "AI travel plan retrying. travelId={} attempt={} reasons={}",
+          travel.getId(),
+          attempt + 1,
+          feedback);
       prompt +=
           "\n직전 결과의 품질 검증 실패 항목:\n"
               + String.join("\n", feedback)
