@@ -100,6 +100,38 @@ class AdminZoneEventTargetControllerTest {
                     }
                     """))
         .andExpect(status().isBadRequest());
+
+    mockMvc
+        .perform(
+            post("/admin/zone-events/{eventId}/targets", EVENT_ID)
+                .contentType("application/json")
+                .content(
+                    """
+                    {
+                      "targetKind":"PLACE","placeContentId":"126081","contentTypeId":"12",
+                      "latitude":35.1532,"longitude":129.1181,"radiusM":2001
+                    }
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("반경 상한 2000m는 허용한다")
+  void createMaxRadius() throws Exception {
+    when(targetService.create(any(), eq(EVENT_ID), any())).thenReturn(target("ACTIVE"));
+
+    mockMvc
+        .perform(
+            post("/admin/zone-events/{eventId}/targets", EVENT_ID)
+                .contentType("application/json")
+                .content(
+                    """
+                    {
+                      "targetKind":"PLACE","placeContentId":"126081","contentTypeId":"12",
+                      "latitude":35.1690,"longitude":129.1306,"radiusM":2000
+                    }
+                    """))
+        .andExpect(status().isCreated());
   }
 
   @Test

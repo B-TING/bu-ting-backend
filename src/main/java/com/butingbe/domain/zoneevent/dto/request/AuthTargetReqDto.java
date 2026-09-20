@@ -13,4 +13,4 @@ public record AuthTargetReqDto(
     String exampleFileKey,
     @NotNull Double latitude,
     @NotNull Double longitude,
-    @NotNull @Min(30) @Max(500) Integer radiusM) {}
+    @NotNull @Min(30) @Max(2000) Integer radiusM) {}

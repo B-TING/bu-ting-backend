@@ -15,7 +15,22 @@ public final class TravelPlanFixtures {
   private static final List<String> NAMES =
       List.of("감천문화마을", "해운대해수욕장", "광안리해수욕장", "해동용궁사", "자갈치시장", "태종대", "송정해수욕장", "용두산공원");
 
+  /** 카탈로그가 비어 있을 때 쓰이는 기본 체류 시간. */
+  public static final int DEFAULT_DWELL_MINUTES = 60;
+
   private TravelPlanFixtures() {}
+
+  /** 실제 협력자로 조립한 배치기. 경로는 좌표 추정을 쓰고, 장소 카탈로그가 비어 체류 시간은 기본값으로 떨어진다. */
+  public static TravelPlanRoutePlanner routePlanner() {
+    com.butingbe.domain.route.HaversineRouteProvider haversine =
+        new com.butingbe.domain.route.HaversineRouteProvider();
+    return new TravelPlanRoutePlanner(
+        new com.butingbe.domain.route.VisitOrderOptimizer(haversine),
+        haversine,
+        haversine,
+        (provider, providerPlaceId) -> DEFAULT_DWELL_MINUTES,
+        (provider, providerPlaceId) -> java.util.Optional.empty());
+  }
 
   public static Travel travel() {
     return Travel.builder()
@@ -75,7 +90,7 @@ public final class TravelPlanFixtures {
 
   public static TravelPlanAiResponse qualityResponse() {
     var catalog = SelectedPlaceCatalog.from(request());
-    var routes = new TravelPlanRoutePlanner().plan(travel(), catalog);
+    var routes = routePlanner().plan(travel(), catalog);
     return new TravelPlanAiResponse(
         routes.entrySet().stream()
             .map(

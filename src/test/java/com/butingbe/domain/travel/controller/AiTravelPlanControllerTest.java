@@ -130,7 +130,26 @@ class AiTravelPlanControllerTest {
   }
 
   @Test
-  void emptySelectionRejected() throws Exception {
+  @org.junit.jupiter.api.DisplayName("선택 장소가 비어도 요청은 통과한다 — 서버가 후보로 채운다")
+  void emptySelectionIsAccepted() throws Exception {
+    when(service.generate(any(), any(), any()))
+        .thenReturn(new TravelPlansResDto(travelId, "부산", List.of()));
+
+    mvc.perform(
+            post("/api/v1/travels/{travelId}/ai-plans", travelId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"selectedPlaces\":[]}"))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  @org.junit.jupiter.api.DisplayName("채울 후보조차 없으면 400이다")
+  void rejectsWhenNoCandidatesAvailable() throws Exception {
+    when(service.generate(any(), any(), any()))
+        .thenThrow(
+            new TravelPlanValidationException(
+                TravelPlanValidationException.Reason.INVALID_PLACE_REFERENCE, false, Set.of()));
+
     mvc.perform(
             post("/api/v1/travels/{travelId}/ai-plans", travelId)
                 .contentType(MediaType.APPLICATION_JSON)

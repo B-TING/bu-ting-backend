@@ -4,6 +4,7 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travel.ai.PlaceKey;
 import com.butingbe.domain.travel.ai.SelectedPlaceCatalog;
 import com.butingbe.domain.travel.ai.TravelPlanAiResponse;
+import com.butingbe.domain.travel.ai.TravelPlanCandidateFiller;
 import com.butingbe.domain.travel.ai.TravelPlanGenerator;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto;
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto.WizardPickedPlaceReqDto;
@@ -11,6 +12,7 @@ import com.butingbe.domain.travel.dto.response.TravelPlansResDto;
 import com.butingbe.domain.travel.dto.response.TravelPlansResDto.PlanDayResDto;
 import com.butingbe.domain.travel.entity.Plan;
 import com.butingbe.domain.travel.entity.PlanPlace;
+import com.butingbe.domain.travel.entity.PlanPlaceSource;
 import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRepository;
@@ -36,6 +38,7 @@ public class AiTravelPlanService {
   private final UserRepository userRepository;
   private final TravelMemberAuthorization authorization;
   private final TravelPlanGenerator generator;
+  private final TravelPlanCandidateFiller candidateFiller;
 
   @Transactional
   public TravelPlansResDto generate(
@@ -50,7 +53,10 @@ public class AiTravelPlanService {
             .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
     authorization.validateMember(travelId, user.getId());
 
-    Map<PlaceKey, WizardPickedPlaceReqDto> catalog = SelectedPlaceCatalog.from(request);
+    // 고른 장소가 모자라면 카탈로그에서 후보를 보탠다. 합쳐진 목록이 그대로 검증 경로를 탄다.
+    TravelPlanCandidateFiller.FilledPlaces filled = candidateFiller.fill(travel, request);
+    Map<PlaceKey, WizardPickedPlaceReqDto> catalog =
+        SelectedPlaceCatalog.fromPlaces(filled.places());
     TravelPlanAiResponse response = generator.generate(travel, request, catalog);
     if (response.days().stream()
         .anyMatch(day -> planRepository.existsByTravel_IdAndVisitDate(travelId, day.date()))) {
@@ -59,13 +65,16 @@ public class AiTravelPlanService {
     List<Plan> plans =
         response.days().stream()
             .sorted(java.util.Comparator.comparing(TravelPlanAiResponse.Day::date))
-            .map(day -> saveDay(travel, day, catalog))
+            .map(day -> saveDay(travel, day, catalog, filled))
             .toList();
     return TravelPlansResDto.of(travel, plans.stream().map(this::toDay).toList());
   }
 
   private Plan saveDay(
-      Travel travel, TravelPlanAiResponse.Day day, Map<PlaceKey, WizardPickedPlaceReqDto> catalog) {
+      Travel travel,
+      TravelPlanAiResponse.Day day,
+      Map<PlaceKey, WizardPickedPlaceReqDto> catalog,
+      TravelPlanCandidateFiller.FilledPlaces filled) {
     Plan plan =
         planRepository.save(
             Plan.builder()
@@ -91,6 +100,10 @@ public class AiTravelPlanService {
               .provider(key.provider())
               .providerPlaceId(key.providerPlaceId())
               .memo(place.memo())
+              .source(
+                  filled.autoFilled(key.providerPlaceId())
+                      ? PlanPlaceSource.AUTO_FILLED
+                      : PlanPlaceSource.USER_PICKED)
               .build());
     }
     return plan;

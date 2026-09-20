@@ -35,7 +35,7 @@ src/main/java/com/butingbe
 │   ├── file            # S3 uploads and file metadata
 │   ├── place           # Place catalog backed by TourAPI and Google Places
 │   ├── reward          # Reward catalog, grants, point ledger and badges (Phase 1)
-│   ├── route           # Travel time, distance, visit-order and alternative routes
+│   ├── route           # Travel time, distance, visit-order and alternative routes, external leg cache
 │   ├── station         # Station reference data
 │   ├── storage         # Luggage storage locations
 │   ├── travel          # Travels, plans, and AI itinerary generation (ai package)
@@ -116,6 +116,7 @@ Request flow:
 | `/api/v1/users/me/rewards`, `/point-ledger`  | `UserRewardController`          | My reward summary (badges by zone, balance) and point ledger |
 | `/api/v1/admin/zone-events`                  | `AdminZoneEventController`      | Operator event CRUD and state transitions (ADMIN/MANAGER) |
 | `/api/v1/admin/reward-catalog`               | `AdminRewardCatalogController`  | Operator reward catalog CRUD and grant history (ADMIN/MANAGER) |
+| `/api/v1/admin/places`                       | `AdminPlaceController`          | Operator place catalog: TourAPI sync, Google Places popularity enrichment, dwell time and time-slot curation (ADMIN/MANAGER) |
 | `/api/v1/admin/zone-event-rounds`            | `AdminRoundController`          | Operator round console: calendar, slots, backup/rain-swap targets, open/close/settle, settlement report (ADMIN/MANAGER) |
 | `/api/v1/zone-event-rounds/current`          | `ZoneEventRoundController`      | Current round status per zone (OPEN/REST/UPCOMING) |
 
@@ -196,7 +197,7 @@ Environment variables referenced by `application.yaml` (and the AWS default cred
 | AWS creds     | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (local only; on EC2 use the instance IAM role)       |
 | Upload limits | `FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE`                                                          |
 | Invitations   | `TRAVEL_INVITE_BASE_URL`                                                                          |
-| Routing       | `ROUTE_GOOGLE_ENABLED` (off by default), `ROUTE_GOOGLE_API_KEY` (falls back to `GOOGLE_PLACES_API_KEY`) |
+| Routing       | `ROUTE_GOOGLE_ENABLED` (off by default), `ROUTE_GOOGLE_API_KEY` (falls back to `GOOGLE_PLACES_API_KEY`), `ROUTE_CACHE_TTL_DAYS` (default 30), `ROUTE_CACHE_EVICTION_ENABLED` / `ROUTE_CACHE_EVICTION_CRON` |
 | Admin         | `ADMIN_TOKEN` (optional operator bootstrap token; unset disables it)                              |
 | Zone Event    | `ZONE_EVENT_REVIEW_MODE`, `ZONE_EVENT_REPORT_AUTO_HIDE_THRESHOLD`, `ZONE_EVENT_REVIEW_CAPTURED_AT_THRESHOLD_MINUTES`, `ZONE_EVENT_ROUND_SCHEDULER_DELAY_MS`, `ZONE_EVENT_ROUND_SCHEDULER_INITIAL_DELAY_MS` (all optional, sensible defaults) |
 

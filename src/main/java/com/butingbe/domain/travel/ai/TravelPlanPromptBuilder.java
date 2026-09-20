@@ -1,6 +1,7 @@
 package com.butingbe.domain.travel.ai;
 
 import com.butingbe.domain.travel.dto.request.AiTravelPlanGenerateReqDto;
+import com.butingbe.domain.travel.entity.CompanionType;
 import com.butingbe.domain.travel.entity.Travel;
 import java.time.temporal.ChronoUnit;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,10 @@ public class TravelPlanPromptBuilder {
         여행 스타일: %s
         여행 속도: %s
         동행 인원: %s
+        동행 유형: %s
+        짐 많음: %s
+        평지 선호: %s
+        반려동물 동반: %s
         선호 음식: %s
         위저드 음식 태그: %s
         여행 목적: %s
@@ -41,48 +46,106 @@ public class TravelPlanPromptBuilder {
         숙소 이름과 주변 지역은 출발·복귀 동선 참고 정보입니다. 숙소의 정확한 좌표나 이동 시간을 추측하지 마세요.
         예약 숙소가 필수 방문 목록에 없다면 관광 장소로 추가하지 마세요.
         선택한 모든 (provider, providerPlaceId)를 전체 일정에 정확히 한 번씩 포함하세요. 누락·추가·중복은 금지합니다.
-        가까운 주소와 좌표를 묶어 날짜별로 배치하세요. 일부 지역이 멀어도 선택 장소를 임의로 제외하지 마세요.
-        RELAXED/BALANCED/TIGHT는 분배와 일정 밀도에만 영향을 주며 장소 수의 상한이 아닙니다.
-        3일에 8곳이면 3/3/2 등으로 모두 배치할 수 있지만 개수를 균등하게 맞추는 것보다 가까운 권역 배치가 우선입니다.
-        2/2/2로 잘라내지 마세요. 권역에 따라 4/3/1처럼 불균등한 배치도 허용합니다.
+        날짜별 묶음은 서버가 이동 시간과 체류 시간으로 이미 정했습니다. 묶음을 바꾸거나 선택 장소를 제외하지 마세요.
         장소 목록 밖의 장소를 임의로 생성하지 말고, 날짜 범위를 벗어나지 마세요.
         모든 날짜를 빠짐없이 생성하고 각 날짜의 order는 1부터 시작하세요.
         """
-        .formatted(
-            travel.getDestination(),
-            travel.getStartDate(),
-            travel.getEndDate(),
-            days,
-            value(travel.getAccommodationArea()),
-            value(travel.getTravelStyle()),
-            value(travel.getPace()),
-            value(travel.getCompanionCount()),
-            value(travel.getPreferredFoods()),
-            request == null ? "없음" : value(request.foodIds()),
-            request == null ? "없음" : value(request.purposes()),
-            request == null ? "없음" : value(request.schedulePace()),
-            request == null ? "없음" : value(request.bookedAccommodation()),
-            request == null ? "없음" : value(request.accommodationAreaIds()),
-            request == null ? 0 : request.selectedPlaces().size(),
-            request == null
-                ? "없음"
-                : request.selectedPlaces().stream()
-                    .map(
-                        place ->
-                            PlaceKey.of(place.provider(), place.providerPlaceId()).provider()
-                                + " | "
-                                + place.providerPlaceId()
-                                + " | "
-                                + place.placeName()
-                                + " | "
-                                + value(place.address())
-                                + " | "
-                                + value(place.latitude())
-                                + " | "
-                                + value(place.longitude())
-                                + " | "
-                                + value(place.type()))
-                    .toList());
+            .formatted(
+                travel.getDestination(),
+                travel.getStartDate(),
+                travel.getEndDate(),
+                days,
+                value(travel.getAccommodationArea()),
+                value(travel.getTravelStyle()),
+                value(travel.getPace()),
+                value(travel.getCompanionCount()),
+                value(travel.getCompanionTypes()),
+                flag(travel.getHasHeavyBaggage()),
+                flag(travel.getPreferFlatTerrain()),
+                flag(travel.getHasPets()),
+                value(travel.getPreferredFoods()),
+                request == null ? "없음" : value(request.foodIds()),
+                request == null ? "없음" : value(request.purposes()),
+                request == null ? "없음" : value(request.schedulePace()),
+                request == null ? "없음" : value(request.bookedAccommodation()),
+                request == null ? "없음" : value(request.accommodationAreaIds()),
+                request == null ? 0 : request.selectedPlaces().size(),
+                request == null
+                    ? "없음"
+                    : request.selectedPlaces().stream()
+                        .map(
+                            place ->
+                                PlaceKey.of(place.provider(), place.providerPlaceId()).provider()
+                                    + " | "
+                                    + place.providerPlaceId()
+                                    + " | "
+                                    + place.placeName()
+                                    + " | "
+                                    + value(place.address())
+                                    + " | "
+                                    + value(place.latitude())
+                                    + " | "
+                                    + value(place.longitude())
+                                    + " | "
+                                    + value(place.type()))
+                        .toList())
+        + constraintDirectives(travel)
+        + courseGuide(travel);
+  }
+
+  /**
+   * 위저드 제약을 행동 지시문으로 바꾼다. 값만 나열하면 모델이 무시하므로 배치 규칙으로 적는다.
+   *
+   * <p>해당하지 않는 제약은 문장을 넣지 않는다. 항상 넣으면 프롬프트만 길어져 지시 밀도가 떨어진다.
+   *
+   * <p>선택 장소는 전부 배치해야 하므로(누락 금지) 이 제약들은 장소를 빼지 못하고 순서·분배·memo에만 작용한다. 장소 자체를 거르는 일은 장소 속성이 생긴 뒤 코드가
+   * 할 몫이다.
+   */
+  private String constraintDirectives(Travel travel) {
+    StringBuilder directives = new StringBuilder();
+    if (travel.getCompanionTypes() == CompanionType.FAMILY) {
+      directives.append("가족 동행입니다. 하루 이동 횟수를 줄이고 장소 사이 간격을 짧게 잡으세요.\n");
+    }
+    if (Boolean.TRUE.equals(travel.getHasHeavyBaggage())) {
+      directives.append("짐이 많습니다. 첫날 첫 장소는 숙소 권역에서 가장 가까운 곳으로 배치하세요.\n");
+    }
+    if (Boolean.TRUE.equals(travel.getPreferFlatTerrain())) {
+      directives.append("평지를 선호합니다. 경사나 계단이 많은 장소를 연속으로 배치하지 마세요.\n");
+    }
+    if (Boolean.TRUE.equals(travel.getHasPets())) {
+      directives.append("반려동물을 동반합니다. memo에 동반 가능 여부를 미리 확인하라는 안내를 포함하세요.\n");
+    }
+    return directives.toString();
+  }
+
+  /**
+   * 부산 권역별 배치 기준. 야경 명소가 오전에 배치되는 식의 비현실적인 순서를 막는다.
+   *
+   * <p>부산 외 지역에는 적용되지 않는다. 여기 언급한 장소 이름이 선택 목록에 없는데 추가되지 않도록 마지막 줄로 못박는다.
+   */
+  private String courseGuide(Travel travel) {
+    String destination = travel.getDestination();
+    if (destination == null || !destination.contains("부산")) {
+      return "";
+    }
+    return """
+        부산 권역별 배치 기준:
+        권역은 해운대·기장 / 수영·남구 / 원도심(중구·서구·동구) / 영도 / 서부산(사하·사상·강서) / 중부·북부(부산진·연제·동래·금정)입니다.
+        같은 권역의 장소는 같은 날에 묶으세요.
+        원도심의 자갈치시장·국제시장·BIFF광장·보수동책방골목·용두산공원은 도보로 이어지므로 같은 날 연속으로 배치하세요.
+        기장의 해동용궁사는 다른 권역에서 이동이 길므로 같은 날에 다른 권역을 섞지 마세요.
+        광안리 해수욕장·더베이101·황령산처럼 야경이 핵심인 장소는 그날의 마지막 순서로 배치하세요.
+        다대포 해수욕장·송도 해수욕장처럼 일몰이 핵심인 장소는 늦은 오후로 배치하세요.
+        자갈치시장·국제시장 같은 시장은 오전에서 점심 사이로 배치하세요.
+        이 기준은 순서를 정할 때만 쓰며, 여기 언급된 장소라도 선택 목록에 없으면 추가하지 마세요.
+        """;
+  }
+
+  private String flag(Boolean value) {
+    if (value == null) {
+      return "없음";
+    }
+    return value ? "예" : "아니오";
   }
 
   private String value(Object value) {
