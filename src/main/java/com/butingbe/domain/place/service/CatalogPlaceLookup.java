@@ -7,8 +7,7 @@ import java.util.Optional;
 /**
  * 일정 provider와 카탈로그 provider 차이를 흡수한다.
  *
- * <p>앱/일정은 GOOGLE + 관광 contentId 계약을 쓰고, 카탈로그 적재는 TOUR_API로 저장한다. 조회 시 GOOGLE로 오면 TOUR_API도
- * 함께 본다.
+ * <p>앱/일정은 GOOGLE + 관광 contentId 계약을 쓰고, 카탈로그 적재는 TOUR_API로 저장한다. 조회 시 GOOGLE로 오면 TOUR_API도 함께 본다.
  */
 final class CatalogPlaceLookup {
   private CatalogPlaceLookup() {}
