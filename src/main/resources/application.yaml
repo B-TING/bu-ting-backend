@@ -64,6 +64,15 @@ admin:
   # local 프로필에서만 동작하는 운영자 부트스트랩 토큰. 비우면 비활성.
   token: ${ADMIN_TOKEN:}
 
+auth:
+  token:
+    cleanup:
+      # 만료·폐기된 토큰 행을 매일 지운다. 회전이 폐기 이력을 남기므로 방치하면 계속 쌓인다.
+      enabled: ${AUTH_TOKEN_CLEANUP_ENABLED:true}
+      cron: ${AUTH_TOKEN_CLEANUP_CRON:0 0 4 * * *}
+      # 폐기 이력을 남겨 두는 기간. 짧으면 재사용 감지가 "모르는 토큰"으로 끝난다.
+      retention-days: ${AUTH_TOKEN_CLEANUP_RETENTION_DAYS:7}
+
 file-storage:
   s3:
     bucket: ${S3_BUCKET:}

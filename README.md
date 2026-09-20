@@ -202,6 +202,7 @@ Environment variables referenced by `application.yaml` (and the AWS default cred
 | AWS creds     | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (local only; on EC2 use the instance IAM role)       |
 | Upload limits | `FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE`                                                          |
 | Invitations   | `TRAVEL_INVITE_BASE_URL`                                                                          |
+| Auth tokens   | `AUTH_TOKEN_CLEANUP_ENABLED` / `AUTH_TOKEN_CLEANUP_CRON` (daily cleanup of expired or revoked opaque tokens), `AUTH_TOKEN_CLEANUP_RETENTION_DAYS` (default 7; how long revoked tokens are kept for refresh-token reuse detection) |
 | Routing       | `ROUTE_GOOGLE_ENABLED` (off by default), `ROUTE_GOOGLE_API_KEY` (falls back to `GOOGLE_PLACES_API_KEY`), `ROUTE_CACHE_TTL_DAYS` (default 30), `ROUTE_CACHE_EVICTION_ENABLED` / `ROUTE_CACHE_EVICTION_CRON` |
 | Admin         | `ADMIN_TOKEN` (optional operator bootstrap token; **only honoured under the `local` profile**, ignored elsewhere; unset disables it) |
 | Zone Event    | `ZONE_EVENT_REVIEW_MODE`, `ZONE_EVENT_REPORT_AUTO_HIDE_THRESHOLD`, `ZONE_EVENT_REVIEW_CAPTURED_AT_THRESHOLD_MINUTES`, `ZONE_EVENT_ROUND_SCHEDULER_DELAY_MS`, `ZONE_EVENT_ROUND_SCHEDULER_INITIAL_DELAY_MS` (all optional, sensible defaults) |
