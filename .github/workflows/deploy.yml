@@ -114,6 +114,14 @@ jobs:
             fi
           }
 
+          # 롤백 대상이 될 현재 배포 태그를 덮어쓰기 전에 보관한다.
+          # .env에 IMAGE_TAG 줄이 아직 없으면 빈 값이 되고, 이 경우 되돌릴 대상이 없다.
+          PREVIOUS_IMAGE_TAG="$( (sed -n 's|^IMAGE_TAG=||p' .env 2>/dev/null || true) | tail -n 1)"
+
+          # Flyway 마이그레이션은 되돌릴 수 없으므로 이미지 롤백이 스키마까지 되돌리지는 못한다.
+          # 스키마를 바꾸는 배포가 실패해 롤백되면, 이전 이미지가 새 스키마 위에서 동작하는지
+          # 수동으로 확인해야 한다.
+
           update_env DOCKERHUB_USERNAME "$DOCKERHUB_USERNAME"
           update_env IMAGE_TAG "$IMAGE_TAG"
 
@@ -122,17 +130,43 @@ jobs:
             's|sslrootcert=src/main/resources/certs/global-bundle.pem|sslrootcert=/app/certs/global-bundle.pem|g' \
             .env
 
+          # 기동 중 Flyway 마이그레이션이 돌 수 있어 기존 TCP 확인(12 x 5s = 60s)보다 넉넉하게
+          # 24 x 5s = 120초까지 기다린다. 액추에이터 health가 DOWN이면 503이 내려오고 curl -f가 실패한다.
+          health_check() {
+            for attempt in $(seq 1 24); do
+              if curl -fsS http://127.0.0.1:8080/actuator/health >/dev/null 2>&1; then
+                return 0
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
           docker compose pull app
           docker compose up -d --no-deps app
 
-          for attempt in $(seq 1 12); do
-            if timeout 1 bash -c '</dev/tcp/127.0.0.1/8080' 2>/dev/null; then
-              docker image prune -f
-              exit 0
-            fi
-            sleep 5
-          done
+          if health_check; then
+            docker image prune -f
+            exit 0
+          fi
 
+          echo "헬스체크 실패: 새 이미지(${IMAGE_TAG})가 정상 기동하지 않았다."
+          docker compose logs --tail=100 app
+
+          if [ -z "$PREVIOUS_IMAGE_TAG" ]; then
+            echo "이전 IMAGE_TAG가 .env에 없어 롤백할 대상이 없다. 컨테이너를 수동으로 확인해야 한다."
+            exit 1
+          fi
+
+          echo "이전 이미지(${PREVIOUS_IMAGE_TAG})로 롤백한다."
+          update_env IMAGE_TAG "$PREVIOUS_IMAGE_TAG"
+
+          if docker compose pull app && docker compose up -d --no-deps app && health_check; then
+            echo "롤백 완료: 이전 이미지(${PREVIOUS_IMAGE_TAG})가 정상 동작한다. 배포 자체는 실패로 처리한다."
+            exit 1
+          fi
+
+          echo "롤백 실패: 이전 이미지(${PREVIOUS_IMAGE_TAG})도 헬스체크를 통과하지 못했다. 수동 조치가 필요하다."
           docker compose logs --tail=100 app
           exit 1
           REMOTE
