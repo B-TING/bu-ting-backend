@@ -35,19 +35,24 @@ public class TravelPlanQualityValidator {
         feedback.add(day.date() + ": 불필요한 왕복으로 직선 이동 거리가 큽니다. 서버의 추천 순서를 사용하세요.");
       }
       for (var place : day.places()) {
-        String memo = place.memo().strip();
-        String normalized = memo.replaceAll("[\\p{P}\\p{Z}\\s]", "");
-        String name =
+        String memo = place.memo() == null ? "" : place.memo().strip();
+        String expectedName =
             catalog.get(PlaceKey.of(place.provider(), place.providerPlaceId())).placeName();
-        String normalizedName = name.replaceAll("[\\p{P}\\p{Z}\\s]", "");
-        if (!normalized.startsWith(normalizedName)) {
+        // 모델이 이 ID를 어느 장소로 이해했는지 확인한다. 장소명은 서버가 원본에서 채우므로,
+        // 이 대조가 없으면 ID와 설명이 어긋나도 알아챌 방법이 없다.
+        if (!normalize(place.placeName()).equals(normalize(expectedName))) {
           feedback.add(
               day.date()
                   + " order="
                   + place.order()
-                  + ": memo를 이 ID에 해당하는 원본 장소명으로 시작하세요. 다른 장소의 설명을 붙이지 마세요.");
+                  + ": placeName에 이 providerPlaceId의 원본 장소명을 그대로 복사하세요. 지금 값은 \""
+                  + (place.placeName() == null ? "" : place.placeName().strip())
+                  + "\"이고 기대값은 \""
+                  + expectedName
+                  + "\"입니다.");
         }
-        String body = normalized.replace(normalizedName, "");
+        // memo에는 장소명을 적지 않으므로 본문 전체가 설명이다.
+        String body = normalize(memo);
         if (body.length() < 15
             || memo.contains("<")
             || memo.contains("구체적으로 작성")
@@ -63,5 +68,10 @@ public class TravelPlanQualityValidator {
       }
     }
     return List.copyOf(feedback);
+  }
+
+  /** 구두점·공백 차이로 비교가 갈리지 않게 한다. 괄호가 붙은 카탈로그 이름도 같은 기준으로 다룬다. */
+  private String normalize(String value) {
+    return value == null ? "" : value.replaceAll("[\\p{P}\\p{Z}\\s]", "");
   }
 }

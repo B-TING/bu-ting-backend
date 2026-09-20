@@ -39,9 +39,11 @@ class TravelPlanAiClientTest {
     assertThat(place.providerPlaceId()).isEqualTo("126083");
     assertThat(place.provider()).isEqualTo("GOOGLE");
     assertThat(place.memo()).isEqualTo("해변 산책");
+    // placeName 은 ID와 설명이 어긋났는지 확인하려고 받는다. 주소·좌표는 여전히 받지 않는다.
+    assertThat(place.placeName()).isEqualTo("부산타워");
     assertThat(TravelPlanAiResponse.Place.class.getRecordComponents())
         .extracting(c -> c.getName())
-        .containsExactly("order", "provider", "providerPlaceId", "memo");
+        .containsExactly("order", "provider", "providerPlaceId", "placeName", "memo");
   }
 
   @Test

@@ -65,7 +65,7 @@ class TravelPlanAiResponseValidatorTest {
     var result = response(IDS);
     var days = new ArrayList<>(result.days());
     var places = new ArrayList<>(days.get(0).places());
-    places.set(0, new TravelPlanAiResponse.Place(1, "NAVER", IDS.get(0), "memo"));
+    places.set(0, new TravelPlanAiResponse.Place(1, "NAVER", IDS.get(0), "장소", "memo"));
     days.set(0, new TravelPlanAiResponse.Day(days.get(0).date(), places));
     assertFailure(new TravelPlanAiResponse(days), UNEXPECTED_PLACE);
   }
@@ -77,7 +77,7 @@ class TravelPlanAiResponseValidatorTest {
         0,
         new TravelPlanAiResponse.Day(
             days.get(0).date(),
-            List.of(new TravelPlanAiResponse.Place(1, "GOOGLE", null, "memo"))));
+            List.of(new TravelPlanAiResponse.Place(1, "GOOGLE", null, "장소", "memo"))));
     assertFailure(new TravelPlanAiResponse(days), INVALID_PLACE_REFERENCE);
   }
 
@@ -93,7 +93,7 @@ class TravelPlanAiResponseValidatorTest {
         0,
         new TravelPlanAiResponse.Day(
             days.get(0).date(),
-            List.of(new TravelPlanAiResponse.Place(2, "GOOGLE", IDS.get(0), "memo"))));
+            List.of(new TravelPlanAiResponse.Place(2, "GOOGLE", IDS.get(0), "장소", "memo"))));
     assertFailure(new TravelPlanAiResponse(days), INVALID_SCHEDULE);
   }
 
