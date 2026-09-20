@@ -1,7 +1,9 @@
 package com.butingbe.domain.file.controller;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -11,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.file.dto.FileUploadResDto;
 import com.butingbe.domain.file.service.FileStorageService;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,13 +49,17 @@ class FileControllerTest {
   @BeforeEach
   void setUp() {
     mockMvc =
-        MockMvcBuilders.standaloneSetup(fileController)
-            .setCustomArgumentResolvers(uploaderResolver())
-            .setMessageConverters(new MappingJackson2HttpMessageConverter())
-            .build();
+        mockMvcWithPrincipal(new AuthenticatedUser(UPLOADER, "up@example.com", "up", List.of()));
   }
 
-  private HandlerMethodArgumentResolver uploaderResolver() {
+  private MockMvc mockMvcWithPrincipal(AuthenticatedUser principal) {
+    return MockMvcBuilders.standaloneSetup(fileController)
+        .setCustomArgumentResolvers(uploaderResolver(principal))
+        .setMessageConverters(new MappingJackson2HttpMessageConverter())
+        .build();
+  }
+
+  private HandlerMethodArgumentResolver uploaderResolver(AuthenticatedUser principal) {
     return new HandlerMethodArgumentResolver() {
       @Override
       public boolean supportsParameter(MethodParameter parameter) {
@@ -65,7 +72,7 @@ class FileControllerTest {
           ModelAndViewContainer mavContainer,
           NativeWebRequest webRequest,
           WebDataBinderFactory binderFactory) {
-        return new AuthenticatedUser(UPLOADER, "up@example.com", "up", List.of());
+        return principal;
       }
     };
   }
@@ -104,6 +111,32 @@ class FileControllerTest {
         .perform(delete("/files").param("fileKey", "uploads/photo.jpg"))
         .andExpect(status().isNoContent());
 
-    verify(fileStorageService).delete("uploads/photo.jpg");
+    verify(fileStorageService).delete("uploads/photo.jpg", UPLOADER);
+  }
+
+  @Test
+  @DisplayName("인증 없이 삭제를 요청하면 서비스를 호출하지 않는다")
+  void deleteRequiresAuthentication() {
+    MockMvc anonymous = mockMvcWithPrincipal(null);
+
+    assertThatThrownBy(
+            () -> anonymous.perform(delete("/files").param("fileKey", "uploads/photo.jpg")))
+        .hasRootCauseInstanceOf(UnauthenticatedException.class);
+
+    verifyNoInteractions(fileStorageService);
+  }
+
+  @Test
+  @DisplayName("id 없는 개발 관리자 토큰으로는 업로드할 수 없다")
+  void uploadRejectsPrincipalWithoutId() {
+    MockMvc developmentAdmin = mockMvcWithPrincipal(AuthenticatedUser.developmentAdmin());
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "photo.jpg", MediaType.IMAGE_JPEG_VALUE, "binary-content".getBytes());
+
+    assertThatThrownBy(() -> developmentAdmin.perform(multipart("/files").file(file)))
+        .hasRootCauseInstanceOf(UnauthenticatedException.class);
+
+    verifyNoInteractions(fileStorageService);
   }
 }

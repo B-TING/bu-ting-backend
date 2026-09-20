@@ -92,7 +92,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
         }
 
         @Override
-        public void delete(String fileKey) {}
+        public void delete(String fileKey, java.util.UUID requesterId) {}
       };
     }
   }
