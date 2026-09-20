@@ -17,17 +17,14 @@ class UserRepositoryTest extends AbstractContainerTest {
   @Autowired private UserRepository userRepository;
 
   @Test
-  @DisplayName("이메일로 사용자가 존재하는지 정확하게 확인한다")
-  void existsByEmailSuccess() {
-    // given
-    User user = createTestUser("test@example.com", "테스터");
-    userRepository.save(user);
+  @DisplayName("이메일로 사용자를 찾는다")
+  void findByEmailSuccess() {
+    userRepository.save(createTestUser("test@example.com", "테스터"));
 
-    // when
-    boolean exists = userRepository.existsByEmail("test@example.com");
-
-    // then
-    assertThat(exists).isTrue();
+    assertThat(userRepository.findByEmail("test@example.com"))
+        .get()
+        .extracting(User::getNickname)
+        .isEqualTo("테스터");
   }
 
   private User createTestUser(String email, String nickname) {

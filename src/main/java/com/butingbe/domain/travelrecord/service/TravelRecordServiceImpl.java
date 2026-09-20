@@ -964,12 +964,9 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   }
 
   private TravelRecordResDto toResponse(TravelRecord travelRecord, boolean likedByMe) {
-    List<TravelRecordDayResDto> days =
-        travelRecordDayRepository
-            .findByTravelRecord_IdOrderByDayNumberAsc(travelRecord.getId())
-            .stream()
-            .map(this::toDayResponse)
-            .toList();
+    List<TravelRecordDay> travelRecordDays =
+        travelRecordDayRepository.findByTravelRecord_IdOrderByDayNumberAsc(travelRecord.getId());
+    List<TravelRecordDayResDto> days = toDayResponses(travelRecordDays);
 
     return TravelRecordResDto.of(
         travelRecord,
@@ -1017,15 +1014,35 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         travelRecord, toTravelRecordImageUrl(travelRecord.getCoverImageUrl()), likedByMe);
   }
 
-  private TravelRecordDayResDto toDayResponse(TravelRecordDay day) {
-    Map<UUID, TravelRecordRoute> routeByFromPlaceId =
-        travelRecordRouteRepository.findByTravelRecordDay_Id(day.getId()).stream()
-            .collect(Collectors.toMap(route -> route.getFromPlace().getId(), Function.identity()));
+  /** 일자별로 장소와 경로를 따로 조회하면 5일짜리 기록 하나에 10번의 추가 쿼리가 나간다. 전체 일자 id로 두 번만 조회하고 메모리에서 묶는다. */
+  private List<TravelRecordDayResDto> toDayResponses(List<TravelRecordDay> days) {
+    if (days.isEmpty()) {
+      return List.of();
+    }
 
-    return TravelRecordDayResDto.of(
-        day,
-        travelRecordPlaceRepository.findByTravelRecordDay_IdOrderBySequenceAsc(day.getId()),
-        routeByFromPlaceId);
+    List<UUID> dayIds = days.stream().map(TravelRecordDay::getId).toList();
+    Map<UUID, List<TravelRecordPlace>> placesByDayId =
+        travelRecordPlaceRepository.findByTravelRecordDay_IdInOrderBySequenceAsc(dayIds).stream()
+            .collect(
+                Collectors.groupingBy(
+                    place -> place.getTravelRecordDay().getId(),
+                    LinkedHashMap::new,
+                    Collectors.toList()));
+    Map<UUID, Map<UUID, TravelRecordRoute>> routesByDayId =
+        travelRecordRouteRepository.findByTravelRecordDay_IdIn(dayIds).stream()
+            .collect(
+                Collectors.groupingBy(
+                    route -> route.getTravelRecordDay().getId(),
+                    Collectors.toMap(route -> route.getFromPlace().getId(), Function.identity())));
+
+    return days.stream()
+        .map(
+            day ->
+                TravelRecordDayResDto.of(
+                    day,
+                    placesByDayId.getOrDefault(day.getId(), List.of()),
+                    routesByDayId.getOrDefault(day.getId(), Map.of())))
+        .toList();
   }
 
   private PlaceReviewResDto toPlaceReviewResponse(PlaceReview placeReview) {

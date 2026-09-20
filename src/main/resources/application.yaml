@@ -39,12 +39,17 @@ spring:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
   jpa:
+    # 컨트롤러까지 영속성 컨텍스트를 열어두면 커넥션을 응답 끝까지 잡고, 지연 로딩이
+    # 컨트롤러에서 조용히 동작해 N+1 을 가린다. DTO 변환은 서비스 계층에서 끝낸다.
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:
       hibernate:
         jdbc:
           time_zone: Asia/Seoul
+        # 지연 로딩이 남아 있는 곳에서 한 건씩 조회하지 않고 한 번에 묶어 가져온다.
+        default_batch_fetch_size: 100
   flyway:
     enabled: true
     baseline-on-migrate: true

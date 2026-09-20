@@ -207,4 +207,42 @@ class AuthControllerTest {
                 .content("{\"refreshToken\": \"\"}"))
         .andExpect(status().isBadRequest());
   }
+
+  @Test
+  @DisplayName("Accept-Language가 en이면 검증 실패 메시지를 영어로 응답한다")
+  void loginValidationFailWithEnglishLocale() throws Exception {
+    assertLocalizedValidationMessage("en", "OAuth provider is required.");
+  }
+
+  @Test
+  @DisplayName("Accept-Language가 ja이면 검증 실패 메시지를 일본어로 응답한다")
+  void loginValidationFailWithJapaneseLocale() throws Exception {
+    assertLocalizedValidationMessage("ja", "OAuthプロバイダーは必須入力項目です。");
+  }
+
+  @Test
+  @DisplayName("Accept-Language가 zh이면 검증 실패 메시지를 중국어로 응답한다")
+  void loginValidationFailWithChineseLocale() throws Exception {
+    assertLocalizedValidationMessage("zh", "OAuth provider为必填项。");
+  }
+
+  /** provider를 비워 @Valid를 실패시키고, 응답 메시지가 Accept-Language를 따르는지 본다. */
+  private void assertLocalizedValidationMessage(String language, String expectedMessage)
+      throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/auth/oauth/login")
+                .header("Accept-Language", language)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "provider": "",
+                      "providerToken": "token"
+                    }
+                    """))
+        .andDo(print())
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value(expectedMessage));
+  }
 }

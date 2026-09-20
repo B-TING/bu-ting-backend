@@ -28,6 +28,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       """
       select tr
       from TravelRecord tr
+      join fetch tr.author
       where tr.status = :status
         and (
           :hasKeyword = false
@@ -101,6 +102,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       """
       select tr
       from TravelRecord tr
+      join fetch tr.author
       where tr.status = :status
         and (
           tr.publishedAt < :cursorPublishedAt
@@ -180,6 +182,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       """
       select tr
       from TravelRecord tr
+      join fetch tr.author
       where tr.status = :status
         and (
           :hasKeyword = false
@@ -253,6 +256,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       """
       select tr
       from TravelRecord tr
+      join fetch tr.author
       where tr.status = :status
         and (
           tr.likeCount < :cursorSortCount
@@ -338,6 +342,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       """
       select tr
       from TravelRecord tr
+      join fetch tr.author
       where tr.status = :status
         and (
           :hasKeyword = false
@@ -411,6 +416,7 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, UUID
       """
       select tr
       from TravelRecord tr
+      join fetch tr.author
       where tr.status = :status
         and (
           tr.viewCount < :cursorSortCount
