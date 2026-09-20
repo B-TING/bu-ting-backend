@@ -200,14 +200,6 @@ public class ZoneEventParticipation extends TimestampEntity {
     this.visibility = visibility;
   }
 
-  public void increaseLikeCount() {
-    this.likeCount += 1;
-  }
-
-  public void decreaseLikeCount() {
-    this.likeCount = Math.max(0, this.likeCount - 1);
-  }
-
   public void increaseCommentCount() {
     this.commentCount += 1;
   }
