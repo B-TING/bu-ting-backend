@@ -131,6 +131,11 @@ The generated OpenAPI specification lives at `src/main/resources/static/docs/ope
 | Broker prefix           | `/sub`               |
 | Message mapping         | `/pub/chat/message`  |
 
+CONNECT requires a valid opaque access token in the `Authorization: Bearer <token>` native header; the connection is
+rejected otherwise. Subscribing to `/sub/chat/room/{roomId}` and publishing to `/pub/chat/message` are allowed only for
+members of that room (`chat_member`). The handshake accepts the same origins as the HTTP CORS allow-list
+(`SecurityConfig.ALLOWED_ORIGINS`).
+
 ## Local Database
 
 Docker Compose runs only PostgreSQL. The Spring Boot application runs locally through Gradle.

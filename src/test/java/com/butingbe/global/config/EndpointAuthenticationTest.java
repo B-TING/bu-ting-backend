@@ -137,6 +137,17 @@ class EndpointAuthenticationTest extends AbstractContainerTest {
   }
 
   @Test
+  @DisplayName("STOMP 핸드셰이크는 인증 없이 통과한다")
+  void stompHandshakeIsNotBlockedByHttpAuthentication() throws Exception {
+    // 토큰은 핸드셰이크 헤더가 아니라 STOMP CONNECT 프레임으로 온다. 여기서 401 이 나면 연결 자체가 끊긴다.
+    // 업그레이드 헤더 없이 부르므로 성공 상태는 아니지만, 401 만 아니면 된다.
+    MockHttpServletResponse response =
+        mockMvc.perform(MockMvcRequestBuilders.get("/ws-stomp")).andReturn().getResponse();
+
+    assertThat(response.getStatus()).isNotEqualTo(HttpStatus.UNAUTHORIZED.value());
+  }
+
+  @Test
   @DisplayName("운영자가 아닌 사용자가 admin API를 부르면 403을 ApiResponse 형식으로 돌려준다")
   void nonOperatorGetsForbiddenInApiResponseShape() throws Exception {
     User user = userRepository.save(createUser("endpoint-auth@example.com", "endpoint-auth"));

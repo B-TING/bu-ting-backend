@@ -4,6 +4,7 @@ import com.butingbe.domain.auth.security.OpaqueTokenAuthenticationFilter;
 import com.butingbe.domain.user.oauth.CustomOAuth2UserService;
 import com.butingbe.domain.user.oauth.OAuth2AuthenticationSuccessHandler;
 import com.butingbe.global.error.RestAuthenticationErrorWriter;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -46,6 +47,14 @@ public class SecurityConfig {
     "/api/v1/zones/*/album",
   };
 
+  /** HTTP CORS와 WebSocket 핸드셰이크가 함께 쓰는 허용 오리진 목록. */
+  public static final List<String> ALLOWED_ORIGINS =
+      List.of(
+          "http://localhost:3000",
+          "http://localhost:3001",
+          "https://dev.buting.store",
+          "https://buting.store");
+
   private final CustomOAuth2UserService customOAuth2UserService;
   private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
   private final OpaqueTokenAuthenticationFilter opaqueTokenAuthenticationFilter;
@@ -64,6 +73,13 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/travel-records/me", "/api/v1/travel-records/me/**")
                     .authenticated()
                     .requestMatchers("/api/v1/auth/**", "/error")
+                    .permitAll()
+                    // STOMP 핸드셰이크에는 Authorization 헤더가 없다. 토큰은 CONNECT 프레임으로 오고
+                    // StompAuthChannelInterceptor 가 거기서 검사한다. 여기서 막으면 연결 자체가 끊긴다.
+                    .requestMatchers("/ws-stomp/**")
+                    .permitAll()
+                    // Spring Security 가 직접 처리하는 OAuth2 로그인 왕복 경로.
+                    .requestMatchers("/oauth2/**", "/login/**")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**")
                     .permitAll()
@@ -100,10 +116,7 @@ public class SecurityConfig {
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
 
-    configuration.addAllowedOrigin("http://localhost:3000");
-    configuration.addAllowedOrigin("http://localhost:3001");
-    configuration.addAllowedOrigin("https://dev.buting.store");
-    configuration.addAllowedOrigin("https://buting.store");
+    ALLOWED_ORIGINS.forEach(configuration::addAllowedOrigin);
     configuration.addAllowedMethod("*"); // 모든 HTTP Method 일단 허용 (GET, POST 등)
     configuration.addAllowedHeader("*"); // 모든 헤더 허용
 
