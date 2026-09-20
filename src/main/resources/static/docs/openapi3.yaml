@@ -777,6 +777,9 @@ paths:
         이미지는 JPEG, PNG, WebP, 영상은 MP4, MOV 형식만 업로드할 수 있습니다.
         파일 하나당 최대 50MB이며, 업로드한 파일은 S3에 저장되고 파일 메타데이터가 DB에 기록됩니다.
         응답 URL은 기본 1시간 동안만 사용할 수 있는 Presigned GET URL입니다.
+        업로드한 사용자가 파일 소유자로 기록되며, 삭제할 수 있는 사람도 그 사용자뿐입니다.
+      security:
+        - opaqueToken: [ ]
       requestBody:
         required: true
         content:
@@ -803,11 +806,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증되지 않은 요청
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
     delete:
       tags:
         - File
       summary: 업로드 파일 삭제
-      description: S3 객체와 DB에 저장된 파일 메타데이터를 함께 삭제합니다.
+      description: |
+        S3 객체와 DB에 저장된 파일 메타데이터를 함께 삭제합니다.
+        업로드한 본인만 삭제할 수 있습니다. 다른 사용자의 파일이거나 소유자 정보가 없는 파일은 403입니다.
+      security:
+        - opaqueToken: [ ]
       parameters:
         - name: fileKey
           in: query
@@ -822,6 +835,24 @@ paths:
           description: 삭제 성공
         "400":
           description: 유효하지 않은 파일 키
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: 인증되지 않은 요청
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 업로더 본인이 아닌 요청
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 등록되지 않은 파일 키
           content:
             application/json:
               schema:

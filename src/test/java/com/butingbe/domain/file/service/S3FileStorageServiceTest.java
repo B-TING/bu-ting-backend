@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.butingbe.domain.file.entity.FileMetadata;
 import com.butingbe.domain.file.repository.FileMetadataRepository;
+import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Optional;
@@ -38,6 +40,8 @@ class S3FileStorageServiceTest {
 
   private static final java.util.UUID UPLOADER =
       java.util.UUID.fromString("99999999-0000-0000-0000-000000000001");
+  private static final java.util.UUID OTHER_USER =
+      java.util.UUID.fromString("99999999-0000-0000-0000-000000000002");
 
   @Mock private S3Client s3Client;
   @Mock private FileMetadataRepository fileMetadataRepository;
@@ -170,35 +174,64 @@ class S3FileStorageServiceTest {
   }
 
   @Test
-  @DisplayName("파일을 삭제하면 S3 객체와 메타데이터를 함께 지운다")
+  @DisplayName("업로더 본인이 삭제하면 S3 객체와 메타데이터를 함께 지운다")
   void deleteRemovesObjectAndMetadata() {
     String fileKey = "uploads/images/busan.png";
-    FileMetadata metadata = FileMetadata.builder().objectKey(fileKey).build();
+    FileMetadata metadata = FileMetadata.builder().objectKey(fileKey).uploaderId(UPLOADER).build();
     when(fileMetadataRepository.findByObjectKey(fileKey)).thenReturn(Optional.of(metadata));
 
-    service.delete(fileKey);
+    service.delete(fileKey, UPLOADER);
 
     verify(s3Client).deleteObject(any(DeleteObjectRequest.class));
     verify(fileMetadataRepository).delete(metadata);
   }
 
   @Test
-  @DisplayName("메타데이터가 없어도 S3 객체 삭제는 수행한다")
-  void deleteToleratesMissingMetadata() {
+  @DisplayName("업로더가 아니면 삭제를 거부하고 S3 객체를 건드리지 않는다")
+  void deleteRejectsNonUploader() {
+    String fileKey = "uploads/images/busan.png";
+    FileMetadata metadata = FileMetadata.builder().objectKey(fileKey).uploaderId(UPLOADER).build();
+    when(fileMetadataRepository.findByObjectKey(fileKey)).thenReturn(Optional.of(metadata));
+
+    assertThatThrownBy(() -> service.delete(fileKey, OTHER_USER))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("error.file.forbidden");
+
+    verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+    verify(fileMetadataRepository, never()).delete(any(FileMetadata.class));
+  }
+
+  @Test
+  @DisplayName("인증 필수 이전에 올라가 업로더가 비어 있는 파일도 삭제를 거부한다")
+  void deleteRejectsLegacyFileWithoutUploader() {
+    String fileKey = "uploads/images/legacy.png";
+    FileMetadata metadata = FileMetadata.builder().objectKey(fileKey).build();
+    when(fileMetadataRepository.findByObjectKey(fileKey)).thenReturn(Optional.of(metadata));
+
+    assertThatThrownBy(() -> service.delete(fileKey, UPLOADER))
+        .isInstanceOf(ForbiddenException.class);
+
+    verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+  }
+
+  @Test
+  @DisplayName("등록되지 않은 파일 키는 삭제할 수 없다")
+  void deleteRejectsUnregisteredFileKey() {
     String fileKey = "uploads/images/busan.png";
     when(fileMetadataRepository.findByObjectKey(fileKey)).thenReturn(Optional.empty());
 
-    service.delete(fileKey);
+    assertThatThrownBy(() -> service.delete(fileKey, UPLOADER))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.file.not_found");
 
-    verify(s3Client).deleteObject(any(DeleteObjectRequest.class));
-    verify(fileMetadataRepository, never()).delete(any(FileMetadata.class));
+    verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
   }
 
   @ParameterizedTest
   @DisplayName("상위 경로 탈출이나 빈 값 같은 위험한 파일 키는 거부한다")
   @ValueSource(strings = {"", "   ", "../secret.png", "/etc/passwd", "uploads/../../secret.png"})
   void rejectsUnsafeFileKey(String fileKey) {
-    assertThatThrownBy(() -> service.delete(fileKey))
+    assertThatThrownBy(() -> service.delete(fileKey, UPLOADER))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("유효하지 않은 파일 키입니다.");
 

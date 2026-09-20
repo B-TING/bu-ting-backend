@@ -33,8 +33,10 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
-      # 가상 스레드를 켜면 동시 요청 수에 제한이 없어 이 풀이 유일한 병목이 된다.
-      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      # 가상 스레드를 켜면 동시 요청 수에 제한이 없어 이 풀이 유일한 동시성 제한이 된다.
+      # 기본값은 지금까지 쓰던 Hikari 기본치와 같은 10이다. 올리려면 PostgreSQL 의
+      # max_connections 와 인스턴스 수를 함께 확인해야 한다.
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
   jpa:
     hibernate:
@@ -52,6 +54,10 @@ spring:
 server:
   # 배포로 컨테이너가 교체될 때 처리 중인 요청을 끊지 않는다.
   shutdown: graceful
+
+admin:
+  # local 프로필에서만 동작하는 운영자 부트스트랩 토큰. 비우면 비활성.
+  token: ${ADMIN_TOKEN:}
 
 file-storage:
   s3:

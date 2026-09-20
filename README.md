@@ -187,7 +187,7 @@ Environment variables referenced by `application.yaml` (and the AWS default cred
 
 | Feature       | Variables                                                                                        |
 |---------------|--------------------------------------------------------------------------------------------------|
-| Database      | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (required), `DB_POOL_MAX_SIZE` (default 20), `DB_CONNECTION_TIMEOUT_MS` (default 5000) |
+| Database      | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (required), `DB_POOL_MAX_SIZE` (default 10; raising it requires checking PostgreSQL `max_connections`), `DB_CONNECTION_TIMEOUT_MS` (default 5000) |
 | AI            | `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`, `AI_CONNECT_TIMEOUT` (default 5s), `AI_READ_TIMEOUT` (default 60s) |
 | Google OAuth  | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_ALLOWED_AUDIENCES`, `GOOGLE_AND_DEBUG_CLIENT_ID`, `GOOGLE_AND_RELEASE_CLIENT_ID` |
 | Naver OAuth   | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `NAVER_REDIRECT_URI`                                    |
@@ -198,7 +198,7 @@ Environment variables referenced by `application.yaml` (and the AWS default cred
 | Upload limits | `FILE_MAX_SIZE`, `FILE_MAX_REQUEST_SIZE`                                                          |
 | Invitations   | `TRAVEL_INVITE_BASE_URL`                                                                          |
 | Routing       | `ROUTE_GOOGLE_ENABLED` (off by default), `ROUTE_GOOGLE_API_KEY` (falls back to `GOOGLE_PLACES_API_KEY`), `ROUTE_CACHE_TTL_DAYS` (default 30), `ROUTE_CACHE_EVICTION_ENABLED` / `ROUTE_CACHE_EVICTION_CRON` |
-| Admin         | `ADMIN_TOKEN` (optional operator bootstrap token; unset disables it)                              |
+| Admin         | `ADMIN_TOKEN` (optional operator bootstrap token; **only honoured under the `local` profile**, ignored elsewhere; unset disables it) |
 | Zone Event    | `ZONE_EVENT_REVIEW_MODE`, `ZONE_EVENT_REPORT_AUTO_HIDE_THRESHOLD`, `ZONE_EVENT_REVIEW_CAPTURED_AT_THRESHOLD_MINUTES`, `ZONE_EVENT_ROUND_SCHEDULER_DELAY_MS`, `ZONE_EVENT_ROUND_SCHEDULER_INITIAL_DELAY_MS` (all optional, sensible defaults) |
 
 Push notifications currently use a logging stub (`LoggingPushSender`); do not set `push.fcm.enabled` until a real
@@ -340,6 +340,15 @@ to accept connections before pruning old images.
 
 For an RDS connection using `sslmode=verify-full`, set the JDBC URL's certificate parameter to
 `sslrootcert=/app/certs/global-bundle.pem`. The AWS RDS global CA bundle ships at that path in the runtime image.
+
+### Manual dev deployment
+
+`.github/workflows/deploy-dev.yml` ("Deploy Dev (manual)") is `workflow_dispatch` only and builds a `:dev` tagged image.
+There is no separate dev server, so it deploys to the **same EC2 host as production** and replaces the running
+production container, applying any dev-only Flyway migration to the production database. Its deploy job therefore runs
+in the `production-dev-image` environment, which has a required reviewer: the run pauses after the image is pushed and
+waits for approval before touching EC2. The `production` environment used by `deploy.yml` is unchanged, so production
+releases still deploy without an approval pause.
 
 ## Branches
 
