@@ -2,6 +2,7 @@ package com.butingbe.domain.place.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.butingbe.domain.place.entity.Place;
@@ -45,6 +46,15 @@ class CatalogPlaceDwellTimeProviderTest {
         .thenReturn(Optional.of(place(null)));
 
     assertThat(provider.dwellMinutes("TOUR_API", "126508")).isEqualTo(60);
+  }
+
+  @Test
+  @DisplayName("장소 식별자가 비어 있으면 카탈로그를 조회하지 않고 기본값으로 답한다")
+  void fallsBackWhenProviderPlaceIdMissing() {
+    // 식별자 없이 조회하면 provider 전체가 걸려 엉뚱한 장소를 잡는다. 조회 전에 막는다.
+    assertThat(provider.dwellMinutes("TOUR_API", " ")).isEqualTo(60);
+
+    verifyNoInteractions(placeRepository);
   }
 
   @Test

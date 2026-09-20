@@ -204,6 +204,14 @@ class TravelPlanCandidateFillerTest {
         .build();
   }
 
+  @Test
+  @DisplayName("카탈로그 provider 가 비어 있으면 일정 계약의 기본 provider 로 맞춘다")
+  void blankCatalogProviderFallsBackToPlanProvider() {
+    // 카탈로그에 provider 가 비어 들어온 행이 섞여도 일정 생성 계약(GOOGLE)이 깨지지 않아야 한다.
+    assertThat(TravelPlanCandidateFiller.toPlanProvider(null)).isEqualTo("GOOGLE");
+    assertThat(TravelPlanCandidateFiller.toPlanProvider("  ")).isEqualTo("GOOGLE");
+  }
+
   private AiTravelPlanGenerateReqDto request(WizardPickedPlaceReqDto... places) {
     return new AiTravelPlanGenerateReqDto(List.of(places), null, null, null, null, null);
   }
