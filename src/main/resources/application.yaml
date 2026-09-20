@@ -39,6 +39,10 @@ spring:
     baseline-version: 1
     locations: classpath:db/migration
 
+admin:
+  # local 프로필에서만 동작하는 운영자 부트스트랩 토큰. 비우면 비활성.
+  token: ${ADMIN_TOKEN:}
+
 file-storage:
   s3:
     bucket: ${S3_BUCKET:}
