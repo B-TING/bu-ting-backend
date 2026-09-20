@@ -68,6 +68,12 @@ class CatalogPlaceDwellTimeProviderTest {
     assertThat(provider.dwellMinutes("GOOGLE", "126508")).isEqualTo(90);
   }
 
+  @Test
+  @DisplayName("providerPlaceId가 비어 있으면 카탈로그를 조회하지 않고 기본값으로 답한다")
+  void fallsBackWhenProviderPlaceIdBlank() {
+    assertThat(provider.dwellMinutes("GOOGLE", "  ")).isEqualTo(60);
+  }
+
   private Place place(Integer dwellMinutes) {
     return Place.builder()
         .provider("TOUR_API")

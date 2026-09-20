@@ -399,11 +399,12 @@ class TravelServiceImplTest extends AbstractContainerTest {
                 129.16,
                 PlaceProvider.GOOGLE,
                 "google-haeundae",
-                null));
+                "12"));
 
     assertThat(updated.placeName()).isEqualTo("Haeundae Beach");
     assertThat(updated.address()).isEqualTo("Busan Haeundae-gu");
     assertThat(updated.providerPlaceId()).isEqualTo("google-haeundae");
+    assertThat(updated.contentTypeId()).isEqualTo("12");
     assertThat(planRouteRepository.findAll()).isEmpty();
   }
 

@@ -61,6 +61,13 @@ class TravelPlanCandidateFillerTest {
   }
 
   @Test
+  @DisplayName("카탈로그 provider가 비어 있으면 GOOGLE로 본다")
+  void mapsBlankCatalogProviderToGoogle() {
+    assertThat(TravelPlanCandidateFiller.toPlanProvider(null)).isEqualTo("GOOGLE");
+    assertThat(TravelPlanCandidateFiller.toPlanProvider("  ")).isEqualTo("GOOGLE");
+  }
+
+  @Test
   @DisplayName("고른 장소는 그대로 두고 부족분만 채운다")
   void fillsOnlyTheGap() {
     when(placeCandidateFinder.findCandidates(any(), any(), eq(7)))
