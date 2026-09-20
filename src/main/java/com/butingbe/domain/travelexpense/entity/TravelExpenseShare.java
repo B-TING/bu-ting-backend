@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelexpense.entity;
 
 import com.butingbe.domain.user.entity.User;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -51,7 +52,7 @@ public class TravelExpenseShare {
     this.expense = Objects.requireNonNull(expense, "Expense is required.");
     this.user = Objects.requireNonNull(user, "Expense participant is required.");
     if (shareAmount == null || shareAmount < 0) {
-      throw new IllegalArgumentException("Share amount must not be negative.");
+      throw new InvalidRequestException("Share amount must not be negative.");
     }
     this.shareAmount = shareAmount;
   }

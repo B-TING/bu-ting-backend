@@ -4,6 +4,7 @@ import com.butingbe.domain.file.dto.FileUploadResDto;
 import com.butingbe.domain.file.entity.FileMetadata;
 import com.butingbe.domain.file.repository.FileMetadataRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.io.IOException;
 import java.time.Duration;
@@ -103,25 +104,25 @@ public class S3FileStorageService implements FileStorageService {
     validateFileKey(fileKey);
     fileMetadataRepository
         .findByObjectKey(fileKey)
-        .orElseThrow(() -> new IllegalArgumentException("등록되지 않은 파일입니다."));
+        .orElseThrow(() -> new InvalidRequestException("등록되지 않은 파일입니다."));
     return createPresignedGetUrl(fileKey);
   }
 
   private void validate(MultipartFile file) {
     if (file == null || file.isEmpty()) {
-      throw new IllegalArgumentException("파일이 비어 있습니다.");
+      throw new InvalidRequestException("파일이 비어 있습니다.");
     }
     if (file.getSize() > maxFileSize) {
-      throw new IllegalArgumentException("파일 크기 제한을 초과했습니다.");
+      throw new InvalidRequestException("파일 크기 제한을 초과했습니다.");
     }
     if (!ALLOWED_TYPES.contains(file.getContentType())) {
-      throw new IllegalArgumentException("지원하지 않는 파일 형식입니다.");
+      throw new InvalidRequestException("지원하지 않는 파일 형식입니다.");
     }
   }
 
   private void validateFileKey(String fileKey) {
     if (!StringUtils.hasText(fileKey) || fileKey.contains("..") || fileKey.startsWith("/")) {
-      throw new IllegalArgumentException("유효하지 않은 파일 키입니다.");
+      throw new InvalidRequestException("유효하지 않은 파일 키입니다.");
     }
   }
 

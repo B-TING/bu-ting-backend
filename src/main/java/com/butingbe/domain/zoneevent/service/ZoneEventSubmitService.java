@@ -25,6 +25,7 @@ import com.butingbe.domain.zoneevent.support.GpsDistance;
 import com.butingbe.domain.zonetitle.service.ZoneTitleService;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.Duration;
@@ -131,7 +132,7 @@ public class ZoneEventSubmitService {
                   .build());
     } catch (DataIntegrityViolationException concurrent) {
       // media_file_key 유니크 인덱스 위반: 동시 요청이 같은 fileKey를 먼저 제출했다.
-      throw new IllegalArgumentException("error.zone_event.media.already_used");
+      throw new InvalidRequestException("error.zone_event.media.already_used");
     }
 
     participation.submit(
@@ -189,19 +190,19 @@ public class ZoneEventSubmitService {
     FileMetadata file =
         fileMetadataRepository
             .findByObjectKey(mediaFileKey)
-            .orElseThrow(() -> new IllegalArgumentException("error.zone_event.media.invalid"));
+            .orElseThrow(() -> new InvalidRequestException("error.zone_event.media.invalid"));
     if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
-      throw new IllegalArgumentException("error.zone_event.media.invalid");
+      throw new InvalidRequestException("error.zone_event.media.invalid");
     }
     if (file.getUploaderId() == null || !file.getUploaderId().equals(userId)) {
       throw new ForbiddenException("error.zone_event.media.forbidden");
     }
     if (submissionRepository.existsByMediaFileKey(mediaFileKey)) {
-      throw new IllegalArgumentException("error.zone_event.media.already_used");
+      throw new InvalidRequestException("error.zone_event.media.already_used");
     }
     if (Duration.between(file.getCreatedAt(), LocalDateTime.now()).toMinutes()
         > uploadRecencyThresholdMinutes) {
-      throw new IllegalArgumentException("error.zone_event.media.stale");
+      throw new InvalidRequestException("error.zone_event.media.stale");
     }
   }
 

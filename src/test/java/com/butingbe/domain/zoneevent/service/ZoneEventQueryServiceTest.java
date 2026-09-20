@@ -21,6 +21,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -119,7 +120,7 @@ class ZoneEventQueryServiceTest {
   @DisplayName("잘못된 구역은 400(invalid_zone) 예외다")
   void rejectsInvalidZone() {
     assertThatThrownBy(() -> service.getActiveEvents("NOWHERE", null))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.invalid_zone");
   }
 

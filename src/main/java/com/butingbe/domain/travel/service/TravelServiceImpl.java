@@ -29,6 +29,7 @@ import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.List;
@@ -325,20 +326,20 @@ public class TravelServiceImpl implements TravelService {
 
   private void validateTravelDate(TravelCreateReqDto request) {
     if (request.endDate().isBefore(request.startDate())) {
-      throw new IllegalArgumentException("Travel end date cannot be before start date.");
+      throw new InvalidRequestException("Travel end date cannot be before start date.");
     }
   }
 
   private void validatePlanDate(Travel travel, PlanCreateReqDto request) {
     if (request.visitDate().isBefore(travel.getStartDate())
         || request.visitDate().isAfter(travel.getEndDate())) {
-      throw new IllegalArgumentException("Plan visit date must be within the travel period.");
+      throw new InvalidRequestException("Plan visit date must be within the travel period.");
     }
   }
 
   private void validatePlanDayNumber(UUID travelId, Integer dayNumber) {
     if (planRepository.existsByTravel_IdAndDayNumber(travelId, dayNumber)) {
-      throw new IllegalArgumentException("Plan day number already exists.");
+      throw new InvalidRequestException("Plan day number already exists.");
     }
   }
 
@@ -357,7 +358,7 @@ public class TravelServiceImpl implements TravelService {
           case IN_PROGRESS, COMPLETED -> true;
         };
     if (!allowed) {
-      throw new IllegalArgumentException("Travel status cannot be changed back to PLANNED.");
+      throw new InvalidRequestException("Travel status cannot be changed back to PLANNED.");
     }
   }
 
@@ -371,7 +372,7 @@ public class TravelServiceImpl implements TravelService {
                 .orElse(1);
 
     if (planPlaceRepository.existsByPlan_IdAndSequence(planId, sequence)) {
-      throw new IllegalArgumentException("Plan place sequence already exists.");
+      throw new InvalidRequestException("Plan place sequence already exists.");
     }
 
     return sequence;
@@ -385,18 +386,18 @@ public class TravelServiceImpl implements TravelService {
 
   private void validateReorderRequest(List<PlanPlace> places, List<UUID> requestedIds) {
     if (places.size() != requestedIds.size()) {
-      throw new IllegalArgumentException("All plan place ids must be included.");
+      throw new InvalidRequestException("All plan place ids must be included.");
     }
 
     Set<UUID> existingIds = places.stream().map(PlanPlace::getId).collect(Collectors.toSet());
     Set<UUID> uniqueRequestedIds = requestedIds.stream().collect(Collectors.toSet());
 
     if (uniqueRequestedIds.size() != requestedIds.size()) {
-      throw new IllegalArgumentException("Duplicated plan place id exists.");
+      throw new InvalidRequestException("Duplicated plan place id exists.");
     }
 
     if (!existingIds.equals(uniqueRequestedIds)) {
-      throw new IllegalArgumentException("Plan place ids do not match this plan.");
+      throw new InvalidRequestException("Plan place ids do not match this plan.");
     }
   }
 

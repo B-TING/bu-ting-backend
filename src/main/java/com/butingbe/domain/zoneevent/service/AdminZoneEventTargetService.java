@@ -18,6 +18,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,7 +68,7 @@ public class AdminZoneEventTargetService {
     if (kind == ZoneEventTargetKind.PLACE) {
       if (!StringUtils.hasText(request.placeContentId())
           || !StringUtils.hasText(request.contentTypeId())) {
-        throw new IllegalArgumentException("error.zone_event.target.invalid_kind");
+        throw new InvalidRequestException("error.zone_event.target.invalid_kind");
       }
       placeContentId = request.placeContentId();
       contentTypeId = request.contentTypeId();
@@ -75,14 +76,14 @@ public class AdminZoneEventTargetService {
 
       PlaceSummaryResDto summary = placeService.getPlaceSummary(placeContentId);
       if (summary == null || summary.latitude() == null || summary.longitude() == null) {
-        throw new IllegalArgumentException("error.zone_event.place_not_found");
+        throw new InvalidRequestException("error.zone_event.place_not_found");
       }
       sourceLatitude = summary.latitude();
       sourceLongitude = summary.longitude();
       placeName = StringUtils.hasText(request.placeName()) ? request.placeName() : summary.title();
     } else {
       if (!StringUtils.hasText(request.landmarkId()) || !StringUtils.hasText(request.placeName())) {
-        throw new IllegalArgumentException("error.zone_event.target.invalid_kind");
+        throw new InvalidRequestException("error.zone_event.target.invalid_kind");
       }
       placeName = request.placeName();
     }
@@ -125,7 +126,7 @@ public class AdminZoneEventTargetService {
       throw new ConflictException("error.zone_event.invalid_state");
     }
     if ((request.latitude() == null) != (request.longitude() == null)) {
-      throw new IllegalArgumentException("error.zone_event.target.invalid_coordinates");
+      throw new InvalidRequestException("error.zone_event.target.invalid_coordinates");
     }
 
     Map<String, Object> before = snapshot(target);
@@ -161,7 +162,7 @@ public class AdminZoneEventTargetService {
 
     PlaceSummaryResDto summary = placeService.getPlaceSummary(request.placeContentId());
     if (summary == null || summary.latitude() == null || summary.longitude() == null) {
-      throw new IllegalArgumentException("error.zone_event.place_not_found");
+      throw new InvalidRequestException("error.zone_event.place_not_found");
     }
     double[] coordinates =
         resolveCoordinates(
@@ -223,12 +224,12 @@ public class AdminZoneEventTargetService {
       Double sourceLongitude) {
     if (requestedLatitude == null && requestedLongitude == null) {
       if (sourceLatitude == null || sourceLongitude == null) {
-        throw new IllegalArgumentException("error.zone_event.target.invalid_coordinates");
+        throw new InvalidRequestException("error.zone_event.target.invalid_coordinates");
       }
       return new double[] {sourceLatitude, sourceLongitude};
     }
     if (requestedLatitude == null || requestedLongitude == null) {
-      throw new IllegalArgumentException("error.zone_event.target.invalid_coordinates");
+      throw new InvalidRequestException("error.zone_event.target.invalid_coordinates");
     }
     return new double[] {requestedLatitude, requestedLongitude};
   }
@@ -237,7 +238,7 @@ public class AdminZoneEventTargetService {
     try {
       return ZoneEventTargetKind.valueOf(kind.trim());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.target.invalid_kind");
+      throw new InvalidRequestException("error.zone_event.target.invalid_kind");
     }
   }
 

@@ -24,6 +24,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -209,29 +210,29 @@ class ZoneEventAlbumServiceTest extends AbstractContainerTest {
 
     ZoneEventParticipation p = success(authorId, 0, ParticipationVisibility.PUBLIC, "x.jpg");
     assertThatThrownBy(() -> albumService.setVisibility(author, p.getId(), "WEIRD"))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test
   @DisplayName("잘못된 구역·정렬·커서(형식 포함)는 400이다")
   void invalidInputs() {
     assertThatThrownBy(() -> albumService.zoneAlbum("NOWHERE", null, null, 20, null))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
     assertThatThrownBy(() -> albumService.eventAlbum(event.getId(), "WEIRD", null, 20, null))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
     assertThatThrownBy(() -> albumService.eventAlbum(event.getId(), "LATEST", "!!bad!!", 20, null))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
 
     // 형식은 맞지만 구성 요소 수가 틀린 커서
     String latestWrongParts = base64("a|b|c");
     assertThatThrownBy(
             () -> albumService.eventAlbum(event.getId(), "LATEST", latestWrongParts, 20, null))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
     String mostLikedWrongParts = base64("1|2");
     assertThatThrownBy(
             () ->
                 albumService.eventAlbum(event.getId(), "MOST_LIKED", mostLikedWrongParts, 20, null))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   private String base64(String raw) {

@@ -15,6 +15,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventTargetStatus;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuthTargetRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -146,7 +147,7 @@ public class ZoneEventQueryService {
     try {
       return ChatZone.fromString(zone).name();
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.invalid_zone");
+      throw new InvalidRequestException("error.zone_event.invalid_zone");
     }
   }
 }

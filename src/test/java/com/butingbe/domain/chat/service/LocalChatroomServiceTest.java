@@ -23,6 +23,7 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -145,8 +146,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.getChatRoom(roomId, userId, null))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("존재하지 않는 오픈채팅방입니다.");
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.chat.room.not_found");
   }
 
   @Test
@@ -159,8 +160,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.getChatRoom(roomId, userId, invalidMessageId))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("기준이 되는 메시지가 존재하지 않습니다.");
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.chat.message.not_found");
   }
 
   // ==========================================
@@ -192,8 +193,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.joinRoom(roomId, userId))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("존재하지 않는 오픈채팅방입니다.");
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.chat.room.not_found");
   }
 
   @Test
@@ -205,8 +206,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.joinRoom(roomId, userId))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("존재하지 않는 사용자입니다.");
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.user.not_found");
   }
 
   @Test
@@ -332,8 +333,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.exitChatroom(roomId, userId))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("존재하지 않는 채팅방입니다.");
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.chat.room.not_found");
   }
 
   @Test
@@ -345,8 +346,8 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.exitChatroom(roomId, userId))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("참여하고 있지 않은 채팅방입니다.");
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessage("error.chat.room.not_joined");
   }
 
   // ==========================================
@@ -381,13 +382,13 @@ class LocalChatroomServiceTest {
   }
 
   @Test
-  @DisplayName("존재하지 않는 방에 실시간 입장하면 IllegalArgumentException을 던진다")
+  @DisplayName("존재하지 않는 방에 실시간 입장하면 404를 던진다")
   void enterLiveChatroom_rejectsUnknownRoom() {
     when(localChatroomRepository.findById(roomId)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> localChatroomService.enterLiveChatroom(roomId))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("존재하지 않는 채팅방입니다.");
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.chat.room.not_found");
   }
 
   @Test
@@ -424,12 +425,12 @@ class LocalChatroomServiceTest {
   }
 
   @Test
-  @DisplayName("존재하지 않는 방에서 실시간 퇴장하면 IllegalArgumentException을 던진다")
+  @DisplayName("존재하지 않는 방에서 실시간 퇴장하면 404를 던진다")
   void exitLiveChatroom_rejectsUnknownRoom() {
     when(localChatroomRepository.findById(roomId)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> localChatroomService.exitLiveChatroom(roomId))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("존재하지 않는 채팅방입니다.");
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessage("error.chat.room.not_found");
   }
 }

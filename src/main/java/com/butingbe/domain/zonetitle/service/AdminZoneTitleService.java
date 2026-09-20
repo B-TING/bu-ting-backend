@@ -17,6 +17,7 @@ import com.butingbe.domain.zonetitle.entity.ZoneTitleDef;
 import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
 import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -198,17 +199,17 @@ public class AdminZoneTitleService {
    */
   void requireMonotonic(String zoneId, UUID excludeId, Integer tier, Integer requiredSuccessCount) {
     if (requiredSuccessCount <= 0) {
-      throw new IllegalArgumentException("error.zone_title.invalid_required_success_count");
+      throw new InvalidRequestException("error.zone_title.invalid_required_success_count");
     }
     for (ZoneTitleDef sibling : titleDefRepository.findByZoneIdOrderByTierAsc(zoneId)) {
       if (excludeId != null && sibling.getId().equals(excludeId)) {
         continue;
       }
       if (sibling.getTier() < tier && sibling.getRequiredSuccessCount() >= requiredSuccessCount) {
-        throw new IllegalArgumentException("error.zone_title.invalid_required_success_count");
+        throw new InvalidRequestException("error.zone_title.invalid_required_success_count");
       }
       if (sibling.getTier() > tier && sibling.getRequiredSuccessCount() <= requiredSuccessCount) {
-        throw new IllegalArgumentException("error.zone_title.invalid_required_success_count");
+        throw new InvalidRequestException("error.zone_title.invalid_required_success_count");
       }
     }
   }

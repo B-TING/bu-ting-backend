@@ -21,6 +21,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
@@ -84,7 +85,7 @@ class AdminRewardCatalogServiceTest extends AbstractContainerTest {
         new AdminRewardCatalogCreateReqDto(
             "WRONG", "CODE_X", "이름", null, null, null, null, null, true);
     assertThatThrownBy(() -> adminRewardCatalogService.create(operator, request))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.reward.invalid_type");
   }
 
@@ -199,7 +200,17 @@ class AdminRewardCatalogServiceTest extends AbstractContainerTest {
             .withoutPadding()
             .encodeToString("nopipe".getBytes(java.nio.charset.StandardCharsets.UTF_8));
     assertThatThrownBy(() -> adminRewardCatalogService.grants(operator, rewardId, noPipe, 20))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
+
+    // 구분자는 있지만 값이 날짜·UUID 로 파싱되지 않는 커서. 위의 '구분자 없음' 과 다른 갈래를 탄다.
+    String unparsable =
+        java.util.Base64.getUrlEncoder()
+            .withoutPadding()
+            .encodeToString(
+                "not-a-date|not-a-uuid".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    assertThatThrownBy(() -> adminRewardCatalogService.grants(operator, rewardId, unparsable, 20))
+        .isInstanceOf(InvalidRequestException.class);
+
     // 기본 size 경로
     assertThat(adminRewardCatalogService.grants(operator, rewardId, null, null).items()).isEmpty();
   }

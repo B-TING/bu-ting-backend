@@ -31,6 +31,7 @@ import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.math.BigDecimal;
@@ -276,10 +277,10 @@ public class TravelExpenseService {
 
   static List<Long> calculateEqualShares(long amount, int participantCount) {
     if (amount <= 0) {
-      throw new IllegalArgumentException("Expense amount must be positive.");
+      throw new InvalidRequestException("Expense amount must be positive.");
     }
     if (participantCount <= 0) {
-      throw new IllegalArgumentException("At least one participant is required.");
+      throw new InvalidRequestException("At least one participant is required.");
     }
 
     long baseAmount = amount / participantCount;
@@ -292,7 +293,7 @@ public class TravelExpenseService {
   private void validateDistinctParticipants(List<UUID> participantIds) {
     Set<UUID> uniqueIds = new HashSet<>(participantIds);
     if (uniqueIds.size() != participantIds.size()) {
-      throw new IllegalArgumentException("Expense participants must not be duplicated.");
+      throw new InvalidRequestException("Expense participants must not be duplicated.");
     }
   }
 
@@ -307,7 +308,7 @@ public class TravelExpenseService {
   private User requireTravelMember(Map<UUID, User> membersById, UUID userId, String subject) {
     User member = membersById.get(userId);
     if (member == null) {
-      throw new IllegalArgumentException(subject + " is not a travel member.");
+      throw new InvalidRequestException(subject + " is not a travel member.");
     }
     return member;
   }
@@ -323,7 +324,7 @@ public class TravelExpenseService {
 
   private void validateExpensePeriod(LocalDateTime from, LocalDateTime to) {
     if (from != null && to != null && from.isAfter(to)) {
-      throw new IllegalArgumentException("Expense search start time must not be after end time.");
+      throw new InvalidRequestException("Expense search start time must not be after end time.");
     }
   }
 

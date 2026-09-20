@@ -36,6 +36,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import jakarta.persistence.EntityManager;
@@ -340,7 +341,7 @@ class AdminZoneEventReportServiceTest extends AbstractContainerTest {
                     new ReportUpholdReqDto(
                         "근거", ReportUpholdAction.DISQUALIFY, report.getRevision()),
                     null))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.report.action_not_supported");
   }
 

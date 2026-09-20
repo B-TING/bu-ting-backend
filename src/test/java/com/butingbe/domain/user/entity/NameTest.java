@@ -3,6 +3,7 @@ package com.butingbe.domain.user.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.butingbe.global.error.exception.InvalidRequestException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -30,8 +31,8 @@ class NameTest {
   void lastNameValidationFail(String invalidLastName) {
     // when & then
     assertThatThrownBy(() -> new Name(invalidLastName, "길동"))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("성은 필수 입력 항목입니다.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.user.last_name.required");
   }
 
   @ParameterizedTest
@@ -41,7 +42,7 @@ class NameTest {
   void firstNameValidationFail(String invalidFirstName) {
     // when & then
     assertThatThrownBy(() -> new Name("홍", invalidFirstName))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("이름은 필수 입력 항목입니다.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.user.first_name.required");
   }
 }

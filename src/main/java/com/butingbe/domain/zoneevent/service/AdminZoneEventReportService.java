@@ -23,6 +23,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
@@ -172,7 +173,7 @@ public class AdminZoneEventReportService {
       AuthenticatedUser user, UUID reportId, ReportUpholdReqDto request, String idempotencyKey) {
     operatorAuthorization.requireOperator(user);
     if (request.action() != ReportUpholdAction.HOLD) {
-      throw new IllegalArgumentException("error.zone_event.report.action_not_supported");
+      throw new InvalidRequestException("error.zone_event.report.action_not_supported");
     }
     String fingerprint =
         reportId + ":" + request.note() + ":" + request.action() + ":" + request.expectedRevision();

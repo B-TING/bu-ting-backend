@@ -1,7 +1,6 @@
 package com.butingbe.domain.place.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
@@ -17,6 +16,7 @@ import com.butingbe.domain.place.dto.response.PlaceDetailResDto;
 import com.butingbe.domain.place.dto.response.PlaceSearchResDto;
 import com.butingbe.domain.place.dto.response.PlaceSummaryResDto;
 import com.butingbe.domain.place.exception.PlaceKeywordNotFoundException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -214,12 +214,12 @@ class TourApiPlaceServiceTest {
                 """,
                 MediaType.APPLICATION_JSON));
 
-    assertThatIllegalArgumentException()
-        .isThrownBy(
+    assertThatThrownBy(
             () ->
                 placeService.searchPlacesByLocation(
                     new PlaceLocationSearchReqDto(1, 20, 128.9084, 35.1487, 3000, "32", "E")))
-        .withMessage("No places found for the requested location.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("No places found for the requested location.");
     server.verify();
   }
 
@@ -742,9 +742,9 @@ class TourApiPlaceServiceTest {
     TourApiPlaceService placeService =
         new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
 
-    assertThatIllegalArgumentException()
-        .isThrownBy(() -> placeService.getPlaceSummary("  "))
-        .withMessage("contentId is required.");
+    assertThatThrownBy(() -> placeService.getPlaceSummary("  "))
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("contentId is required.");
 
     server.verify();
   }
@@ -757,12 +757,12 @@ class TourApiPlaceServiceTest {
     TourApiPlaceService placeService =
         new TourApiPlaceService(builder.build(), "https://tour.example.com", "SERVICE_KEY");
 
-    assertThatIllegalArgumentException()
-        .isThrownBy(() -> placeService.getPlaceDetail("", "32", null))
-        .withMessage("contentId and contentTypeId are required.");
-    assertThatIllegalArgumentException()
-        .isThrownBy(() -> placeService.getPlaceDetail("2651318", "  ", null))
-        .withMessage("contentId and contentTypeId are required.");
+    assertThatThrownBy(() -> placeService.getPlaceDetail("", "32", null))
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("contentId and contentTypeId are required.");
+    assertThatThrownBy(() -> placeService.getPlaceDetail("2651318", "  ", null))
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("contentId and contentTypeId are required.");
 
     server.verify();
   }

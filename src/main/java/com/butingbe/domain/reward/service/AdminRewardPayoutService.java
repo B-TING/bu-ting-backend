@@ -29,6 +29,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.service.IdempotencyService;
 import com.butingbe.global.error.exception.BulkPayoutConflictException;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -113,7 +114,7 @@ public class AdminRewardPayoutService {
       Integer size) {
     operatorAuthorization.requireOperator(user);
     if (status != null && !status.isBlank() && (rewardReason == null || rewardReason.isBlank())) {
-      throw new IllegalArgumentException("error.reward.payout.status_requires_reward_reason");
+      throw new InvalidRequestException("error.reward.payout.status_requires_reward_reason");
     }
     int pageNumber = page == null || page < 1 ? 1 : page;
     int pageSize = size == null || size <= 0 ? DEFAULT_SIZE : Math.min(size, MAX_SIZE);

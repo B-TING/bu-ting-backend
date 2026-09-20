@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ class TravelSettlementTransferTest {
                     .toUser(same)
                     .amount(15000L)
                     .build())
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Settlement sender and receiver must be different.");
   }
 
@@ -67,7 +68,7 @@ class TravelSettlementTransferTest {
                     .toUser(receiver)
                     .amount(null)
                     .build())
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Settlement amount must be positive.");
     assertThatThrownBy(
             () ->
@@ -78,7 +79,7 @@ class TravelSettlementTransferTest {
                     .toUser(receiver)
                     .amount(0L)
                     .build())
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Settlement amount must be positive.");
   }
 

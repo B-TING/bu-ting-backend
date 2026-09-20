@@ -15,6 +15,7 @@ import com.butingbe.domain.zoneevent.dto.response.ZoneEventSummaryResDto;
 import com.butingbe.domain.zoneevent.dto.response.ZoneRef;
 import com.butingbe.domain.zoneevent.service.ZoneEventQueryService;
 import com.butingbe.global.error.GlobalExceptionHandler;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -98,7 +99,7 @@ class ZoneEventControllerTest {
   void invalidZoneReturns400() throws Exception {
     currentUser = null;
     when(zoneEventQueryService.getActiveEvents(eq("NOWHERE"), isNull()))
-        .thenThrow(new IllegalArgumentException("error.zone_event.invalid_zone"));
+        .thenThrow(new InvalidRequestException("error.zone_event.invalid_zone"));
 
     mockMvc
         .perform(get("/zone-events/active").param("zone", "NOWHERE"))

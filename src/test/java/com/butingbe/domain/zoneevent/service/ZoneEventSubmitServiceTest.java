@@ -34,6 +34,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository
 import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.LocalDateTime;
@@ -244,7 +245,7 @@ class ZoneEventSubmitServiceTest {
     stubJoinedWithTargetAndMedia(participation, "application/pdf");
 
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.media.invalid");
   }
 
@@ -258,7 +259,7 @@ class ZoneEventSubmitServiceTest {
     when(fileMetadataRepository.findByObjectKey(FILE_KEY)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.media.invalid");
   }
 
@@ -380,7 +381,7 @@ class ZoneEventSubmitServiceTest {
     when(submissionRepository.existsByMediaFileKey(FILE_KEY)).thenReturn(true);
 
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.media.already_used");
   }
 
@@ -394,7 +395,7 @@ class ZoneEventSubmitServiceTest {
         .save(any());
 
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.media.already_used");
   }
 
@@ -428,7 +429,7 @@ class ZoneEventSubmitServiceTest {
     when(fileMetadataRepository.findByObjectKey(FILE_KEY)).thenReturn(Optional.of(stale));
 
     assertThatThrownBy(() -> service.submit(user, EVENT_ID, PARTICIPATION_ID, request(FILE_KEY)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.media.stale");
   }
 

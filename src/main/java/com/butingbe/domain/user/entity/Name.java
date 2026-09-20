@@ -1,11 +1,12 @@
 package com.butingbe.domain.user.entity;
 
+import com.butingbe.global.error.exception.InvalidRequestException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 @Embeddable // JPA가 이 클래스를 다른 엔티티의 일부로 인식하도록 설정
 @Getter
@@ -19,8 +20,14 @@ public class Name {
   private String firstName; // 이름 (예: 철수)
 
   public Name(String lastName, String firstName) {
-    Assert.hasText(lastName, "성은 필수 입력 항목입니다.");
-    Assert.hasText(firstName, "이름은 필수 입력 항목입니다.");
+    // Spring Assert 는 IllegalArgumentException 을 던진다. 전용 핸들러가 사라진 뒤로는 그게 500 이 된다.
+    // 사용자 프로필 입력에서 만들어지는 값이라 400 이어야 한다.
+    if (!StringUtils.hasText(lastName)) {
+      throw new InvalidRequestException("error.user.last_name.required");
+    }
+    if (!StringUtils.hasText(firstName)) {
+      throw new InvalidRequestException("error.user.first_name.required");
+    }
 
     this.lastName = lastName.trim();
     this.firstName = firstName.trim();

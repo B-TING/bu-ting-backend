@@ -5,6 +5,7 @@ import com.butingbe.domain.zoneevent.dto.response.ParticipationHistoryPageResDto
 import com.butingbe.domain.zoneevent.entity.ParticipationStatus;
 import com.butingbe.domain.zoneevent.service.ZoneEventParticipationQueryService;
 import com.butingbe.global.common.ApiResponse;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -52,7 +53,7 @@ public class ZoneEventMeController {
           .map(ParticipationStatus::valueOf)
           .toList();
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.participation.invalid_state");
+      throw new InvalidRequestException("error.zone_event.participation.invalid_state");
     }
   }
 }

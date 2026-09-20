@@ -23,6 +23,7 @@ import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
 import com.butingbe.domain.zonetitle.repository.ZoneTitleDefRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.support.AbstractContainerTest;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
@@ -153,7 +154,7 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
                     operator,
                     new AdminZoneTitleCreateReqDto(
                         "SUYEONG_NAMGU", 2, 3, "다른이름", "chip", "#111111")))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_title.invalid_required_success_count");
   }
 
@@ -169,7 +170,7 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
                     operator,
                     new AdminZoneTitleCreateReqDto(
                         "SUYEONG_NAMGU", 1, 10, "다른이름", "chip", "#111111")))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_title.invalid_required_success_count");
   }
 
@@ -328,7 +329,7 @@ class AdminZoneTitleServiceTest extends AbstractContainerTest {
                     UUID.fromString(created.titleDefId()),
                     new com.butingbe.domain.zonetitle.dto.request.AdminZoneTitleUpdateReqDto(
                         null, 0, false, created.revision())))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_title.invalid_required_success_count");
   }
 

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.butingbe.domain.file.entity.FileMetadata;
 import com.butingbe.domain.file.repository.FileMetadataRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.net.URI;
 import java.time.Duration;
@@ -88,7 +89,7 @@ class S3FileStorageServiceTest {
         new MockMultipartFile("file", "busan.png", "image/png", new byte[] {1, 2, 3});
 
     assertThatThrownBy(() -> service.upload(file, UPLOADER))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("파일 크기 제한을 초과했습니다.");
 
     verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
@@ -154,7 +155,7 @@ class S3FileStorageServiceTest {
     MockMultipartFile file = new MockMultipartFile("file", "busan.png", "image/png", new byte[0]);
 
     assertThatThrownBy(() -> service.upload(file, UPLOADER))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("파일이 비어 있습니다.");
 
     verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
@@ -167,7 +168,7 @@ class S3FileStorageServiceTest {
         new MockMultipartFile("file", "malware.exe", "application/octet-stream", new byte[] {1});
 
     assertThatThrownBy(() -> service.upload(file, UPLOADER))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("지원하지 않는 파일 형식입니다.");
 
     verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
@@ -232,7 +233,7 @@ class S3FileStorageServiceTest {
   @ValueSource(strings = {"", "   ", "../secret.png", "/etc/passwd", "uploads/../../secret.png"})
   void rejectsUnsafeFileKey(String fileKey) {
     assertThatThrownBy(() -> service.delete(fileKey, UPLOADER))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("유효하지 않은 파일 키입니다.");
 
     verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
@@ -245,7 +246,7 @@ class S3FileStorageServiceTest {
     when(fileMetadataRepository.findByObjectKey(fileKey)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.getPresignedUrl(fileKey))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("등록되지 않은 파일입니다.");
   }
 

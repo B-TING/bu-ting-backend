@@ -41,6 +41,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventSettlementReportReposit
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
@@ -217,7 +218,7 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     adminZoneEventService.create(operator, zoneEventReq(roundId, "YEONGDO"));
 
     assertThatThrownBy(() -> consoleService.schedule(operator, roundId))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test
@@ -247,7 +248,7 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     adminZoneEventService.create(operator, zoneEventReq(roundId, "WESTERN_BUSAN")); // 타겟 없음
 
     assertThatThrownBy(() -> consoleService.schedule(operator, roundId))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test
@@ -465,7 +466,7 @@ class AdminRoundConsoleServiceTest extends AbstractContainerTest {
     adminZoneEventService.cancel(operator, cancelledEventId);
 
     assertThatThrownBy(() -> consoleService.schedule(operator, roundId))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test

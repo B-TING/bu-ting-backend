@@ -25,6 +25,7 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
@@ -93,7 +94,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
             () ->
                 travelExpenseService.createEqualExpense(
                     AuthenticatedUser.from(creator), travel.getId(), request))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Expense participants must not be duplicated.");
     assertThat(travelExpenseRepository.count()).isZero();
   }
@@ -111,7 +112,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                     AuthenticatedUser.from(creator),
                     travel.getId(),
                     request(10_000L, creator, List.of(creator.getId(), outsider.getId()))))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Participant is not a travel member.");
     assertThat(travelExpenseRepository.count()).isZero();
   }
@@ -708,7 +709,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
             () ->
                 travelExpenseService.getExpenses(
                     authenticatedUser, travel.getId(), null, from, to, null, Pageable.unpaged()))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Expense search start time must not be after end time.");
   }
 
@@ -737,10 +738,10 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
   @DisplayName("금액이 0 이하이거나 참여자가 없으면 균등 분배를 계산하지 않는다")
   void calculateEqualSharesRejectsInvalidInput() {
     assertThatThrownBy(() -> TravelExpenseService.calculateEqualShares(0L, 3))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Expense amount must be positive.");
     assertThatThrownBy(() -> TravelExpenseService.calculateEqualShares(1000L, 0))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("At least one participant is required.");
   }
 

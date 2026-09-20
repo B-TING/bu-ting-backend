@@ -28,6 +28,7 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
@@ -68,7 +69,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
             null);
 
     assertThatThrownBy(() -> travelService.createTravel(authenticatedUser, request))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Travel end date cannot be before start date.");
     assertThat(travelRepository.findAll()).isEmpty();
   }
@@ -227,7 +228,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     authenticatedUser,
                     travel.id(),
                     new TravelStatusUpdateReqDto(TravelStatus.PLANNED)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Travel status cannot be changed back to PLANNED.");
   }
 
@@ -482,7 +483,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     authenticatedUser,
                     travel.id(),
                     new PlanCreateReqDto(1, LocalDate.of(2026, 7, 31))))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Plan visit date must be within the travel period.");
   }
 
@@ -501,7 +502,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     authenticatedUser,
                     travel.id(),
                     new PlanCreateReqDto(1, LocalDate.of(2026, 8, 2))))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Plan day number already exists.");
   }
 
@@ -540,7 +541,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     authenticatedUser,
                     travel.id(),
                     new TravelStatusUpdateReqDto(TravelStatus.PLANNED)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Travel status cannot be changed back to PLANNED.");
   }
 
@@ -556,7 +557,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
     createPlace(authenticatedUser, plan.planId(), 1, "First");
 
     assertThatThrownBy(() -> createPlace(authenticatedUser, plan.planId(), 1, "Duplicate"))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Plan place sequence already exists.");
   }
 
@@ -594,7 +595,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     authenticatedUser,
                     plan.planId(),
                     new PlanPlaceSequenceUpdateReqDto(List.of(first.planPlaceId()))))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("All plan place ids must be included.");
 
     assertThatThrownBy(
@@ -604,7 +605,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     plan.planId(),
                     new PlanPlaceSequenceUpdateReqDto(
                         List.of(first.planPlaceId(), first.planPlaceId()))))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Duplicated plan place id exists.");
 
     assertThatThrownBy(
@@ -614,7 +615,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
                     plan.planId(),
                     new PlanPlaceSequenceUpdateReqDto(
                         List.of(first.planPlaceId(), java.util.UUID.randomUUID()))))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Plan place ids do not match this plan.");
   }
 

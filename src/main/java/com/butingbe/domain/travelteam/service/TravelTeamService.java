@@ -17,6 +17,7 @@ import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -88,16 +89,16 @@ public class TravelTeamService {
             travelId, user.getId(), "Only travel leaders can remove members.");
 
     if (user.getId().equals(targetUserId)) {
-      throw new IllegalArgumentException("Leader cannot remove themselves.");
+      throw new InvalidRequestException("Leader cannot remove themselves.");
     }
 
     TravelMember targetMember =
         travelMemberRepository
             .findByTravel_IdAndUser_Id(travelId, targetUserId)
-            .orElseThrow(() -> new IllegalArgumentException("Target user is not a travel member."));
+            .orElseThrow(() -> new InvalidRequestException("Target user is not a travel member."));
 
     if (targetMember.getRole() == TravelTeamRole.LEADER) {
-      throw new IllegalArgumentException("Leader cannot be removed.");
+      throw new InvalidRequestException("Leader cannot be removed.");
     }
 
     travelMemberRepository.delete(targetMember);
@@ -114,13 +115,13 @@ public class TravelTeamService {
             travelId, user.getId(), "Only travel leaders can transfer leader role.");
 
     if (user.getId().equals(request.newLeaderUserId())) {
-      throw new IllegalArgumentException("New leader must be another travel member.");
+      throw new InvalidRequestException("New leader must be another travel member.");
     }
 
     TravelMember newLeader =
         travelMemberRepository
             .findByTravel_IdAndUser_Id(travelId, request.newLeaderUserId())
-            .orElseThrow(() -> new IllegalArgumentException("New leader is not a travel member."));
+            .orElseThrow(() -> new InvalidRequestException("New leader is not a travel member."));
 
     currentLeader.changeRole(TravelTeamRole.MEMBER);
     newLeader.changeRole(TravelTeamRole.LEADER);
@@ -138,7 +139,7 @@ public class TravelTeamService {
         travelInviteRepository
             .findFirstByTravel_IdAndUsedFalseAndExpiredAtAfterOrderByExpiredAtDesc(
                 travelId, OffsetDateTime.now())
-            .orElseThrow(() -> new IllegalArgumentException("Active invite link not found."));
+            .orElseThrow(() -> new InvalidRequestException("Active invite link not found."));
 
     return new TravelInviteLinkInfoResponse(toInviteLink(invite.getToken()), invite.getExpiredAt());
   }
@@ -162,7 +163,7 @@ public class TravelTeamService {
     Travel travel =
         travelRepository
             .findById(travelId)
-            .orElseThrow(() -> new IllegalArgumentException("Travel not found."));
+            .orElseThrow(() -> new InvalidRequestException("Travel not found."));
 
     String token = UUID.randomUUID().toString();
     OffsetDateTime expiredAt = OffsetDateTime.now().plusHours(24);
@@ -182,7 +183,7 @@ public class TravelTeamService {
     Travel travel = invite.getTravel();
 
     if (travelMemberRepository.existsByTravel_IdAndUser_Id(travel.getId(), user.getId())) {
-      throw new IllegalArgumentException("User already joined this travel.");
+      throw new InvalidRequestException("User already joined this travel.");
     }
 
     travelMemberRepository.save(
@@ -218,14 +219,14 @@ public class TravelTeamService {
     TravelInvite invite =
         travelInviteRepository
             .findByToken(token)
-            .orElseThrow(() -> new IllegalArgumentException("Invalid invite link."));
+            .orElseThrow(() -> new InvalidRequestException("Invalid invite link."));
 
     if (invite.isExpired()) {
-      throw new IllegalArgumentException("Invite link has expired.");
+      throw new InvalidRequestException("Invite link has expired.");
     }
 
     if (Boolean.TRUE.equals(invite.getUsed())) {
-      throw new IllegalArgumentException("Invite link has already been used.");
+      throw new InvalidRequestException("Invite link has already been used.");
     }
 
     return invite;
@@ -247,7 +248,7 @@ public class TravelTeamService {
 
   private void validateTravelExists(UUID travelId) {
     if (!travelRepository.existsById(travelId)) {
-      throw new IllegalArgumentException("Travel not found.");
+      throw new InvalidRequestException("Travel not found.");
     }
   }
 

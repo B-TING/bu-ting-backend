@@ -25,6 +25,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
@@ -99,7 +100,7 @@ class AdminZoneEventStatsServiceTest extends AbstractContainerTest {
   @DisplayName("roundId도 from/to도 없으면 400")
   void requiresRoundOrRange() {
     assertThatThrownBy(() -> service.stats(operator, null, null, null))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.stats.round_or_range_required");
   }
 

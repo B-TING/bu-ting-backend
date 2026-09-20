@@ -32,6 +32,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import java.time.OffsetDateTime;
@@ -153,7 +154,7 @@ public class AdminZoneEventService {
     ZoneEventAuthTarget target = null;
     if (Boolean.TRUE.equals(type.getRequiresUpload())) {
       if (request.authTarget() == null) {
-        throw new IllegalArgumentException("error.zone_event.media.invalid");
+        throw new InvalidRequestException("error.zone_event.media.invalid");
       }
       target = authTargetRepository.save(buildTarget(event, request.authTarget()));
     } else if (request.authTarget() != null) {
@@ -380,12 +381,12 @@ public class AdminZoneEventService {
     if (base != null
         && base.badgeCode() != null
         && !rewardCatalogRepository.existsByCode(base.badgeCode())) {
-      throw new IllegalArgumentException("error.reward.catalog_not_found");
+      throw new InvalidRequestException("error.reward.catalog_not_found");
     }
     if (excellence != null
         && excellence.prizeRewardCode() != null
         && !rewardCatalogRepository.existsByCode(excellence.prizeRewardCode())) {
-      throw new IllegalArgumentException("error.reward.catalog_not_found");
+      throw new InvalidRequestException("error.reward.catalog_not_found");
     }
   }
 
@@ -398,14 +399,14 @@ public class AdminZoneEventService {
   private ZoneEventType requireType(String typeCode) {
     return zoneEventTypeRepository
         .findById(typeCode)
-        .orElseThrow(() -> new IllegalArgumentException("error.zone_event.type_not_found"));
+        .orElseThrow(() -> new InvalidRequestException("error.zone_event.type_not_found"));
   }
 
   private String parseZone(String zone) {
     try {
       return ChatZone.fromString(zone).name();
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.invalid_zone");
+      throw new InvalidRequestException("error.zone_event.invalid_zone");
     }
   }
 
@@ -413,7 +414,7 @@ public class AdminZoneEventService {
     try {
       return ZoneEventStatus.valueOf(status.trim());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.invalid_state");
+      throw new InvalidRequestException("error.zone_event.invalid_state");
     }
   }
 
@@ -421,7 +422,7 @@ public class AdminZoneEventService {
     try {
       return ZoneEventTargetKind.valueOf(kind.trim());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.media.invalid");
+      throw new InvalidRequestException("error.zone_event.media.invalid");
     }
   }
 }

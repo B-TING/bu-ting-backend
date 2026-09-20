@@ -913,6 +913,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 존재하지 않는 채팅방 또는 사용자
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: 이미 가입했거나 정원이 가득 찬 채팅방
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/chat/rooms/{roomId}/exit:
     delete:
       tags:
@@ -946,6 +958,18 @@ paths:
                     example: "채팅방 퇴장이 완료되었습니다."
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: 참여하고 있지 않은 채팅방
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: 존재하지 않는 채팅방
           content:
             application/json:
               schema:
@@ -1001,6 +1025,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+        "404":
+          description: 존재하지 않는 채팅방 또는 기준 메시지
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
   /api/v1/travels:
     post:
       tags:

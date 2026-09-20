@@ -26,6 +26,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -128,7 +129,7 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
 
     assertThatThrownBy(
             () -> targetService.create(operator, eventId, placeCreateReq("126081", 35.16, null)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.target.invalid_coordinates");
   }
 
@@ -139,7 +140,7 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
 
     assertThatThrownBy(
             () -> targetService.create(operator, eventId, placeCreateReq("GHOST", null, null)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.place_not_found");
   }
 
@@ -162,7 +163,7 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
         new AdminAuthTargetCreateReqDto(
             "OBJECT", null, null, null, "표지판", null, null, 35.1, 129.1, 100);
     assertThatThrownBy(() -> targetService.create(operator, eventId, missingLandmark))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.target.invalid_kind");
 
     AdminAuthTargetCreateReqDto ok =
@@ -181,7 +182,7 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
             "OBJECT", "signpost-1", null, null, "표지판", null, null, null, null, 100);
 
     assertThatThrownBy(() -> targetService.create(operator, eventId, missingCoordinates))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.target.invalid_coordinates");
   }
 
@@ -193,7 +194,7 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
             "GHOST", null, "126081", "12", null, null, null, null, null, 100);
 
     assertThatThrownBy(() -> targetService.create(operator, eventId, invalidKind))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.target.invalid_kind");
   }
 
@@ -205,7 +206,7 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
             "PLACE", null, "126081", null, null, null, null, null, null, 100);
 
     assertThatThrownBy(() -> targetService.create(operator, eventId, missingContentTypeId))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.target.invalid_kind");
   }
 
@@ -284,7 +285,7 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
                     UUID.fromString(created.targetId()),
                     new AdminAuthTargetPatchReqDto(
                         null, null, 35.2, null, null, null, created.revision())))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.target.invalid_coordinates");
   }
 
@@ -408,7 +409,7 @@ class AdminZoneEventTargetServiceTest extends com.butingbe.support.AbstractConta
                     UUID.fromString(created.targetId()),
                     new AdminAuthTargetReplaceReqDto(
                         "GHOST", "12", null, null, null, null, 100, null)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.place_not_found");
   }
 

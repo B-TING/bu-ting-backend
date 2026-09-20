@@ -21,6 +21,7 @@ import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.LocalDate;
@@ -372,13 +373,13 @@ class TravelRouteServiceTest {
             () ->
                 travelRouteService.applyOptimizedOrder(
                     authenticatedUser, PLAN_ID, List.of(UUID.randomUUID())))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Plan place ids do not match this plan.");
     assertThatThrownBy(
             () ->
                 travelRouteService.applyOptimizedOrder(
                     authenticatedUser, PLAN_ID, List.of(onlyPlace.getId(), onlyPlace.getId())))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Duplicated plan place id exists.");
 
     verify(travelService, never())

@@ -18,6 +18,7 @@ import com.butingbe.domain.travel.repository.PlanRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travel.service.TravelService;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.ArrayList;
@@ -207,11 +208,11 @@ public class TravelRouteService {
   /** 요청한 장소가 모두 이 일정의 것인지, 중복이 없는지 확인한다. 누락은 허용한다. */
   private void validateBelongsToPlan(List<PlanPlace> places, List<UUID> requestedIds) {
     if (new HashSet<>(requestedIds).size() != requestedIds.size()) {
-      throw new IllegalArgumentException("Duplicated plan place id exists.");
+      throw new InvalidRequestException("Duplicated plan place id exists.");
     }
     Set<UUID> planPlaceIds = places.stream().map(PlanPlace::getId).collect(Collectors.toSet());
     if (!planPlaceIds.containsAll(requestedIds)) {
-      throw new IllegalArgumentException("Plan place ids do not match this plan.");
+      throw new InvalidRequestException("Plan place ids do not match this plan.");
     }
   }
 

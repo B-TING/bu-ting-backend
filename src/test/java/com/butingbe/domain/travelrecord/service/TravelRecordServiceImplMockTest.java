@@ -34,6 +34,7 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -95,7 +96,7 @@ class TravelRecordServiceImplMockTest {
     when(travelRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(record));
 
     assertThatThrownBy(() -> travelRecordService.publish(authenticatedUser, TRAVEL_ID, RECORD_ID))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Travel record title is required.");
   }
 
@@ -126,7 +127,7 @@ class TravelRecordServiceImplMockTest {
                         null,
                         null,
                         null)))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Travel record itinerary is required.");
 
     verify(travelRepository, never()).save(any(Travel.class));

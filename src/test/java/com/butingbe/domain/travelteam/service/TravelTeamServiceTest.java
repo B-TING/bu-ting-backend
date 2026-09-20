@@ -23,6 +23,7 @@ import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
@@ -161,7 +162,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
             () ->
                 travelTeamService.removeMember(
                     AuthenticatedUser.from(leader), travel.getId(), coLeader.getId()))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Leader cannot be removed.");
 
     assertThat(travelMemberRepository.existsByTravel_IdAndUser_Id(travel.getId(), coLeader.getId()))
@@ -180,7 +181,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
             () ->
                 travelTeamService.removeMember(
                     AuthenticatedUser.from(leader), travel.getId(), outsider.getId()))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Target user is not a travel member.");
   }
 
@@ -218,7 +219,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
             () ->
                 travelTeamService.removeMember(
                     AuthenticatedUser.from(leader), travel.getId(), leader.getId()))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Leader cannot remove themselves.");
   }
 
@@ -288,7 +289,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                     AuthenticatedUser.from(leader),
                     travel.getId(),
                     new TravelLeaderTransferRequest(outsider.getId())))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("New leader is not a travel member.");
   }
 
@@ -424,7 +425,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
 
     assertThatThrownBy(
             () -> travelTeamService.acceptInvite(AuthenticatedUser.from(user), invite.getToken()))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("User already joined this travel.");
   }
 
@@ -488,7 +489,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                     AuthenticatedUser.from(leader),
                     travel.getId(),
                     new TravelLeaderTransferRequest(leader.getId())))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("New leader must be another travel member.");
   }
 
@@ -502,10 +503,10 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     travelInviteRepository.save(used);
 
     assertThatThrownBy(() -> travelTeamService.verifyToken("expired-token"))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Invite link has expired.");
     assertThatThrownBy(() -> travelTeamService.verifyToken("used-token"))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Invite link has already been used.");
   }
 
@@ -517,7 +518,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
 
     assertThatThrownBy(
             () -> travelTeamService.getTravelMembers(AuthenticatedUser.from(user), unknownTravelId))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Travel not found.");
     assertThatThrownBy(() -> travelTeamService.getMyTravels(null, null))
         .isInstanceOf(UnauthenticatedException.class);

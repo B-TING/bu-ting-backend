@@ -31,6 +31,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
@@ -299,7 +300,7 @@ class ZoneEventParticipationQueryServiceTest extends AbstractContainerTest {
   void invalidCursor() {
     assertThatThrownBy(
             () -> queryService.history(user, null, null, List.of(), null, null, "!!bad!!", 20))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test
@@ -311,7 +312,7 @@ class ZoneEventParticipationQueryServiceTest extends AbstractContainerTest {
             .encodeToString("nopipe".getBytes(java.nio.charset.StandardCharsets.UTF_8));
     assertThatThrownBy(
             () -> queryService.history(user, null, null, List.of(), null, null, noPipe, 20))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test

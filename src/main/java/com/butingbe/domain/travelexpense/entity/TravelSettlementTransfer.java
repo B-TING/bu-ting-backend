@@ -1,6 +1,7 @@
 package com.butingbe.domain.travelexpense.entity;
 
 import com.butingbe.domain.user.entity.User;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -54,10 +55,10 @@ public class TravelSettlementTransfer {
     this.fromUser = Objects.requireNonNull(fromUser, "Settlement sender is required.");
     this.toUser = Objects.requireNonNull(toUser, "Settlement receiver is required.");
     if (Objects.equals(fromUser.getId(), toUser.getId())) {
-      throw new IllegalArgumentException("Settlement sender and receiver must be different.");
+      throw new InvalidRequestException("Settlement sender and receiver must be different.");
     }
     if (amount == null || amount <= 0) {
-      throw new IllegalArgumentException("Settlement amount must be positive.");
+      throw new InvalidRequestException("Settlement amount must be positive.");
     }
     this.amount = amount;
   }
