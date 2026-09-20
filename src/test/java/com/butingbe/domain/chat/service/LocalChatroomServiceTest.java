@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.dto.ChatroomResponse;
 import com.butingbe.domain.chat.entity.ChatMember;
@@ -21,6 +22,7 @@ import com.butingbe.domain.chat.repository.LocalChatroomRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.ForbiddenException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -254,6 +257,52 @@ class LocalChatroomServiceTest {
 
     // then
     assertThat(result).hasSize(1);
+  }
+
+  // ==========================================
+  // 📍 SEND MESSAGE TESTS
+  // ==========================================
+
+  @Test
+  @DisplayName("참여 중인 방에 보낸 메시지는 저장한 뒤 해당 방 구독자에게 발행한다")
+  void sendMessage_success() {
+    AuthenticatedUser sender =
+        new AuthenticatedUser(userId, "user@example.com", "tester", List.of());
+    when(chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)).thenReturn(true);
+    when(chatMessageRepository.save(any(ChatMessage.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    localChatroomService.sendMessage(roomId, sender, "안녕하세요");
+
+    ArgumentCaptor<ChatMessage> savedCaptor = ArgumentCaptor.forClass(ChatMessage.class);
+    verify(chatMessageRepository).save(savedCaptor.capture());
+    assertThat(savedCaptor.getValue().getRoomId()).isEqualTo(roomId);
+    assertThat(savedCaptor.getValue().getUserId()).isEqualTo(userId);
+    assertThat(savedCaptor.getValue().getSenderNickname()).isEqualTo("tester");
+    assertThat(savedCaptor.getValue().getContent()).isEqualTo("안녕하세요");
+
+    ArgumentCaptor<ChatMessageResponse> publishedCaptor =
+        ArgumentCaptor.forClass(ChatMessageResponse.class);
+    verify(messagingTemplate)
+        .convertAndSend(eq("/sub/chat/room/" + roomId), publishedCaptor.capture());
+    assertThat(publishedCaptor.getValue().roomId()).isEqualTo(roomId);
+    assertThat(publishedCaptor.getValue().senderNickname()).isEqualTo("tester");
+    assertThat(publishedCaptor.getValue().content()).isEqualTo("안녕하세요");
+    assertThat(publishedCaptor.getValue().isMine()).isNull();
+  }
+
+  @Test
+  @DisplayName("참여하지 않은 방에 메시지를 보내면 ForbiddenException을 던진다")
+  void sendMessage_rejectsNonParticipant() {
+    AuthenticatedUser sender =
+        new AuthenticatedUser(userId, "user@example.com", "tester", List.of());
+    when(chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)).thenReturn(false);
+
+    assertThatThrownBy(() -> localChatroomService.sendMessage(roomId, sender, "안녕하세요"))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessageContaining("참여하지 않은 채팅방");
+
+    verify(chatMessageRepository, never()).save(any(ChatMessage.class));
   }
 
   // ==========================================
