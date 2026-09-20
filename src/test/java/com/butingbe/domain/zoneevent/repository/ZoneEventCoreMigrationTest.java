@@ -11,10 +11,12 @@ import java.sql.SQLException;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /** V30/V31 마이그레이션이 만드는 구역 이벤트 제약과 시드를 실제 PostgreSQL로 검증한다. */
+@Tag("integration")
 class ZoneEventCoreMigrationTest {
 
   @Test

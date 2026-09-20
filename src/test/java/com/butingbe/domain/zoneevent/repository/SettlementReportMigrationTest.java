@@ -10,10 +10,12 @@ import java.sql.SQLException;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /** V40이 만드는 정산 리포트 PK/FK와 감사 로그를 검증한다. */
+@Tag("integration")
 class SettlementReportMigrationTest {
 
   @Test

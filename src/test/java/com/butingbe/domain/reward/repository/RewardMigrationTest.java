@@ -11,10 +11,12 @@ import java.sql.SQLException;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /** V32/V33이 만드는 보상 제약과 카탈로그 시드를 실제 PostgreSQL로 검증한다. */
+@Tag("integration")
 class RewardMigrationTest {
 
   @Test

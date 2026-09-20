@@ -148,6 +148,21 @@ tasks.withType<Test> {
     finalizedBy(tasks.jacocoTestReport)
 }
 
+// pre-push 훅 전용. 도커 컨테이너를 띄우는 integration 태그를 빼고 빠른 단위 테스트만 돌린다.
+// 검증 기준을 낮추는 게 아니라 로컬 훅만 줄인 것이다 -- CI 의 check 는 그대로 전체를 돈다.
+// 공통 설정(타임존 등)은 위 tasks.withType<Test> 블록에서 상속받고, 커버리지 게이트를 돌리는
+// jacocoTestReport(= 전체 test 실행) 만 떼어낸다.
+tasks.register<Test>("unitTest") {
+    val testSourceSet = sourceSets["test"]
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+
+    useJUnitPlatform {
+        excludeTags("integration")
+    }
+    setFinalizedBy(emptyList<Any>())
+}
+
 tasks.check {
     dependsOn(tasks.jacocoTestCoverageVerification)
 }
