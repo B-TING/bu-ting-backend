@@ -48,6 +48,7 @@ import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordBookmarkRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordCommentRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
+import com.butingbe.domain.travelrecord.repository.TravelRecordFeedSpecifications;
 import com.butingbe.domain.travelrecord.repository.TravelRecordImageRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordLikeRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordPlaceRepository;
@@ -388,9 +389,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     validateFeedCursorSort(feedCursor, feedSort);
     FeedSearchCondition searchCondition =
         resolveFeedSearchCondition(keyword, placeId, travelStartDate, travelEndDate, region, city);
-    PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
     List<TravelRecord> fetchedRecords =
-        findFeedRecords(feedCursor, searchCondition, feedSort, pageRequest);
+        findFeedRecords(feedCursor, searchCondition, feedSort, pageSize + 1);
     boolean hasNext = fetchedRecords.size() > pageSize;
     List<TravelRecord> pageRecords = hasNext ? fetchedRecords.subList(0, pageSize) : fetchedRecords;
     List<TravelRecordFeedResDto> items = toFeedResponses(pageRecords, authenticatedUser);
@@ -1610,122 +1610,42 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     return size;
   }
 
+  /** 정렬 기준과 커서 유무에 따라 쿼리를 고르던 자리다. 조건이 하나로 합쳐져 분기가 사라졌다. */
   private List<TravelRecord> findFeedRecords(
       FeedCursor feedCursor,
       FeedSearchCondition searchCondition,
       TravelRecordFeedSort sort,
-      PageRequest pageRequest) {
-    if (feedCursor == null) {
-      return switch (sort) {
-        case LATEST ->
-            travelRecordRepository.findFeedPage(
-                TravelRecordStatus.PUBLISHED,
-                searchCondition.hasKeyword(),
-                searchCondition.keywordPattern(),
-                searchCondition.hasPlace(),
-                searchCondition.placeId(),
-                searchCondition.hasRegion(),
-                searchCondition.regionPattern(),
-                searchCondition.hasCity(),
-                searchCondition.cityPattern(),
-                searchCondition.hasTravelStartDate(),
-                searchCondition.travelStartDate(),
-                searchCondition.hasTravelEndDate(),
-                searchCondition.travelEndDate(),
-                pageRequest);
-        case MOST_LIKED ->
-            travelRecordRepository.findFeedPageOrderByLikeCount(
-                TravelRecordStatus.PUBLISHED,
-                searchCondition.hasKeyword(),
-                searchCondition.keywordPattern(),
-                searchCondition.hasPlace(),
-                searchCondition.placeId(),
-                searchCondition.hasRegion(),
-                searchCondition.regionPattern(),
-                searchCondition.hasCity(),
-                searchCondition.cityPattern(),
-                searchCondition.hasTravelStartDate(),
-                searchCondition.travelStartDate(),
-                searchCondition.hasTravelEndDate(),
-                searchCondition.travelEndDate(),
-                pageRequest);
-        case MOST_VIEWED ->
-            travelRecordRepository.findFeedPageOrderByViewCount(
-                TravelRecordStatus.PUBLISHED,
-                searchCondition.hasKeyword(),
-                searchCondition.keywordPattern(),
-                searchCondition.hasPlace(),
-                searchCondition.placeId(),
-                searchCondition.hasRegion(),
-                searchCondition.regionPattern(),
-                searchCondition.hasCity(),
-                searchCondition.cityPattern(),
-                searchCondition.hasTravelStartDate(),
-                searchCondition.travelStartDate(),
-                searchCondition.hasTravelEndDate(),
-                searchCondition.travelEndDate(),
-                pageRequest);
-      };
-    }
+      int limit) {
+    TravelRecordFeedSpecifications.Sorting sorting = toSorting(sort);
+    return travelRecordRepository.findBy(
+        TravelRecordFeedSpecifications.publishedFeed(
+            toFeedSearch(searchCondition), sorting, toFeedCursor(feedCursor)),
+        query -> query.sortBy(TravelRecordFeedSpecifications.order(sorting)).limit(limit).all());
+  }
 
+  private TravelRecordFeedSpecifications.Sorting toSorting(TravelRecordFeedSort sort) {
     return switch (sort) {
-      case LATEST ->
-          travelRecordRepository.findFeedPageAfterCursor(
-              TravelRecordStatus.PUBLISHED,
-              feedCursor.publishedAt(),
-              feedCursor.createdAt(),
-              searchCondition.hasKeyword(),
-              searchCondition.keywordPattern(),
-              searchCondition.hasPlace(),
-              searchCondition.placeId(),
-              searchCondition.hasRegion(),
-              searchCondition.regionPattern(),
-              searchCondition.hasCity(),
-              searchCondition.cityPattern(),
-              searchCondition.hasTravelStartDate(),
-              searchCondition.travelStartDate(),
-              searchCondition.hasTravelEndDate(),
-              searchCondition.travelEndDate(),
-              pageRequest);
-      case MOST_LIKED ->
-          travelRecordRepository.findFeedPageAfterCursorOrderByLikeCount(
-              TravelRecordStatus.PUBLISHED,
-              feedCursor.sortCount(),
-              feedCursor.publishedAt(),
-              feedCursor.createdAt(),
-              searchCondition.hasKeyword(),
-              searchCondition.keywordPattern(),
-              searchCondition.hasPlace(),
-              searchCondition.placeId(),
-              searchCondition.hasRegion(),
-              searchCondition.regionPattern(),
-              searchCondition.hasCity(),
-              searchCondition.cityPattern(),
-              searchCondition.hasTravelStartDate(),
-              searchCondition.travelStartDate(),
-              searchCondition.hasTravelEndDate(),
-              searchCondition.travelEndDate(),
-              pageRequest);
-      case MOST_VIEWED ->
-          travelRecordRepository.findFeedPageAfterCursorOrderByViewCount(
-              TravelRecordStatus.PUBLISHED,
-              feedCursor.sortCount(),
-              feedCursor.publishedAt(),
-              feedCursor.createdAt(),
-              searchCondition.hasKeyword(),
-              searchCondition.keywordPattern(),
-              searchCondition.hasPlace(),
-              searchCondition.placeId(),
-              searchCondition.hasRegion(),
-              searchCondition.regionPattern(),
-              searchCondition.hasCity(),
-              searchCondition.cityPattern(),
-              searchCondition.hasTravelStartDate(),
-              searchCondition.travelStartDate(),
-              searchCondition.hasTravelEndDate(),
-              searchCondition.travelEndDate(),
-              pageRequest);
+      case LATEST -> TravelRecordFeedSpecifications.Sorting.LATEST;
+      case MOST_LIKED -> TravelRecordFeedSpecifications.Sorting.MOST_LIKED;
+      case MOST_VIEWED -> TravelRecordFeedSpecifications.Sorting.MOST_VIEWED;
     };
+  }
+
+  private TravelRecordFeedSpecifications.FeedSearch toFeedSearch(FeedSearchCondition condition) {
+    return new TravelRecordFeedSpecifications.FeedSearch(
+        condition.hasKeyword() ? condition.keywordPattern() : null,
+        condition.hasPlace() ? condition.placeId() : null,
+        condition.hasRegion() ? condition.regionPattern() : null,
+        condition.hasCity() ? condition.cityPattern() : null,
+        condition.hasTravelStartDate() ? condition.travelStartDate() : null,
+        condition.hasTravelEndDate() ? condition.travelEndDate() : null);
+  }
+
+  private TravelRecordFeedSpecifications.FeedCursor toFeedCursor(FeedCursor feedCursor) {
+    return feedCursor == null
+        ? null
+        : new TravelRecordFeedSpecifications.FeedCursor(
+            feedCursor.sortCount(), feedCursor.publishedAt(), feedCursor.createdAt());
   }
 
   private FeedSearchCondition resolveFeedSearchCondition(
