@@ -85,7 +85,7 @@ Request flow:
 
 | Base path                                    | Controller                      | Description                                        |
 |----------------------------------------------|---------------------------------|----------------------------------------------------|
-| `/api/v1/auth`                               | `AuthController`                | OAuth login                                        |
+| `/api/v1/auth`                               | `AuthController`                | OAuth login, access token refresh                  |
 | `/api/v1/users`                              | `UserController`                | Sign-up, profile read/update/delete                |
 | `/api/v1/travel-surveys`                      | `TravelSurveyController`        | Travel preference survey                           |
 | `/api/v1/places`                             | `PlaceController`               | Place search, nearby, festivals, detail            |

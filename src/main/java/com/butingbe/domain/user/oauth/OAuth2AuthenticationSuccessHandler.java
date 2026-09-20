@@ -48,12 +48,14 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
                     user,
                     issuedToken.accessToken(),
                     issuedToken.tokenType(),
-                    issuedToken.expiresIn())));
+                    issuedToken.expiresIn(),
+                    issuedToken.refreshToken(),
+                    issuedToken.refreshExpiresIn())));
   }
 
   private String toJson(OAuth2LoginResDto data) {
     return """
-        {"success":true,"message":"OAuth2 login succeeded.","data":{"userId":"%s","email":%s,"nickname":"%s","provider":"%s","loggedIn":true,"emailRequired":%s,"accessToken":"%s","tokenType":"%s","expiresIn":%d}}\
+        {"success":true,"message":"OAuth2 login succeeded.","data":{"userId":"%s","email":%s,"nickname":"%s","provider":"%s","loggedIn":true,"emailRequired":%s,"accessToken":"%s","tokenType":"%s","expiresIn":%d,"refreshToken":"%s","refreshExpiresIn":%d}}\
         """
         .formatted(
             escape(data.userId()),
@@ -63,7 +65,9 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
             data.emailRequired(),
             escape(data.accessToken()),
             escape(data.tokenType()),
-            data.expiresIn());
+            data.expiresIn(),
+            escape(data.refreshToken()),
+            data.refreshExpiresIn());
   }
 
   private String nullableStringJson(String value) {

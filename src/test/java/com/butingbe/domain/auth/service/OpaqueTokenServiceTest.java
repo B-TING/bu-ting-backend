@@ -9,6 +9,7 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -48,10 +49,15 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
     assertThat(issuedToken.tokenType()).isEqualTo("Bearer");
     assertThat(issuedToken.expiresIn())
         .isEqualTo(OpaqueTokenService.ACCESS_TOKEN_EXPIRES_IN_SECONDS);
-    assertThat(opaqueTokensOf(user))
+    assertThat(opaqueTokensOf(user, com.butingbe.domain.auth.entity.OpaqueTokenType.ACCESS))
         .singleElement()
         .satisfies(
             token -> assertThat(token.getTokenHash()).isNotEqualTo(issuedToken.accessToken()));
+    assertThat(issuedToken.refreshToken()).isNotBlank().isNotEqualTo(issuedToken.accessToken());
+    assertThat(issuedToken.refreshExpiresIn())
+        .isEqualTo(OpaqueTokenService.REFRESH_TOKEN_EXPIRES_IN_SECONDS);
+    assertThat(opaqueTokensOf(user, com.butingbe.domain.auth.entity.OpaqueTokenType.REFRESH))
+        .hasSize(1);
     assertThat(opaqueTokenService.authenticate(issuedToken.accessToken()))
         .hasValueSatisfying(
             authenticated -> assertThat(authenticated.getEmail()).isEqualTo(user.getEmail()));
@@ -77,7 +83,12 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
 
     assertThat(reusedToken.accessToken()).isEqualTo(firstToken.accessToken());
     assertThat(reusedToken.expiresIn()).isLessThanOrEqualTo(firstToken.expiresIn());
-    assertThat(opaqueTokensOf(user)).hasSize(1);
+    assertThat(opaqueTokensOf(user, com.butingbe.domain.auth.entity.OpaqueTokenType.ACCESS))
+        .hasSize(1);
+    // 액세스를 재사용해도 리프레시는 새로 내준다. 이전 리프레시는 남지 않는다.
+    assertThat(opaqueTokensOf(user, com.butingbe.domain.auth.entity.OpaqueTokenType.REFRESH))
+        .hasSize(1);
+    assertThat(reusedToken.refreshToken()).isNotEqualTo(firstToken.refreshToken());
   }
 
   @Test
@@ -98,7 +109,8 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
     OpaqueTokenService.IssuedOpaqueToken secondToken = opaqueTokenService.issue(user);
 
     assertThat(secondToken.accessToken()).isNotEqualTo(firstToken.accessToken());
-    assertThat(opaqueTokensOf(user)).hasSize(1);
+    assertThat(opaqueTokensOf(user, com.butingbe.domain.auth.entity.OpaqueTokenType.ACCESS))
+        .hasSize(1);
     assertThat(opaqueTokenService.authenticate(firstToken.accessToken())).isEmpty();
     assertThat(opaqueTokenService.authenticate(secondToken.accessToken()))
         .hasValueSatisfying(
@@ -130,7 +142,8 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
         opaqueTokenService.issue(user, "Bearer " + expiredRawToken);
 
     assertThat(issuedToken.accessToken()).isNotEqualTo(expiredRawToken);
-    assertThat(opaqueTokensOf(user)).hasSize(2);
+    // 만료된 옛 토큰은 삭제 대상이 아니라 그대로 남고, 새 액세스·리프레시가 더해진다.
+    assertThat(opaqueTokensOf(user)).hasSize(3);
     assertThat(opaqueTokenService.authenticate(issuedToken.accessToken())).contains(user);
   }
 
@@ -191,10 +204,86 @@ class OpaqueTokenServiceTest extends AbstractContainerTest {
     }
   }
 
+  @Test
+  @DisplayName("리프레시 토큰으로 새 액세스 토큰을 받고, 쓰인 리프레시는 재사용되지 않는다")
+  void refreshRotatesTokens() {
+    User user = saveUser("refresh-rotate");
+
+    OpaqueTokenService.IssuedOpaqueToken issued = opaqueTokenService.issue(user);
+    OpaqueTokenService.IssuedOpaqueToken refreshed =
+        opaqueTokenService.refresh(issued.refreshToken());
+
+    assertThat(refreshed.accessToken()).isNotBlank().isNotEqualTo(issued.accessToken());
+    assertThat(refreshed.refreshToken()).isNotBlank().isNotEqualTo(issued.refreshToken());
+    assertThat(opaqueTokenService.authenticate(refreshed.accessToken())).contains(user);
+    // 옛 액세스와 옛 리프레시는 모두 끊긴다.
+    assertThat(opaqueTokenService.authenticate(issued.accessToken())).isEmpty();
+    assertThatThrownBy(() -> opaqueTokenService.refresh(issued.refreshToken()))
+        .isInstanceOf(UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("리프레시 토큰으로는 API를 호출할 수 없다")
+  void refreshTokenCannotAuthenticate() {
+    User user = saveUser("refresh-not-access");
+
+    OpaqueTokenService.IssuedOpaqueToken issued = opaqueTokenService.issue(user);
+
+    assertThat(opaqueTokenService.authenticate(issued.refreshToken())).isEmpty();
+  }
+
+  @Test
+  @DisplayName("액세스 토큰으로는 재발급을 받을 수 없다")
+  void accessTokenCannotRefresh() {
+    User user = saveUser("access-not-refresh");
+
+    OpaqueTokenService.IssuedOpaqueToken issued = opaqueTokenService.issue(user);
+
+    assertThatThrownBy(() -> opaqueTokenService.refresh(issued.accessToken()))
+        .isInstanceOf(UnauthenticatedException.class);
+  }
+
+  @Test
+  @DisplayName("알 수 없거나 만료된 리프레시 토큰은 거부한다")
+  void refreshRejectsUnknownOrExpiredToken() {
+    User user = saveUser("refresh-expired");
+    String expiredRaw = "expired-refresh-token";
+    opaqueTokenRepository.save(
+        com.butingbe.domain.auth.entity.OpaqueToken.builder()
+            .tokenHash(sha256(expiredRaw))
+            .user(user)
+            .tokenType(com.butingbe.domain.auth.entity.OpaqueTokenType.REFRESH)
+            .expiresAt(LocalDateTime.now().minusSeconds(1))
+            .build());
+
+    assertThatThrownBy(() -> opaqueTokenService.refresh("없는-토큰"))
+        .isInstanceOf(UnauthenticatedException.class);
+    assertThatThrownBy(() -> opaqueTokenService.refresh(expiredRaw))
+        .isInstanceOf(UnauthenticatedException.class);
+  }
+
+  private User saveUser(String slug) {
+    return userRepository.save(
+        User.builder()
+            .email(slug + "@example.com")
+            .provider("google")
+            .providerId("google-" + slug)
+            .name(new Name("홍", "길동"))
+            .nickname(slug)
+            .role(UserRole.USER)
+            .build());
+  }
+
   private java.util.List<com.butingbe.domain.auth.entity.OpaqueToken> opaqueTokensOf(User user) {
     return opaqueTokenRepository.findAll().stream()
         .filter(token -> user.getId().equals(token.getUser().getId()))
         .toList();
+  }
+
+  /** 로그인 한 번이면 액세스와 리프레시가 한 개씩 남는다. */
+  private java.util.List<com.butingbe.domain.auth.entity.OpaqueToken> opaqueTokensOf(
+      User user, com.butingbe.domain.auth.entity.OpaqueTokenType type) {
+    return opaqueTokensOf(user).stream().filter(token -> token.getTokenType() == type).toList();
   }
 
   @Test

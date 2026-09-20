@@ -11,10 +11,17 @@ public record OAuth2LoginResDto(
     boolean emailRequired,
     String accessToken,
     String tokenType,
-    long expiresIn) {
+    long expiresIn,
+    String refreshToken,
+    long refreshExpiresIn) {
 
   public static OAuth2LoginResDto from(
-      User user, String accessToken, String tokenType, long expiresIn) {
+      User user,
+      String accessToken,
+      String tokenType,
+      long expiresIn,
+      String refreshToken,
+      long refreshExpiresIn) {
     return new OAuth2LoginResDto(
         user.getId().toString(),
         user.getEmail(),
@@ -24,6 +31,8 @@ public record OAuth2LoginResDto(
         false,
         accessToken,
         tokenType,
-        expiresIn);
+        expiresIn,
+        refreshToken,
+        refreshExpiresIn);
   }
 }
