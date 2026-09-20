@@ -13,6 +13,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # permissions 를 명시하면 적지 않은 스코프는 none 이 된다. 이게 없으면 PR 본문의
+  # Closes #N 으로 연결된 이슈가 머지 후에도 닫히지 않는다.
+  issues: write
 
 jobs:
   automerge:
