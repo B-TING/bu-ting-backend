@@ -3,7 +3,9 @@ package com.butingbe.domain.chat.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,6 +20,7 @@ import com.butingbe.domain.chat.repository.ChatMessageRepository;
 import com.butingbe.domain.chat.repository.LocalChatroomRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.ConflictException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,9 +64,7 @@ class LocalChatroomServiceTest {
   }
 
   private void setChatroomMembers(LocalChatroom chatroom, int current) {
-    while (chatroom.getCurrentMembers() < current) {
-      chatroom.incrementCurrentMembers();
-    }
+    org.springframework.test.util.ReflectionTestUtils.setField(chatroom, "currentMembers", current);
   }
 
   // ==========================================
@@ -170,12 +171,13 @@ class LocalChatroomServiceTest {
     when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(mockChatroom));
     when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
     when(chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)).thenReturn(false);
+    when(localChatroomRepository.increaseCurrentMembers(roomId)).thenReturn(1);
 
     // when
     localChatroomService.joinRoom(roomId, userId);
 
     // then
-    assertThat(mockChatroom.getCurrentMembers()).isEqualTo(11); // 10 -> 11명 증가 검증
+    verify(localChatroomRepository).increaseCurrentMembers(roomId);
     verify(chatMemberRepository).save(any(ChatMember.class));
   }
 
@@ -214,26 +216,26 @@ class LocalChatroomServiceTest {
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.joinRoom(roomId, userId))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("이미 가입한 사용자입니다.");
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.chat.room.already_joined");
+    verify(localChatroomRepository, never()).increaseCurrentMembers(any());
   }
 
   @Test
-  @DisplayName("신규 가입이지만 방 정원이 가득 찬 상태라면 예외를 던진다")
+  @DisplayName("정원이 가득 차 갱신된 행이 없으면 가입을 거부하고 멤버를 저장하지 않는다")
   void joinRoom_fail_roomFull() {
-    // given
-    LocalChatroom fullChatroom =
-        LocalChatroom.builder().chatZone(ChatZone.SUYEONG_NAMGU).maxMembers(10).build();
-    setChatroomMembers(fullChatroom, 10); // 10명 정원에 10명 가득 찬 상태로 모킹
-
-    when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(fullChatroom));
+    // given: 정원 확인은 update 의 where 절이 한다. 갱신 행 수 0이 곧 '자리 없음'이다.
+    when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(mockChatroom));
     when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
     when(chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)).thenReturn(false);
+    when(localChatroomRepository.increaseCurrentMembers(roomId)).thenReturn(0);
 
     // when & then
     assertThatThrownBy(() -> localChatroomService.joinRoom(roomId, userId))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("채팅방 정원이 가득 찼습니다.");
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.chat.room.full");
+    verify(chatMemberRepository, never()).save(any(ChatMember.class));
+    verify(localChatroomRepository).increaseCurrentMembers(roomId);
   }
 
   // ==========================================
@@ -269,7 +271,7 @@ class LocalChatroomServiceTest {
     localChatroomService.exitChatroom(roomId, userId);
 
     // then
-    assertThat(mockChatroom.getCurrentMembers()).isEqualTo(9); // 10 -> 9명 감소 검증
+    verify(localChatroomRepository).decreaseCurrentMembers(roomId);
     verify(chatMemberRepository).deleteByIdRoomIdAndIdUserId(roomId, userId);
   }
 
@@ -306,14 +308,27 @@ class LocalChatroomServiceTest {
   @DisplayName("실시간 입장 시 인원이 1 증가하고 상태 채널로 브로드캐스트한다")
   void enterLiveChatroom_incrementsAndBroadcasts() {
     when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(mockChatroom));
+    when(localChatroomRepository.increaseCurrentMembers(roomId)).thenReturn(1);
+    when(localChatroomRepository.findCurrentMembers(roomId)).thenReturn(Optional.of(11));
 
     localChatroomService.enterLiveChatroom(roomId);
 
-    assertThat(mockChatroom.getCurrentMembers()).isEqualTo(11);
     verify(messagingTemplate)
         .convertAndSend(
             eq("/sub/chat/room/" + roomId + "/status"),
             (Object) eq(Map.of("roomId", roomId, "currentMembers", 11)));
+  }
+
+  @Test
+  @DisplayName("정원이 가득 찬 방에 실시간 입장하면 409로 거부한다")
+  void enterLiveChatroom_rejectsFullRoom() {
+    when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(mockChatroom));
+    when(localChatroomRepository.increaseCurrentMembers(roomId)).thenReturn(0);
+
+    assertThatThrownBy(() -> localChatroomService.enterLiveChatroom(roomId))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("error.chat.room.full");
+    verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
   }
 
   @Test
@@ -330,10 +345,11 @@ class LocalChatroomServiceTest {
   @DisplayName("실시간 퇴장 시 인원이 1 감소하고 상태 채널로 브로드캐스트한다")
   void exitLiveChatroom_decrementsAndBroadcasts() {
     when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(mockChatroom));
+    when(localChatroomRepository.findCurrentMembers(roomId)).thenReturn(Optional.of(9));
 
     localChatroomService.exitLiveChatroom(roomId);
 
-    assertThat(mockChatroom.getCurrentMembers()).isEqualTo(9);
+    verify(localChatroomRepository).decreaseCurrentMembers(roomId);
     verify(messagingTemplate)
         .convertAndSend(
             eq("/sub/chat/room/" + roomId + "/status"),
@@ -343,13 +359,15 @@ class LocalChatroomServiceTest {
   @Test
   @DisplayName("인원이 0인 방에서 실시간 퇴장해도 음수로 내려가지 않는다")
   void exitLiveChatroom_doesNotGoBelowZero() {
+    // 0 방어는 update 의 where currentMembers > 0 이 한다. 갱신 행이 없으니 값은 그대로 0이다.
     LocalChatroom emptyRoom =
         LocalChatroom.builder().chatZone(ChatZone.SUYEONG_NAMGU).maxMembers(30).build();
     when(localChatroomRepository.findById(roomId)).thenReturn(Optional.of(emptyRoom));
+    when(localChatroomRepository.decreaseCurrentMembers(roomId)).thenReturn(0);
+    when(localChatroomRepository.findCurrentMembers(roomId)).thenReturn(Optional.of(0));
 
     localChatroomService.exitLiveChatroom(roomId);
 
-    assertThat(emptyRoom.getCurrentMembers()).isZero();
     verify(messagingTemplate)
         .convertAndSend(
             eq("/sub/chat/room/" + roomId + "/status"),

@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -67,4 +68,28 @@ public interface ZoneEventParticipationRepository
   List<UUID> findDistinctSuccessUserIdsByZone(@Param("zoneId") String zoneId);
 
   long countByEvent_IdAndCurrentSubmissionIdIsNotNull(UUID eventId);
+
+  /** 좋아요 수를 원자적으로 올린다. 읽고 더해 저장하면 동시 요청에서 값이 유실된다. 이 수는 랭킹과 보상 지급 기준이다. */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update ZoneEventParticipation p
+      set p.likeCount = p.likeCount + 1
+      where p.id = :participationId
+      """)
+  void increaseLikeCount(@Param("participationId") UUID participationId);
+
+  /** 좋아요 수를 원자적으로 내린다. 0 아래로는 내려가지 않는다. */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update ZoneEventParticipation p
+      set p.likeCount = p.likeCount - 1
+      where p.id = :participationId and p.likeCount > 0
+      """)
+  void decreaseLikeCount(@Param("participationId") UUID participationId);
+
+  /** 벌크 갱신 직후의 좋아요 수. 영속성 컨텍스트의 엔티티는 갱신 전 값이라 그대로 읽으면 안 된다. */
+  @Query("select p.likeCount from ZoneEventParticipation p where p.id = :participationId")
+  Optional<Long> findLikeCount(@Param("participationId") UUID participationId);
 }

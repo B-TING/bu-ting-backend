@@ -88,8 +88,8 @@ public class ZoneEventSocialService {
     ZoneEventLike like =
         likeRepository.save(
             ZoneEventLike.builder().participationId(participationId).userId(userId).build());
-    participation.increaseLikeCount();
-    return LikeResDto.of(like, participation.getLikeCount());
+    participationRepository.increaseLikeCount(participationId);
+    return LikeResDto.of(like, currentLikeCount(participationId));
   }
 
   @Transactional
@@ -98,14 +98,19 @@ public class ZoneEventSocialService {
     ZoneEventLike like =
         likeRepository
             .findByParticipationIdAndUserId(participationId, userId)
-            .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.like.duplicate"));
+            .orElseThrow(() -> new ResourceNotFoundException("error.zone_event.like.not_found"));
     ZoneEventParticipation participation =
         participationRepository.findById(participationId).orElse(null);
     if (participation != null) {
       requireEventActive(participation);
-      participation.decreaseLikeCount();
+      participationRepository.decreaseLikeCount(participationId);
     }
     likeRepository.delete(like);
+  }
+
+  /** 벌크 갱신 직후의 값. 영속성 컨텍스트에 남은 엔티티는 갱신 전 값을 들고 있다. */
+  private long currentLikeCount(UUID participationId) {
+    return participationRepository.findLikeCount(participationId).orElse(0L);
   }
 
   @Transactional

@@ -221,9 +221,12 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   public TravelRecordResDto getPublished(AuthenticatedUser authenticatedUser, UUID travelRecordId) {
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validatePublished(travelRecord);
-    travelRecord.increaseViewCount();
+    travelRecordRepository.increaseViewCount(travelRecordId);
 
-    return toResponse(travelRecord, isLikedBy(authenticatedUser, travelRecord.getId()));
+    // 벌크 update 는 영속성 컨텍스트를 거치지 않는다. 위에서 읽은 엔티티는 증가 전 조회수를 들고
+    // 있으므로 다시 읽는다(increaseViewCount 가 컨텍스트를 비운다).
+    return toResponse(
+        findTravelRecord(travelRecordId), isLikedBy(authenticatedUser, travelRecordId));
   }
 
   @Override
@@ -521,12 +524,13 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     validatePublished(travelRecord);
     validateLikeNotDuplicated(user.getId(), travelRecordId);
 
-    travelRecord.increaseLikeCount();
     TravelRecordLike like =
         travelRecordLikeRepository.saveAndFlush(
             TravelRecordLike.builder().user(user).travelRecord(travelRecord).build());
+    travelRecordRepository.increaseLikeCount(travelRecordId);
 
-    return TravelRecordLikeResDto.from(like);
+    return TravelRecordLikeResDto.from(
+        like, travelRecordRepository.findLikeCount(travelRecordId).orElse(0L));
   }
 
   @Override
@@ -538,8 +542,8 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .findByUser_IdAndTravelRecord_Id(user.getId(), travelRecordId)
         .ifPresent(
             like -> {
-              like.getTravelRecord().decreaseLikeCount();
               travelRecordLikeRepository.delete(like);
+              travelRecordRepository.decreaseLikeCount(travelRecordId);
             });
   }
 

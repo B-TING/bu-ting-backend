@@ -50,19 +50,4 @@ public class LocalChatroom {
     this.maxMembers = maxMembers;
     this.currentMembers = 0;
   }
-
-  // 비즈니스 로직: 유저 입장 시 인원수 증가 (정원 체크는 서비스 레이어에서 수행)
-  public void incrementCurrentMembers() {
-    if (this.currentMembers >= this.maxMembers) {
-      throw new IllegalStateException("채팅방 정원이 가득 찼습니다.");
-    }
-    this.currentMembers++;
-  }
-
-  // 비즈니스 로직: 유저 완전히 나가기 시 인원수 차감
-  public void decrementCurrentMembers() {
-    if (this.currentMembers > 0) {
-      this.currentMembers--;
-    }
-  }
 }
