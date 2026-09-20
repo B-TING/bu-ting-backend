@@ -38,10 +38,8 @@ class TravelPlanQualityValidatorTest {
                                   i + 1,
                                   "GOOGLE",
                                   key.providerPlaceId(),
-                                  catalog.get(key).placeName()
-                                      + "에서는 활동 "
-                                      + i
-                                      + "을 중심으로 주변 풍경을 살펴보며 여행 목적에 맞게 방문하세요.");
+                                  catalog.get(key).placeName(),
+                                  "활동 " + i + "을 중심으로 주변 풍경을 살펴보며 여행 목적에 맞게 방문하세요.");
                             })
                         .toList())));
     assertThat(validator.feedback(bad, Map.of(date, keys), catalog))
@@ -68,11 +66,9 @@ class TravelPlanQualityValidatorTest {
                                             p.provider(),
                                             p.providerPlaceId(),
                                             catalog
-                                                    .get(
-                                                        PlaceKey.of(
-                                                            p.provider(), p.providerPlaceId()))
-                                                    .placeName()
-                                                + "에서 주변 풍경을 살펴보며 여유롭게 시간을 보내기 좋습니다."))
+                                                .get(PlaceKey.of(p.provider(), p.providerPlaceId()))
+                                                .placeName(),
+                                            "주변 풍경을 살펴보며 여유롭게 시간을 보내기 좋습니다."))
                                 .toList()))
                 .toList());
     assertThat(
@@ -101,7 +97,8 @@ class TravelPlanQualityValidatorTest {
                                             1,
                                             "GOOGLE",
                                             "id",
-                                            "장소에서는 사용자가 선택한 여행 목적을 고려하여 현장의 분위기를 천천히 살펴보세요."))
+                                            catalog.get(key).placeName(),
+                                            "사용자가 선택한 여행 목적을 고려하여 현장의 분위기를 천천히 살펴보세요."))
                                 .toList()))
                 .toList());
     assertThat(validator.feedback(response, routes, catalog)).isEmpty();
@@ -125,7 +122,8 @@ class TravelPlanQualityValidatorTest {
                                                 p.order(),
                                                 p.provider(),
                                                 p.providerPlaceId(),
-                                                "광안리해수욕장은 해변에서 다양한 활동과 바다 경치를 즐길 수 있는 곳입니다.")
+                                                "광안리해수욕장",
+                                                "해변에서 다양한 활동과 바다 경치를 즐길 수 있는 곳입니다.")
                                             : p)
                                 .toList()))
                 .toList());
@@ -134,6 +132,6 @@ class TravelPlanQualityValidatorTest {
                 response, planner.plan(TravelPlanFixtures.travel(), catalog), catalog))
         .singleElement()
         .asString()
-        .contains("다른 장소의 설명");
+        .contains("placeName", "광안리해수욕장", "태종대");
   }
 }

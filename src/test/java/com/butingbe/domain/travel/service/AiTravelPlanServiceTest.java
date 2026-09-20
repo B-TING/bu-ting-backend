@@ -13,6 +13,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -113,7 +115,7 @@ class AiTravelPlanServiceTest {
                         START,
                         List.of(
                             new com.butingbe.domain.travel.ai.TravelPlanAiResponse.Place(
-                                1, "GOOGLE", IDS.get(0), "감천문화마을 알록달록한 골목을 천천히 둘러본다."))),
+                                1, "GOOGLE", IDS.get(0), "감천문화마을", "알록달록한 골목을 천천히 둘러본다."))),
                     new com.butingbe.domain.travel.ai.TravelPlanAiResponse.Day(
                         START.plusDays(1), List.of()),
                     new com.butingbe.domain.travel.ai.TravelPlanAiResponse.Day(
@@ -148,6 +150,35 @@ class AiTravelPlanServiceTest {
         .isEqualTo(com.butingbe.domain.travel.entity.PlanPlaceSource.AUTO_FILLED);
   }
 
+  @Test
+  @org.junit.jupiter.api.DisplayName("모델이 ID와 다른 장소명을 보내면 저장 전에 거부한다")
+  void rejectsForgedPlaceName() {
+    var forged = qualityResponse();
+    var days =
+        forged.days().stream()
+            .map(
+                day ->
+                    new com.butingbe.domain.travel.ai.TravelPlanAiResponse.Day(
+                        day.date(),
+                        day.places().stream()
+                            .map(
+                                place ->
+                                    new com.butingbe.domain.travel.ai.TravelPlanAiResponse.Place(
+                                        place.order(),
+                                        place.provider(),
+                                        place.providerPlaceId(),
+                                        "다른 장소",
+                                        place.memo()))
+                            .toList()))
+            .toList();
+    when(ai.generate(anyString()))
+        .thenReturn(new com.butingbe.domain.travel.ai.TravelPlanAiResponse(days));
+
+    assertThatThrownBy(() -> service.generate(principal, travelId, request()))
+        .isInstanceOf(TravelPlanValidationException.class);
+    verify(places, never()).save(any());
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void savesAllEightOriginalPlacesAndReturnsUnchangedApiContract(boolean tamperedMetadata) {
@@ -157,10 +188,11 @@ class AiTravelPlanServiceTest {
           .thenReturn(org.springframework.ai.chat.prompt.ChatOptions.builder().build());
       String json =
           new tools.jackson.databind.json.JsonMapper().writeValueAsString(qualityResponse());
+      // 주소·좌표는 서버가 요청 원본에서 채우므로 모델이 무엇을 보내든 무시돼야 한다.
+      // placeName 은 ID 대조에 쓰이므로 여기서 위조하지 않는다. 위조 시 거부되는 것은 별도 테스트에서 본다.
       json =
           json.replace(
-              "\"memo\":",
-              "\"placeName\":\"위조 이름\",\"address\":\"위조 주소\",\"latitude\":0,\"longitude\":0,\"memo\":");
+              "\"memo\":", "\"address\":\"위조 주소\",\"latitude\":0,\"longitude\":0,\"memo\":");
       when(model.call(any(Prompt.class)))
           .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(json)))));
       when(ai.generate(anyString()))
@@ -261,7 +293,11 @@ class AiTravelPlanServiceTest {
                                     p ->
                                         new com.butingbe.domain.travel.ai.TravelPlanAiResponse
                                             .Place(
-                                            p.order(), p.provider(), p.providerPlaceId(), "추천 이유"))
+                                            p.order(),
+                                            p.provider(),
+                                            p.providerPlaceId(),
+                                            p.placeName(),
+                                            "추천 이유"))
                                 .toList()))
                 .toList());
     when(ai.generate(anyString())).thenReturn(poor);

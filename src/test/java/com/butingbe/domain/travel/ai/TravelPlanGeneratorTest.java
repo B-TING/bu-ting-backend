@@ -79,7 +79,11 @@ class TravelPlanGeneratorTest {
                             .map(
                                 p ->
                                     new TravelPlanAiResponse.Place(
-                                        p.order(), p.provider(), p.providerPlaceId(), "추천 이유"))
+                                        p.order(),
+                                        p.provider(),
+                                        p.providerPlaceId(),
+                                        p.placeName(),
+                                        "추천 이유"))
                             .toList()))
             .toList());
   }
