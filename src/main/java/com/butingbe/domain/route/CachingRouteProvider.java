@@ -103,11 +103,14 @@ public class CachingRouteProvider implements RouteProvider {
   private void store(PlaceTravelTimeId id, int durationMinutes, int distanceMeters) {
     try {
       LocalDateTime now = LocalDateTime.now();
-      repository
-          .findById(id)
-          .ifPresentOrElse(
-              entry -> entry.refresh(durationMinutes, distanceMeters, now),
-              () -> repository.save(new PlaceTravelTime(id, durationMinutes, distanceMeters, now)));
+      // 갱신도 명시적으로 저장한다. 일정 생성은 트랜잭션 밖에서 경로를 조회하므로,
+      // 더티 체킹에 기대면 갱신이 플러시되지 않고 조용히 사라진다.
+      PlaceTravelTime entry =
+          repository
+              .findById(id)
+              .orElseGet(() -> new PlaceTravelTime(id, durationMinutes, distanceMeters, now));
+      entry.refresh(durationMinutes, distanceMeters, now);
+      repository.save(entry);
     } catch (RuntimeException e) {
       // 저장에 실패해도 이번 계산 결과는 이미 손에 있다. 다음 호출에서 다시 저장을 시도한다.
       log.warn("Route cache store failed. reason={}", e.toString());

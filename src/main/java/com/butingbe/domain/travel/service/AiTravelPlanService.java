@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -39,8 +39,8 @@ public class AiTravelPlanService {
   private final TravelMemberAuthorization authorization;
   private final TravelPlanGenerator generator;
   private final TravelPlanCandidateFiller candidateFiller;
+  private final TransactionTemplate transactionTemplate;
 
-  @Transactional
   public TravelPlansResDto generate(
       AuthenticatedUser authenticatedUser, UUID travelId, AiTravelPlanGenerateReqDto request) {
     User user =
@@ -57,9 +57,22 @@ public class AiTravelPlanService {
     TravelPlanCandidateFiller.FilledPlaces filled = candidateFiller.fill(travel, request);
     Map<PlaceKey, WizardPickedPlaceReqDto> catalog =
         SelectedPlaceCatalog.fromPlaces(filled.places());
+
+    // AI 호출은 수 초에서 수십 초 걸린다. 트랜잭션 안에서 기다리면 그동안 DB 커넥션을 쥐고 있어,
+    // 동시 요청 몇 건만으로 풀이 말라 이 API와 무관한 요청까지 멈춘다. 저장만 트랜잭션으로 묶는다.
     TravelPlanAiResponse response = generator.generate(travel, request, catalog);
+
+    return transactionTemplate.execute(status -> saveDays(travel, response, catalog, filled));
+  }
+
+  private TravelPlansResDto saveDays(
+      Travel travel,
+      TravelPlanAiResponse response,
+      Map<PlaceKey, WizardPickedPlaceReqDto> catalog,
+      TravelPlanCandidateFiller.FilledPlaces filled) {
     if (response.days().stream()
-        .anyMatch(day -> planRepository.existsByTravel_IdAndVisitDate(travelId, day.date()))) {
+        .anyMatch(
+            day -> planRepository.existsByTravel_IdAndVisitDate(travel.getId(), day.date()))) {
       throw new ConflictException("Travel plans already exist for one or more dates.");
     }
     List<Plan> plans =
