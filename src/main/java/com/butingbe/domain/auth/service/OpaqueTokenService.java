@@ -14,12 +14,14 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Objects;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
+@Slf4j
 public class OpaqueTokenService {
 
   public static final long ACCESS_TOKEN_EXPIRES_IN_SECONDS = 60L * 60L;
@@ -69,22 +71,35 @@ public class OpaqueTokenService {
   /**
    * 리프레시 토큰으로 새 액세스 토큰을 발급한다.
    *
-   * <p>쓰인 리프레시는 즉시 폐기하고 새것을 함께 내준다(회전). 탈취된 토큰이 계속 쓰이는 것을 막고, 이미 쓰인 토큰이 다시 오면 거부된다.
+   * <p>쓰인 리프레시는 지우지 않고 폐기 표시만 남긴 뒤 새것을 함께 내준다(회전). 폐기 이력이 남아야 이미 쓰인 토큰이 다시 왔을 때 탈취로 판단할 수 있다.
+   *
+   * <p>폐기된 리프레시가 다시 오면 그 사용자의 살아 있는 토큰을 전부 끊는다. 정상 흐름에서는 같은 리프레시가 두 번 쓰이지 않으므로, 재사용은 토큰이 새어 나갔다는
+   * 신호다.
+   *
+   * <p>{@code noRollbackFor}가 필요하다. 거부는 예외로 알리는데, 기본 규칙대로 롤백하면 재사용 감지가 방금 남긴 폐기 표시까지 되돌아간다.
    */
-  @Transactional
+  @Transactional(noRollbackFor = UnauthenticatedException.class)
   public IssuedOpaqueToken refresh(String rawRefreshToken) {
     LocalDateTime now = LocalDateTime.now();
     OpaqueToken refreshToken =
         opaqueTokenRepository
-            .findByTokenHashAndRevokedAtIsNull(hash(rawRefreshToken))
-            .filter(token -> token.isActive(now))
+            .findByTokenHash(hash(rawRefreshToken))
             .filter(token -> token.getTokenType() == OpaqueTokenType.REFRESH)
             .orElseThrow(UnauthenticatedException::new);
 
     User user = refreshToken.getUser();
-    // 액세스는 새로 발급하고, 쓰인 리프레시는 새것으로 갈아끼운다.
-    opaqueTokenRepository.deleteActiveByUserIdAndType(user.getId(), OpaqueTokenType.ACCESS, now);
-    opaqueTokenRepository.deleteActiveByUserIdAndType(user.getId(), OpaqueTokenType.REFRESH, now);
+    if (refreshToken.getRevokedAt() != null) {
+      opaqueTokenRepository.revokeActiveByUserId(user.getId(), now);
+      log.warn(
+          "Detected reuse of a rotated refresh token. Revoked all tokens. userId={}", user.getId());
+      throw new UnauthenticatedException();
+    }
+    if (!refreshToken.isActive(now)) {
+      throw new UnauthenticatedException();
+    }
+
+    // 액세스와 리프레시를 함께 폐기하고 새 쌍을 내준다.
+    opaqueTokenRepository.revokeActiveByUserId(user.getId(), now);
 
     return new IssuedOpaqueToken(
         save(user, OpaqueTokenType.ACCESS, now),
