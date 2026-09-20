@@ -46,7 +46,12 @@ class OAuth2AuthenticationSuccessHandlerTest {
     given(opaqueTokenService.issue(user))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "opaque-token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
+                "opaque-token",
+                "Bearer",
+                3600,
+                LocalDateTime.now().plusHours(1),
+                "refresh-token",
+                2592000));
 
     MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -87,7 +92,12 @@ class OAuth2AuthenticationSuccessHandlerTest {
     given(opaqueTokenService.issue(user))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "opaque\"token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
+                "opaque\"token",
+                "Bearer",
+                3600,
+                LocalDateTime.now().plusHours(1),
+                "refresh\"token",
+                2592000));
 
     MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -119,7 +129,12 @@ class OAuth2AuthenticationSuccessHandlerTest {
     given(opaqueTokenService.issue(user))
         .willReturn(
             new OpaqueTokenService.IssuedOpaqueToken(
-                "opaque-token", "Bearer", 3600, LocalDateTime.now().plusHours(1)));
+                "opaque-token",
+                "Bearer",
+                3600,
+                LocalDateTime.now().plusHours(1),
+                "refresh-token",
+                2592000));
 
     MockHttpServletResponse response = new MockHttpServletResponse();
 

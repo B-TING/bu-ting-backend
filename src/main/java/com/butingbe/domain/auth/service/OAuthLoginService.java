@@ -38,7 +38,13 @@ public class OAuthLoginService {
     User user = findOrCreate(userInfo);
     OpaqueTokenService.IssuedOpaqueToken token = opaqueTokenService.issue(user, authorization);
 
-    return OAuth2LoginResDto.from(user, token.accessToken(), token.tokenType(), token.expiresIn());
+    return OAuth2LoginResDto.from(
+        user,
+        token.accessToken(),
+        token.tokenType(),
+        token.expiresIn(),
+        token.refreshToken(),
+        token.refreshExpiresIn());
   }
 
   private User findOrCreate(OAuth2UserInfo userInfo) {

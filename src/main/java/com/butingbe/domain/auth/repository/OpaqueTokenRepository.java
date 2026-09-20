@@ -1,6 +1,7 @@
 package com.butingbe.domain.auth.repository;
 
 import com.butingbe.domain.auth.entity.OpaqueToken;
+import com.butingbe.domain.auth.entity.OpaqueTokenType;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,4 +35,19 @@ public interface OpaqueTokenRepository extends JpaRepository<OpaqueToken, UUID> 
         and token.expiresAt > :now
       """)
   int deleteActiveByUserId(@Param("userId") UUID userId, @Param("now") LocalDateTime now);
+
+  /** 종류를 지정해 살아 있는 토큰만 지운다. 회전 시 리프레시만 갈아끼우는 데 쓴다. */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      """
+      delete from OpaqueToken token
+      where token.user.id = :userId
+        and token.tokenType = :tokenType
+        and token.revokedAt is null
+        and token.expiresAt > :now
+      """)
+  int deleteActiveByUserIdAndType(
+      @Param("userId") UUID userId,
+      @Param("tokenType") OpaqueTokenType tokenType,
+      @Param("now") LocalDateTime now);
 }

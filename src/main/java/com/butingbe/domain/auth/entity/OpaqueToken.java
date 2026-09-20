@@ -15,7 +15,8 @@ import lombok.NoArgsConstructor;
     name = "opaque_tokens",
     indexes = {
       @Index(name = "idx_opaque_tokens_token_hash", columnList = "token_hash", unique = true),
-      @Index(name = "idx_opaque_tokens_user_id", columnList = "user_id")
+      @Index(name = "idx_opaque_tokens_user_id", columnList = "user_id"),
+      @Index(name = "idx_opaque_tokens_user_type", columnList = "user_id, token_type")
     })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -39,11 +40,18 @@ public class OpaqueToken extends TimestampEntity {
   @Column(name = "revoked_at")
   private LocalDateTime revokedAt;
 
+  /** 용도. 지정하지 않으면 액세스 토큰으로 본다. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "token_type", nullable = false, length = 20)
+  private OpaqueTokenType tokenType = OpaqueTokenType.ACCESS;
+
   @Builder
-  public OpaqueToken(String tokenHash, User user, LocalDateTime expiresAt) {
+  public OpaqueToken(
+      String tokenHash, User user, LocalDateTime expiresAt, OpaqueTokenType tokenType) {
     this.tokenHash = tokenHash;
     this.user = user;
     this.expiresAt = expiresAt;
+    this.tokenType = tokenType == null ? OpaqueTokenType.ACCESS : tokenType;
   }
 
   public boolean isActive(LocalDateTime now) {
