@@ -3,6 +3,7 @@ package com.butingbe.global.config;
 import com.butingbe.domain.auth.security.OpaqueTokenAuthenticationFilter;
 import com.butingbe.domain.user.oauth.CustomOAuth2UserService;
 import com.butingbe.domain.user.oauth.OAuth2AuthenticationSuccessHandler;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -19,6 +20,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+  /** HTTP CORS와 WebSocket 핸드셰이크가 함께 쓰는 허용 오리진 목록. */
+  public static final List<String> ALLOWED_ORIGINS =
+      List.of(
+          "http://localhost:3000",
+          "http://localhost:3001",
+          "https://dev.buting.store",
+          "https://buting.store");
 
   private final CustomOAuth2UserService customOAuth2UserService;
   private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
@@ -55,10 +64,7 @@ public class SecurityConfig {
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
 
-    configuration.addAllowedOrigin("http://localhost:3000");
-    configuration.addAllowedOrigin("http://localhost:3001");
-    configuration.addAllowedOrigin("https://dev.buting.store");
-    configuration.addAllowedOrigin("https://buting.store");
+    ALLOWED_ORIGINS.forEach(configuration::addAllowedOrigin);
     configuration.addAllowedMethod("*"); // 모든 HTTP Method 일단 허용 (GET, POST 등)
     configuration.addAllowedHeader("*"); // 모든 헤더 허용
 

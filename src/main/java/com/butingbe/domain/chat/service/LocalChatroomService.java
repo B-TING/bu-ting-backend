@@ -1,5 +1,6 @@
 package com.butingbe.domain.chat.service;
 
+import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.chat.dto.ChatMessageResponse;
 import com.butingbe.domain.chat.dto.ChatroomResponse;
 import com.butingbe.domain.chat.entity.*;
@@ -8,6 +9,7 @@ import com.butingbe.domain.chat.repository.ChatMessageRepository;
 import com.butingbe.domain.chat.repository.LocalChatroomRepository;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.ForbiddenException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +72,26 @@ public class LocalChatroomService {
     return localChatroomRepository.findByChatZone(zone).stream()
         .map(ChatroomResponse::from)
         .toList();
+  }
+
+  /** 참여 중인 방에만 메시지를 저장하고, 그 방 구독자에게 발행한다. */
+  @Transactional
+  public void sendMessage(UUID roomId, AuthenticatedUser sender, String content) {
+    if (!chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.id())) {
+      throw new ForbiddenException("참여하지 않은 채팅방에는 메시지를 보낼 수 없습니다.");
+    }
+
+    ChatMessage savedMessage =
+        chatMessageRepository.save(
+            ChatMessage.builder()
+                .roomId(roomId)
+                .userId(sender.id())
+                .senderNickname(sender.nickname())
+                .content(content)
+                .build());
+
+    messagingTemplate.convertAndSend(
+        "/sub/chat/room/" + roomId, ChatMessageResponse.from(savedMessage, null));
   }
 
   @Transactional
