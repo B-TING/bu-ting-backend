@@ -309,7 +309,9 @@ npm install
 ## CI
 
 Pull requests targeting `dev` or `main` run `.github/workflows/ci.yml`, which sets up Temurin Java 25 and runs
-`./gradlew check --no-daemon`. The `check` status check is required on the `dev` branch (no review approval required).
+`./gradlew check --no-daemon`. Branch protection on `dev` requires the `check` status check **and one approving
+review**; an approval is dismissed when new commits are pushed, so a review always covers the code that merges.
+Administrators can still bypass these rules (`enforce_admins` is off). `main` has no branch protection.
 
 ### Auto-merge
 
@@ -317,8 +319,9 @@ Pull requests targeting `dev` or `main` run `.github/workflows/ci.yml`, which se
 workflow completes for a `pull_request`, finds the open PR for that commit, and merges it (with branch delete) only
 when `mergeStateStatus == CLEAN` — a PR that is `BEHIND` dev, has conflicts (`DIRTY`), or is otherwise `BLOCKED` is
 skipped, so a stale green check never merges an out-of-date branch. A PR is also skipped unless its `reviewDecision`
-is `APPROVED` — a green CI alone never merges — and unless its head repository owner matches this repository's owner,
-so a fork PR is never auto-merged by the write-scoped `workflow_run` token. Only `dev`-targeted, non-draft PRs are
+is `APPROVED` — a green CI alone never merges, and GitHub does not let you approve your own PR, so solo work needs a
+teammate — and unless its head repository owner matches this repository's owner, so a fork PR is never auto-merged by
+the write-scoped `workflow_run` token. Only `dev`-targeted, non-draft PRs are
 eligible; `main` release PRs are merged manually so the deploy workflow triggers. Every skip logs its reason in the
 workflow run. The workflow grants itself `contents` and
 `pull-requests` write via its own `permissions:` block and merges with the built-in `GITHUB_TOKEN`.
