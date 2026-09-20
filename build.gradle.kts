@@ -9,7 +9,7 @@ plugins {
     id("com.diffplug.spotless") version "6.25.0"
 }
 
-group = "com.example"
+group = "com.butingbe"
 version = "0.0.1-SNAPSHOT"
 description = "buting-be"
 
@@ -93,10 +93,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
 
-    // 👇 [미래 확장] 주석 해제하여 사용할 라이브러리 구역
-    // 1. 데이터베이스 및 ORM (JPA) 라이브러리 추가
+    // Persistence
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    // 2. PostgreSQL (주 DBMS 연동 시 주석 해제)
     runtimeOnly("org.postgresql:postgresql")
 
     // Database migrations
@@ -104,15 +102,13 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
 
-    // 3. Redis & Spring Session (세션 관리용 Redis 연동 시 주석 해제)
-    // implementation("org.springframework.boot:spring-boot-starter-data-redis")
-    // implementation("org.springframework.session:spring-session-data-redis")
+    // 스케줄러 분산 잠금. 인스턴스가 늘어나도 라운드 정산 같은 작업이 두 번 돌지 않게 한다.
+    implementation("net.javacrumbs.shedlock:shedlock-spring:6.9.2")
+    implementation("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:6.9.2")
 
-    // 4. Spring Security & OAuth 2.0 (소셜 로그인 및 보안 적용 시 주석 해제)
+    // Security & OAuth 2.0
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
-
-    // AI agent
 
     // Lombok
     compileOnly("org.projectlombok:lombok")
@@ -127,19 +123,17 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testAnnotationProcessor("org.projectlombok:lombok")
 
-//    testImplementation("org.testcontainers:testcontainers:1.20.1")
-//    testImplementation("org.testcontainers:junit-jupiter:1.20.1")
-//    testImplementation("org.testcontainers:postgresql:1.20.1")
     testImplementation("org.testcontainers:testcontainers:1.21.4")
     testImplementation("org.testcontainers:junit-jupiter:1.21.4")
-
-    // 다른 testcontainers 모듈(mysql, postgresql 등)이 있다면 그것도 버전을 맞춰줍니다.
     testImplementation("org.testcontainers:postgresql:1.21.4")
-
     testImplementation("org.springframework.security:spring-security-test")
 
     implementation("org.springframework.boot:spring-boot-starter-websocket")
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
+}
+
+// 배포 스크립트와 Dockerfile 이 파일 이름에 기대므로 버전 규칙과 무관하게 고정한다.
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+  archiveFileName.set("app.jar")
 }
 
 tasks.withType<Test> {
