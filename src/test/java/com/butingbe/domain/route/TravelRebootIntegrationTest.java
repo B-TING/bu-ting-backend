@@ -138,6 +138,7 @@ class TravelRebootIntegrationTest extends AbstractContainerTest {
             longitude,
             PlaceProvider.GOOGLE,
             name,
+            null,
             durationMinutes,
             null,
             null,

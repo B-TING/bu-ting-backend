@@ -281,7 +281,8 @@ class TravelServiceImplTest extends AbstractContainerTest {
                 35.153,
                 129.118,
                 PlaceProvider.KAKAO,
-                "kakao-gwangalli-id"));
+                "kakao-gwangalli-id",
+                null));
 
     assertThat(result.placeName()).isEqualTo("Gwangalli");
     assertThat(result.address()).isEqualTo("Busan Suyeong-gu");
@@ -290,6 +291,37 @@ class TravelServiceImplTest extends AbstractContainerTest {
     assertThat(result.provider()).isEqualTo(PlaceProvider.KAKAO);
     assertThat(result.providerPlaceId()).isEqualTo("kakao-gwangalli-id");
     assertThat(planRouteRepository.findByPlan_Id(plan.planId())).isEmpty();
+
+    // contentTypeId 를 주면 갱신되고, 주지 않으면 기존 값이 남는다.
+    PlanPlaceResDto withContentType =
+        travelService.updatePlanPlacePlace(
+            authenticatedUser,
+            first.planPlaceId(),
+            new PlanPlaceUpdatePlaceReqDto(
+                "Gwangalli",
+                "Busan Suyeong-gu",
+                35.153,
+                129.118,
+                PlaceProvider.GOOGLE,
+                "126508",
+                "12"));
+
+    assertThat(withContentType.contentTypeId()).isEqualTo("12");
+
+    PlanPlaceResDto withoutContentType =
+        travelService.updatePlanPlacePlace(
+            authenticatedUser,
+            first.planPlaceId(),
+            new PlanPlaceUpdatePlaceReqDto(
+                "Gwangalli",
+                "Busan Suyeong-gu",
+                35.153,
+                129.118,
+                PlaceProvider.GOOGLE,
+                "126508",
+                null));
+
+    assertThat(withoutContentType.contentTypeId()).isEqualTo("12");
   }
 
   @Test
@@ -366,11 +398,13 @@ class TravelServiceImplTest extends AbstractContainerTest {
                 35.158,
                 129.16,
                 PlaceProvider.GOOGLE,
-                "google-haeundae"));
+                "google-haeundae",
+                "12"));
 
     assertThat(updated.placeName()).isEqualTo("Haeundae Beach");
     assertThat(updated.address()).isEqualTo("Busan Haeundae-gu");
     assertThat(updated.providerPlaceId()).isEqualTo("google-haeundae");
+    assertThat(updated.contentTypeId()).isEqualTo("12");
     assertThat(planRouteRepository.findAll()).isEmpty();
   }
 
@@ -636,6 +670,7 @@ class TravelServiceImplTest extends AbstractContainerTest {
             129.041,
             PlaceProvider.GOOGLE,
             name,
+            null,
             30,
             null,
             null,

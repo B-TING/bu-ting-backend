@@ -3275,6 +3275,7 @@ class TravelRecordServiceImplTest extends AbstractContainerTest {
             129.041,
             PlaceProvider.GOOGLE,
             name,
+            null,
             30,
             "memo-" + name,
             LocalTime.of(10 + sequence, 0),

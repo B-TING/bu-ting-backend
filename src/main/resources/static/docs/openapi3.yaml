@@ -9262,6 +9262,11 @@ components:
         providerPlaceId:
           type: string
           example: google-place-id
+        contentTypeId:
+          type: string
+          nullable: true
+          description: "TourAPI 관광타입 ID: 12 관광지, 14 문화시설, 15 축제공연행사, 25 여행코스, 28 레포츠, 32 숙박, 38 쇼핑, 39 음식점"
+          example: "12"
         durationMinutes:
           type: integer
           minimum: 0
@@ -9338,6 +9343,11 @@ components:
         providerPlaceId:
           type: string
           example: kakao-gwangalli-id
+        contentTypeId:
+          type: string
+          nullable: true
+          description: "TourAPI 관광타입 ID: 12 관광지, 14 문화시설, 15 축제공연행사, 25 여행코스, 28 레포츠, 32 숙박, 38 쇼핑, 39 음식점"
+          example: "12"
     PlanPlaceSequenceUpdateRequest:
       type: object
       required:
@@ -9506,6 +9516,11 @@ components:
         providerPlaceId:
           type: string
           example: google-place-id
+        contentTypeId:
+          type: string
+          nullable: true
+          description: "TourAPI 관광타입 ID: 12 관광지, 14 문화시설, 15 축제공연행사, 25 여행코스, 28 레포츠, 32 숙박, 38 쇼핑, 39 음식점"
+          example: "12"
         durationMinutes:
           type: integer
           nullable: true
@@ -9589,6 +9604,11 @@ components:
         providerPlaceId:
           type: string
           example: google-place-id
+        contentTypeId:
+          type: string
+          nullable: true
+          description: "TourAPI 관광타입 ID: 12 관광지, 14 문화시설, 15 축제공연행사, 25 여행코스, 28 레포츠, 32 숙박, 38 쇼핑, 39 음식점"
+          example: "12"
         durationMinutes:
           type: integer
           nullable: true

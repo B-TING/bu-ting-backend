@@ -48,6 +48,17 @@ class CatalogPlaceTimeSlotProviderTest {
     assertThat(provider.timeSlot("GOOGLE", "unknown")).isEmpty();
   }
 
+  @Test
+  @DisplayName("GOOGLE + contentId로 조회해도 TOUR_API 카탈로그 시간대를 찾는다")
+  void findsTourApiCatalogViaGoogleContract() {
+    when(placeRepository.findByProviderAndProviderPlaceId("GOOGLE", "264337"))
+        .thenReturn(Optional.empty());
+    when(placeRepository.findByProviderAndProviderPlaceId("TOUR_API", "264337"))
+        .thenReturn(Optional.of(place(PlaceTimeSlot.EVENING)));
+
+    assertThat(provider.timeSlot("GOOGLE", "264337")).contains(PlaceTimeSlot.EVENING);
+  }
+
   private Place place(PlaceTimeSlot timeSlot) {
     return Place.builder()
         .provider("TOUR_API")

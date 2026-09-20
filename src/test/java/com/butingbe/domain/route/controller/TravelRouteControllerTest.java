@@ -345,6 +345,7 @@ class TravelRouteControllerTest {
         129.1,
         PlaceProvider.GOOGLE,
         name,
+        null,
         30,
         null,
         null,

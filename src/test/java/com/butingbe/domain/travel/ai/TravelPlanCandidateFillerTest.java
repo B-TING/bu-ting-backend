@@ -44,6 +44,27 @@ class TravelPlanCandidateFillerTest {
 
     assertThat(merged.places()).hasSize(2);
     assertThat(merged.places().get(0).providerPlaceId()).isEqualTo("1");
+    assertThat(merged.places().get(0).provider()).isEqualTo("GOOGLE");
+  }
+
+  @Test
+  @DisplayName("카탈로그 TOUR_API 후보는 일정 계약용 GOOGLE provider로 바꾼다")
+  void mapsTourApiProviderToGoogle() {
+    when(placeCandidateFinder.findCandidates(any(), any(), anyInt()))
+        .thenReturn(List.of(candidate("126081")));
+
+    var merged = filler.fill(travel(TravelPace.BALANCED, null), request());
+
+    assertThat(merged.places().get(0).provider()).isEqualTo("GOOGLE");
+    assertThat(SelectedPlaceCatalog.fromPlaces(merged.places()))
+        .containsKey(PlaceKey.of("GOOGLE", "126081"));
+  }
+
+  @Test
+  @DisplayName("카탈로그 provider가 비어 있으면 GOOGLE로 본다")
+  void mapsBlankCatalogProviderToGoogle() {
+    assertThat(TravelPlanCandidateFiller.toPlanProvider(null)).isEqualTo("GOOGLE");
+    assertThat(TravelPlanCandidateFiller.toPlanProvider("  ")).isEqualTo("GOOGLE");
   }
 
   @Test
@@ -188,6 +209,14 @@ class TravelPlanCandidateFillerTest {
         .pace(pace)
         .accommodationArea(accommodationArea)
         .build();
+  }
+
+  @Test
+  @DisplayName("카탈로그 provider 가 비어 있으면 일정 계약의 기본 provider 로 맞춘다")
+  void blankCatalogProviderFallsBackToPlanProvider() {
+    // 카탈로그에 provider 가 비어 들어온 행이 섞여도 일정 생성 계약(GOOGLE)이 깨지지 않아야 한다.
+    assertThat(TravelPlanCandidateFiller.toPlanProvider(null)).isEqualTo("GOOGLE");
+    assertThat(TravelPlanCandidateFiller.toPlanProvider("  ")).isEqualTo("GOOGLE");
   }
 
   private AiTravelPlanGenerateReqDto request(WizardPickedPlaceReqDto... places) {

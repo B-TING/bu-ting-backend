@@ -60,6 +60,10 @@ public class PlanPlace {
   @Column(name = "provider_place_id", nullable = false)
   private String providerPlaceId;
 
+  /** TourAPI contentTypeId. 12 관광지, 14 문화시설, 15 축제, 25 코스, 28 레포츠, 32 숙박, 38 쇼핑, 39 음식점. */
+  @Column(name = "content_type_id", length = 10)
+  private String contentTypeId;
+
   @Column(name = "duration_minutes")
   private Integer durationMinutes;
 
@@ -87,6 +91,7 @@ public class PlanPlace {
       Double longitude,
       PlaceProvider provider,
       String providerPlaceId,
+      String contentTypeId,
       Integer durationMinutes,
       String memo,
       LocalTime scheduledTime,
@@ -100,6 +105,7 @@ public class PlanPlace {
     this.longitude = longitude;
     this.provider = provider;
     this.providerPlaceId = providerPlaceId;
+    this.contentTypeId = contentTypeId;
     this.durationMinutes = durationMinutes;
     this.memo = memo;
     this.scheduledTime = scheduledTime;
@@ -135,12 +141,16 @@ public class PlanPlace {
       Double latitude,
       Double longitude,
       PlaceProvider provider,
-      String providerPlaceId) {
+      String providerPlaceId,
+      String contentTypeId) {
     this.placeName = placeName;
     this.address = address;
     this.latitude = latitude;
     this.longitude = longitude;
     this.provider = provider;
     this.providerPlaceId = providerPlaceId;
+    if (contentTypeId != null) {
+      this.contentTypeId = contentTypeId;
+    }
   }
 }
