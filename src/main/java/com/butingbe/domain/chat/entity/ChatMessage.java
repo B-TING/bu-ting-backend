@@ -1,5 +1,6 @@
 package com.butingbe.domain.chat.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -18,10 +19,19 @@ public class ChatMessage {
   @GeneratedValue(generator = "UUID")
   private UUID messageId;
 
+  @Column(name = "room_id", nullable = false)
   private UUID roomId;
+
+  @Column(name = "user_id", nullable = false)
   private UUID userId;
+
+  @Column(name = "sender_nickname", nullable = false, length = 100)
   private String senderNickname;
+
+  @Column(name = "content", nullable = false, columnDefinition = "TEXT")
   private String content;
+
+  @Column(name = "created_at")
   private OffsetDateTime createdAt;
 
   @Builder
