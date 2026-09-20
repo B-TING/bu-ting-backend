@@ -4,7 +4,6 @@ import com.butingbe.domain.auth.security.AuthenticatedUser;
 import com.butingbe.domain.travelsurvey.dto.request.TravelSurveyProfileReqDto;
 import com.butingbe.domain.travelsurvey.dto.response.TravelSurveyProfileResDto;
 import com.butingbe.domain.travelsurvey.service.TravelSurveyService;
-import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,20 +25,12 @@ public class TravelSurveyController {
   public ResponseEntity<TravelSurveyProfileResDto> upsertProfile(
       @AuthenticationPrincipal AuthenticatedUser user,
       @RequestBody @Valid TravelSurveyProfileReqDto request) {
-    if (user == null) {
-      throw new UnauthenticatedException();
-    }
-
     return ResponseEntity.ok(travelSurveyService.upsertProfile(user, request));
   }
 
   @GetMapping
   public ResponseEntity<TravelSurveyProfileResDto> getProfile(
       @AuthenticationPrincipal AuthenticatedUser user) {
-    if (user == null) {
-      throw new UnauthenticatedException();
-    }
-
     return ResponseEntity.ok(travelSurveyService.getProfile(user));
   }
 }
