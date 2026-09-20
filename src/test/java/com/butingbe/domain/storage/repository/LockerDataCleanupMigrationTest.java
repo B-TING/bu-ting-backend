@@ -10,6 +10,7 @@ import java.sql.Statement;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
@@ -18,6 +19,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  *
  * <p>V48까지 적용한 뒤 시드를 한 번 더 돌린 상황(운영에서 실제로 일어난 중복)을 만들고 V50을 적용한다.
  */
+@Tag("integration")
 class LockerDataCleanupMigrationTest {
 
   @Test

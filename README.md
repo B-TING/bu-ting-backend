@@ -239,6 +239,17 @@ Integration tests use Testcontainers and start their own PostgreSQL container, s
 does not need to be running. Docker itself is required — if a test fails because Docker is unavailable, that is an
 environment failure, not a code failure.
 
+Those tests carry `@Tag("integration")`. The tag sits on `AbstractContainerTest` and JUnit 5 inherits class-level tags,
+so every subclass is tagged by that single annotation; the tests that start their own container instead of extending it
+(the `*MigrationTest` classes and `FlywaySchemaValidationTest`) carry the tag directly. Run only the fast tests with:
+
+```bash
+./gradlew unitTest
+```
+
+`unitTest` excludes the `integration` tag, needs no Docker, and does not run the JaCoCo report or the coverage gate.
+It is what the pre-push hook runs. `check` still runs everything.
+
 ## Coverage
 
 The build enforces **80% bundle line coverage** through `jacocoTestCoverageVerification`, which `check` depends on.
@@ -273,7 +284,9 @@ Run both before pushing:
 ./gradlew check
 ```
 
-`check` runs the tests, the JaCoCo report, and the coverage gate.
+`check` runs the tests, the JaCoCo report, and the coverage gate. The pre-push hook runs the faster
+`./gradlew spotlessApply unitTest` instead, so run the full `check` yourself before opening a PR — CI runs it either
+way and the `check` status check gates the merge.
 
 ## Formatting
 
@@ -283,9 +296,10 @@ Java formatting is Spotless with Google Java Format. Do not hand-align code — 
 ./gradlew spotlessApply
 ```
 
-The Husky **pre-push** hook runs `./gradlew spotlessApply check` automatically and blocks the push if Spotless modified
-any file, so review and commit those changes before pushing again. The `pre-commit` hook intentionally does nothing,
-which keeps commits easy to split.
+The Husky **pre-push** hook runs `./gradlew spotlessApply unitTest` automatically and blocks the push if Spotless
+modified any file, so review and commit those changes before pushing again. It deliberately skips the Testcontainers
+integration tests and the coverage gate — a slow hook just gets bypassed with `--no-verify`, and CI re-runs the full
+`check` on the PR anyway. The `pre-commit` hook intentionally does nothing, which keeps commits easy to split.
 
 Install the hooks once after cloning:
 

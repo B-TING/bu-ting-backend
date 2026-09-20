@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
@@ -22,6 +23,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * <p>그래서 이름만 확인하지 않고 실행 계획을 본다. 행이 적으면 Postgres 가 어차피 순차 스캔을 고르므로, 순차 스캔을 끄고 "이 쿼리에 이 인덱스를 쓸 수
  * 있는가"를 묻는다.
  */
+@Tag("integration")
 class TravelRecordSearchIndexMigrationTest {
 
   private static final String[] EXPECTED_INDEXES = {

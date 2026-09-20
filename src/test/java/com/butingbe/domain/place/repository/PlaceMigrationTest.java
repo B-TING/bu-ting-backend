@@ -10,10 +10,12 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /** V51이 만드는 장소 카탈로그 테이블의 유니크·CHECK 제약을 실제 PostgreSQL로 검증한다. */
+@Tag("integration")
 class PlaceMigrationTest {
 
   @Test
