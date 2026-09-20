@@ -23,6 +23,7 @@ import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.LocalDate;
@@ -128,7 +129,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                 travelTeamService.getTravelMembers(
                     AuthenticatedUser.from(outsider), travel.getId()))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not a travel member.");
+        .hasMessage("error.travel.not_member");
   }
 
   @Test
@@ -161,8 +162,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
             () ->
                 travelTeamService.removeMember(
                     AuthenticatedUser.from(leader), travel.getId(), coLeader.getId()))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Leader cannot be removed.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_team.leader_cannot_be_removed");
 
     assertThat(travelMemberRepository.existsByTravel_IdAndUser_Id(travel.getId(), coLeader.getId()))
         .isTrue();
@@ -180,8 +181,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
             () ->
                 travelTeamService.removeMember(
                     AuthenticatedUser.from(leader), travel.getId(), outsider.getId()))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Target user is not a travel member.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_team.target_not_member");
   }
 
   @Test
@@ -218,8 +219,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
             () ->
                 travelTeamService.removeMember(
                     AuthenticatedUser.from(leader), travel.getId(), leader.getId()))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Leader cannot remove themselves.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_team.leader_self_remove");
   }
 
   @Test
@@ -288,8 +289,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                     AuthenticatedUser.from(leader),
                     travel.getId(),
                     new TravelLeaderTransferRequest(outsider.getId())))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("New leader is not a travel member.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_team.new_leader_not_member");
   }
 
   @Test
@@ -424,8 +425,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
 
     assertThatThrownBy(
             () -> travelTeamService.acceptInvite(AuthenticatedUser.from(user), invite.getToken()))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("User already joined this travel.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_team.already_joined");
   }
 
   @Test
@@ -468,7 +469,7 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     assertThatThrownBy(
             () -> travelTeamService.exitTravel(AuthenticatedUser.from(leader), travel.getId()))
         .isInstanceOf(ConflictException.class)
-        .hasMessage("LEADER_TRANSFER_REQUIRED");
+        .hasMessage("error.travel_team.leader_transfer_required");
   }
 
   private Travel createTravel(String title) {
@@ -488,8 +489,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
                     AuthenticatedUser.from(leader),
                     travel.getId(),
                     new TravelLeaderTransferRequest(leader.getId())))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("New leader must be another travel member.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_team.new_leader_must_differ");
   }
 
   @Test
@@ -502,11 +503,11 @@ class TravelTeamServiceTest extends AbstractContainerTest {
     travelInviteRepository.save(used);
 
     assertThatThrownBy(() -> travelTeamService.verifyToken("expired-token"))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Invite link has expired.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_team.invite.expired");
     assertThatThrownBy(() -> travelTeamService.verifyToken("used-token"))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Invite link has already been used.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_team.invite.already_used");
   }
 
   @Test
@@ -517,8 +518,8 @@ class TravelTeamServiceTest extends AbstractContainerTest {
 
     assertThatThrownBy(
             () -> travelTeamService.getTravelMembers(AuthenticatedUser.from(user), unknownTravelId))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Travel not found.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel.not_found");
     assertThatThrownBy(() -> travelTeamService.getMyTravels(null, null))
         .isInstanceOf(UnauthenticatedException.class);
     assertThatThrownBy(

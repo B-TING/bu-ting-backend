@@ -34,6 +34,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventReportRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.support.AbstractContainerTest;
 import jakarta.persistence.EntityManager;
@@ -564,7 +565,7 @@ class AdminRewardPayoutServiceTest extends AbstractContainerTest {
             () ->
                 payoutService.list(
                     operator, null, null, null, "CONFIRMED", null, null, null, 1, 20))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.reward.payout.status_requires_reward_reason");
   }
 

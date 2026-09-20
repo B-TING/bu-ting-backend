@@ -30,6 +30,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.support.AbstractContainerTest;
 import java.util.List;
 import java.util.UUID;
@@ -101,7 +102,7 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
     UUID participationId = publicSuccess().getId();
     AuthenticatedUser author = user(authorId);
     assertThatThrownBy(() -> socialService.like(author, participationId))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.like.self");
 
     socialService.like(viewer, participationId);
@@ -213,7 +214,7 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
   void reportGuards() {
     UUID participationId = publicSuccess().getId();
     assertThatThrownBy(() -> socialService.report(user(authorId), participationId, "SPAM", null))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.report.self");
 
     socialService.report(viewer, participationId, "SPAM", null);
@@ -256,15 +257,15 @@ class ZoneEventSocialServiceTest extends AbstractContainerTest {
         .isInstanceOf(com.butingbe.global.error.exception.ResourceNotFoundException.class);
 
     assertThatThrownBy(() -> socialService.report(viewer, participationId, "GHOST", null))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
     assertThatThrownBy(() -> socialService.getComments(participationId, "!!bad!!", 20))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
     String wrongParts =
         java.util.Base64.getUrlEncoder()
             .withoutPadding()
             .encodeToString("nopipe".getBytes(java.nio.charset.StandardCharsets.UTF_8));
     assertThatThrownBy(() -> socialService.getComments(participationId, wrongParts, 20))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
     assertThatThrownBy(() -> socialService.like(null, participationId))
         .isInstanceOf(com.butingbe.global.error.exception.UnauthenticatedException.class);
   }

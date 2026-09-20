@@ -16,6 +16,7 @@ import com.butingbe.domain.notification.repository.PushNotificationLogRepository
 import com.butingbe.domain.notification.repository.UserDeviceTokenRepository;
 import com.butingbe.domain.notification.repository.UserNotificationPreferenceRepository;
 import com.butingbe.domain.notification.repository.UserZoneSubscriptionRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.List;
 import java.util.Map;
@@ -169,7 +170,7 @@ public class NotificationService {
     try {
       return DevicePlatform.valueOf(platform.trim().toUpperCase(java.util.Locale.ROOT));
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.invalid_state");
+      throw new InvalidRequestException("error.zone_event.invalid_state");
     }
   }
 
@@ -177,7 +178,7 @@ public class NotificationService {
     try {
       return NotificationType.valueOf(type.trim());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.invalid_state");
+      throw new InvalidRequestException("error.zone_event.invalid_state");
     }
   }
 
@@ -185,7 +186,7 @@ public class NotificationService {
     try {
       return ChatZone.fromString(zone).name();
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.invalid_zone");
+      throw new InvalidRequestException("error.zone_event.invalid_zone");
     }
   }
 

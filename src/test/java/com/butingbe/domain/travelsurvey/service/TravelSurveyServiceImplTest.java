@@ -17,6 +17,7 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.List;
 import java.util.Optional;
@@ -110,8 +111,8 @@ class TravelSurveyServiceImplTest {
     when(travelSurveyRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> travelSurveyService.getProfile(authenticatedUser))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("travel survey profile not found.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_survey.not_found");
   }
 
   @Test

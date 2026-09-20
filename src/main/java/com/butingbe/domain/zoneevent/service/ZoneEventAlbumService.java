@@ -18,6 +18,7 @@ import com.butingbe.domain.zonetitle.dto.response.EquippedTitleResDto;
 import com.butingbe.domain.zonetitle.service.ZoneTitleService;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.persistence.criteria.Predicate;
@@ -241,7 +242,7 @@ public class ZoneEventAlbumService {
     try {
       return ChatZone.fromString(zone).name();
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.invalid_zone");
+      throw new InvalidRequestException("error.zone_event.invalid_zone");
     }
   }
 
@@ -252,7 +253,7 @@ public class ZoneEventAlbumService {
     try {
       return AlbumSort.valueOf(sort.trim());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.invalid_sort");
+      throw new InvalidRequestException("error.zone_event.invalid_sort");
     }
   }
 
@@ -260,7 +261,7 @@ public class ZoneEventAlbumService {
     try {
       return ParticipationVisibility.valueOf(visibility.trim());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.participation.invalid_state");
+      throw new InvalidRequestException("error.zone_event.participation.invalid_state");
     }
   }
 
@@ -283,17 +284,17 @@ public class ZoneEventAlbumService {
       String[] parts = raw.split("\\|");
       if (sort == AlbumSort.MOST_LIKED) {
         if (parts.length != 3) {
-          throw new IllegalArgumentException("Invalid album cursor.");
+          throw new InvalidRequestException("error.zone_event.album.cursor_invalid");
         }
         return new Cursor(
             Long.parseLong(parts[0]), OffsetDateTime.parse(parts[1]), UUID.fromString(parts[2]));
       }
       if (parts.length != 2) {
-        throw new IllegalArgumentException("Invalid album cursor.");
+        throw new InvalidRequestException("error.zone_event.album.cursor_invalid");
       }
       return new Cursor(0L, OffsetDateTime.parse(parts[0]), UUID.fromString(parts[1]));
     } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
-      throw new IllegalArgumentException("Invalid album cursor.");
+      throw new InvalidRequestException("error.zone_event.album.cursor_invalid");
     }
   }
 

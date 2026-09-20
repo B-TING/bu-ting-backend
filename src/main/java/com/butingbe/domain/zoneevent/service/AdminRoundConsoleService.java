@@ -31,6 +31,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventSettlementReportRepository;
 import com.butingbe.global.error.exception.ConflictException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import java.time.OffsetDateTime;
@@ -177,7 +178,7 @@ public class AdminRoundConsoleService {
       distinctZones.add(event.getZoneId());
     }
     if (events.size() != 4 || distinctZones.size() != 4) {
-      throw new IllegalArgumentException("error.zone_event.round_slots_incomplete");
+      throw new InvalidRequestException("error.zone_event.round_slots_incomplete");
     }
     for (ZoneEvent event : events) {
       boolean hasActiveTarget =
@@ -186,7 +187,7 @@ public class AdminRoundConsoleService {
                   event.getId(), ZoneEventTargetStatus.ACTIVE)
               .isPresent();
       if (!hasActiveTarget) {
-        throw new IllegalArgumentException("error.zone_event.round_target_missing");
+        throw new InvalidRequestException("error.zone_event.round_target_missing");
       }
     }
     round.confirmSchedule();

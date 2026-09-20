@@ -31,6 +31,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -400,7 +401,7 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
             null,
             null);
     assertThatThrownBy(() -> adminZoneEventService.create(operator, request))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test
@@ -420,7 +421,7 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
             null,
             target());
     assertThatThrownBy(() -> adminZoneEventService.create(operator, request))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.reward.catalog_not_found");
   }
 
@@ -441,7 +442,7 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
             null,
             target());
     assertThatThrownBy(() -> adminZoneEventService.create(operator, request))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.type_not_found");
   }
 
@@ -667,7 +668,7 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
 
     assertThatThrownBy(
             () -> adminZoneEventService.list(operator, null, null, "GHOST", null, null, null, 20))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
 
     AdminZoneEventPageResDto negativePage =
         adminZoneEventService.list(operator, null, null, null, null, null, -1, 20);
@@ -695,7 +696,7 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
             new RewardSnapshotReqDto(null, null, 5, "NOPE_PRIZE"),
             target());
     assertThatThrownBy(() -> adminZoneEventService.create(operator, badPrize))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.reward.catalog_not_found");
 
     AdminZoneEventCreateReqDto badZone =
@@ -712,7 +713,7 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
             null,
             target());
     assertThatThrownBy(() -> adminZoneEventService.create(operator, badZone))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("error.zone_event.invalid_zone");
 
     AdminZoneEventCreateReqDto badKind =
@@ -729,7 +730,7 @@ class AdminZoneEventServiceTest extends AbstractContainerTest {
             null,
             new AuthTargetReqDto("GHOST", null, "광안", null, null, 35.1, 129.1, 100));
     assertThatThrownBy(() -> adminZoneEventService.create(operator, badKind))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test

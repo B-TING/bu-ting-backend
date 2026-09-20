@@ -10,6 +10,7 @@ import com.butingbe.global.error.exception.BulkPayoutConflictException;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -122,13 +123,23 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
-  @DisplayName("잘못된 인자는 400과 원본 메시지를 반환한다")
-  void illegalArgumentReturnsBadRequest() {
+  @DisplayName("잘못된 요청은 400과 원본 메시지를 반환한다")
+  void invalidRequestReturnsBadRequest() {
     ResponseEntity<ApiResponse<Void>> response =
-        handler.handleIllegalArgumentException(new IllegalArgumentException("잘못된 값입니다."), request);
+        handler.handleInvalidRequestException(new InvalidRequestException("잘못된 값입니다."), request);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody().getMessage()).isEqualTo("잘못된 값입니다.");
+  }
+
+  @Test
+  @DisplayName("의도하지 않은 InvalidRequestException 은 400이 아니라 500으로 떨어진다")
+  void unexpectedIllegalArgumentFallsThroughToServerError() {
+    // UUID.fromString 이나 Enum.valueOf 가 던지는 것까지 400 으로 내보내면 서버 버그가 클라이언트 오류로 위장된다.
+    ResponseEntity<ApiResponse<Void>> response =
+        handler.handleException(new InvalidRequestException("Invalid UUID string: abc"), request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   @Test

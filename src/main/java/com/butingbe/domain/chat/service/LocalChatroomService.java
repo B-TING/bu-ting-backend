@@ -11,6 +11,7 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class LocalChatroomService {
 
     localChatroomRepository
         .findById(roomId)
-        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 오픈채팅방입니다."));
+        .orElseThrow(() -> new ResourceNotFoundException("error.chat.room.not_found"));
 
     List<ChatMessage> chatHistory;
 
@@ -49,7 +50,7 @@ public class LocalChatroomService {
       ChatMessage lastMessage =
           chatMessageRepository
               .findById(lastMessageId)
-              .orElseThrow(() -> new IllegalArgumentException("기준이 되는 메시지가 존재하지 않습니다."));
+              .orElseThrow(() -> new ResourceNotFoundException("error.chat.message.not_found"));
 
       // 안전하게 시간과 ID를 추출하여 전달
       chatHistory =
@@ -79,7 +80,7 @@ public class LocalChatroomService {
   @Transactional
   public void sendMessage(UUID roomId, AuthenticatedUser sender, String content) {
     if (!chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.id())) {
-      throw new ForbiddenException("참여하지 않은 채팅방에는 메시지를 보낼 수 없습니다.");
+      throw new ForbiddenException("error.chat.message.not_joined");
     }
 
     ChatMessage savedMessage =
@@ -100,7 +101,7 @@ public class LocalChatroomService {
     requireRoom(roomId);
 
     if (!chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
-      throw new IllegalArgumentException("참여하고 있지 않은 채팅방입니다.");
+      throw new ForbiddenException("error.chat.room.not_joined");
     }
 
     chatMemberRepository.deleteByIdRoomIdAndIdUserId(roomId, userId);
@@ -112,12 +113,12 @@ public class LocalChatroomService {
     LocalChatroom chatroom =
         localChatroomRepository
             .findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 오픈채팅방입니다."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.chat.room.not_found"));
 
     User user =
         userRepository
             .findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.user.not_found"));
     if (chatMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
       throw new ConflictException("error.chat.room.already_joined");
     }
@@ -163,7 +164,7 @@ public class LocalChatroomService {
   private LocalChatroom requireRoom(UUID roomId) {
     return localChatroomRepository
         .findById(roomId)
-        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채팅방입니다."));
+        .orElseThrow(() -> new ResourceNotFoundException("error.chat.room.not_found"));
   }
 
   /** 벌크 갱신 직후의 인원수. 영속성 컨텍스트에 남은 엔티티는 갱신 전 값을 들고 있다. */

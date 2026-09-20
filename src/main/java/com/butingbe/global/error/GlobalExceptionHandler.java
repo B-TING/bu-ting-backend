@@ -9,6 +9,7 @@ import com.butingbe.global.error.exception.BulkPayoutConflictException;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -65,7 +66,7 @@ public class GlobalExceptionHandler {
         .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
-  /** ❌ 2. 잘못된 비즈니스 요청 예외 (400 Bad Request) IllegalArgumentException 등이 터졌을 때 처리합니다. */
+  /** 이미 있는 리소스와 충돌하거나 현재 상태에서 할 수 없는 요청 (409 Conflict) */
   @ExceptionHandler(ConflictException.class)
   public ResponseEntity<ApiResponse<Void>> handleConflictException(
       ConflictException e, HttpServletRequest request) {
@@ -75,19 +76,23 @@ public class GlobalExceptionHandler {
         .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
-  @ExceptionHandler(IllegalArgumentException.class)
-  public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(
-      IllegalArgumentException e, HttpServletRequest request) {
-    log.warn("Bad Request Exception 발생: {}", e.getMessage());
+  /**
+   * 잘못된 요청 (400 Bad Request).
+   *
+   * <p>IllegalArgumentException 을 잡지 않는다. 잡으면 JDK 와 라이브러리가 던지는 것까지 걸려 UUID.fromString 이나
+   * Enum.valueOf 의 내부 메시지가 그대로 400 으로 나간다. 서버 버그가 클라이언트 오류로 위장된다. 의도한 400 만 이 타입으로 던지고, 나머지는 아래
+   * Exception 핸들러가 500 으로 처리해 추적 가능하게 둔다.
+   */
+  @ExceptionHandler(InvalidRequestException.class)
+  public ResponseEntity<ApiResponse<Void>> handleInvalidRequestException(
+      InvalidRequestException e, HttpServletRequest request) {
+    log.warn("Invalid Request Exception: {}", e.getMessage());
 
-    return ResponseEntity.status(HttpStatus.BAD_REQUEST) // HTTP 상태코드 400 세팅
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .body(ApiResponse.fail(message(e.getMessage(), request)));
   }
 
-  /**
-   * 📝 3. DTO 유효성 검증 실패 예외 (400 Bad Request) 컨트롤러에서 @Valid 선언한 DTO 제약조건(예: @NotBlank)을 위반했을 때
-   * 작동합니다.
-   */
+  /** 권한이 없는 요청 (403 Forbidden) */
   @ExceptionHandler(ForbiddenException.class)
   public ResponseEntity<ApiResponse<Void>> handleForbiddenException(
       ForbiddenException e, HttpServletRequest request) {

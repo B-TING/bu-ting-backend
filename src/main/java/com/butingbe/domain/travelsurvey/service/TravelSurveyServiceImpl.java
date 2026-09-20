@@ -10,6 +10,7 @@ import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +57,7 @@ public class TravelSurveyServiceImpl implements TravelSurveyService {
     return travelSurveyRepository
         .findById(user.getId())
         .map(TravelSurveyProfileResDto::from)
-        .orElseThrow(() -> new IllegalArgumentException("travel survey profile not found."));
+        .orElseThrow(() -> new InvalidRequestException("error.travel_survey.not_found"));
   }
 
   private User findOrCreateAuthenticatedUser(AuthenticatedUser authenticatedUser) {

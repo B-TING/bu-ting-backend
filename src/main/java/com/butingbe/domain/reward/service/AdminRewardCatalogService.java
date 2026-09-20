@@ -15,6 +15,7 @@ import com.butingbe.domain.reward.repository.RewardGrantRepository;
 import com.butingbe.domain.zoneevent.entity.ZoneEventAuditLog;
 import com.butingbe.domain.zoneevent.repository.ZoneEventAuditLogRepository;
 import com.butingbe.global.error.exception.DuplicateResourceException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import java.nio.charset.StandardCharsets;
@@ -178,7 +179,7 @@ public class AdminRewardCatalogService {
     try {
       return RewardType.valueOf(rewardType.trim());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.reward.invalid_type");
+      throw new InvalidRequestException("error.reward.invalid_type");
     }
   }
 
@@ -204,11 +205,11 @@ public class AdminRewardCatalogService {
       String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
       String[] parts = raw.split("\\|");
       if (parts.length != 2) {
-        throw new IllegalArgumentException("Invalid reward grant cursor.");
+        throw new InvalidRequestException("error.reward.grant_cursor_invalid");
       }
       return new Cursor(OffsetDateTime.parse(parts[0]), UUID.fromString(parts[1]));
     } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
-      throw new IllegalArgumentException("Invalid reward grant cursor.");
+      throw new InvalidRequestException("error.reward.grant_cursor_invalid");
     }
   }
 

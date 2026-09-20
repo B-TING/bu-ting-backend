@@ -18,6 +18,7 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.support.AbstractContainerTest;
 import java.util.List;
 import java.util.Map;
@@ -145,11 +146,11 @@ class NotificationServiceTest extends AbstractContainerTest {
   @DisplayName("잘못된 플랫폼·구역·타입은 400이다")
   void invalidInputs() {
     assertThatThrownBy(() -> notificationService.upsertToken(user, "t", "WINDOWS"))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
     assertThatThrownBy(() -> notificationService.setSubscriptions(user, List.of("NOWHERE")))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
     assertThatThrownBy(() -> notificationService.updateSettings(user, Map.of("GHOST", false)))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test

@@ -153,7 +153,7 @@ class TravelSettlementServiceTest extends AbstractContainerTest {
       org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
     assertThatThrownBy(call)
         .isInstanceOf(ConflictException.class)
-        .hasMessage("SETTLEMENT_CONFIRMED");
+        .hasMessage("error.travel_expense.settlement_confirmed");
   }
 
   private TravelExpenseCreateResponse createExpense(TestTravel testTravel, long amount) {

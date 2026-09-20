@@ -15,6 +15,7 @@ import com.butingbe.domain.reward.repository.UserBadgeRepository;
 import com.butingbe.domain.reward.repository.UserPointLedgerRepository;
 import com.butingbe.domain.zoneevent.entity.ZoneEvent;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.persistence.criteria.Predicate;
 import java.nio.charset.StandardCharsets;
@@ -171,11 +172,11 @@ public class RewardQueryService {
       String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
       String[] parts = raw.split("\\|");
       if (parts.length != 2) {
-        throw new IllegalArgumentException("Invalid point ledger cursor.");
+        throw new InvalidRequestException("error.reward.point_ledger_cursor_invalid");
       }
       return new Cursor(OffsetDateTime.parse(parts[0]), UUID.fromString(parts[1]));
     } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
-      throw new IllegalArgumentException("Invalid point ledger cursor.");
+      throw new InvalidRequestException("error.reward.point_ledger_cursor_invalid");
     }
   }
 

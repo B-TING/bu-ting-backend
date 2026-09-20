@@ -28,6 +28,7 @@ import com.butingbe.domain.zonetitle.service.ZoneTitleService;
 import com.butingbe.global.error.exception.ConflictException;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.persistence.criteria.Predicate;
@@ -80,7 +81,7 @@ public class ZoneEventSocialService {
     ZoneEventParticipation participation = requireInteractable(participationId);
     requireEventActive(participation);
     if (participation.getUserId().equals(userId)) {
-      throw new IllegalArgumentException("error.zone_event.like.self");
+      throw new InvalidRequestException("error.zone_event.like.self");
     }
     if (likeRepository.existsByParticipationIdAndUserId(participationId, userId)) {
       throw new ConflictException("error.zone_event.like.duplicate");
@@ -201,7 +202,7 @@ public class ZoneEventSocialService {
     UUID userId = requireUserId(user);
     ZoneEventParticipation participation = requireInteractable(participationId);
     if (participation.getUserId().equals(userId)) {
-      throw new IllegalArgumentException("error.zone_event.report.self");
+      throw new InvalidRequestException("error.zone_event.report.self");
     }
     if (reportRepository.existsByParticipationIdAndReporterId(participationId, userId)) {
       throw new DuplicateResourceException("error.zone_event.report.duplicate");
@@ -281,7 +282,7 @@ public class ZoneEventSocialService {
     try {
       return ReportReasonCode.valueOf(reasonCode.trim());
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("error.zone_event.participation.invalid_state");
+      throw new InvalidRequestException("error.zone_event.participation.invalid_state");
     }
   }
 
@@ -307,11 +308,11 @@ public class ZoneEventSocialService {
       String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
       String[] parts = raw.split("\\|");
       if (parts.length != 2) {
-        throw new IllegalArgumentException("Invalid comment cursor.");
+        throw new InvalidRequestException("error.zone_event.comment.cursor_invalid");
       }
       return new Cursor(OffsetDateTime.parse(parts[0]), UUID.fromString(parts[1]));
     } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
-      throw new IllegalArgumentException("Invalid comment cursor.");
+      throw new InvalidRequestException("error.zone_event.comment.cursor_invalid");
     }
   }
 

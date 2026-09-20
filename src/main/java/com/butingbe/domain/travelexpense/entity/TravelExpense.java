@@ -2,6 +2,7 @@ package com.butingbe.domain.travelexpense.entity;
 
 import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.user.entity.User;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -120,17 +121,17 @@ public class TravelExpense {
 
   private static String requireTitle(String title) {
     if (title == null || title.isBlank()) {
-      throw new IllegalArgumentException("Expense title is required.");
+      throw new InvalidRequestException("error.travel_expense.title_required");
     }
     if (title.length() > 50) {
-      throw new IllegalArgumentException("Expense title must be 50 characters or fewer.");
+      throw new InvalidRequestException("error.travel_expense.title_too_long");
     }
     return title.trim();
   }
 
   private static Long requirePositiveAmount(Long amount) {
     if (amount == null || amount <= 0) {
-      throw new IllegalArgumentException("Expense amount must be positive.");
+      throw new InvalidRequestException("error.travel_expense.amount_invalid");
     }
     return amount;
   }
@@ -139,7 +140,7 @@ public class TravelExpense {
     String normalized =
         currency == null || currency.isBlank() ? "KRW" : currency.trim().toUpperCase();
     if (normalized.length() != 3) {
-      throw new IllegalArgumentException("Currency must be a 3-letter code.");
+      throw new InvalidRequestException("error.travel_expense.currency_invalid");
     }
     return normalized;
   }

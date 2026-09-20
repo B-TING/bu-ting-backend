@@ -18,6 +18,7 @@ import com.butingbe.domain.zoneevent.repository.ZoneEventRoundRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRoundSlotRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
 import com.butingbe.domain.zonetitle.repository.UserZoneTitleRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -48,7 +49,7 @@ public class AdminZoneEventStatsService {
       AuthenticatedUser user, UUID roundId, OffsetDateTime from, OffsetDateTime to) {
     operatorAuthorization.requireOperator(user);
     if (roundId == null && (from == null || to == null)) {
-      throw new IllegalArgumentException("error.zone_event.stats.round_or_range_required");
+      throw new InvalidRequestException("error.zone_event.stats.round_or_range_required");
     }
 
     List<ZoneEventRound> rounds =

@@ -21,6 +21,7 @@ import com.butingbe.domain.travel.repository.PlanPlaceRepository;
 import com.butingbe.domain.travel.repository.PlanRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelteam.service.TravelMemberAuthorization;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.time.LocalDate;
@@ -137,7 +138,7 @@ class TravelRouteServiceTest {
     assertThatThrownBy(
             () -> travelRouteService.getPlanRoute(authenticatedUser, PLAN_ID, TransportType.CAR))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Plan not found.");
+        .hasMessage("error.travel.plan.not_found");
   }
 
   @Test
@@ -291,7 +292,7 @@ class TravelRouteServiceTest {
     assertThatThrownBy(
             () -> travelRouteService.optimizeTravelVisitOrder(authenticatedUser, TRAVEL_ID, null))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel not found.");
+        .hasMessage("error.travel.not_found");
   }
 
   @Test
@@ -372,14 +373,14 @@ class TravelRouteServiceTest {
             () ->
                 travelRouteService.applyOptimizedOrder(
                     authenticatedUser, PLAN_ID, List.of(UUID.randomUUID())))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Plan place ids do not match this plan.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel.plan_place.id_mismatch");
     assertThatThrownBy(
             () ->
                 travelRouteService.applyOptimizedOrder(
                     authenticatedUser, PLAN_ID, List.of(onlyPlace.getId(), onlyPlace.getId())))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Duplicated plan place id exists.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel.plan_place.duplicated_id");
 
     verify(travelService, never())
         .updatePlanPlaceSequence(any(), any(), any(PlanPlaceSequenceUpdateReqDto.class));

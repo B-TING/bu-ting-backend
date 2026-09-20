@@ -24,6 +24,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventStatus;
 import com.butingbe.domain.zoneevent.entity.ZoneEventType;
 import com.butingbe.domain.zoneevent.repository.ZoneEventRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventTypeRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
 import java.time.OffsetDateTime;
@@ -137,7 +138,7 @@ class RewardQueryServiceTest extends AbstractContainerTest {
   @DisplayName("잘못된 원장 커서는 400이다")
   void invalidLedgerCursor() {
     assertThatThrownBy(() -> rewardQueryService.pointLedger(user, "!!bad!!", 20))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test
@@ -148,7 +149,7 @@ class RewardQueryServiceTest extends AbstractContainerTest {
             .withoutPadding()
             .encodeToString("nopipe".getBytes(java.nio.charset.StandardCharsets.UTF_8));
     assertThatThrownBy(() -> rewardQueryService.pointLedger(user, noPipe, 20))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(InvalidRequestException.class);
   }
 
   @Test

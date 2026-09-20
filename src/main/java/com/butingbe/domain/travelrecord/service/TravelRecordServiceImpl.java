@@ -61,6 +61,7 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.net.URI;
@@ -1195,23 +1196,23 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private Travel findTravel(UUID travelId) {
     return travelRepository
         .findById(travelId)
-        .orElseThrow(() -> new ResourceNotFoundException("Travel not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("error.travel.not_found"));
   }
 
   private TravelRecord findTravelRecord(UUID travelRecordId) {
     return travelRecordRepository
         .findById(travelRecordId)
-        .orElseThrow(() -> new ResourceNotFoundException("Travel record not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("error.travel_record.not_found"));
   }
 
   private PlanPlace findPlanPlaceInTravel(UUID planPlaceId, UUID travelId) {
     PlanPlace planPlace =
         planPlaceRepository
             .findById(planPlaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Plan place not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan_place.not_found"));
 
     if (!planPlace.getPlan().getTravel().getId().equals(travelId)) {
-      throw new ResourceNotFoundException("Plan place not found.");
+      throw new ResourceNotFoundException("error.travel.plan_place.not_found");
     }
 
     return planPlace;
@@ -1220,75 +1221,76 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private PlaceReview findPlaceReviewByPlanPlaceId(UUID planPlaceId, UUID authorId) {
     return placeReviewRepository
         .findByPlanPlace_IdAndAuthor_Id(planPlaceId, authorId)
-        .orElseThrow(() -> new ResourceNotFoundException("Place review not found."));
+        .orElseThrow(
+            () -> new ResourceNotFoundException("error.travel_record.place_review.not_found"));
   }
 
   private TravelRecordComment findCommentInTravelRecord(UUID commentId, UUID travelRecordId) {
     return travelRecordCommentRepository
         .findByIdAndTravelRecord_Id(commentId, travelRecordId)
-        .orElseThrow(() -> new ResourceNotFoundException("Travel record comment not found."));
+        .orElseThrow(() -> new ResourceNotFoundException("error.travel_record.comment.not_found"));
   }
 
   private void validateTravelMember(UUID travelId, UUID userId) {
     if (!travelMemberRepository.existsByTravel_IdAndUser_Id(travelId, userId)) {
-      throw new ForbiddenException("User is not a travel member.");
+      throw new ForbiddenException("error.travel.not_member");
     }
   }
 
   private void validateDraftBelongsToTravel(TravelRecord travelRecord, UUID travelId) {
     if (travelRecord.getOriginalTravel() == null
         || !travelRecord.getOriginalTravel().getId().equals(travelId)) {
-      throw new ResourceNotFoundException("Travel record not found.");
+      throw new ResourceNotFoundException("error.travel_record.not_found");
     }
   }
 
   private void validateAuthor(TravelRecord travelRecord, UUID userId) {
     if (!travelRecord.getAuthor().getId().equals(userId)) {
-      throw new ForbiddenException("User is not the travel record author.");
+      throw new ForbiddenException("error.travel_record.not_author");
     }
   }
 
   private void validateCommentAuthor(TravelRecordComment comment, UUID userId) {
     if (!comment.getAuthor().getId().equals(userId)) {
-      throw new ForbiddenException("User is not the travel record comment author.");
+      throw new ForbiddenException("error.travel_record.comment.not_author");
     }
   }
 
   private void validateDraft(TravelRecord travelRecord) {
     if (travelRecord.getStatus() != TravelRecordStatus.DRAFT) {
-      throw new IllegalArgumentException("Only draft travel records can be accessed here.");
+      throw new InvalidRequestException("error.travel_record.draft_only");
     }
   }
 
   private void validatePublishable(TravelRecord travelRecord) {
     if (travelRecord.getTitle() == null || travelRecord.getTitle().isBlank()) {
-      throw new IllegalArgumentException("Travel record title is required.");
+      throw new InvalidRequestException("error.travel_record.title_required");
     }
 
     if (travelRecordDayRepository
         .findByTravelRecord_IdOrderByDayNumberAsc(travelRecord.getId())
         .isEmpty()) {
-      throw new IllegalArgumentException("Travel record itinerary is required.");
+      throw new InvalidRequestException("error.travel_record.itinerary_required");
     }
 
     if (travelRecord.getOverallRating() == null) {
-      throw new IllegalArgumentException("Travel record overall rating is required.");
+      throw new InvalidRequestException("error.travel_record.rating_required");
     }
   }
 
   private void validatePublished(TravelRecord travelRecord) {
     if (travelRecord.getStatus() != TravelRecordStatus.PUBLISHED) {
-      throw new ResourceNotFoundException("Travel record not found.");
+      throw new ResourceNotFoundException("error.travel_record.not_found");
     }
   }
 
   private void validateRepublishable(TravelRecord travelRecord) {
     if (travelRecord.getStatus() != TravelRecordStatus.HIDDEN) {
-      throw new IllegalArgumentException("Only hidden travel records can be republished.");
+      throw new InvalidRequestException("error.travel_record.republish_hidden_only");
     }
 
     if (travelRecord.getPublishedAt() == null) {
-      throw new IllegalArgumentException(
+      throw new InvalidRequestException(
           "Only previously published travel records can be republished.");
     }
   }
@@ -1299,7 +1301,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     if (request.title() != null && request.title().isBlank()) {
-      throw new IllegalArgumentException("Travel record title cannot be blank.");
+      throw new InvalidRequestException("error.travel_record.title_blank");
     }
 
     validateTravelRecordOverallRating(request.overallRating());
@@ -1312,7 +1314,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     if (request.title() != null && request.title().isBlank()) {
-      throw new IllegalArgumentException("Travel record title cannot be blank.");
+      throw new InvalidRequestException("error.travel_record.title_blank");
     }
 
     validateTravelRecordOverallRating(request.overallRating());
@@ -1321,25 +1323,25 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   private void validateCloneToTravelRequest(TravelRecordCloneToTravelReqDto request) {
     if (request == null) {
-      throw new IllegalArgumentException("Travel clone request is required.");
+      throw new InvalidRequestException("error.travel_record.clone_request_required");
     }
 
     if (request.startDate() == null) {
-      throw new IllegalArgumentException("Travel start date is required.");
+      throw new InvalidRequestException("error.travel.start_date_required");
     }
 
     if (request.title() != null && request.title().isBlank()) {
-      throw new IllegalArgumentException("Travel title cannot be blank.");
+      throw new InvalidRequestException("error.travel.title_blank");
     }
 
     if (request.title() != null && request.title().length() > MAX_TRAVEL_TITLE_LENGTH) {
-      throw new IllegalArgumentException("Travel title must be 15 characters or less.");
+      throw new InvalidRequestException("error.travel.title_too_long");
     }
   }
 
   private void validateCloneableItinerary(List<TravelRecordDay> recordDays) {
     if (recordDays.isEmpty()) {
-      throw new IllegalArgumentException("Travel record itinerary is required.");
+      throw new InvalidRequestException("error.travel_record.itinerary_required");
     }
   }
 
@@ -1349,17 +1351,17 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     if (overallRating < 1 || overallRating > 5) {
-      throw new IllegalArgumentException("Travel record overall rating must be between 1 and 5.");
+      throw new InvalidRequestException("error.travel_record.rating_range");
     }
   }
 
   private void validateCommentCreateRequest(TravelRecordCommentCreateReqDto request) {
     if (request == null || request.content() == null || request.content().isBlank()) {
-      throw new IllegalArgumentException("Travel record comment content is required.");
+      throw new InvalidRequestException("error.travel_record.comment.content_required");
     }
 
     if (request.content().trim().length() > MAX_COMMENT_CONTENT_LENGTH) {
-      throw new IllegalArgumentException(
+      throw new InvalidRequestException(
           "Travel record comment content must be "
               + MAX_COMMENT_CONTENT_LENGTH
               + " characters or less.");
@@ -1368,11 +1370,11 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   private void validateCommentUpdateRequest(TravelRecordCommentUpdateReqDto request) {
     if (request == null || request.content() == null || request.content().isBlank()) {
-      throw new IllegalArgumentException("Travel record comment content is required.");
+      throw new InvalidRequestException("error.travel_record.comment.content_required");
     }
 
     if (request.content().trim().length() > MAX_COMMENT_CONTENT_LENGTH) {
-      throw new IllegalArgumentException(
+      throw new InvalidRequestException(
           "Travel record comment content must be "
               + MAX_COMMENT_CONTENT_LENGTH
               + " characters or less.");
@@ -1381,11 +1383,11 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   private void validatePlaceReviewCreateRequest(PlaceReviewCreateReqDto request) {
     if (request == null || request.rating() == null) {
-      throw new IllegalArgumentException("Place review rating is required.");
+      throw new InvalidRequestException("error.travel_record.place_review.rating_required");
     }
 
     if (request.rating() < 1 || request.rating() > 5) {
-      throw new IllegalArgumentException("Place review rating must be between 1 and 5.");
+      throw new InvalidRequestException("error.travel_record.place_review.rating_range");
     }
 
     validatePlaceReviewStayMinutes(request.stayMinutes());
@@ -1397,7 +1399,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     if (request.rating() != null && (request.rating() < 1 || request.rating() > 5)) {
-      throw new IllegalArgumentException("Place review rating must be between 1 and 5.");
+      throw new InvalidRequestException("error.travel_record.place_review.rating_range");
     }
 
     validatePlaceReviewStayMinutes(request.stayMinutes());
@@ -1409,7 +1411,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     if (stayMinutes < 0) {
-      throw new IllegalArgumentException("Stay minutes must be 0 or greater.");
+      throw new InvalidRequestException("error.travel_record.stay_minutes_invalid");
     }
   }
 
@@ -1426,14 +1428,14 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             .toList();
 
     if (normalizedTags.size() > MAX_PLACE_REVIEW_TAG_COUNT) {
-      throw new IllegalArgumentException(
+      throw new InvalidRequestException(
           "Place review tags must be " + MAX_PLACE_REVIEW_TAG_COUNT + " or fewer.");
     }
 
     boolean hasTooLongTag =
         normalizedTags.stream().anyMatch(tag -> tag.length() > MAX_PLACE_REVIEW_TAG_LENGTH);
     if (hasTooLongTag) {
-      throw new IllegalArgumentException(
+      throw new InvalidRequestException(
           "Place review tag must be " + MAX_PLACE_REVIEW_TAG_LENGTH + " characters or less.");
     }
 
@@ -1453,7 +1455,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             .toList();
 
     if (normalizedMediaFileKeys.size() > MAX_PLACE_REVIEW_MEDIA_COUNT) {
-      throw new IllegalArgumentException(
+      throw new InvalidRequestException(
           "Place review media file keys must be " + MAX_PLACE_REVIEW_MEDIA_COUNT + " or fewer.");
     }
 
@@ -1461,7 +1463,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         normalizedMediaFileKeys.stream()
             .anyMatch(fileKey -> fileKey.length() > MAX_PLACE_REVIEW_MEDIA_FILE_KEY_LENGTH);
     if (hasTooLongFileKey) {
-      throw new IllegalArgumentException(
+      throw new InvalidRequestException(
           "Place review media file key must be "
               + MAX_PLACE_REVIEW_MEDIA_FILE_KEY_LENGTH
               + " characters or less.");
@@ -1483,7 +1485,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
             .toList();
 
     if (normalizedImageUrls.size() > MAX_TRAVEL_RECORD_IMAGE_COUNT) {
-      throw new IllegalArgumentException(
+      throw new InvalidRequestException(
           "Travel record image URLs must be " + MAX_TRAVEL_RECORD_IMAGE_COUNT + " or fewer.");
     }
 
@@ -1491,7 +1493,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         normalizedImageUrls.stream()
             .anyMatch(imageUrl -> imageUrl.length() > MAX_TRAVEL_RECORD_IMAGE_URL_LENGTH);
     if (hasTooLongImageUrl) {
-      throw new IllegalArgumentException(
+      throw new InvalidRequestException(
           "Travel record image URL must be "
               + MAX_TRAVEL_RECORD_IMAGE_URL_LENGTH
               + " characters or less.");
@@ -1502,7 +1504,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   private void validatePlaceReviewSummaryRequest(PlaceProvider provider, String providerPlaceId) {
     if (provider == null) {
-      throw new IllegalArgumentException("Place provider is required.");
+      throw new InvalidRequestException("error.place.provider_required");
     }
 
     validatePlaceId(providerPlaceId);
@@ -1510,37 +1512,37 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   private void validatePlaceId(String placeId) {
     if (placeId == null || placeId.isBlank()) {
-      throw new IllegalArgumentException("Place id is required.");
+      throw new InvalidRequestException("error.place.id_required");
     }
   }
 
   private void validatePlaceReviewNotDuplicated(UUID planPlaceId, UUID authorId) {
     if (placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(planPlaceId, authorId).isPresent()) {
-      throw new DuplicateResourceException("Place review already exists.");
+      throw new DuplicateResourceException("error.travel_record.place_review.duplicate");
     }
   }
 
   private void validateBookmarkNotDuplicated(UUID userId, UUID travelRecordId) {
     if (travelRecordBookmarkRepository.existsByUser_IdAndTravelRecord_Id(userId, travelRecordId)) {
-      throw new DuplicateResourceException("Travel record bookmark already exists.");
+      throw new DuplicateResourceException("error.travel_record.bookmark.duplicate");
     }
   }
 
   private void validateLikeNotDuplicated(UUID userId, UUID travelRecordId) {
     if (travelRecordLikeRepository.existsByUser_IdAndTravelRecord_Id(userId, travelRecordId)) {
-      throw new DuplicateResourceException("Travel record like already exists.");
+      throw new DuplicateResourceException("error.travel_record.like.duplicate");
     }
   }
 
   private void validateCompletedTravel(Travel travel) {
     if (travel.getStatus() != TravelStatus.COMPLETED) {
-      throw new IllegalArgumentException("Only completed travels can be recorded.");
+      throw new InvalidRequestException("error.travel_record.completed_only");
     }
   }
 
   private void validateNotDuplicated(UUID travelId, UUID authorId) {
     if (travelRecordRepository.existsByOriginalTravel_IdAndAuthor_Id(travelId, authorId)) {
-      throw new DuplicateResourceException("Travel record already exists.");
+      throw new DuplicateResourceException("error.travel_record.duplicate");
     }
   }
 
@@ -1604,7 +1606,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     if (size < 1 || size > MAX_FEED_SIZE) {
-      throw new IllegalArgumentException("Feed size must be between 1 and 50.");
+      throw new InvalidRequestException("error.travel_record.feed.size_range");
     }
 
     return size;
@@ -1669,7 +1671,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     if (travelStartDate != null
         && travelEndDate != null
         && travelEndDate.isBefore(travelStartDate)) {
-      throw new IllegalArgumentException("Travel end date cannot be before travel start date.");
+      throw new InvalidRequestException("error.travel.end_date_before_start");
     }
 
     return new FeedSearchCondition(
@@ -1689,7 +1691,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   private void validateFeedCursorSort(FeedCursor feedCursor, TravelRecordFeedSort sort) {
     if (feedCursor != null && feedCursor.sort() != sort) {
-      throw new IllegalArgumentException("Feed cursor sort does not match requested sort.");
+      throw new InvalidRequestException("error.travel_record.feed.cursor_sort_mismatch");
     }
   }
 
@@ -1732,7 +1734,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       }
 
       if (values.length != 4) {
-        throw new IllegalArgumentException("Invalid feed cursor.");
+        throw new InvalidRequestException("error.travel_record.feed.cursor_invalid");
       }
 
       return new FeedCursor(
@@ -1741,7 +1743,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
           LocalDateTime.parse(values[2]),
           LocalDateTime.parse(values[3]));
     } catch (IllegalArgumentException exception) {
-      throw new IllegalArgumentException("Invalid feed cursor.");
+      throw new InvalidRequestException("error.travel_record.feed.cursor_invalid");
     }
   }
 

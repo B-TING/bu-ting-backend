@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.butingbe.domain.travel.entity.Travel;
 import com.butingbe.domain.user.entity.User;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,8 +34,8 @@ class TravelExpenseTest {
   @Test
   void rejectsNonPositiveExpenseAmount() {
     assertThatThrownBy(() -> createExpense(0L, "KRW"))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Expense amount must be positive.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_expense.amount_invalid");
   }
 
   @Test
@@ -44,30 +45,30 @@ class TravelExpenseTest {
     assertThatThrownBy(
             () ->
                 TravelExpenseShare.builder().expense(expense).user(payer).shareAmount(-1L).build())
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Share amount must not be negative.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_expense.share_amount_negative");
   }
 
   @Test
   @DisplayName("제목이 비었거나 50자를 넘으면 경비를 만들 수 없다")
   void rejectsInvalidTitle() {
     assertThatThrownBy(() -> createExpense(10000L, "KRW", "  "))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Expense title is required.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_expense.title_required");
     assertThatThrownBy(() -> createExpense(10000L, "KRW", null))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Expense title is required.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_expense.title_required");
     assertThatThrownBy(() -> createExpense(10000L, "KRW", "a".repeat(51)))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Expense title must be 50 characters or fewer.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_expense.title_too_long");
   }
 
   @Test
   @DisplayName("통화 코드가 3글자가 아니면 경비를 만들 수 없다")
   void rejectsInvalidCurrencyCode() {
     assertThatThrownBy(() -> createExpense(10000L, "KRWW"))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Currency must be a 3-letter code.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_expense.currency_invalid");
   }
 
   @Test

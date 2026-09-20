@@ -25,6 +25,7 @@ import com.butingbe.domain.user.entity.User;
 import com.butingbe.domain.user.entity.UserRole;
 import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.ForbiddenException;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import com.butingbe.support.AbstractContainerTest;
@@ -93,8 +94,8 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
             () ->
                 travelExpenseService.createEqualExpense(
                     AuthenticatedUser.from(creator), travel.getId(), request))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Expense participants must not be duplicated.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_expense.participant_duplicated");
     assertThat(travelExpenseRepository.count()).isZero();
   }
 
@@ -111,7 +112,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                     AuthenticatedUser.from(creator),
                     travel.getId(),
                     request(10_000L, creator, List.of(creator.getId(), outsider.getId()))))
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(InvalidRequestException.class)
         .hasMessage("Participant is not a travel member.");
     assertThat(travelExpenseRepository.count()).isZero();
   }
@@ -214,7 +215,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                     null,
                     PageRequest.of(0, 20)))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not a travel member.");
+        .hasMessage("error.travel.not_member");
   }
 
   @Test
@@ -291,7 +292,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                 travelExpenseService.getExpense(
                     AuthenticatedUser.from(user), otherTravel.getId(), created.expenseId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Expense not found.");
+        .hasMessage("error.travel_expense.not_found");
   }
 
   @Test
@@ -490,7 +491,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                 travelExpenseService.deleteExpense(
                     AuthenticatedUser.from(user), otherTravel.getId(), created.expenseId()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Expense not found.");
+        .hasMessage("error.travel_expense.not_found");
     assertThat(travelExpenseRepository.existsById(created.expenseId())).isTrue();
   }
 
@@ -623,7 +624,7 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
                 travelExpenseService.getExpenseSummary(
                     AuthenticatedUser.from(outsider), travel.getId(), null, null))
         .isInstanceOf(ForbiddenException.class)
-        .hasMessage("User is not a travel member.");
+        .hasMessage("error.travel.not_member");
   }
 
   @Test
@@ -679,19 +680,19 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
     assertThatThrownBy(
             () -> travelExpenseService.getExpense(authenticatedUser, unknownTravelId, expenseId))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel not found.");
+        .hasMessage("error.travel.not_found");
     assertThatThrownBy(
             () ->
                 travelExpenseService.getExpenses(
                     authenticatedUser, unknownTravelId, null, null, null, null, Pageable.unpaged()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel not found.");
+        .hasMessage("error.travel.not_found");
     assertThatThrownBy(
             () ->
                 travelExpenseService.getExpenseSummary(
                     authenticatedUser, unknownTravelId, null, null))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessage("Travel not found.");
+        .hasMessage("error.travel.not_found");
   }
 
   @Test
@@ -708,8 +709,8 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
             () ->
                 travelExpenseService.getExpenses(
                     authenticatedUser, travel.getId(), null, from, to, null, Pageable.unpaged()))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Expense search start time must not be after end time.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_expense.search_range_invalid");
   }
 
   @Test
@@ -737,11 +738,11 @@ class TravelExpenseServiceTest extends AbstractContainerTest {
   @DisplayName("금액이 0 이하이거나 참여자가 없으면 균등 분배를 계산하지 않는다")
   void calculateEqualSharesRejectsInvalidInput() {
     assertThatThrownBy(() -> TravelExpenseService.calculateEqualShares(0L, 3))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Expense amount must be positive.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_expense.amount_invalid");
     assertThatThrownBy(() -> TravelExpenseService.calculateEqualShares(1000L, 0))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("At least one participant is required.");
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("error.travel_expense.participant_required");
   }
 
   private TravelExpenseUpdateRequest updateRequest(

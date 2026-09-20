@@ -16,6 +16,7 @@ import com.butingbe.domain.zoneevent.entity.ZoneEventParticipation;
 import com.butingbe.domain.zoneevent.entity.ZoneEventSubmission;
 import com.butingbe.domain.zoneevent.repository.ZoneEventParticipationRepository;
 import com.butingbe.domain.zoneevent.repository.ZoneEventSubmissionRepository;
+import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.UnauthenticatedException;
 import jakarta.persistence.criteria.Predicate;
 import java.nio.charset.StandardCharsets;
@@ -225,11 +226,11 @@ public class ZoneEventParticipationQueryService {
       String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
       String[] parts = raw.split("\\|");
       if (parts.length != 2) {
-        throw new IllegalArgumentException("Invalid participation cursor.");
+        throw new InvalidRequestException("error.zone_event.participation.cursor_invalid");
       }
       return new Cursor(OffsetDateTime.parse(parts[0]), UUID.fromString(parts[1]));
     } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
-      throw new IllegalArgumentException("Invalid participation cursor.");
+      throw new InvalidRequestException("error.zone_event.participation.cursor_invalid");
     }
   }
 
