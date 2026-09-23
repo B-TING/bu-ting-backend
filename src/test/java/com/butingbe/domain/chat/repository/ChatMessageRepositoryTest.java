@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.butingbe.domain.chat.entity.ChatMessage;
+import com.butingbe.domain.chat.entity.ChatZone;
 import com.butingbe.domain.chat.entity.LocalChatroom;
 import com.butingbe.domain.user.entity.Name;
 import com.butingbe.domain.user.entity.User;
@@ -44,7 +45,7 @@ class ChatMessageRepositoryTest extends AbstractContainerTest {
         LocalChatroom.builder()
             .title("수영구 오픈채팅방")
             .maxMembers(30)
-            // 만약 ChatZone이 필수라면 .chatZone(ChatZone.SUYEONG_NAMGU) 추가
+            .chatZone(ChatZone.SUYEONG_NAMGU)
             .build();
     em.persist(testRoom);
     roomId = testRoom.getRoomId();

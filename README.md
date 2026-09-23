@@ -252,7 +252,24 @@ It is what the pre-push hook runs. `check` still runs everything.
 
 ## Coverage
 
-The build enforces **80% bundle line coverage** through `jacocoTestCoverageVerification`, which `check` depends on.
+The build enforces two bundle-level gates through `jacocoTestCoverageVerification`, which `check` depends on:
+
+| Counter | Minimum | Currently |
+|---------|---------|-----------|
+| Line    | 100%    | 100%      |
+| Branch  | 85%     | ~87%      |
+
+The line gate is held by **deleting unreachable code rather than writing tests to reach it** — see #218. When the gate
+flags a line, first ask whether that line can ever execute in production; a dead guard is a better thing to remove than
+to cover.
+
+The branch gate exists because full line coverage still misses the other side of a condition: a test that only exercises
+the `true` branch of an `if` covers every line on it. It is set just below the current ratio so it ratchets rather than
+demands new work.
+
+One place where the line gate shaped production code: `OpaqueTokenService` has a package-private constructor that takes
+the hash algorithm name, purely so a test can pass an unknown algorithm and cover the `NoSuchAlgorithmException` branch.
+SHA-256 is always available on a real JVM, so that branch is unreachable in production.
 
 Excluded from the coverage gate:
 
