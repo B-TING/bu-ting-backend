@@ -32,8 +32,6 @@ import com.butingbe.domain.travelrecord.dto.response.TravelRecordLikeResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordManageResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto;
 import com.butingbe.domain.travelrecord.dto.response.TravelRecordResDto.TravelRecordDayResDto;
-import com.butingbe.domain.travelrecord.entity.PlaceReview;
-import com.butingbe.domain.travelrecord.entity.PlaceReviewImage;
 import com.butingbe.domain.travelrecord.entity.TravelRecord;
 import com.butingbe.domain.travelrecord.entity.TravelRecordBookmark;
 import com.butingbe.domain.travelrecord.entity.TravelRecordComment;
@@ -43,8 +41,6 @@ import com.butingbe.domain.travelrecord.entity.TravelRecordLike;
 import com.butingbe.domain.travelrecord.entity.TravelRecordPlace;
 import com.butingbe.domain.travelrecord.entity.TravelRecordRoute;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
-import com.butingbe.domain.travelrecord.repository.PlaceReviewImageRepository;
-import com.butingbe.domain.travelrecord.repository.PlaceReviewRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordBookmarkRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordCommentRepository;
 import com.butingbe.domain.travelrecord.repository.TravelRecordDayRepository;
@@ -58,12 +54,10 @@ import com.butingbe.domain.travelteam.entity.TravelMember;
 import com.butingbe.domain.travelteam.entity.TravelTeamRole;
 import com.butingbe.domain.travelteam.repository.TravelMemberRepository;
 import com.butingbe.domain.user.entity.User;
-import com.butingbe.domain.user.repository.UserRepository;
 import com.butingbe.global.error.exception.DuplicateResourceException;
 import com.butingbe.global.error.exception.ForbiddenException;
 import com.butingbe.global.error.exception.InvalidRequestException;
 import com.butingbe.global.error.exception.ResourceNotFoundException;
-import com.butingbe.global.error.exception.UnauthenticatedException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -93,10 +87,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private static final int MAX_FEED_SIZE = 50;
   private static final int MAX_TRAVEL_TITLE_LENGTH = 15;
   private static final int MAX_COMMENT_CONTENT_LENGTH = 1000;
-  private static final int MAX_PLACE_REVIEW_TAG_COUNT = 10;
-  private static final int MAX_PLACE_REVIEW_TAG_LENGTH = 30;
-  private static final int MAX_PLACE_REVIEW_MEDIA_COUNT = 20;
-  private static final int MAX_PLACE_REVIEW_MEDIA_FILE_KEY_LENGTH = 500;
   private static final int MAX_TRAVEL_RECORD_IMAGE_COUNT = 20;
   private static final int MAX_TRAVEL_RECORD_IMAGE_URL_LENGTH = 1000;
 
@@ -105,26 +95,68 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   private final PlanPlaceRepository planPlaceRepository;
   private final PlanRouteRepository planRouteRepository;
   private final TravelMemberRepository travelMemberRepository;
-  private final UserRepository userRepository;
   private final TravelRecordRepository travelRecordRepository;
   private final TravelRecordDayRepository travelRecordDayRepository;
   private final TravelRecordImageRepository travelRecordImageRepository;
   private final TravelRecordPlaceRepository travelRecordPlaceRepository;
   private final TravelRecordRouteRepository travelRecordRouteRepository;
   private final FileStorageService fileStorageService;
-  private final PlaceReviewRepository placeReviewRepository;
-  private final PlaceReviewImageRepository placeReviewImageRepository;
+  private final TravelRecordSupport support;
+  private final PlaceReviewService placeReviewService;
   private final TravelRecordBookmarkRepository travelRecordBookmarkRepository;
   private final TravelRecordLikeRepository travelRecordLikeRepository;
   private final TravelRecordCommentRepository travelRecordCommentRepository;
+
+  // 장소 리뷰 로직은 PlaceReviewService 로 옮겼다. 인터페이스는 네 조각을 모두 뗀 뒤 한 번에 정리한다.
+  // 조각마다 컨트롤러와 테스트를 손대면 같은 파일을 네 번 건드리게 된다.
+  @Override
+  public PlaceReviewSummaryResDto getPlaceReviewSummary(String placeId) {
+    return placeReviewService.getPlaceReviewSummary(placeId);
+  }
+
+  @Override
+  public PlaceReviewSummaryResDto getPlaceReviewSummary(
+      PlaceProvider provider, String providerPlaceId) {
+    return placeReviewService.getPlaceReviewSummary(provider, providerPlaceId);
+  }
+
+  @Override
+  public PlaceReviewResDto createPlaceReview(
+      AuthenticatedUser authenticatedUser,
+      UUID travelId,
+      UUID planPlaceId,
+      PlaceReviewCreateReqDto request) {
+    return placeReviewService.createPlaceReview(authenticatedUser, travelId, planPlaceId, request);
+  }
+
+  @Override
+  public PlaceReviewResDto getPlaceReview(
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID planPlaceId) {
+    return placeReviewService.getPlaceReview(authenticatedUser, travelId, planPlaceId);
+  }
+
+  @Override
+  public PlaceReviewResDto updatePlaceReview(
+      AuthenticatedUser authenticatedUser,
+      UUID travelId,
+      UUID planPlaceId,
+      PlaceReviewUpdateReqDto request) {
+    return placeReviewService.updatePlaceReview(authenticatedUser, travelId, planPlaceId, request);
+  }
+
+  @Override
+  public void deletePlaceReview(
+      AuthenticatedUser authenticatedUser, UUID travelId, UUID planPlaceId) {
+    placeReviewService.deletePlaceReview(authenticatedUser, travelId, planPlaceId);
+  }
 
   @Override
   @Transactional
   public TravelRecordResDto createDraft(
       AuthenticatedUser authenticatedUser, UUID travelId, TravelRecordCreateReqDto request) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     Travel travel = findTravel(travelId);
-    validateTravelMember(travelId, author.getId());
+    support.validateTravelMember(travelId, author.getId());
     validateCompletedTravel(travel);
     validateCreateRequest(request);
     validateNotDuplicated(travelId, author.getId());
@@ -157,7 +189,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Override
   public TravelRecordResDto getDraft(
       AuthenticatedUser authenticatedUser, UUID travelId, UUID travelRecordId) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validateDraftBelongsToTravel(travelRecord, travelId);
     validateAuthor(travelRecord, author.getId());
@@ -173,7 +205,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       UUID travelId,
       UUID travelRecordId,
       TravelRecordUpdateReqDto request) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validateDraftBelongsToTravel(travelRecord, travelId);
     validateAuthor(travelRecord, author.getId());
@@ -200,7 +232,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Transactional
   public TravelRecordResDto publish(
       AuthenticatedUser authenticatedUser, UUID travelId, UUID travelRecordId) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validateDraftBelongsToTravel(travelRecord, travelId);
     validateAuthor(travelRecord, author.getId());
@@ -237,7 +269,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       AuthenticatedUser authenticatedUser,
       UUID travelRecordId,
       TravelRecordCloneToTravelReqDto request) {
-    User user = findAuthenticatedUser(authenticatedUser);
+    User user = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validatePublished(travelRecord);
     validateCloneToTravelRequest(request);
@@ -402,7 +434,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   @Override
   public List<TravelRecordManageResDto> getMyRecords(AuthenticatedUser authenticatedUser) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
 
     return travelRecordRepository.findByAuthor_IdOrderByCreatedAtDesc(author.getId()).stream()
         .map(
@@ -414,7 +446,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
 
   @Override
   public TravelRecordResDto getMyRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validateAuthor(travelRecord, author.getId());
 
@@ -425,7 +457,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Transactional
   public TravelRecordResDto updateMyRecord(
       AuthenticatedUser authenticatedUser, UUID travelRecordId, TravelRecordUpdateReqDto request) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validateAuthor(travelRecord, author.getId());
     validateUpdateRequest(request);
@@ -449,7 +481,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Override
   @Transactional
   public TravelRecordResDto hideMyRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validateAuthor(travelRecord, author.getId());
 
@@ -462,7 +494,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Transactional
   public TravelRecordResDto republishMyRecord(
       AuthenticatedUser authenticatedUser, UUID travelRecordId) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validateAuthor(travelRecord, author.getId());
     validateRepublishable(travelRecord);
@@ -476,7 +508,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Transactional
   public TravelRecordBookmarkResDto bookmarkTravelRecord(
       AuthenticatedUser authenticatedUser, UUID travelRecordId) {
-    User user = findAuthenticatedUser(authenticatedUser);
+    User user = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validatePublished(travelRecord);
     validateBookmarkNotDuplicated(user.getId(), travelRecordId);
@@ -492,7 +524,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Override
   @Transactional
   public void unbookmarkTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId) {
-    User user = findAuthenticatedUser(authenticatedUser);
+    User user = support.findAuthenticatedUser(authenticatedUser);
 
     travelRecordBookmarkRepository
         .findByUser_IdAndTravelRecord_Id(user.getId(), travelRecordId)
@@ -502,7 +534,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Override
   public List<TravelRecordBookmarkResDto> getMyBookmarkedRecords(
       AuthenticatedUser authenticatedUser) {
-    User user = findAuthenticatedUser(authenticatedUser);
+    User user = support.findAuthenticatedUser(authenticatedUser);
 
     return travelRecordBookmarkRepository
         .findByUser_IdAndTravelRecord_StatusOrderByCreatedAtDesc(
@@ -520,7 +552,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Transactional
   public TravelRecordLikeResDto likeTravelRecord(
       AuthenticatedUser authenticatedUser, UUID travelRecordId) {
-    User user = findAuthenticatedUser(authenticatedUser);
+    User user = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validatePublished(travelRecord);
     validateLikeNotDuplicated(user.getId(), travelRecordId);
@@ -537,7 +569,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Override
   @Transactional
   public void unlikeTravelRecord(AuthenticatedUser authenticatedUser, UUID travelRecordId) {
-    User user = findAuthenticatedUser(authenticatedUser);
+    User user = support.findAuthenticatedUser(authenticatedUser);
 
     travelRecordLikeRepository
         .findByUser_IdAndTravelRecord_Id(user.getId(), travelRecordId)
@@ -554,7 +586,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       AuthenticatedUser authenticatedUser,
       UUID travelRecordId,
       TravelRecordCommentCreateReqDto request) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validatePublished(travelRecord);
     validateCommentCreateRequest(request);
@@ -590,7 +622,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
       UUID travelRecordId,
       UUID commentId,
       TravelRecordCommentUpdateReqDto request) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validatePublished(travelRecord);
     validateCommentUpdateRequest(request);
@@ -606,7 +638,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Transactional
   public void deleteComment(
       AuthenticatedUser authenticatedUser, UUID travelRecordId, UUID commentId) {
-    User author = findAuthenticatedUser(authenticatedUser);
+    User author = support.findAuthenticatedUser(authenticatedUser);
     TravelRecord travelRecord = findTravelRecord(travelRecordId);
     validatePublished(travelRecord);
 
@@ -630,7 +662,7 @@ public class TravelRecordServiceImpl implements TravelRecordService {
   @Override
   public TravelRecordFeedPageResDto getTravelRecordsByPlace(
       AuthenticatedUser authenticatedUser, String placeId, String cursor, Integer size) {
-    validatePlaceId(placeId);
+    support.validatePlaceId(placeId);
     String normalizedPlaceId = placeId.trim();
 
     int pageSize = resolveFeedSize(size);
@@ -655,128 +687,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         items,
         hasNext ? encodeFeedCursor(pageRecords.getLast(), TravelRecordFeedSort.LATEST) : null,
         hasNext);
-  }
-
-  @Override
-  public PlaceReviewSummaryResDto getPlaceReviewSummary(String placeId) {
-    validatePlaceId(placeId);
-
-    String normalizedPlaceId = placeId.trim();
-    List<PlaceReview> reviews =
-        placeReviewRepository.findByPlaceIdAndRecordStatus(
-            normalizedPlaceId, TravelRecordStatus.PUBLISHED);
-
-    return PlaceReviewSummaryResDto.of(
-        normalizedPlaceId,
-        calculateAverageRating(reviews),
-        calculateRatingCounts(reviews),
-        reviews.stream()
-            .map(
-                review ->
-                    toPlaceReviewSummaryItem(review, findPlaceReviewMediaUrls(review.getId())))
-            .toList());
-  }
-
-  @Override
-  public PlaceReviewSummaryResDto getPlaceReviewSummary(
-      PlaceProvider provider, String providerPlaceId) {
-    validatePlaceReviewSummaryRequest(provider, providerPlaceId);
-
-    List<PlaceReview> reviews =
-        placeReviewRepository.findByPlaceAndRecordStatus(
-            provider, providerPlaceId, TravelRecordStatus.PUBLISHED);
-
-    return PlaceReviewSummaryResDto.of(
-        providerPlaceId,
-        calculateAverageRating(reviews),
-        calculateRatingCounts(reviews),
-        reviews.stream()
-            .map(
-                review ->
-                    toPlaceReviewSummaryItem(review, findPlaceReviewMediaUrls(review.getId())))
-            .toList());
-  }
-
-  @Override
-  @Transactional
-  public PlaceReviewResDto createPlaceReview(
-      AuthenticatedUser authenticatedUser,
-      UUID travelId,
-      UUID planPlaceId,
-      PlaceReviewCreateReqDto request) {
-    User author = findAuthenticatedUser(authenticatedUser);
-    validateTravelMember(travelId, author.getId());
-    validatePlaceReviewCreateRequest(request);
-    List<String> tags = normalizePlaceReviewTags(request.tags());
-    List<String> mediaFileKeys = normalizePlaceReviewMediaFileKeys(request.mediaFileKeys());
-
-    PlanPlace planPlace = findPlanPlaceInTravel(planPlaceId, travelId);
-    validatePlaceReviewNotDuplicated(planPlaceId, author.getId());
-
-    PlaceReview placeReview =
-        placeReviewRepository.save(
-            PlaceReview.builder()
-                .planPlace(planPlace)
-                .author(author)
-                .rating(request.rating())
-                .stayMinutes(request.stayMinutes())
-                .content(request.content())
-                .tags(tags)
-                .build());
-
-    savePlaceReviewMedia(placeReview, mediaFileKeys);
-
-    return toPlaceReviewResponse(placeReview);
-  }
-
-  @Override
-  public PlaceReviewResDto getPlaceReview(
-      AuthenticatedUser authenticatedUser, UUID travelId, UUID planPlaceId) {
-    User author = findAuthenticatedUser(authenticatedUser);
-    validateTravelMember(travelId, author.getId());
-    findPlanPlaceInTravel(planPlaceId, travelId);
-
-    PlaceReview placeReview = findPlaceReviewByPlanPlaceId(planPlaceId, author.getId());
-
-    return toPlaceReviewResponse(placeReview);
-  }
-
-  @Override
-  @Transactional
-  public PlaceReviewResDto updatePlaceReview(
-      AuthenticatedUser authenticatedUser,
-      UUID travelId,
-      UUID planPlaceId,
-      PlaceReviewUpdateReqDto request) {
-    User author = findAuthenticatedUser(authenticatedUser);
-    validateTravelMember(travelId, author.getId());
-    findPlanPlaceInTravel(planPlaceId, travelId);
-    validatePlaceReviewUpdateRequest(request);
-
-    PlaceReview placeReview = findPlaceReviewByPlanPlaceId(planPlaceId, author.getId());
-    if (request == null) {
-      return PlaceReviewResDto.from(placeReview);
-    }
-
-    List<String> tags = request.tags() == null ? null : normalizePlaceReviewTags(request.tags());
-    placeReview.update(request.rating(), request.stayMinutes(), request.content(), tags);
-    if (request.mediaFileKeys() != null) {
-      savePlaceReviewMedia(placeReview, normalizePlaceReviewMediaFileKeys(request.mediaFileKeys()));
-    }
-    return toPlaceReviewResponse(placeReview);
-  }
-
-  @Override
-  @Transactional
-  public void deletePlaceReview(
-      AuthenticatedUser authenticatedUser, UUID travelId, UUID planPlaceId) {
-    User author = findAuthenticatedUser(authenticatedUser);
-    validateTravelMember(travelId, author.getId());
-    findPlanPlaceInTravel(planPlaceId, travelId);
-
-    PlaceReview placeReview = findPlaceReviewByPlanPlaceId(planPlaceId, author.getId());
-    placeReviewImageRepository.deleteByPlaceReview_Id(placeReview.getId());
-    placeReviewRepository.delete(placeReview);
   }
 
   private void copyItinerarySnapshot(UUID travelId, TravelRecord travelRecord) {
@@ -820,31 +730,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
                   .build());
 
       copiedPlaceByOriginalId.put(place.getId(), recordPlace);
-      copyPlaceReviewSnapshot(place, recordPlace);
+      placeReviewService.copyPlaceReviewSnapshot(place, recordPlace);
     }
 
     return copiedPlaceByOriginalId;
-  }
-
-  private void copyPlaceReviewSnapshot(PlanPlace sourcePlace, TravelRecordPlace recordPlace) {
-    placeReviewRepository
-        .findByPlanPlace_IdAndAuthor_Id(
-            sourcePlace.getId(),
-            recordPlace.getTravelRecordDay().getTravelRecord().getAuthor().getId())
-        .ifPresent(
-            sourceReview -> {
-              PlaceReview snapshotReview =
-                  PlaceReview.builder()
-                      .travelRecordPlace(recordPlace)
-                      .author(sourceReview.getAuthor())
-                      .rating(sourceReview.getRating())
-                      .stayMinutes(sourceReview.getStayMinutes())
-                      .content(sourceReview.getContent())
-                      .tags(List.copyOf(sourceReview.getTags()))
-                      .build();
-              PlaceReview savedReview = placeReviewRepository.save(snapshotReview);
-              copyPlaceReviewMedia(sourceReview, savedReview);
-            });
   }
 
   private void copyRoutes(
@@ -1046,10 +935,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .toList();
   }
 
-  private PlaceReviewResDto toPlaceReviewResponse(PlaceReview placeReview) {
-    return PlaceReviewResDto.from(placeReview, findPlaceReviewMediaUrls(placeReview.getId()));
-  }
-
   private List<String> findTravelRecordImageUrls(UUID travelRecordId) {
     return travelRecordImageRepository
         .findByTravelRecord_IdOrderBySequenceAsc(travelRecordId)
@@ -1057,40 +942,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .map(TravelRecordImage::getUrl)
         .map(this::toTravelRecordImageUrl)
         .toList();
-  }
-
-  private PlaceReviewSummaryResDto.PlaceReviewItemResDto toPlaceReviewSummaryItem(
-      PlaceReview placeReview, List<String> mediaUrls) {
-    TravelRecordPlace place = placeReview.getTravelRecordPlace();
-    TravelRecord travelRecord = place.getTravelRecordDay().getTravelRecord();
-
-    return new PlaceReviewSummaryResDto.PlaceReviewItemResDto(
-        placeReview.getId(),
-        travelRecord.getId(),
-        travelRecord.getTitle(),
-        travelRecord.getAuthor().getId(),
-        travelRecord.getAuthor().getNickname(),
-        place.getId(),
-        place.getPlaceName(),
-        placeReview.getRating(),
-        placeReview.getStayMinutes(),
-        placeReview.getContent(),
-        List.copyOf(placeReview.getTags()),
-        List.copyOf(mediaUrls),
-        placeReview.getCreatedAt(),
-        placeReview.getUpdatedAt());
-  }
-
-  private List<String> findPlaceReviewMediaUrls(UUID placeReviewId) {
-    return placeReviewImageRepository.findByPlaceReview_IdOrderBySequenceAsc(placeReviewId).stream()
-        .map(this::toMediaUrl)
-        .toList();
-  }
-
-  private String toMediaUrl(PlaceReviewImage image) {
-    return image.getFileKey() == null
-        ? image.getExternalUrl()
-        : fileStorageService.getPresignedUrl(image.getFileKey());
   }
 
   private String toTravelRecordImageUrl(String storedUrl) {
@@ -1132,32 +983,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
   }
 
-  private void savePlaceReviewMedia(PlaceReview placeReview, List<String> mediaFileKeys) {
-    placeReviewImageRepository.deleteByPlaceReview_Id(placeReview.getId());
-    for (int index = 0; index < mediaFileKeys.size(); index++) {
-      placeReviewImageRepository.save(
-          PlaceReviewImage.builder()
-              .placeReview(placeReview)
-              .fileKey(mediaFileKeys.get(index))
-              .externalUrl(null)
-              .sequence(index + 1)
-              .build());
-    }
-  }
-
-  private void copyPlaceReviewMedia(PlaceReview sourceReview, PlaceReview targetReview) {
-    placeReviewImageRepository.findByPlaceReview_IdOrderBySequenceAsc(sourceReview.getId()).stream()
-        .map(
-            image ->
-                PlaceReviewImage.builder()
-                    .placeReview(targetReview)
-                    .fileKey(image.getFileKey())
-                    .externalUrl(image.getExternalUrl())
-                    .sequence(image.getSequence())
-                    .build())
-        .forEach(placeReviewImageRepository::save);
-  }
-
   private void saveTravelRecordImages(TravelRecord travelRecord, List<String> imageUrls) {
     travelRecordImageRepository.deleteByTravelRecord_Id(travelRecord.getId());
     travelRecordImageRepository.flush();
@@ -1183,16 +1008,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     return null;
   }
 
-  private User findAuthenticatedUser(AuthenticatedUser authenticatedUser) {
-    if (authenticatedUser == null || authenticatedUser.id() == null) {
-      throw new UnauthenticatedException();
-    }
-
-    return userRepository
-        .findById(authenticatedUser.id())
-        .orElseThrow(UnauthenticatedException::new);
-  }
-
   private Travel findTravel(UUID travelId) {
     return travelRepository
         .findById(travelId)
@@ -1205,36 +1020,10 @@ public class TravelRecordServiceImpl implements TravelRecordService {
         .orElseThrow(() -> new ResourceNotFoundException("error.travel_record.not_found"));
   }
 
-  private PlanPlace findPlanPlaceInTravel(UUID planPlaceId, UUID travelId) {
-    PlanPlace planPlace =
-        planPlaceRepository
-            .findById(planPlaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("error.travel.plan_place.not_found"));
-
-    if (!planPlace.getPlan().getTravel().getId().equals(travelId)) {
-      throw new ResourceNotFoundException("error.travel.plan_place.not_found");
-    }
-
-    return planPlace;
-  }
-
-  private PlaceReview findPlaceReviewByPlanPlaceId(UUID planPlaceId, UUID authorId) {
-    return placeReviewRepository
-        .findByPlanPlace_IdAndAuthor_Id(planPlaceId, authorId)
-        .orElseThrow(
-            () -> new ResourceNotFoundException("error.travel_record.place_review.not_found"));
-  }
-
   private TravelRecordComment findCommentInTravelRecord(UUID commentId, UUID travelRecordId) {
     return travelRecordCommentRepository
         .findByIdAndTravelRecord_Id(commentId, travelRecordId)
         .orElseThrow(() -> new ResourceNotFoundException("error.travel_record.comment.not_found"));
-  }
-
-  private void validateTravelMember(UUID travelId, UUID userId) {
-    if (!travelMemberRepository.existsByTravel_IdAndUser_Id(travelId, userId)) {
-      throw new ForbiddenException("error.travel.not_member");
-    }
   }
 
   private void validateDraftBelongsToTravel(TravelRecord travelRecord, UUID travelId) {
@@ -1381,97 +1170,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
   }
 
-  private void validatePlaceReviewCreateRequest(PlaceReviewCreateReqDto request) {
-    if (request == null || request.rating() == null) {
-      throw new InvalidRequestException("error.travel_record.place_review.rating_required");
-    }
-
-    if (request.rating() < 1 || request.rating() > 5) {
-      throw new InvalidRequestException("error.travel_record.place_review.rating_range");
-    }
-
-    validatePlaceReviewStayMinutes(request.stayMinutes());
-  }
-
-  private void validatePlaceReviewUpdateRequest(PlaceReviewUpdateReqDto request) {
-    if (request == null) {
-      return;
-    }
-
-    if (request.rating() != null && (request.rating() < 1 || request.rating() > 5)) {
-      throw new InvalidRequestException("error.travel_record.place_review.rating_range");
-    }
-
-    validatePlaceReviewStayMinutes(request.stayMinutes());
-  }
-
-  private void validatePlaceReviewStayMinutes(Integer stayMinutes) {
-    if (stayMinutes == null) {
-      return;
-    }
-
-    if (stayMinutes < 0) {
-      throw new InvalidRequestException("error.travel_record.stay_minutes_invalid");
-    }
-  }
-
-  private List<String> normalizePlaceReviewTags(List<String> tags) {
-    if (tags == null || tags.isEmpty()) {
-      return List.of();
-    }
-
-    List<String> normalizedTags =
-        tags.stream()
-            .filter(tag -> tag != null && !tag.isBlank())
-            .map(String::trim)
-            .distinct()
-            .toList();
-
-    if (normalizedTags.size() > MAX_PLACE_REVIEW_TAG_COUNT) {
-      throw new InvalidRequestException(
-          "Place review tags must be " + MAX_PLACE_REVIEW_TAG_COUNT + " or fewer.");
-    }
-
-    boolean hasTooLongTag =
-        normalizedTags.stream().anyMatch(tag -> tag.length() > MAX_PLACE_REVIEW_TAG_LENGTH);
-    if (hasTooLongTag) {
-      throw new InvalidRequestException(
-          "Place review tag must be " + MAX_PLACE_REVIEW_TAG_LENGTH + " characters or less.");
-    }
-
-    return normalizedTags;
-  }
-
-  private List<String> normalizePlaceReviewMediaFileKeys(List<String> mediaFileKeys) {
-    if (mediaFileKeys == null || mediaFileKeys.isEmpty()) {
-      return List.of();
-    }
-
-    List<String> normalizedMediaFileKeys =
-        mediaFileKeys.stream()
-            .filter(fileKey -> fileKey != null && !fileKey.isBlank())
-            .map(String::trim)
-            .distinct()
-            .toList();
-
-    if (normalizedMediaFileKeys.size() > MAX_PLACE_REVIEW_MEDIA_COUNT) {
-      throw new InvalidRequestException(
-          "Place review media file keys must be " + MAX_PLACE_REVIEW_MEDIA_COUNT + " or fewer.");
-    }
-
-    boolean hasTooLongFileKey =
-        normalizedMediaFileKeys.stream()
-            .anyMatch(fileKey -> fileKey.length() > MAX_PLACE_REVIEW_MEDIA_FILE_KEY_LENGTH);
-    if (hasTooLongFileKey) {
-      throw new InvalidRequestException(
-          "Place review media file key must be "
-              + MAX_PLACE_REVIEW_MEDIA_FILE_KEY_LENGTH
-              + " characters or less.");
-    }
-
-    return normalizedMediaFileKeys;
-  }
-
   private List<String> normalizeTravelRecordImageUrls(List<String> imageUrls) {
     if (imageUrls == null || imageUrls.isEmpty()) {
       return List.of();
@@ -1500,26 +1198,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     }
 
     return normalizedImageUrls;
-  }
-
-  private void validatePlaceReviewSummaryRequest(PlaceProvider provider, String providerPlaceId) {
-    if (provider == null) {
-      throw new InvalidRequestException("error.place.provider_required");
-    }
-
-    validatePlaceId(providerPlaceId);
-  }
-
-  private void validatePlaceId(String placeId) {
-    if (placeId == null || placeId.isBlank()) {
-      throw new InvalidRequestException("error.place.id_required");
-    }
-  }
-
-  private void validatePlaceReviewNotDuplicated(UUID planPlaceId, UUID authorId) {
-    if (placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(planPlaceId, authorId).isPresent()) {
-      throw new DuplicateResourceException("error.travel_record.place_review.duplicate");
-    }
   }
 
   private void validateBookmarkNotDuplicated(UUID userId, UUID travelRecordId) {
@@ -1575,29 +1253,6 @@ public class TravelRecordServiceImpl implements TravelRecordService {
     return title.length() <= MAX_TRAVEL_TITLE_LENGTH
         ? title
         : title.substring(0, MAX_TRAVEL_TITLE_LENGTH);
-  }
-
-  private double calculateAverageRating(List<PlaceReview> reviews) {
-    if (reviews.isEmpty()) {
-      return 0.0;
-    }
-
-    double average = reviews.stream().mapToInt(PlaceReview::getRating).average().orElse(0.0);
-
-    return Math.round(average * 10.0) / 10.0;
-  }
-
-  private Map<Integer, Long> calculateRatingCounts(List<PlaceReview> reviews) {
-    Map<Integer, Long> ratingCounts = new LinkedHashMap<>();
-    for (int rating = 1; rating <= 5; rating++) {
-      ratingCounts.put(rating, 0L);
-    }
-
-    for (PlaceReview review : reviews) {
-      ratingCounts.computeIfPresent(review.getRating(), (rating, count) -> count + 1);
-    }
-
-    return ratingCounts;
   }
 
   private int resolveFeedSize(Integer size) {
