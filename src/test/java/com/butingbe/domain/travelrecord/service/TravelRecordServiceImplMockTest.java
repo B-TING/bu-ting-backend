@@ -16,7 +16,6 @@ import com.butingbe.domain.travel.repository.PlanRouteRepository;
 import com.butingbe.domain.travel.repository.TravelRepository;
 import com.butingbe.domain.travelrecord.dto.request.TravelRecordCloneToTravelReqDto;
 import com.butingbe.domain.travelrecord.entity.PlaceReview;
-import com.butingbe.domain.travelrecord.entity.PlaceReviewImage;
 import com.butingbe.domain.travelrecord.entity.TravelRecord;
 import com.butingbe.domain.travelrecord.entity.TravelRecordStatus;
 import com.butingbe.domain.travelrecord.repository.PlaceReviewImageRepository;
@@ -58,6 +57,8 @@ class TravelRecordServiceImplMockTest {
   private static final UUID RECORD_ID = UUID.fromString("44444444-0000-0000-0000-000000000001");
   private static final UUID REVIEW_ID = UUID.fromString("66666666-0000-0000-0000-000000000001");
 
+  @Mock private TravelRecordSupport support;
+  @Mock private PlaceReviewService placeReviewService;
   @Mock private TravelRepository travelRepository;
   @Mock private PlanRepository planRepository;
   @Mock private PlanPlaceRepository planPlaceRepository;
@@ -92,7 +93,7 @@ class TravelRecordServiceImplMockTest {
   void rejectsPublishWhenTitleIsBlank() {
     TravelRecord record = record(TravelRecordStatus.DRAFT, "   ");
 
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(author));
+    when(support.findAuthenticatedUser(authenticatedUser)).thenReturn(author);
     when(travelRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(record));
 
     assertThatThrownBy(() -> travelRecordService.publish(authenticatedUser, TRAVEL_ID, RECORD_ID))
@@ -105,7 +106,7 @@ class TravelRecordServiceImplMockTest {
   void rejectsCloneWhenItineraryIsEmpty() {
     TravelRecord record = record(TravelRecordStatus.PUBLISHED, "부산 3일");
 
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(author));
+    when(support.findAuthenticatedUser(authenticatedUser)).thenReturn(author);
     when(travelRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(record));
     when(travelRecordDayRepository.findByTravelRecord_IdOrderByDayNumberAsc(RECORD_ID))
         .thenReturn(List.of());
@@ -131,33 +132,6 @@ class TravelRecordServiceImplMockTest {
         .hasMessage("error.travel_record.itinerary_required");
 
     verify(travelRepository, never()).save(any(Travel.class));
-  }
-
-  @Test
-  @DisplayName("파일 키 없이 외부 URL만 가진 리뷰 이미지는 presigned URL을 만들지 않고 그대로 노출한다")
-  void usesExternalUrlWhenFileKeyIsAbsent() {
-    PlaceReview review = review();
-    PlaceReviewImage externalImage =
-        PlaceReviewImage.builder()
-            .placeReview(review)
-            .fileKey(null)
-            .externalUrl("https://legacy.example.com/photo.jpg")
-            .sequence(1)
-            .build();
-
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(author));
-    when(travelMemberRepository.existsByTravel_IdAndUser_Id(TRAVEL_ID, USER_ID)).thenReturn(true);
-    when(planPlaceRepository.findById(any())).thenReturn(Optional.of(planPlace()));
-    when(placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(any(), any()))
-        .thenReturn(Optional.of(review));
-    when(placeReviewImageRepository.findByPlaceReview_IdOrderBySequenceAsc(REVIEW_ID))
-        .thenReturn(List.of(externalImage));
-
-    var response =
-        travelRecordService.getPlaceReview(authenticatedUser, TRAVEL_ID, UUID.randomUUID());
-
-    assertThat(response.mediaUrls()).containsExactly("https://legacy.example.com/photo.jpg");
-    verify(fileStorageService, never()).getPresignedUrl(any());
   }
 
   private TravelRecord record(TravelRecordStatus status, String title) {
@@ -251,8 +225,8 @@ class TravelRecordServiceImplMockTest {
             .provider(com.butingbe.domain.travel.entity.PlaceProvider.GOOGLE)
             .build();
 
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(author));
-    when(travelMemberRepository.existsByTravel_IdAndUser_Id(TRAVEL_ID, USER_ID)).thenReturn(true);
+    when(support.findAuthenticatedUser(authenticatedUser)).thenReturn(author);
+
     when(travelRepository.findById(TRAVEL_ID)).thenReturn(Optional.of(travel));
     when(travelRecordRepository.existsByOriginalTravel_IdAndAuthor_Id(TRAVEL_ID, USER_ID))
         .thenReturn(false);
@@ -264,8 +238,6 @@ class TravelRecordServiceImplMockTest {
         .thenReturn(List.of(copiedPlace));
     when(travelRecordPlaceRepository.save(any()))
         .thenAnswer(invocation -> invocation.getArgument(0));
-    when(placeReviewRepository.findByPlanPlace_IdAndAuthor_Id(any(), any()))
-        .thenReturn(Optional.empty());
     when(planRouteRepository.findByPlan_Id(plan.getId())).thenReturn(List.of(danglingRoute));
     when(travelRecordDayRepository.findByTravelRecord_IdOrderByDayNumberAsc(any()))
         .thenReturn(List.of());
@@ -287,7 +259,7 @@ class TravelRecordServiceImplMockTest {
             .build();
     ReflectionTestUtils.setField(recordDay, "id", UUID.randomUUID());
 
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(author));
+    when(support.findAuthenticatedUser(authenticatedUser)).thenReturn(author);
     when(travelRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(record));
     when(travelRecordDayRepository.findByTravelRecord_IdOrderByDayNumberAsc(RECORD_ID))
         .thenReturn(List.of(recordDay));
@@ -345,7 +317,7 @@ class TravelRecordServiceImplMockTest {
             .provider(com.butingbe.domain.travel.entity.PlaceProvider.GOOGLE)
             .build();
 
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(author));
+    when(support.findAuthenticatedUser(authenticatedUser)).thenReturn(author);
     when(travelRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(record));
     when(travelRecordDayRepository.findByTravelRecord_IdOrderByDayNumberAsc(RECORD_ID))
         .thenReturn(List.of(recordDay));
